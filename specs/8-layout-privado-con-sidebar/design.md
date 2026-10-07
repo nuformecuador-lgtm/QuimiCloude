@@ -146,7 +146,7 @@ porque el logout real termina en `redirect`, y `redirect` no devuelve.
 - **Añade dentro de `lib/actions/logout.ts`** el `redirect(LOGIN_ROUTE)` después de
   `endSession()`.
 - **Añade la validación de permisos en servidor** (`cookies()`) en el layout o en el
-  middleware, que es lo que `CHECKPOINTS.md > Permisos` exige y que **aquí no aplica** (§8).
+  middleware, que es lo que `docs/checkpoints-proyecto.md > Permisos` exige y que **aquí no aplica** (§8).
 
 **Cero archivos de UI tocados.** Ese es el criterio con el que el reviewer de la feature 10
 juzgará esta costura.
@@ -279,7 +279,7 @@ Nada más. Sin `try/catch` vacío (`docs/conventions.md`), sin `redirect` (R22),
 | --- | --- | --- |
 | `app/(private)/layout.tsx` | RSC | Layout del route group de la zona autenticada (D1). Es el **único** punto que llama al proveedor de sesión y reparte props, como manda `docs/architecture.md > Permisos y autenticacion` («el padre Server Component … pasa datos por props»). |
 | `app/(private)/sidebar-toggle.tsx` | client | Wrapper del trigger que añade `aria-expanded`/`aria-controls` (R23, R31). No porta datos y su único consumidor es el layout → vive junto a él (`docs/architecture.md > Sin sobre-ingeniería`). |
-| `components/private/app-sidebar.tsx` | client | Porta datos de sesión (los recibe y los baja al pie) → `components/private/` por `docs/architecture.md > Componentes` y `CHECKPOINTS.md > Permisos`. Es client porque necesita la ruta activa (R8, R12) y cerrar el panel al navegar (R33). |
+| `components/private/app-sidebar.tsx` | client | Porta datos de sesión (los recibe y los baja al pie) → `components/private/` por `docs/architecture.md > Componentes` y `docs/checkpoints-proyecto.md > Permisos`. Es client porque necesita la ruta activa (R8, R12) y cerrar el panel al navegar (R33). |
 | `components/private/nav-user.tsx` | client | Pinta la identidad del usuario: **datos sensibles por props** → `components/private/`. Renderiza el menú desplegable (R17) y el `<form action={logoutAction}>` (R19). |
 | `components/private/logout-menu-item.tsx` | client | No porta datos, pero es hoja exclusiva de `nav-user.tsx`; se coloca junto a su único consumidor. Ponerlo en `app/(private)/` obligaría a que `components/` importara de `app/`, invirtiendo la dirección de dependencia. |
 | `lib/utils/initials.ts` | helper puro | Derivar iniciales es formateo sin efectos → `lib/utils/` (`docs/architecture.md`). Testeable sin DOM. |
@@ -509,7 +509,7 @@ primitivo ya conmuta una sola instancia según el hook de viewport.
 
 ### D. Que `AppSidebar` lea la sesión por su cuenta con `cookies()` (DESCARTADA)
 
-Ahorraría el paso de props y viola dos reglas duras: `CHECKPOINTS.md > Permisos`
+Ahorraría el paso de props y viola dos reglas duras: `docs/checkpoints-proyecto.md > Permisos`
 («Componentes `private/` reciben datos por props; no fetchean datos sensibles») y la
 restricción explícita del humano. Además rompe la costura: la feature 10 tendría que editar un
 archivo de UI para cambiar de dónde sale la sesión. Descartada sin matices.

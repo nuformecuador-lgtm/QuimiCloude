@@ -368,7 +368,7 @@ T11 (R13, R14, R15), que corre el leader.** En la primera tanda eran 14 verdes y
 
 Las cuatro se hicieron **sobre el archivo real**, una a una, y se restauraron **desde una copia
 (`cp`), nunca con `git checkout`**. La salida se redirigió a archivo y el código de salida se leyó
-de `$?`, sin pipe a `head`/`tail` (`docs/verification.md > Trampas conocidas`).
+de `$?`, sin pipe a `head`/`tail` (`docs/gate.md > Trampas conocidas`).
 
 Al terminar, `git status` es **byte a byte el mismo** que antes de empezar (comprobado con `diff`
 entre las dos capturas): sin residuos.

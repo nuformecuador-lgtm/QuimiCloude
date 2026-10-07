@@ -121,7 +121,7 @@
       codigo de produccion **se restaura** al terminar.
       - Quitar a mano `requestScoped` del cableado de T3 → T5 y T6 rojos.
       - Quitar `runInRequestScope` de **un** `currentActor` → su caso de T6 rojo.
-      - Restaurar desde copia, no con `git checkout` (`docs/verification.md > Probar que muerde`).
+      - Restaurar desde copia, no con `git checkout` (`docs/gate.md > Probar que muerde`).
 
       **Hecho:**
       - la salida roja de las dos mutaciones y la verde tras restaurar, pegadas en el `impl_`;

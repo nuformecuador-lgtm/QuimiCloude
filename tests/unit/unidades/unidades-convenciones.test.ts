@@ -300,7 +300,7 @@ describe('R32 — esta ficha no toca db/schema.prisma ni anade ninguna migracion
   //
   // Fuera de la rama de QC-38 estos dos casos quedan MUDOS (`skipped`), nunca verdes: un verde
   // diria «comprobado» sin haber mirado nada, que es el anti-patron de la «validacion opcional»
-  // de `docs/verification.md`. Dentro de su rama vigilan exactamente igual que antes.
+  // de `docs/gate.md`. Dentro de su rama vigilan exactamente igual que antes.
   //
   // RETENSADO 2026-09-08, y no es un adorno: un archivo solo NO identificaba la rama. QC-70
   // -catalogo unico de errores- sustituye la copia de `toErrorState` de LOS SIETE adaptadores

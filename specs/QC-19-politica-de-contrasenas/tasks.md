@@ -145,7 +145,7 @@ Depende de: T4.
       adaptador (**R24**), al estilo de `guard-password-hash-module`.
 - [x] **Cada regla se autocomprueba sobre un fuente sintético que la viola.** Un
       `expect(...).toEqual([])` sobre archivos que ya cumplen no demuestra que la guardia muerda
-      (`docs/verification.md > Probar que muerde, no que pasa`).
+      (`docs/gate.md > Probar que muerde, no que pasa`).
 - **Hecho cuando:** la guardia pasa, y **falla de verdad** al inyectar a mano un archivo que
   hashea sin política (probado y restaurado desde copia, no con `git checkout`). **Cubre R18,
   R19.**

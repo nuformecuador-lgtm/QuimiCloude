@@ -177,7 +177,7 @@ describe('endAllSessions — alcance de la ficha (R51)', () => {
 // ---------------------------------------------------------------------------------------------
 // QC-101 T3 — bloque NUEVO al final, aditivo: no reescribe ni reordena ningun caso de QC-23.
 //
-// `CHECKPOINTS.md > Permisos` pide que la autorizacion de ESTA ficha tenga test propio nombrado
+// `docs/checkpoints-proyecto.md > Permisos` pide que la autorizacion de ESTA ficha tenga test propio nombrado
 // con su requisito, aunque QC-23 ya cubra la misma regla arriba. R3 y R4 son de
 // `specs/QC-101-cierre-de-sesiones-de-otro-desde-la-pantalla/requirements.md`.
 // ---------------------------------------------------------------------------------------------

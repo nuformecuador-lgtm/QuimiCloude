@@ -119,7 +119,7 @@ Actions.** Si alguna parece necesitarlo, se para y se pregunta.
       versionado distinto de `playwright.config.ts` activa la variable, o si `lib/composition` elige
       un doble sin consultarla.
       **Hecho cuando**: la guardia pasa en verde **y** se comprueba que **muerde**, con un fixture
-      por cada uno de los dos motivos de fallo (`docs/verification.md > Probar que muerde`).
+      por cada uno de los dos motivos de fallo (`docs/gate.md > Probar que muerde`).
 
 - [x] **T15.** Depende de T13. `e2e/documentos.spec.ts`: login → detalle de proveedor → elegir tres
       PDFs → subir (con `page.route()` interceptando el `PUT` al enlace firmado) → ver tres filas →

@@ -5,7 +5,7 @@
 // valor entero viene de `tsc`: `tsconfig.json` incluye `**/*.ts`, asi que `pnpm run typecheck` lo
 // compila con el resto del repo.
 //
-// Como muerde, que es lo unico que importa (`docs/verification.md > Probar que muerde`): cada
+// Como muerde, que es lo unico que importa (`docs/gate.md > Probar que muerde`): cada
 // construccion ilegal lleva encima un `@ts-expect-error`. Si alguien vuelve a abrir el tipo —por
 // ejemplo devolviendo `reference?: string` a un objeto plano—, esas dos lineas dejarian de dar
 // error, el `@ts-expect-error` pasaria a estar de mas y **`tsc` se pone rojo por ellas**

@@ -165,7 +165,7 @@ ninguna vía de la aplicación DEBE emitir una modificación ni un borrado sobre
 escrita no se corrige. `[D13]`
 
 **R32.** La tabla del registro DEBE tener RLS **activada y forzada**, y solo el módulo propietario
-DEBE consultarla. *(`CHECKPOINTS.md > Datos y seguridad`, sin fila propia en la tabla.)*
+DEBE consultarla. *(`docs/checkpoints-proyecto.md > Datos y seguridad`, sin fila propia en la tabla.)*
 
 **R33.** Todo identificador nuevo de base de datos —tabla, columnas, tipo, valores de la acción,
 restricciones e índices— DEBE estar **en inglés** y en `snake_case` (los valores del tipo, en

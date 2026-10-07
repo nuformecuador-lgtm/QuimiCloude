@@ -1,13 +1,17 @@
 ---
-description: Conecta tu cuenta de Jira al arnes, verifica que la conexion es real y lista los proyectos a los que tienes acceso
+description: Conecta tu cuenta de Jira al arnes, verifica que la conexion es real, lista los proyectos a los que tienes acceso y fija tu identidad en .arnes.local.json
 ---
 
-Vas a dejar a quien corre este comando conectado al board de Jira con **su propia cuenta**, y a
-demostrarselo listando los proyectos que ve. No es un tutorial: cada paso termina en una
-comprobacion, y el comando no dice "listo" sin haber llamado a una herramienta de Jira.
+Vas a dejar a quien corre este comando conectado al board de Jira con **su propia cuenta**, a
+demostrarselo listando los proyectos que ve, y a dejar escrita su identidad en
+`.arnes.local.json`. No es un tutorial: cada paso termina en una comprobacion, y el comando no
+dice "listo" sin haber llamado a una herramienta de Jira.
 
 Contrato completo en `docs/jira.md`. Este comando automatiza su seccion
-`## Montar un colaborador nuevo`.
+`## Montar un colaborador nuevo`. Para que sirve la identidad: `docs/equipo.md > Quien soy`.
+
+El board que este repo espera **no lo tienes memorizado**: leelo de `arnes.config.json > jira`
+(`site` y `project`).
 
 ## Regla que no se rompe: el token no entra en el chat
 
@@ -19,7 +23,7 @@ generar otro — no sigas como si nada.
 
 ## Paso 1 — Detectar en que fase estas
 
-Llama a `getVisibleJiraProjects`. El resultado decide todo lo que sigue:
+Llama a `mcp__atlassian__getVisibleJiraProjects`. El resultado decide todo lo que sigue:
 
 - **La herramienta no existe** en tu set → no hay conexion. Ve a la **Fase A**.
 - **La herramienta responde** → hay conexion. Ve a la **Fase B**.
@@ -35,11 +39,10 @@ no hay conexion util por mucho que el indicador este en verde.
 Guia los cuatro pasos, **uno a uno**, esperando confirmacion antes de dictar el siguiente. No
 los vuelques todos de golpe: el modo de fallo real es que alguien haga el 3 sin el 1.
 
-**A.1 — Que este invitado al proyecto.** Pregunta si ya acepto una invitacion a
-`https://singularboard.atlassian.net` con la cuenta que va a usar. Si no, para: el admin tiene
-que agregarlo al proyecto que declara `jira.project` en `feature_list.json` (hoy **QC**)
-como **Member** (no *Viewer*: el ciclo escribe labels en F1.0,
-comenta en F1.3 y F2.5 y mueve tarjetas). Sin esa invitacion aceptada, el token que genere no
+**A.1 — Que este invitado al proyecto.** Pregunta si ya acepto una invitacion al sitio de
+`arnes.config.json > jira.site` con la cuenta que va a usar. Si no, para: el admin tiene que
+agregarlo al proyecto de `arnes.config.json > jira.project` como **Member** (no *Viewer*: el
+ciclo se asigna features y escribe labels en F1.0, comenta en F1.3 y F2.5 y mueve tarjetas). Sin esa invitacion aceptada, el token que genere no
 sirve para este sitio.
 
 Recuerdale que el email con el que acepte la invitacion es el que va en A.3. Si acepta con otro,
@@ -66,8 +69,8 @@ Y los pasos, tal cual, dentro del mensaje:
 3. En el selector de app, elegir **"Rovo MCP"**. ⚠️ **No "Rovo MCP v2"**: con la v2, aun marcando
    *todos* los scopes, el servidor autentica pero solo expone cinco herramientas de identidad y
    Teamwork Graph — **ninguna de Jira**. Verificado en este repo.
-4. Marcar los scopes de **Jira, read y write**. Write no es opcional: el ciclo escribe labels en
-   F1.0, comenta en F1.3 y F2.5 y mueve tarjetas.
+4. Marcar los scopes de **Jira, read y write**. Write no es opcional: el ciclo asigna y escribe
+   labels en F1.0, comenta en F1.3 y F2.5 y mueve tarjetas.
 5. Ponerle un nombre reconocible (p. ej. `claude-code-<maquina>`), para poder revocar **solo ese**
    el dia que haga falta.
 6. **Copiar el token en ese momento y guardarlo donde lo tenga a mano un minuto.** Atlassian no lo
@@ -108,15 +111,18 @@ vuelva a correr `/jira-connect` despues de reabrir — ahi caera en la Fase B.
 
 ## Fase B — Hay conexion: verificar y listar
 
-**B.1 — Quien eres.** Llama a `atlassianUserInfo` y di con que cuenta esta entrando. Sirve para
+**B.1 — Quien eres.** Llama a `mcp__atlassian__atlassianUserInfo` y di con que cuenta esta
+entrando (nombre y `accountId`). Guarda los dos: los usa B.4. Sirve para
 cazar el error mas silencioso de todos: estar conectado con la cuenta de otro —por un token
 compartido o uno viejo en la variable— y no enterarse hasta que el board muestre a la persona
 equivocada aprobando specs.
 
-**B.2 — Los proyectos a los que tiene acceso.** Lee `jira.project` de `feature_list.json`:
-ese es el proyecto que este repo espera, no uno que tengas memorizado. Con el resultado de
-`getVisibleJiraProjects`, lista cada proyecto con **clave y nombre** y marca explicitamente
-si el proyecto declarado esta entre ellos:
+**B.2 — Los proyectos a los que tiene acceso.** Lee `jira.project` de `arnes.config.json`:
+ese es el proyecto que este repo espera, no uno que tengas memorizado. Si `arnes.config.json`
+no existe o no declara `jira.project`, dilo: el repo no tiene perfil (`/arnes-init`) y no hay
+contra que comprobar. Con el resultado de `mcp__atlassian__getVisibleJiraProjects`, lista cada
+proyecto con **clave y nombre** y marca explicitamente si el proyecto declarado esta entre
+ellos:
 
 - **Aparece** → la conexion sirve para este repo. Sigue en B.3.
 - **No aparece** → esta autenticado contra Atlassian pero **sin acceso al board de este
@@ -125,7 +131,9 @@ si el proyecto declarado esta entre ellos:
   contrario.
 
 Si la lista trae proyectos de otros sitios de Atlassian, dilo tambien: significa que su cuenta
-pertenece a varias organizaciones, y conviene que sepa cual esta usando el arnes.
+pertenece a varias organizaciones, y conviene que sepa cual esta usando el arnes. Para ver a que
+sitios llega la cuenta, `mcp__atlassian__getAccessibleAtlassianResources`; compara con
+`arnes.config.json > jira.site`.
 
 **B.3 — El limite de lo que acabas de probar.** Se honesto: listar proyectos demuestra
 **lectura**. El permiso de **escritura** no queda probado hasta que el ciclo escriba de verdad —
@@ -134,8 +142,28 @@ pasa en verde y falla mas tarde. No lo presentes como "todo listo"; presentalo c
 confirmada, escritura sin probar". No inventes una prueba de escritura tocando un issue real
 solo para verificar.
 
-**B.4 — Cierre.** Una linea con: cuenta, si el proyecto declarado esta, y cual es el siguiente paso real — el
-arranque de sesion de `CLAUDE.md`, que empieza importando el board (F0 de `AGENTS.md`).
+**B.4 — Fijar la identidad local.** Escribe `.arnes.local.json` en la **raiz del worktree
+principal**, no en el worktree donde estes:
+
+1. Localiza la raiz: `git rev-parse --path-format=absolute --git-common-dir` devuelve el `.git`
+   comun; la raiz es su directorio padre. Desde un worktree de feature, el directorio actual
+   **no** es la raiz.
+2. Escribe el archivo con los datos de B.1, y nada mas:
+
+       {"jira_account_id": "<accountId de atlassianUserInfo>", "nombre": "<displayName>"}
+
+   Si ya existe con otro `jira_account_id`, **no lo pises en silencio**: muestra los dos y
+   pregunta. Cambiar de cuenta cambia que features cuentan como tuyas en el cupo.
+3. Comprueba que esta ignorado: `git check-ignore -q <raiz>/.arnes.local.json` (el `.gitignore`
+   trae `/.arnes.local.json`). Si no lo esta, avisa y para: es identidad personal y no se
+   versiona.
+
+Escribe la identidad aunque el proyecto declarado no aparezca en B.2: la cuenta es la correcta,
+lo que falta es el acceso. Pero dilo en el cierre.
+
+**B.5 — Cierre.** Una linea con: cuenta, si el proyecto declarado esta, que `.arnes.local.json`
+quedo escrito, y cual es el siguiente paso real — el arranque de sesion de `CLAUDE.md`, que
+sigue importando el board (F0 de `AGENTS.md`).
 
 ## Paso 4 — Tabla de errores
 
@@ -147,7 +175,7 @@ Cuando algo falle, no propongas reintentar a ciegas: el error dice en que paso e
 | `403 ... require a modern API token` | A.2: apreto *Create API token* a secas, sin scopes |
 | `401 ... 'bearer' prefix missing` | A.3 o A.4: la variable no llega al proceso, o el par `email:token` esta mal |
 | `You don't have permission to connect via API token` | Rovo sin habilitar en la organizacion. **No lo puede arreglar el colaborador**: es el paso 4 de `docs/jira.md`, y lo hace el admin una sola vez para toda la organizacion |
-| conecta, hay herramientas de Jira, pero el proyecto declarado no esta | A.1: no esta invitado al proyecto |
+| conecta, hay herramientas de Jira, pero el proyecto declarado no esta | A.1: no esta invitado al proyecto, o la cuenta es de otra organizacion (B.2) |
 
 Para separar "la credencial es mala" de "el MCP es el problema", esta la llamada REST directa a
 `/rest/api/3/myself` del final de `## Verificar que la conexion es real` en `docs/jira.md`. Un
@@ -164,5 +192,7 @@ siempre A.2, la app o el boton.
 - **No comparte credenciales.** Si alguien propone reusar el token de otro, di que no y por que:
   un token hereda **todos** los permisos de su dueno —el del creador del sitio es admin de la
   organizacion—, todos los empujones del ciclo quedarian firmados por la misma cuenta (que es
-  justo la autoria que la columna *Spec en revision* existe para registrar), y revocarlo el dia
-  que haga falta tumba al dueno tambien.
+  justo la autoria que la columna *Spec en revision* existe para registrar), el assignee dejaria
+  de distinguir quien tiene cada feature, y revocarlo el dia que haga falta tumba al dueno
+  tambien.
+- **No versiona la identidad.** `.arnes.local.json` es de cada persona y de cada maquina.

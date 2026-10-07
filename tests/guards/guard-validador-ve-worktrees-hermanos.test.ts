@@ -4,13 +4,13 @@
 // Existe por un incidente que paro el repo tres veces —dos en QC-74 y una en QC-76, el
 // 2026-09-08— y siempre igual: `./init.sh` abortaba en el paso 3 con «faltan specs para
 // features sdd en vuelo», con esos specs sanos en disco, en worktrees hermanos, a un
-// directorio de distancia. El gate completo es obligatorio antes de cada PR (regla 5 de
-// `CLAUDE.md`), asi que eso bloqueaba el F2.4 de TODAS las features a la vez.
+// directorio de distancia. El gate se corre antes de cada PR (regla 5 de `CLAUDE.md`), asi
+// que eso bloqueaba el F2.4 de TODAS las features a la vez.
 // Detalle en `docs/worktrees.md > El validador mira el repo entero, no el worktree`.
 //
 // La guardia monta un repo de mentira en un directorio temporal y corre el validador de
 // verdad con `cwd` dentro del worktree. El segundo caso es el que la hace valer: sin el,
-// esto pasaria igual con un validador que no mirara nada (`docs/verification.md > Probar
+// esto pasaria igual con un validador que no mirara nada (`docs/gate.md > Probar
 // que muerde, no que pasa`).
 
 import { execFileSync } from 'node:child_process'

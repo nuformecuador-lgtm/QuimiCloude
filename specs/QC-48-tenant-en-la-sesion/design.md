@@ -30,7 +30,7 @@ lectura pura sobre ese modelo.
 | `Company` | `deletedAt` (`deleted_at`) | `NULL` = empresa viva (QC-47 R6). Es el único criterio de «sigue viva» |
 
 Consecuencia de que no haya esquema nuevo: **no hay `migration.sql` ni `down.sql`**, y la lista de
-`CHECKPOINTS.md > Datos y seguridad` sobre tablas nuevas, RLS y `FORCE ROW LEVEL SECURITY` no
+`docs/checkpoints-proyecto.md > Datos y seguridad` sobre tablas nuevas, RLS y `FORCE ROW LEVEL SECURITY` no
 aplica a esta feature porque no crea ninguna tabla. Se dice explícitamente para que el reviewer no
 lo lea como un olvido.
 

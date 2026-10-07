@@ -281,7 +281,7 @@ el fixture del E2E borra lo suyo.
 ## 5. Lo que la guardia NO comprueba, revisado a mano
 
 `vitest run guard` recorre el arbol y el grafo de imports; estas tres son de criterio y las
-revise leyendo el codigo (`CHECKPOINTS.md > Modulos hexagonales`):
+revise leyendo el codigo (`docs/checkpoints-proyecto.md > Modulos hexagonales`):
 
 1. **La logica de negocio esta en `domain/`, no en la Server Action.** `login-action.ts` no
    cambia ni una linea: sigue traduciendo `FormData`, llamando a la fachada y redirigiendo. El

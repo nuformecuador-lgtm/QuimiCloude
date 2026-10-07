@@ -1,3 +1,4 @@
+<!-- perfil: revisado=2026-10-06 por=arnes-v2 -->
 # docs/architecture.md — Que significa "buen trabajo" aqui
 
 Referencia de arquitectura. El reviewer usa esto para decidir si una implementacion
@@ -8,20 +9,18 @@ esta bien hecha, no solo si "funciona".
 **QuimiCloude es un ERP para una empresa de productos quimicos.** De ahi salen tres
 consecuencias de arquitectura que no son opinables:
 
-1. **Multiempresa en los datos de operacion, un solo sistema en la identidad** (reescrita
-   el 2026-09-04 al abrir la epica QC-46; antes decia «un solo tenant, no hay `empresa_id`
-   ni aislamiento por tenant»). El ERP sirve a varias empresas y **todo dato de operacion
-   pertenece a una y solo una**: inventario, recetas, unidades, proveedores y pedidos.
-   Ninguna consulta ni escritura de esos datos cruza la frontera de la empresa de quien
-   pide, y conocer el identificador de una fila ajena no da acceso a ella. **La identidad
-   NO se parte**: roles y tipos de documento son del sistema y se comparten —
-   «Administrador» significa lo mismo en todas. Lo que une las dos mitades es que **cada
-   usuario pertenece a UNA empresa y tiene UN rol**: la empresa es una columna de su ficha
-   (`users.company_id`, obligatoria **salvo para el Maestro**), no una tabla de
-   pertenencias. Un usuario no puede estar en dos empresas a la vez, y eso es deliberado
-   (QC-47, decisiones 4 y 5). El Maestro, dueno de la plataforma, no pertenece a ninguna
-   (QC-161): la columna admite `NULL` y el disparador `users_check_company_by_role` es la
-   garantia —sin empresa solo el Maestro, y el Maestro nunca con empresa—. Lo que SI se
+1. **Multiempresa en los datos de operacion, un solo sistema en la identidad.** El ERP sirve
+   a varias empresas y **todo dato de operacion pertenece a una y solo una**: inventario,
+   recetas, unidades, proveedores y pedidos. Ninguna consulta ni escritura de esos datos
+   cruza la frontera de la empresa de quien pide, y conocer el identificador de una fila
+   ajena no da acceso a ella. **La identidad NO se parte**: roles y tipos de documento son
+   del sistema y se comparten — «Administrador» significa lo mismo en todas. Lo que une las
+   dos mitades es que **cada usuario pertenece a UNA empresa y tiene UN rol**: la empresa es
+   una columna de su ficha (`users.company_id`, obligatoria **salvo para el Maestro**), no
+   una tabla de pertenencias. Un usuario no puede estar en dos empresas a la vez, y eso es
+   deliberado (QC-47, decisiones 4 y 5). El Maestro, dueno de la plataforma, no pertenece a
+   ninguna (QC-161): la columna admite `NULL` y el disparador `users_check_company_by_role`
+   es la garantia —sin empresa solo el Maestro, y el Maestro nunca con empresa—. Lo que SI se
    parte por empresa dentro de la identidad es la **unicidad** del correo y del documento:
    se miden dentro de la empresa (y aparte entre los usuarios sin empresa). El **nombre de
    usuario es unico en todo el sistema**, empresas y Maestro incluidos (QC-161).
@@ -39,12 +38,10 @@ consecuencias de arquitectura que no son opinables:
      receta (`recipe_lines`, `recipe_tools`). La tabla de usuarios no es exenta: lleva su empresa. La
      lista la hace cumplir `tests/guards/guard-empresa-en-esquema.test.ts`, que la guarda
      con el motivo de cada entrada. Anadir una tabla de operacion sin empresa es BLOQUEANTE.
-   - **Lo que la regla vieja protegia sigue en pie.** No se prepara infraestructura «por
-     si acaso». Lo que cambio es que multiplicar empresas dejo de ser hipotetico y paso a
-     ser backlog; sigue siendo sobre-ingenieria —y el reviewer la rechaza— todo lo que no
-     esta pedido: jerarquias de empresas, empresas anidadas, un usuario en varias empresas,
-     permisos por empresa mas alla de su rol, o un selector de empresa antes de que exista
-     su ficha.
+   - **Nada de infraestructura «por si acaso».** Es sobre-ingenieria —y el reviewer la
+     rechaza— todo lo que no esta pedido: jerarquias de empresas, empresas anidadas, un
+     usuario en varias empresas, permisos por empresa mas alla de su rol, o un selector de
+     empresa antes de que exista su ficha.
    - **Coste que esto impone y se acepta**: cada feature de datos pasa a llevar columna de
      empresa, filtro en cada consulta, rechazo probado del acceso cruzado y su test. No es
      gratis y no es opcional.
@@ -58,156 +55,206 @@ consecuencias de arquitectura que no son opinables:
    borrado fisico en tablas transaccionales, y toda operacion que mueva existencias o
    dinero es **idempotente y auditable** (quien, cuando, sobre que).
 
-Estado actual: las features 1-9 del backlog son el esqueleto (usuarios, roles, hash de
-contrasena, seed, login, sesion, proteccion de rutas, layout y dashboard). **Todavia no
-hay ninguna feature de dominio quimico implementada.**
-
 ### Preguntas abiertas del dominio
 
-No se rellenan con supuestos (regla 6 de `CLAUDE.md`). Estan aqui porque **son caras de meter
-despues**: cambiarlas con datos ya cargados obliga a migrar historico. Conviene cerrarlas
-antes de la primera feature de inventario o de producto, no despues. De las cuatro
-originales queda **una cerrada**, la 4 desde el 2026-09-03 (QC-33). La **1 se reabrio el
-2026-09-07 (QC-76)**: estuvo cerrada desde el 2026-09-01 (QC-14) y revisada el 2026-09-02
-(QC-32), pero la conversion entre unidades, que las dos daban por descartada, ahora existe.
-Siguen abiertas **la 2 y la 3**, y el 2026-09-04 se abrio **la 5** al reescribir el punto 1
-del dominio.
+No se rellenan con supuestos (regla 6 de `CLAUDE.md`). Son **caras de meter despues**:
+cambiarlas con datos ya cargados obliga a migrar historico. **Abiertas: 1, 2, 3 y 5.
+Cerrada: 4.** La historia de cada una esta en el `### Por qué` de esta seccion.
 
-1. ~~**Unidades de medida.**~~ **CERRADA el 2026-09-01 (QC-14) y REVISADA el 2026-09-02
-   (QC-32).** Una sola unidad por elemento y **sin conversiones**: eso no ha cambiado y la
-   unidad sigue siendo puramente anotativa. Lo que cambio es la forma. QC-14 la guardo como
-   **texto libre y opcional** en la columna `unit` del producto, asumiendo a conciencia que
-   normalizarla despues costaria una limpieza de datos. El 2026-09-02, al acotar QC-32, el
-   humano decidio normalizarla: la unidad pasa a ser un **catalogo propio** (modulo `unidades`,
-   tabla `Unit`, nombre unico normalizado y simbolo opcional), y el producto apunta a el en vez
-   de guardar texto. Se paga el coste que QC-14 anticipo, con la suerte de que la base todavia
-   esta vacia. Detalle en `specs/QC-32-modelo-unidades/requirements.md`.
-   **REABIERTA el 2026-09-07 (QC-76).** Lo que cambia es justo la mitad que QC-14 y QC-32
-   daban por cerrada: **si va a haber conversion**. La unidad gana la unidad de la que deriva y
-   un **factor decimal exacto de cuatro decimales, mayor que cero** —1 litro = 1000 mililitros—,
-   con derivacion de **un solo nivel**, y el modulo `unidades` publica la funcion que convierte.
-   Efecto util: la derivacion **deduce la familia de la magnitud**, asi que convertir entre dos
-   unidades que no comparten base es un error, no un resultado.
-   **El PRIMER CONSUMIDOR es QC-63** (`ejecutar-receta-operador`), decidido el 2026-09-08 al
-   acotarla: la pantalla con la que el Operador ejecuta la receta de un pedido asignado deja
-   **cambiar la unidad en que se ven las cantidades** —la misma linea en litros o en mililitros—,
-   para no obligar a nadie a convertir de cabeza en planta. Cambia **solo como se ve**: no altera la receta ni el pedido y
-   no persiste nada, y solo se ofrecen unidades que **comparten base efectiva**. Inventario, recetas y
-   pedidos **siguen** tratando la unidad como anotativa. QC-76 anade tambien el **ambito por empresa**
-   (`company_id` opcional; sin el, la unidad es de sistema y vale para todas), lo que **absorbio y
-   cancelo QC-51**. Detalle y las 30 decisiones cerradas en
-   `specs/QC-76-equivalencia-y-ambito-de-unidades/requirements.md`.
-   **CORREGIDA el 2026-09-22 (QC-147): la linea de receta deja de tener unidad propia.** Pasa a
-   llevar un **porcentaje** (`recipe_lines.percentage`, `DECIMAL(5,2)`, sin `unit_id`) sobre la
-   cantidad del pedido; la unidad que se muestra junto a cada linea es la del producto ingrediente
-   (`ProductRef.unitId`), no una columna de la propia linea. El producto sigue apuntando al
-   catalogo de unidades sin cambios. Detalle en
-   `specs/QC-147-cantidades-de-receta-en-porcentaje/requirements.md`.
-   **REABIERTA EN PARTE el 2026-09-24 (QC-164, `pending`): el pedido vuelve a tener unidad.**
-   QC-147 lo dejo sin unidad; QC-164 le devuelve una del catalogo, y el consumo pasa a ser
-   cantidad x % **convertida** a la unidad del insumo con los factores de QC-76 cuando comparten
-   familia. Entre familias distintas (L frente a kg) se mantiene la aproximacion **sin densidad**
-   que QC-147 acepto (1 L ~ 1 kg): la densidad por producto queda descartada por ahora. De paso,
-   **QC-150** (spec_ready) da a la presentacion su contenido numerico en su propia unidad.
-   Detalle en `specs/QC-164-unidad-del-pedido/requirements.md`.
-2. **Trazabilidad por lote.** ¿Se rastrea lote/batch y fecha de vencimiento? En quimicos
-   suele ser obligatorio por normativa, y retrofitear lotes sobre un inventario que solo
-   guarda totales es de las migraciones mas dolorosas que existen.
-   **RESPONDIDA A MEDIAS, NO CERRADA (2026-09-10, al acotar QC-90).** La tabla
-   `product_batches` existe desde el 2026-09-09 -presentacion, existencia, costo unitario,
-   `lot` y `expiry_date`, los dos ultimos opcionales- y **QC-90** es quien empieza a
-   escribirla: el alta de producto crea su primer lote. Ademas se decidio que **manda el
-   lote**: `products.stock` se quita y la existencia pasa a ser la suma de los lotes, que es
-   **QC-91**, con **QC-92** para corregirla por ajuste. Lo que sigue ABIERTO es el resto de la
-   pregunta: **nada consume todavia** el lote ni el vencimiento -no hay pantalla que los liste,
-   ni consumo que elija de que lote sale lo que se despacha, ni aviso por vencer-, y esta sin
-   decidir que cuenta como lote vivo. Detalle en
-   `specs/QC-90-alta-del-primer-lote/requirements.md`.
-   **Corregido el 2026-09-13 (QC-81): `lot` deja de ser opcional.** Pasa a ser obligatorio, con
-   **correlativo generado por el backend**, numero simple **unico por empresa** y serie que
-   continua desde el mas alto; los lotes que hoy lo tienen vacio se rellenan al migrar. Entra
-   ademas la **fecha de compra**, que no existia -`expiry_date` es otra cosa-: obligatoria, con
-   hoy por defecto y **nunca futura**. `expiry_date` **sigue siendo opcional**. Esto **no cierra
-   la pregunta**: lo que sigue abierto es el resto, que nada consume todavia el lote ni el
-   vencimiento. Detalle en `specs/QC-81-lote-y-fecha-de-compra/requirements.md`.
-   **Avanza el 2026-09-22 (QC-141, implementada el 2026-09-23): primer consumidor del lote.** La
-   reserva de material de un pedido elige **de que lote sale** lo que se despacha: los mas
-   antiguos por fecha de compra, desempatando por numero de lote -el mismo orden que el coste de
-   QC-123-, y entregar lo consume como salida real. El vencimiento **sigue sin consumidor** y la
-   pregunta **sigue abierta** en esa mitad. La existencia pasa de entera a **decimal** en la misma ficha. Detalle en
-   `specs/QC-141-reserva-de-material-del-pedido/requirements.md`.
-   **Avanza el 2026-09-24 (QC-150): el lote tiene ya una entrada por producción.** Finalizar un
-   pedido en `/asignacion/[id]` da de alta, en la misma transacción que el consumo, un **lote de
-   producto terminado**: un cuarto tipo de producto (`FINISHED_PRODUCT`, junto a `PRODUCT`,
-   `MACHINE` y `PACKAGING`), uno por receta + presentación y nacido solo la primera vez. La cantidad
-   son envases enteros × el contenido de la presentación, que se copia en el pedido y en el lote, y
-   el libro lo asienta como `production` con el pedido que lo causa. Un producto terminado no se
-   crea a mano, no admite alta manual de lotes, no es ingrediente de receta y solo admite ajustes
-   que restan. Detalle en `specs/QC-150-producto-terminado/requirements.md`.
-   **Enmendado el 2026-09-25 por QC-168: Finalizar y "entregar" dejan de ser el mismo paso.**
-   Finalizar (el Operario, en `/asignacion/[id]`) sigue consumiendo el material y dando de alta el
-   lote de producto terminado en la misma operación, pero ahora deja el pedido `POR_EMPACAR`, no
-   `ENTREGADO`. El Empacador lo **comienza** (`EN_EMPAQUE`, a su nombre) y lo **termina**, y es
-   Terminar quien deja el pedido `ENTREGADO` con su fecha de terminado, sin tocar inventario.
-   Detalle en `specs/QC-168-estado-por-empacar/requirements.md`.
-3. **Fichas de seguridad y clasificacion de peligro.** ¿El sistema debe almacenar FDS/SDS,
-   clasificacion GHS, o restricciones de almacenamiento/transporte por incompatibilidad?
-   Eso decide si hay gestion de archivos (Supabase Storage) y reglas de validacion.
-4. ~~**Contabilidad e impuestos.**~~ **CERRADA el 2026-09-03 (QC-33).** El ERP **no
-   factura ni liquida impuestos**. El dinero **si** entra al modelo —el precio de venta del
-   pedido nace aqui— con `decimal(14,4)` y nunca `float`, y los calculos de dinero, empezando
-   por el total del pedido, son **internos y derivados**: se calculan multiplicando precio
-   unitario por cantidad y **no se guardan**, para que no puedan contradecir a sus factores.
-   **Queda un fleco abierto**: si algun dia hay que exportar esos datos a un contable externo
-   no se evaluo, y esta anotado como pregunta abierta en
-   `specs/QC-33-modelo-pedidos/requirements.md`.
-   **CORREGIDA el 2026-09-18 (QC-123), y hay que leer este punto con la enmienda delante: las
-   frases de arriba sobre el precio ya NO describen el sistema.** No existe ningun **precio de
-   venta**, ni en el pedido ni en la receta. El precio unitario y la unidad del pedido los
-   **borro QC-35bis el 2026-09-07** (`orders_drop_unit_and_unit_price`), por decision del humano
-   —«un pedido es receta + cantidad»—, y entre esa fecha y el 2026-09-18 este punto siguio
-   diciendo «el precio de venta del pedido nace aqui» sobre columnas que ya no estaban. Lo que
-   **si** existe desde QC-123 es un importe de otra naturaleza: el **coste de los ingredientes**
-   que la receta del pedido consume, leido de los **lotes de inventario con existencia**,
-   promediado por lote usado. Y **se guarda**, al reves de lo que dice la frase original: sus
-   factores —que lotes habia y a que costo— cambian cada dia, asi que calcularlo al leer haria
-   que el importe de un pedido de marzo cambiara solo. Se recalcula **en cada edicion del
-   pedido** y en ningun otro momento. Lo que **sigue en pie**: el ERP no factura ni liquida
-   impuestos, y el dinero va en `decimal(14,4)` y nunca `float`. Detalle en
-   `specs/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio/requirements.md`.
-5. **Moneda por empresa.** QC-14 y QC-42 cerraron que la moneda del costo es **implicita y
-   no se guarda**, y la razon escrita fue «el ERP es de un solo tenant». Esa premisa ya no
-   vale. Si dos empresas pueden operar en monedas distintas, es columna nueva y conversion
-   sobre datos ya cargados. **No se rellena con supuestos**: la cierra la primera ficha de
+1. **Unidades de medida — REABIERTA (QC-76).** Estado vigente:
+   - La unidad es un **catalogo propio** (modulo `unidades`, tabla `Unit`, nombre unico
+     normalizado y simbolo opcional); el producto apunta a el, no guarda texto.
+   - Hay **conversion**: una unidad deriva de otra con un **factor decimal exacto de cuatro
+     decimales, mayor que cero**, con derivacion de **un solo nivel**, y el modulo `unidades`
+     publica la funcion que convierte. Convertir entre dos unidades que no comparten base es
+     un error, no un resultado.
+   - **Ambito por empresa**: `company_id` opcional; sin el, la unidad es de sistema y vale
+     para todas.
+   - La **linea de receta no tiene unidad propia** (QC-147): lleva un **porcentaje**
+     (`recipe_lines.percentage`, `DECIMAL(5,2)`, sin `unit_id`) sobre la cantidad del pedido;
+     la unidad que se muestra es la del producto ingrediente (`ProductRef.unitId`).
+   - El **pedido vuelve a tener unidad** del catalogo (QC-164): el consumo es cantidad x %
+     **convertida** a la unidad del insumo cuando comparten familia; entre familias distintas
+     (L frente a kg) se mantiene la aproximacion **sin densidad** (1 L ~ 1 kg).
+   - Detalle: `specs/QC-76-equivalencia-y-ambito-de-unidades/requirements.md`,
+     `specs/QC-147-cantidades-de-receta-en-porcentaje/requirements.md`,
+     `specs/QC-164-unidad-del-pedido/requirements.md`.
+2. **Trazabilidad por lote — RESPONDIDA A MEDIAS, NO CERRADA.** Estado vigente:
+   - **Manda el lote** (`product_batches`: presentacion, existencia, costo unitario, `lot`,
+     `expiry_date`): la existencia es la suma de los lotes, y es **decimal**.
+   - `lot` es **obligatorio**, con correlativo generado por el backend, **unico por empresa**.
+     La **fecha de compra** es obligatoria, con hoy por defecto y **nunca futura**.
+     `expiry_date` sigue siendo opcional.
+   - La reserva de material de un pedido elige **de que lote sale**: los mas antiguos por fecha
+     de compra, desempatando por numero de lote.
+   - Finalizar un pedido da de alta un **lote de producto terminado** (`FINISHED_PRODUCT`)
+     en la misma transaccion que el consumo, y deja el pedido `POR_EMPACAR` (QC-150, QC-168).
+   - **Sigue ABIERTO**: el vencimiento no tiene consumidor, y esta sin decidir que cuenta como
+     lote vivo.
+3. **Fichas de seguridad y clasificacion de peligro — ABIERTA.** ¿El sistema debe almacenar
+   FDS/SDS, clasificacion GHS, o restricciones de almacenamiento/transporte por
+   incompatibilidad? Eso decide si hay gestion de archivos (Supabase Storage) y reglas de
+   validacion.
+4. **Contabilidad e impuestos — CERRADA (QC-33, corregida en QC-123).** Estado vigente:
+   - El ERP **no factura ni liquida impuestos**.
+   - El dinero va en `decimal(14,4)` y **nunca `float`**.
+   - **No existe ningun precio de venta**, ni en el pedido ni en la receta.
+   - Lo que si existe es el **coste de los ingredientes** que la receta del pedido consume,
+     leido de los **lotes de inventario con existencia** y promediado por lote usado. **Se
+     guarda**, y se recalcula **en cada edicion del pedido** y en ningun otro momento.
+   - **Fleco abierto**: exportar esos datos a un contable externo no se evaluo
+     (`specs/QC-33-modelo-pedidos/requirements.md`).
+5. **Moneda por empresa — ABIERTA.** La moneda del costo es hoy **implicita y no se guarda**.
+   Si dos empresas pueden operar en monedas distintas, es columna nueva y conversion sobre
+   datos ya cargados. **No se rellena con supuestos**: la cierra la primera ficha de
    aislamiento que toque importes.
 
+### Por qué
+
+**El punto 1 se reescribio el 2026-09-04** al abrir la epica QC-46; antes decia «un solo
+tenant, no hay `empresa_id` ni aislamiento por tenant». **Lo que la regla vieja protegia sigue
+en pie**: no se prepara infraestructura «por si acaso». Lo que cambio es que multiplicar
+empresas dejo de ser hipotetico y paso a ser backlog.
+
+**Estado cuando se escribio esta seccion:** las features 1-9 del backlog eran el esqueleto
+(usuarios, roles, hash de contrasena, seed, login, sesion, proteccion de rutas, layout y
+dashboard), y todavia no habia ninguna feature de dominio quimico implementada.
+
+**Las preguntas abiertas, en orden de historia.** De las cuatro originales queda **una
+cerrada**, la 4 desde el 2026-09-03 (QC-33). La **1 se reabrio el 2026-09-07 (QC-76)**: estuvo
+cerrada desde el 2026-09-01 (QC-14) y revisada el 2026-09-02 (QC-32), pero la conversion entre
+unidades, que las dos daban por descartada, ahora existe. Siguen abiertas **la 2 y la 3**, y el
+2026-09-04 se abrio **la 5** al reescribir el punto 1 del dominio. Conviene cerrarlas antes de
+la primera feature que las toque, no despues.
+
+**1. Unidades de medida.** **CERRADA el 2026-09-01 (QC-14) y REVISADA el 2026-09-02 (QC-32).**
+Una sola unidad por elemento y **sin conversiones**: la unidad era puramente anotativa. QC-14 la
+guardo como **texto libre y opcional** en la columna `unit` del producto, asumiendo a conciencia
+que normalizarla despues costaria una limpieza de datos. El 2026-09-02, al acotar QC-32, el
+humano decidio normalizarla: la unidad pasa a ser un **catalogo propio** (modulo `unidades`,
+tabla `Unit`, nombre unico normalizado y simbolo opcional), y el producto apunta a el en vez de
+guardar texto. Se pago el coste que QC-14 anticipo, con la suerte de que la base todavia estaba
+vacia. Detalle en `specs/QC-32-modelo-unidades/requirements.md`.
+**REABIERTA el 2026-09-07 (QC-76).** Lo que cambia es justo la mitad que QC-14 y QC-32 daban por
+cerrada: **si va a haber conversion**. La unidad gana la unidad de la que deriva y un **factor
+decimal exacto de cuatro decimales, mayor que cero** —1 litro = 1000 mililitros—, con derivacion
+de **un solo nivel**, y el modulo `unidades` publica la funcion que convierte. Efecto util: la
+derivacion **deduce la familia de la magnitud**, asi que convertir entre dos unidades que no
+comparten base es un error, no un resultado.
+**El PRIMER CONSUMIDOR es QC-63** (`ejecutar-receta-operador`), decidido el 2026-09-08 al
+acotarla: la pantalla con la que el Operador ejecuta la receta de un pedido asignado deja
+**cambiar la unidad en que se ven las cantidades** —la misma linea en litros o en mililitros—,
+para no obligar a nadie a convertir de cabeza en planta. Cambia **solo como se ve**: no altera la
+receta ni el pedido y no persiste nada, y solo se ofrecen unidades que **comparten base
+efectiva**. Inventario, recetas y pedidos **siguen** tratando la unidad como anotativa. QC-76
+anade tambien el **ambito por empresa** (`company_id` opcional; sin el, la unidad es de sistema y
+vale para todas), lo que **absorbio y cancelo QC-51**. Detalle y las 30 decisiones cerradas en
+`specs/QC-76-equivalencia-y-ambito-de-unidades/requirements.md`.
+**CORREGIDA el 2026-09-22 (QC-147): la linea de receta deja de tener unidad propia.** Pasa a
+llevar un **porcentaje** (`recipe_lines.percentage`, `DECIMAL(5,2)`, sin `unit_id`) sobre la
+cantidad del pedido; la unidad que se muestra junto a cada linea es la del producto ingrediente
+(`ProductRef.unitId`), no una columna de la propia linea. El producto sigue apuntando al catalogo
+de unidades sin cambios. Detalle en `specs/QC-147-cantidades-de-receta-en-porcentaje/requirements.md`.
+**REABIERTA EN PARTE el 2026-09-24 (QC-164, `pending` en esa fecha): el pedido vuelve a tener
+unidad.** QC-147 lo dejo sin unidad; QC-164 le devuelve una del catalogo, y el consumo pasa a ser
+cantidad x % **convertida** a la unidad del insumo con los factores de QC-76 cuando comparten
+familia. Entre familias distintas (L frente a kg) se mantiene la aproximacion **sin densidad**
+que QC-147 acepto (1 L ~ 1 kg): la densidad por producto queda descartada por ahora. De paso,
+**QC-150** (spec_ready en esa fecha) da a la presentacion su contenido numerico en su propia
+unidad. Detalle en `specs/QC-164-unidad-del-pedido/requirements.md`.
+
+**2. Trazabilidad por lote.** ¿Se rastrea lote/batch y fecha de vencimiento? En quimicos suele
+ser obligatorio por normativa, y retrofitear lotes sobre un inventario que solo guarda totales es
+de las migraciones mas dolorosas que existen.
+**RESPONDIDA A MEDIAS, NO CERRADA (2026-09-10, al acotar QC-90).** La tabla `product_batches`
+existe desde el 2026-09-09 -presentacion, existencia, costo unitario, `lot` y `expiry_date`, los
+dos ultimos opcionales- y **QC-90** es quien empieza a escribirla: el alta de producto crea su
+primer lote. Ademas se decidio que **manda el lote**: `products.stock` se quita y la existencia
+pasa a ser la suma de los lotes, que es **QC-91**, con **QC-92** para corregirla por ajuste. Lo
+que seguia ABIERTO era el resto de la pregunta: **nada consumia todavia** el lote ni el
+vencimiento -no habia pantalla que los listara, ni consumo que eligiera de que lote sale lo que
+se despacha, ni aviso por vencer-, y estaba sin decidir que cuenta como lote vivo. Detalle en
+`specs/QC-90-alta-del-primer-lote/requirements.md`.
+**Corregido el 2026-09-13 (QC-81): `lot` deja de ser opcional.** Pasa a ser obligatorio, con
+**correlativo generado por el backend**, numero simple **unico por empresa** y serie que continua
+desde el mas alto; los lotes que lo tenian vacio se rellenan al migrar. Entra ademas la **fecha
+de compra**, que no existia -`expiry_date` es otra cosa-: obligatoria, con hoy por defecto y
+**nunca futura**. `expiry_date` **sigue siendo opcional**. Esto **no cierra la pregunta**. Detalle
+en `specs/QC-81-lote-y-fecha-de-compra/requirements.md`.
+**Avanza el 2026-09-22 (QC-141, implementada el 2026-09-23): primer consumidor del lote.** La
+reserva de material de un pedido elige **de que lote sale** lo que se despacha: los mas antiguos
+por fecha de compra, desempatando por numero de lote -el mismo orden que el coste de QC-123-, y
+entregar lo consume como salida real. El vencimiento **sigue sin consumidor** y la pregunta
+**sigue abierta** en esa mitad. La existencia pasa de entera a **decimal** en la misma ficha.
+Detalle en `specs/QC-141-reserva-de-material-del-pedido/requirements.md`.
+**Avanza el 2026-09-24 (QC-150): el lote tiene ya una entrada por produccion.** Finalizar un
+pedido en `/asignacion/[id]` da de alta, en la misma transaccion que el consumo, un **lote de
+producto terminado**: un cuarto tipo de producto (`FINISHED_PRODUCT`, junto a `PRODUCT`,
+`MACHINE` y `PACKAGING`), uno por receta + presentacion y nacido solo la primera vez. La cantidad
+son envases enteros × el contenido de la presentacion, que se copia en el pedido y en el lote, y
+el libro lo asienta como `production` con el pedido que lo causa. Un producto terminado no se
+crea a mano, no admite alta manual de lotes, no es ingrediente de receta y solo admite ajustes
+que restan. Detalle en `specs/QC-150-producto-terminado/requirements.md`.
+**Enmendado el 2026-09-25 por QC-168: Finalizar y "entregar" dejan de ser el mismo paso.**
+Finalizar (el Operario, en `/asignacion/[id]`) sigue consumiendo el material y dando de alta el
+lote de producto terminado en la misma operacion, pero ahora deja el pedido `POR_EMPACAR`, no
+`ENTREGADO`. El Empacador lo **comienza** (`EN_EMPAQUE`, a su nombre) y lo **termina**, y es
+Terminar quien deja el pedido `ENTREGADO` con su fecha de terminado, sin tocar inventario.
+Detalle en `specs/QC-168-estado-por-empacar/requirements.md`.
+
+**4. Contabilidad e impuestos.** **CERRADA el 2026-09-03 (QC-33).** El ERP **no factura ni
+liquida impuestos**. Texto original: «El dinero **si** entra al modelo —el precio de venta del
+pedido nace aqui— con `decimal(14,4)` y nunca `float`, y los calculos de dinero, empezando por el
+total del pedido, son **internos y derivados**: se calculan multiplicando precio unitario por
+cantidad y **no se guardan**, para que no puedan contradecir a sus factores.» El fleco de la
+exportacion a un contable externo quedo anotado como pregunta abierta en
+`specs/QC-33-modelo-pedidos/requirements.md`.
+**CORREGIDA el 2026-09-18 (QC-123): las frases del texto original sobre el precio ya NO describen
+el sistema.** El precio unitario y la unidad del pedido los **borro QC-35bis el 2026-09-07**
+(`orders_drop_unit_and_unit_price`), por decision del humano —«un pedido es receta + cantidad»—,
+y entre esa fecha y el 2026-09-18 este punto siguio diciendo «el precio de venta del pedido nace
+aqui» sobre columnas que ya no estaban. Lo que **si** existe desde QC-123 es un importe de otra
+naturaleza: el **coste de los ingredientes**. Y **se guarda**, al reves de lo que decia la frase
+original: sus factores —que lotes habia y a que costo— cambian cada dia, asi que calcularlo al
+leer haria que el importe de un pedido de marzo cambiara solo. Detalle en
+`specs/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio/requirements.md`.
+
+**5. Moneda por empresa.** QC-14 y QC-42 cerraron que la moneda del costo es **implicita y no se
+guarda**, y la razon escrita fue «el ERP es de un solo tenant». Esa premisa ya no vale.
+
 ## Stack
-- **Frontend/servidor:** Next.js (App Router) + TypeScript en modo strict.
+- **Frontend/servidor:** Next.js 16 (App Router; `next@16.3.0`) + React 19.2 + TypeScript 5
+  en modo strict.
 - **Estilos:** Tailwind CSS v4.
-- **Componentes:** shadcn/ui (Radix UI base). Primero revisar si existe en shadcn/ui
-  antes de crear uno propio. `npx shadcn add <component>`.
+- **Componentes:** shadcn/ui sobre Base UI (`@base-ui/react`; estilo `base-nova` en
+  `components.json`). Primero revisar si existe en shadcn/ui antes de crear uno propio.
+  `pnpm exec shadcn add <component>`.
 - **Datos:** Supabase (Postgres). **Prisma es el unico camino de lectura/escritura de la
   aplicacion**; el cliente de Supabase (PostgREST) no se usa para datos. Ver
   `## Acceso a datos y autorizacion`, que explica por que eso cambia donde vive la
   seguridad.
-- **ORM:** Prisma. Migraciones versionadas, con `down.sql` **de convencion propia** (ver
-  `## Migraciones up/down`).
-- **Validacion:** zod en el borde de toda entrada externa.
-- **Data fetching cliente:** SWR para queries publicas/no sensibles.
+- **ORM:** Prisma 6 (`prisma` / `@prisma/client` ^6.19). Migraciones versionadas, con `down.sql`
+  **de convencion propia** (ver `## Migraciones up/down`).
+- **Validacion:** zod (v4) en el borde de toda entrada externa.
+- **Data fetching cliente:** no hay libreria aprobada (SWR NO esta instalado). Los datos se leen en
+  Server Components y bajan por props; si una pantalla necesita fetch de cliente, la libreria se
+  propone en su `design.md` y pasa por `## Dependencias de terceros`.
 - **Mutaciones internas:** Server Actions (`'use server'`) para crear/editar/eliminar
   dentro del mismo proyecto. No usar `fetch` a rutas API internas para mutaciones.
 - **API externa/webhooks:** Route handlers en `app/api/` con zod + firma/idempotencia.
 - **Deploy:** Vercel. Secretos en variables de entorno, nunca en repo.
-- **Integraciones externas:** ninguna definida todavia. Cuando entre la primera, se
-  documenta aqui con su cliente en `lib/modules/<modulo>/adapters/driven/`.
+- **Integraciones externas** (cada una con su cliente en `lib/modules/<modulo>/adapters/driven/` y
+  su fila en `docs/dependencias.md`):
+  - Anthropic (`@anthropic-ai/sdk`) y Google Gemini (`@google/genai`): lectura de PDFs con IA.
+  - Upstash QStash (`@upstash/qstash`): cola de procesamiento de PDFs.
+  - Supabase Storage (`@supabase/storage-js`): imagenes de recetas.
+  - Resend (`resend`): correo para establecer la contrasena.
 
 ## Dependencias de terceros
 
 **La regla.** Antes de escribir una utilidad, comprueba si ya la resuelve una librería del
-ecosistema y prefiérela. Reimplementar a mano lo que una librería mantenida ya hace —fechas,
-validación, parsing, decimales, drag&drop, tablas— es código nuestro que hay que mantener,
-testear y arreglar. `components/ui/` ya lo dice para shadcn/ui (`## Componentes`); esto lo
-generaliza a todo el repo, front y back.
+ecosistema y prefiérela (fechas, validación, parsing, decimales, drag&drop, tablas). Vale para
+todo el repo, front y back; `components/ui/` ya lo dice para shadcn/ui (`## Componentes`).
 
 **Los cuatro checks.** Ninguna dependencia entra sin los cuatro, verificados y anotados:
 1. No marcada `deprecated` en npm.
@@ -222,7 +269,7 @@ sí: es un desconocido, y se dice (regla 6 de `CLAUDE.md`).
 Los subagentes no instalan nada por su cuenta — proponen, paran y devuelven la propuesta al
 implementer, que la sube al leader, que pregunta. Aprobada, se anota en `docs/dependencias.md`
 y ahí se instala. Cuando la librería se elige en la fase de spec, la propuesta va en el
-`design.md` y se aprueba junto con el spec (F1.4): así el gate llega antes del código.
+`design.md` y se aprueba junto con el spec (F1.4).
 
 **Excepción.** Ninguna silenciosa. Una librería que falla un check puede entrar si el humano
 la aprueba explícitamente y la fila del registro dice qué check falló y por qué se aceptó.
@@ -232,10 +279,16 @@ la aprueba explícitamente y la fila del registro dice qué check falló y por q
 reviewer lo trata como BLOQUEANTE. La guardia no consulta npm —el gate corre sin red—, así que
 lo que comprueba es la aprobación, no la salud: la salud la acredita la fila del registro.
 
-**Alcance.** Rige hacia adelante. El `package.json` de hoy entra sembrado como `heredada` para
-que el gate quede verde el día uno, y se audita contra los cuatro checks en una feature propia
-del board. El código ya escrito que reimplementa algo no se reescribe hacia atrás; cuando una
-feature lo toque, se aplica a lo que toque.
+**Alcance.** Rige hacia adelante. El `package.json` previo a la regla entra sembrado como
+`heredada` y se audita contra los cuatro checks en una feature propia del board. El código ya
+escrito que reimplementa algo no se reescribe hacia atrás; cuando una feature lo toque, se
+aplica a lo que toque.
+
+### Por qué
+
+Reimplementar a mano lo que una librería mantenida ya hace es código nuestro que hay que
+mantener, testear y arreglar. La aprobación en el spec hace que el gate llegue antes del código.
+El sembrado como `heredada` es para que el gate quedara verde el día uno.
 
 **Lo que cuesta.** Cada dependencia nueva cuesta una parada y una espera a un humano, y el
 umbral de 10.000 descargas descarta librerías nicho legítimas —que entran igual, pero por la
@@ -258,7 +311,7 @@ ningún incidente previo que la motive.
 5. **Migraciones versionadas y reversibles.** Toda migracion Prisma tiene su
    `migration.sql` (UP) y `down.sql` (DOWN). Ver `scripts/db-rollback.ts`.
 6. **La autorizacion vive en el service, no en la base.** Un permiso que solo existe
-   como policy de RLS no protege a esta aplicacion (ver la seccion siguiente).
+   como policy de RLS no protege a esta aplicacion (ver `## Acceso a datos y autorizacion`).
 
 ## Modulos y arquitectura hexagonal
 
@@ -333,24 +386,29 @@ un adaptador driven: recibe datos por props y llama a la Server Action por su ru
 | `components/**`, `hooks/**`, archivos `'use client'` | `@/lib/modules/M` (barrel), `.../adapters/driving/**`, `lib/shared/ui/**`, `lib/shared/routes`, `@/lib/utils` | ademas de lo anterior: `lib/composition`, `lib/shared/db/**` |
 | `tests/**`, `scripts/**` | todo | — (exentos) |
 
-> **Nota sobre driven -> driven (QC-9).** Un adaptador driven puede apoyarse en otro driven **de su
-> mismo modulo**: es lo que permite extraer el codec de sesion (`session-cookie.ts` delega el formato
-> y la firma en `session-token.ts`) y por tanto que exista **una sola** implementacion del HMAC en el
-> repositorio, que es R5 de QC-8. No cablea nada —el cableado puerto -> implementacion sigue siendo
-> exclusivo de `lib/composition/**`—, asi que no toca R11. Un driven de **otro** modulo sigue
-> prohibido: eso si seria saltarse el contrato. Lo hace cumplir
+> **Nota sobre driven -> driven.** Un adaptador driven puede apoyarse en otro driven **de su
+> mismo modulo**. Un driven de **otro** modulo sigue prohibido. El cableado puerto ->
+> implementacion sigue siendo exclusivo de `lib/composition/**`. Lo hace cumplir
 > `tests/guards/guard-arquitectura-modulos.test.ts`.
 
 **Direccion, en una frase:** hacia adentro. `app/components -> composicion -> adaptadores
 driven -> puertos -> dominio`, y el dominio no mira a nadie.
 
+### Por qué
+
+**Driven -> driven (QC-9).** Es lo que permite extraer el codec de sesion (`session-cookie.ts`
+delega el formato y la firma en `session-token.ts`) y por tanto que exista **una sola**
+implementacion del HMAC en el repositorio, que es R5 de QC-8. No cablea nada, asi que no toca
+R11. Un driven de otro modulo si seria saltarse el contrato.
+
 ## Estructura de carpetas
 
 ```
 app/                            # Rutas y paginas (App Router). SIN CAMBIOS de ubicacion.
-  api/                          # Route handlers (webhooks, API publica)
+  api/                          # Route handlers (webhooks, crons, API publica)
   (public)/                     # Paginas publicas (login...)
   (private)/                    # Paginas autenticadas
+    components/                 # componentes del armazon privado (barrel index.ts)
   <ruta>/
     page.tsx                    # solo archivos del App Router en la raiz de la ruta
     components/                 # componentes propios de esa ruta
@@ -367,10 +425,14 @@ lib/
         driving/                # Server Actions ('use server'), route handlers
   composition/
     index.ts                    # PUNTO UNICO DE COMPOSICION
+    edge.ts                     # la parte del cableado que puede cargar el runtime del borde
   shared/                       # nucleo compartido: HOJA del grafo, no conoce modulos
     routes.ts
+    pagination.ts
+    request-scope.ts
     db/prisma.ts                # instancia unica de PrismaClient
     navigation/
+    observability/              # logger (pino)
     ui/
 components/
   ui/                           # Primitivas shadcn/ui (Button, Input, Card...)
@@ -387,25 +449,24 @@ tests/
   guards/                       # Guardias ejecutables (arquitectura, RLS, contrasenas...)
   unit/                         # Dominio, adaptadores y componentes (mockeando DB)
   integration/                  # Constraints de DB de test
+  ui/                           # tests de UI por pantalla (p. ej. inventario-importar/)
+  helpers/                      # Utilidades compartidas de test (setupUser, base de test...)
+  fixtures/
+  baseline-rojos.json           # Rojos heredados (docs/gate.md > Rojos heredados)
 e2e/                            # Playwright (flujos criticos)
 scripts/
   db-rollback.ts                # Script de rollback (aplica down.sql)
+  test-db.ts                    # Base efimera de integracion (docs/verification.md)
+  seed.ts
+  test-rapido.mjs, comparar-baseline-rojos.mjs, validate-features.mjs, wt.sh,
+  archivos-en-vuelo.mjs, check-perfil.mjs, arnes-sync.sh   # del arnes (lista en arnes.manifest)
 ```
 
 ## Acceso a datos y autorizacion
 
-**Esta seccion existe porque el par Prisma + RLS engaña.** Si no se entiende, se escriben
-policies que dan una sensacion de seguridad que no es real.
-
-### El hecho
-
-Prisma se conecta por Postgres directo con el rol de `DATABASE_URL`, que en Supabase es el
-**dueño de las tablas**. Postgres **no aplica RLS al dueño** salvo que la tabla declare
-`FORCE ROW LEVEL SECURITY`. Y aunque se fuerce, Prisma no setea `request.jwt.claims`, asi
-que `auth.uid()` es NULL y toda policy que dependa de el deniega o devuelve vacio.
-
-Conclusion: **las policies de RLS no filtran ninguna query de esta aplicacion.** Solo
-protegen lo que entre por PostgREST con la anon key, via que aqui no se usa.
+**El par Prisma + RLS engaña**: las policies de RLS **no filtran ninguna query de esta
+aplicacion** (el porqué, en `### Por qué`). Si no se entiende, se escriben policies que dan una
+sensacion de seguridad que no es real.
 
 ### La regla
 
@@ -420,8 +481,7 @@ protegen lo que entre por PostgREST con la anon key, via que aqui no se usa.
    pide el test de autorizacion en el service; el test de RLS es adicional, no el que
    cierra el requisito.
 4. **No se usa `createServerClient()` de Supabase para leer o escribir datos de negocio.**
-   Un solo camino de datos: repositorio → Prisma. Dos APIs de datos conviviendo es como se
-   acaba con la mitad de las tablas protegidas y la otra mitad no.
+   Un solo camino de datos: repositorio → Prisma.
 
 ### Variables de entorno de la base
 
@@ -433,9 +493,22 @@ DIRECT_URL     # conexion directa (puerto 5432)  — lo que usa Prisma Migrate
 ```
 
 En el `datasource` van declaradas ambas (`url` y `directUrl`). **Prisma Migrate no
-funciona a traves del pooler en transaction mode**: sin `directUrl`, las migraciones
-fallan con errores que no apuntan a la causa. Es el error mas comun al montar Prisma sobre
-Supabase.
+funciona a traves del pooler en transaction mode.**
+
+### Por qué
+
+**El hecho.** Prisma se conecta por Postgres directo con el rol de `DATABASE_URL`, que en
+Supabase es el **dueño de las tablas**. Postgres **no aplica RLS al dueño** salvo que la tabla
+declare `FORCE ROW LEVEL SECURITY`. Y aunque se fuerce, Prisma no setea `request.jwt.claims`,
+asi que `auth.uid()` es NULL y toda policy que dependa de el deniega o devuelve vacio.
+Conclusion: **las policies de RLS no filtran ninguna query de esta aplicacion.** Solo protegen
+lo que entre por PostgREST con la anon key, via que aqui no se usa.
+
+**Un solo camino de datos.** Dos APIs de datos conviviendo es como se acaba con la mitad de las
+tablas protegidas y la otra mitad no.
+
+**`directUrl`.** Sin ella, las migraciones fallan con errores que no apuntan a la causa. Es el
+error mas comun al montar Prisma sobre Supabase.
 
 ## Permisos y autenticacion
 - Las paginas (Server Components) exigen su permiso en el servidor, antes de leer o pintar datos.
@@ -448,43 +521,49 @@ Supabase.
 - El corte va en **los dos sentidos**: sin sesion valida en una ruta privada, redirige al login con
   la ruta pedida en `next`; con sesion valida en el login, redirige al dashboard.
 - Componentes `private/` reciben datos por props desde el Server Component padre.
-- Datos publicos: el cliente fetchea con SWR desde el navegador.
+- Datos publicos: tambien se leen en el Server Component (no hay libreria de fetch de cliente aprobada).
 - Datos privados (balances, PII): pre-fetch en Server Component, stream al cliente.
+- **El corte por permiso vive en la pagina.** Cada `page.tsx` de `app/(private)/` abre con
+  `requirePagePermission('<modulo>.consultar')`, antes de cualquier lectura de datos. Si el permiso
+  falta, la respuesta es **404** —no 403—, con el mismo contenido que cualquier otro 404 de la zona
+  privada: no nombra el modulo pedido ni menciona permisos.
+- **El layout privado sigue siendo la ultima linea de defensa.** Vuelve a leer la sesion en el
+  servidor y redirige si no la hay, y **filtra el menu** con los permisos de esa misma lectura, en
+  el servidor: un item para el que no hay permiso no viaja en el HTML.
+- **Una sola lectura de sesion por peticion** (QC-104): el layout, el corte por permiso de la
+  pagina y las Server Actions que esos componentes invocan mientras se pintan comparten **la
+  misma** lectura, y lo compartido muere con la peticion —**nunca** se reutiliza entre peticiones—.
+  Lo vigilan tests del gate en `tests/unit/` (no en `tests/guards/`) que fallan si una pantalla, o
+  una Server Action de las que resuelven a la vez el usuario y la empresa, supera **una** lectura
+  de sesion; la lista de esas acciones **no se escribe a mano**: el test **lee el disco**.
+- **Ni el borde ni la pagina son la frontera de autorizacion.** `## Acceso a datos y autorizacion`
+  sigue mandando: la **autorizacion se valida en el service**, antes de tocar el repositorio. El rol
+  que viaja firmado en la cookie **no autoriza** nada; es un dato de presentacion (el nombre que
+  pinta `nav-user`). **Un permiso implementado solo como corte de ruta no cuenta como implementado**,
+  igual que no cuenta uno implementado solo como policy de RLS: el 404 de la pagina decide si se
+  **enseña** una pantalla, y el service decide si se puede **hacer**.
+- **Los permisos de la sesion son una foto del instante del login** y envejecen hasta 8 h: una
+  pantalla puede pintarse para alguien a quien el service ya deniega. La invalidacion inmediata es
+  QC-23.
 
-**El corte por permiso vive en la pagina.** Cada `page.tsx` de `app/(private)/` abre con
-`requirePagePermission('<modulo>.consultar')`, antes de cualquier lectura de datos. Si el permiso
-falta, la respuesta es **404** —no 403—, con el mismo contenido que cualquier otro 404 de la zona
-privada: no nombra el modulo pedido ni menciona permisos, de modo que «no existe» y «no puedes» son
-indistinguibles para quien sondea URLs.
+### Por qué
 
-**El layout privado sigue siendo la ultima linea de defensa.** El corte del middleware no lo
-sustituye ni lo relaja: el layout de la zona privada vuelve a leer la sesion en el servidor y
-redirige si no la hay. Ademas **filtra el menu** con los permisos de esa misma lectura, en el
-servidor: un item para el que no hay permiso no viaja en el HTML. El middleware ahorra render y da
-la vuelta rapida; no es la unica puerta.
+**404 y no 403:** asi «no existe» y «no puedes» son indistinguibles para quien sondea URLs.
 
-**Esa lectura es una sola por peticion** (QC-104): el layout, el corte por permiso de la pagina y
-las Server Actions que esos componentes invocan mientras se pintan comparten **la misma** lectura de
-sesion en vez de repetirla cada uno por su cuenta, y lo compartido muere con la peticion —**nunca**
-se reutiliza entre peticiones, porque una sesion revocada no puede sobrevivir a la peticion en que
-se leyo—. Lo que esta probado es el **conteo**: sendos **tests del gate** —en `tests/unit/`, no en
-`tests/guards/`: los selecciona el grafo de imports, no el barrido de guardias— fallan si una
-pantalla, o una Server Action de las que resuelven a la vez el usuario y la empresa, supera **una**
-lectura de sesion. La lista de esas acciones **no se escribe a mano**: el test **lee el disco** —los
-modulos salen de `readdirSync` de `lib/modules/`, y de cada uno recorre `adapters/driving/` **en
-profundidad**— y se pone rojo si aparece una accion con las dos caras de la sesion fuera de la lista
-o sin ambito. Asi se detecta la que llegue en el proximo merge, aunque venga en un **modulo nuevo**
-o en una **subcarpeta**.
+**El layout como ultima linea:** el corte del middleware no lo sustituye ni lo relaja. El
+middleware ahorra render y da la vuelta rapida; no es la unica puerta.
 
-**Ni el borde ni la pagina son la frontera de autorizacion.** `## Acceso a datos y autorizacion`
-sigue mandando: la **autorizacion se valida en el service**, antes de tocar el repositorio. El rol
-que viaja firmado en la cookie **no autoriza** nada; es un dato de presentacion (el nombre que
-pinta `nav-user`). **Un permiso implementado solo como corte de ruta no cuenta como implementado**,
-igual que no cuenta uno implementado solo como policy de RLS: el 404 de la pagina decide si se
-**enseña** una pantalla, y el service decide si se puede **hacer**. Ademas los permisos que lleva la
-sesion son una **foto del instante del login** y envejecen hasta 8 h: un cambio de permisos no llega
-a la pantalla hasta que la sesion caduca, asi que una pantalla puede pintarse para alguien a quien
-el service ya deniega. La invalidacion inmediata es QC-23.
+**Una lectura por peticion:** se comparte en vez de repetirla cada uno por su cuenta; no se
+reutiliza entre peticiones porque una sesion revocada no puede sobrevivir a la peticion en que se
+leyo. Lo que esta probado es el **conteo**. Los tests viven en `tests/unit/` porque los selecciona
+el grafo de imports, no el barrido de guardias. Que la lista se lea del disco —los modulos salen
+de `readdirSync` de `lib/modules/`, y de cada uno recorre `adapters/driving/` **en profundidad**—,
+y que el test se ponga rojo si aparece una accion con las dos caras de la sesion fuera de la
+lista o sin ambito, es lo que detecta la que llegue en el proximo merge, aunque venga en un
+**modulo nuevo** o en una **subcarpeta**.
+
+**Permisos que envejecen:** un cambio de permisos no llega a la pantalla hasta que la sesion
+caduca.
 
 ## Server Actions vs Route Handlers
 | Caso | Usar |
@@ -494,22 +573,26 @@ el service ya deniega. La invalidacion inmediata es QC-23.
 | API publica para terceros | Route Handler (`app/api/`) |
 | Cron interno | Route Handler (`app/api/`) |
 
+**Crons internos** (`app/api/cron/*`, declarados en `vercel.json`):
+- `/api/**` no pasa por la sesion, asi que la unica puerta es el secreto: la ruta exige
+  `Authorization: Bearer <CRON_SECRET>` y responde 401 si no casa y 500 si la variable no esta
+  definida, sin leer nada en ninguno de los dos casos.
+- `CRON_SECRET` tiene que existir en el proyecto de Vercel (Vercel solo manda la cabecera cuando
+  la variable existe) y esta documentada en `.env.example`.
+- El proceso no actua en nombre de ninguna empresa, pero **tampoco lee varias a la vez**: recorre
+  las empresas y busca los candidatos de cada una por separado, de modo que la regla de ambito de
+  empresa de las consultas se cumple sin excepciones.
+
+### Por qué
+
 El primer cron interno es la caducidad de pedidos de QC-141: `app/api/cron/caducar-pedidos`,
-declarado en `vercel.json` con una sola ejecucion diaria. `/api/**` no pasa por la sesion, asi
-que la unica puerta es el secreto: la ruta exige `Authorization: Bearer <CRON_SECRET>` y responde
-401 si no casa y 500 si la variable no esta definida, sin leer nada en ninguno de los dos casos.
-`CRON_SECRET` tiene que existir en el proyecto de Vercel (Vercel solo manda la cabecera cuando la
-variable existe) y esta documentada en `.env.example`. El proceso no actua en nombre de ninguna
-empresa, pero **tampoco lee varias a la vez**: recorre las empresas y busca los candidatos de cada
-una por separado, de modo que la regla de ambito de empresa de las consultas se cumple sin
-excepciones.
+declarado en `vercel.json` con una sola ejecucion diaria.
 
 ## Migraciones up/down
 
 > **`down.sql` no es de Prisma.** Prisma Migrate **no tiene down migrations**: genera solo
 > el `migration.sql` (UP). El DOWN es una convencion de este repo, y `db:rollback` un
-> script propio. Se documenta asi para que nadie busque el comando de Prisma que lo hace,
-> porque no existe.
+> script propio. No busques el comando de Prisma que lo hace: no existe.
 
 Cada migracion tiene esta estructura:
 ```
@@ -519,12 +602,10 @@ db/migrations/<timestamp>_<nombre>/
 ```
 
 Cada modelo lleva encima un comentario de documentacion `/// @module <modulo>` que
-declara su modulo propietario (arquitectura hexagonal por modulos, ver
-`## Modulos y arquitectura hexagonal`). Un modelo sin ese comentario es un
-incumplimiento: es lo que evita que un modulo nuevo anada tablas sin dueño. Solo los
-adaptadores driven del modulo propietario pueden consultar ese modelo con Prisma; la
-guardia `tests/guards/guard-arquitectura-modulos.test.ts` lo hace cumplir leyendo el
-esquema y buscando `prisma.<modelo>` fuera de su modulo.
+declara su modulo propietario (ver `## Modulos y arquitectura hexagonal`). Un modelo sin ese
+comentario es un incumplimiento. Solo los adaptadores driven del modulo propietario pueden
+consultar ese modelo con Prisma; la guardia `tests/guards/guard-arquitectura-modulos.test.ts`
+lo hace cumplir leyendo el esquema y buscando `prisma.<modelo>` fuera de su modulo.
 
 El schema vive en `db/schema.prisma`, **no** en la ruta por defecto `prisma/schema.prisma`.
 Eso hay que declararlo (campo `prisma.schema` en `package.json` o `prisma.config.ts`) o
@@ -538,13 +619,19 @@ Proceso:
 3. `pnpm run db:migrate` → `prisma migrate deploy` aplica la migracion.
 4. `pnpm run db:rollback` → `scripts/db-rollback.ts` aplica el `down.sql` de la ultima y
    despues corre `prisma migrate resolve --rolled-back <migracion>`. **Ese segundo paso no
-   es opcional**: Prisma lleva su propio registro en la tabla `_prisma_migrations`, y
-   deshacer el SQL sin avisarle deja el historial mintiendo — la siguiente migracion se
-   aplica sobre un estado que Prisma cree que es otro.
+   es opcional.**
+
+### Por qué
+
+**`/// @module`:** es lo que evita que un modulo nuevo anada tablas sin dueño.
+
+**`migrate resolve --rolled-back`:** Prisma lleva su propio registro en la tabla
+`_prisma_migrations`, y deshacer el SQL sin avisarle deja el historial mintiendo — la siguiente
+migracion se aplica sobre un estado que Prisma cree que es otro.
 
 ## Componentes
 - `components/ui/`: primitivas de shadcn/ui. **Nunca crees un componente si ya existe en shadcn/ui.**
-  Agregas con: `npx shadcn add <component>`.
+  Agregas con: `pnpm exec shadcn add <component>`.
 - `components/shared/`: compuestos construidos con primitivas ui/. Reutilizables entre features.
 - `components/private/`: contienen datos sensibles. El padre (Server Component) valida permisos y
   pasa datos por props. No fetchean datos por si mismos.
@@ -583,23 +670,13 @@ import { LoginForm } from './components';        // SI
 // import { LoginForm } from './login-form';              NO: componente suelto
 ```
 
-Por que:
-
-- **`page.tsx` se lee de un vistazo.** La carpeta de la ruta deja de mezclar archivos del
-  framework con detalles de implementacion.
-- **El barrel es la superficie publica de la ruta.** Lo que no esta en `index.ts` es interno;
-  un componente que solo usa otro componente de la misma ruta no tiene por que exportarse.
-- **Mover un componente a `components/shared/` cuesta una linea**, porque nadie importa por
-  ruta profunda.
-
-Notas que evitan sorpresas:
-
+- Lo que no esta en `index.ts` es interno; un componente que solo usa otro componente de la
+  misma ruta no tiene por que exportarse.
 - Una carpeta dentro de `app/` **no crea una ruta** mientras no contenga `page.tsx` o
   `route.ts`, asi que `components/` es seguro. No hace falta el prefijo `_` de Next.js.
 - El barrel **no borra la frontera cliente/servidor**: `'use client'` sigue declarandose en
   cada archivo de componente que lo necesite, nunca en el `index.ts`.
 - Si la ruta necesita **un solo** componente, tambien va en `components/` con su `index.ts`.
-  La consistencia vale mas que ahorrar una carpeta: asi nadie decide caso por caso.
 - Esto aplica a componentes **de ruta**. `components/ui/`, `components/shared/` y
   `components/private/` mantienen su estructura y se importan por su ruta de siempre.
 
@@ -633,10 +710,22 @@ rechaza. La excepcion se documenta donde se decide, no en un comentario del comp
 **Alcance.** Rige para codigo nuevo. Lo ya mergeado no se audita hacia atras; cuando una
 feature toque un componente existente, se aplica a lo que toque.
 
-**Lo que cuesta.** Descarta librerias de UI que solo se prueban en Chrome escritorio y añade
-una pasada de revision en cada PR con UI. El coste se acepta porque el humano fijo el soporte
-movil como requisito del producto (2026-08-28). No hay ningun incidente previo que la motive:
-la regla es preventiva, no reactiva.
+### Por qué
+
+**Barrel por ruta:**
+
+- **`page.tsx` se lee de un vistazo.** La carpeta de la ruta deja de mezclar archivos del
+  framework con detalles de implementacion.
+- **El barrel es la superficie publica de la ruta.**
+- **Mover un componente a `components/shared/` cuesta una linea**, porque nadie importa por
+  ruta profunda.
+- **Un solo componente tambien en `components/`:** la consistencia vale mas que ahorrar una
+  carpeta; asi nadie decide caso por caso.
+
+**Multiplataforma — lo que cuesta.** Descarta librerias de UI que solo se prueban en Chrome
+escritorio y añade una pasada de revision en cada PR con UI. El coste se acepta porque el humano
+fijo el soporte movil como requisito del producto (2026-08-28). No hay ningun incidente previo
+que la motive: la regla es preventiva, no reactiva.
 
 ## Anti-patrones que el reviewer rechaza
 - Logica de negocio dentro de componentes o handlers de ruta.
@@ -654,7 +743,7 @@ la regla es preventiva, no reactiva.
   en un ERP el redondeo binario se acumula y descuadra.
 - **Cantidad sin unidad de medida** en cualquier tabla de producto o existencias, mientras
   la pregunta abierta 1 del dominio no este cerrada en `null`.
-- Server component fetcheando datos publicos del cliente (usa SWR en el cliente).
+- Fetch de datos desde el cliente sin libreria aprobada en el `design.md` de la feature.
 - Componente privado haciendo fetch de datos sensibles (recibe por props).
 - **Componentes de ruta sueltos junto a `page.tsx`**, o importados por ruta profunda
   (`./components/login-form`) saltandose el barrel `index.ts` de la ruta

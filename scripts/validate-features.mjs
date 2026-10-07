@@ -9,21 +9,25 @@
  * paso 1 y aborta si falta, asi que aqui no se depende de nada que pueda faltar en
  * silencio. Ademas este repo se trabaja tambien desde Windows.
  *
- * Salida: un mensaje por linea en stderr y exit != 0 si algo falla. `init.sh` solo invoca.
+ * Salida: errores en stderr y exit 1; notas en stdout, y avisos en stdout con el prefijo
+ * `AVISO:` (no cambian el codigo de salida). `init.sh` solo invoca.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-const FEATURE_LIST = 'feature_list.json';
 const WT_DIR = '.worktrees';
-// Cupo de `in_progress` por zona (CLAUDE.md regla 1). `fullstack` sube a 3 el 2026-09-22 y `backend` el 2026-09-24.
-const MAX_POR_ZONA = { frontend: 2, backend: 3, fullstack: 3 };
-const cupoDe = (zone) => MAX_POR_ZONA[zone] ?? 2;
+const CONFIG = 'arnes.config.json';
+const IDENTIDAD = '.arnes.local.json';
+// Cupo por defecto si `arnes.config.json` no declara `cupos_por_persona` (CLAUDE.md regla 1).
+const CUPOS_POR_DEFECTO = { frontend: 2, backend: 3, fullstack: 3 };
 const EN_VUELO = ['spec_ready', 'in_progress'];
 
 const errores = [];
 const notas = [];
+// Avisos: salen con el prefijo `AVISO:` en stdout e `init.sh` los pinta en amarillo.
+// No cambian el codigo de salida.
+const avisos = [];
 
 // RAIZ DEL REPO, no el directorio actual. El gate se corre DENTRO del worktree de la
 // feature (`AGENTS.md > Worktrees`), y desde ahi `.worktrees/` NO existe: solo se ve el
@@ -49,7 +53,7 @@ function raizDelRepo() {
   // ancestro que tiene `feature_list.json` y NO cuelga de `.worktrees`.
   let dir = path.resolve('.');
   for (let i = 0; i < 6; i++) {
-    if (existsSync(path.join(dir, FEATURE_LIST)) && path.basename(path.dirname(dir)) !== WT_DIR) return dir;
+    if (existsSync(path.join(dir, 'feature_list.json')) && path.basename(path.dirname(dir)) !== WT_DIR) return dir;
     const padre = path.dirname(dir);
     if (padre === dir) break;
     dir = padre;
@@ -60,8 +64,35 @@ function raizDelRepo() {
 const RAIZ = raizDelRepo();
 const DENTRO_DE_WORKTREE = path.basename(path.dirname(path.resolve('.'))) === WT_DIR;
 
+// `feature_list.json` NO se versiona (arnes v2): es la copia local del board que escribe F0 y
+// vive UNA vez por maquina, en la raiz del worktree principal. Un worktree de feature no tiene
+// copia propia, asi que se lee la de la RAIZ.
+const FEATURE_LIST = RAIZ && existsSync(path.join(RAIZ, 'feature_list.json'))
+  ? path.join(RAIZ, 'feature_list.json')
+  : 'feature_list.json';
+
+/** Lee un JSON opcional: `undefined` si no existe; error del gate si existe y esta roto. */
+function leerJsonOpcional(ruta) {
+  if (!existsSync(ruta)) return undefined;
+  try {
+    return JSON.parse(readFileSync(ruta, 'utf8'));
+  } catch (err) {
+    errores.push(`${ruta} no es JSON valido: ${err.message}`);
+    return undefined;
+  }
+}
+
+// `arnes.config.json` SI se versiona y vive en cada worktree: manda el del directorio actual.
+const config = leerJsonOpcional(CONFIG) ?? (RAIZ ? leerJsonOpcional(path.join(RAIZ, CONFIG)) : undefined);
+const CUPOS = { ...CUPOS_POR_DEFECTO, ...(config?.cupos_por_persona ?? {}) };
+const cupoDe = (zone) => CUPOS[zone] ?? 2;
+
+// Quien soy en Jira. Lo escribe `/jira-connect` en la raiz del worktree principal; no se versiona.
+const identidad = leerJsonOpcional(RAIZ ? path.join(RAIZ, IDENTIDAD) : IDENTIDAD);
+const MI_CUENTA = identidad?.jira_account_id ?? null;
+
 // Fallar, no avisar. Un `warn` aqui reintroduce el agujero que este bloque cierra: el gate
-// seguiria verde habiendo validado a ciegas (`docs/verification.md > El anti-patron: la
+// seguiria verde habiendo validado a ciegas (`docs/gate.md > El anti-patron: la
 // validacion opcional`).
 if (RAIZ === null && DENTRO_DE_WORKTREE) {
   errores.push('no se pudo localizar la raiz del repo desde este worktree: los specs de las features en vuelo no se pueden verificar');
@@ -95,7 +126,12 @@ const ref = (f) => f.key ?? String(f.id);
 const prefijos = (f) => [f.key, f.id].filter((v) => v != null).map(String);
 
 if (!existsSync(FEATURE_LIST)) {
-  console.log(`[features] no hay ${FEATURE_LIST} todavia; nada que validar.`);
+  // Caso normal en CI y en un clon recien hecho: la copia del board no se versiona.
+  if (errores.length > 0) {
+    for (const e of errores) console.error(e);
+    process.exit(1);
+  }
+  console.log('sin copia local del board (feature_list.json): en CI es lo esperado; en local, corre F0');
   process.exit(0);
 }
 
@@ -104,7 +140,9 @@ let jira;
 try {
   const raw = JSON.parse(readFileSync(FEATURE_LIST, 'utf8'));
   features = raw.features;
-  jira = raw.jira;
+  // El board al que pertenece el repo vive en `arnes.config.json` (versionado). El bloque
+  // `jira` de `feature_list.json` es el formato anterior a v2 y queda solo de respaldo.
+  jira = config?.jira ?? raw.jira;
   if (!Array.isArray(features)) throw new Error('la clave "features" no es un array');
 } catch (err) {
   console.error(`[features] ${FEATURE_LIST} no se pudo leer: ${err.message}`);
@@ -122,7 +160,7 @@ const conKey = features.filter((f) => f.key != null);
 if (conKey.length > 0) {
   if (!jira?.project) {
     errores.push(
-      `${FEATURE_LIST} no declara "jira.project": no hay contra que validar que las fichas ` +
+      `${CONFIG} no declara "jira.project": no hay contra que validar que las fichas ` +
       `vengan del board correcto (docs/jira.md > El board al que pertenece el disco).`,
     );
   } else {
@@ -131,7 +169,7 @@ if (conKey.length > 0) {
       errores.push(
         `fichas de otro board en ${FEATURE_LIST} (se esperaba "${jira.project}"): ` +
         `${ajenas.map((f) => f.key).join(', ')}. Si el proyecto cambio a proposito, ` +
-        `actualiza "jira.project"; si no, la ultima importacion apunto al board equivocado.`,
+        `actualiza "jira.project" en ${CONFIG}; si no, la ultima importacion apunto al board equivocado.`,
       );
     } else {
       notas.push(`las ${conKey.length} fichas vienen del proyecto ${jira.project}`);
@@ -213,13 +251,34 @@ for (const f of features) {
   }
 }
 
-// --- 3. Cupo de features in_progress por zona -----------------------------------------
-// Coincide con CLAUDE.md regla 1 y AGENTS.md > Paralelismo. Las de `zone: null` se
-// ignoran (aun sin evaluar), y falla al pasar el cupo de la zona, que es inclusive: 2 en
-// `frontend`, 3 en `backend` y `fullstack` (desde el 2026-09-22 y el 2026-09-24; casos: QC-146 y QC-142).
-// Ojo: esto NO valida el conflicto de archivos entre features de la misma zona; eso sigue
-// siendo criterio del leader leyendo la seccion "Archivos esperados" de cada tasks.md.
-const enProgreso = features.filter((f) => f.status === 'in_progress');
+// --- 3. Toda feature en vuelo tiene dueno, y el cupo es POR PERSONA -------------------
+// Arnes v2 (docs/equipo.md). El assignee de Jira es el candado de equipo: una feature en
+// vuelo sin assignee la puede volver a tomar cualquiera. F0 importa
+// `assignee: {accountId, displayName}`; una copia anterior a v2 no trae el campo en NINGUNA
+// ficha, y eso se avisa en vez de fallar: la primera F0 tras actualizar lo arregla.
+const enVuelo = features.filter((f) => EN_VUELO.includes(f.status));
+const copiaV2 = features.some((f) => Object.prototype.hasOwnProperty.call(f, 'assignee'));
+if (!copiaV2) {
+  avisos.push('la copia del board es anterior al arnes v2 (no trae assignee): corre F0 para importarlo');
+} else {
+  const sinDueno = enVuelo.filter((f) => !f.assignee?.accountId).map(ref);
+  if (sinDueno.length > 0) {
+    errores.push(`features en vuelo sin assignee en Jira: ${sinDueno.join(', ')}. Asignalas (docs/equipo.md > Tomar una feature).`);
+  } else if (enVuelo.length > 0) {
+    notas.push(`las ${enVuelo.length} features en vuelo tienen assignee`);
+  }
+}
+
+// El cupo de `in_progress` por zona cuenta SOLO las mias (CLAUDE.md regla 1); las de
+// `zone: null` se ignoran (aun sin evaluar). Sin identidad local no se sabe quien soy: se
+// cuentan todas, como antes de v2, y se avisa.
+// Ojo: esto NO valida el conflicto de archivos entre features; eso lo hace
+// `scripts/archivos-en-vuelo.mjs` contra las ramas de todo el equipo.
+const esMia = (f) => MI_CUENTA == null || f.assignee?.accountId === MI_CUENTA;
+if (MI_CUENTA == null) {
+  avisos.push(`sin ${IDENTIDAD}: el cupo se cuenta sobre TODO el equipo. Corre /jira-connect para fijar tu identidad.`);
+}
+const enProgreso = features.filter((f) => f.status === 'in_progress' && esMia(f));
 const porZona = new Map();
 for (const f of enProgreso) {
   if (f.zone == null) continue;
@@ -230,7 +289,7 @@ for (const [zone, ids] of porZona) {
     errores.push(`zona ${zone}: ${ids.join(', ')} (${ids.length} in_progress, max ${cupoDe(zone)})`);
   }
 }
-notas.push(`regla de cupo por zona respetada (in_progress=${enProgreso.length})`);
+notas.push(`cupo por zona respetado (${MI_CUENTA ? 'mis' : 'todas las'} in_progress=${enProgreso.length})`);
 
 // --- 4. Specs presentes para features sdd en vuelo ------------------------------------
 // Se acota a "en vuelo" a proposito: las `done` pueden ser previas a la convencion y
@@ -359,3 +418,4 @@ if (errores.length > 0) {
   process.exit(1);
 }
 for (const n of notas) console.log(n);
+for (const a of avisos) console.log(`AVISO: ${a}`);

@@ -57,7 +57,7 @@
 //      y hay un caso que lo comprueba-. «ESTO NO ES LO MIO» y «NO HAY NADA QUE MIRAR» quedan
 //      `skipped` y lo dicen en voz alta, NUNCA verdes: un verde afirmaria «he mirado el diff de
 //      QC-66 y no cruza ninguna frontera» sin haber mirado nada, que es el anti-patron de la
-//      «validacion opcional» de `docs/verification.md`.
+//      «validacion opcional» de `docs/gate.md`.
 //
 // POR QUE R46 NO TIENE MITAD DE CONTENIDO, Y ES CORRECTO QUE NO LA TENGA. Que nadie lo «complete»
 // manana: «esta ficha no anade pantalla» es un hecho HISTORICO de esta rama, no una propiedad del

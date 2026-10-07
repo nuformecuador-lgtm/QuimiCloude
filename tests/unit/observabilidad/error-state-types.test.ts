@@ -12,7 +12,7 @@
 //     declaracion que sigue siendo una union de dos ramas, que `reference` vive SOLO en la del
 //     codigo generico y que NO es opcional.
 //
-// Cada comprobacion trae su caso rojo sintetico (`docs/verification.md > Probar que muerde`):
+// Cada comprobacion trae su caso rojo sintetico (`docs/gate.md > Probar que muerde`):
 // se le pasa el fuente estropeado a mano y se exige el hallazgo concreto.
 
 import { readFileSync } from 'node:fs'

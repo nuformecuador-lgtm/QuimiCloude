@@ -260,7 +260,7 @@ T8, T10 y T12.
 - Archivos: ninguno (salvo lo que traiga el merge).
 - `git fetch origin dev` → `git merge origin/dev` → `./init.sh` **sin flags**. El modo rápido no
   vale aquí: lo que esta feature acopla es SQL, nombres de archivo y la forma del árbol de
-  módulos, y el grafo de imports no lo ve (`docs/verification.md > Lo que --rapido NO cubre`).
+  módulos, y el grafo de imports no lo ve (`docs/gate.md > Lo que --rapido NO cubre`).
 - Atención especial al merge sobre `lib/modules/inventario/**` y sobre `db/schema.prisma`.
 - **Hecho cuando:** `./init.sh` termina en `== init OK ==`, con todas las guardias en verde.
 
