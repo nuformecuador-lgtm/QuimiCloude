@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   CUSTOMER_COLUMN_ID,
+  CUSTOMER_PARAM,
   CUSTOMER_PRESENCE_COLUMN_ID,
   ORDER_ACTION_CUSTOMER_TESTID,
   ORDER_CUSTOMER_FILTER_TESTID,
@@ -23,6 +24,7 @@ import {
   ORDER_LIST_NO_MATCHES_TESTID,
   OrderListSection,
   OrderListSkeleton,
+  orderListHref,
 } from '@/app/(private)/pedidos/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import type { OrderCustomer, OrderSummary } from '@/lib/modules/pedidos';
@@ -131,6 +133,20 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
     throw new Error('searchOrderCustomersAction no debe invocarse sin abrir el filtro');
   }),
 }));
+
+// Espia sin sustituir: la tabla se sigue pintando y se pueden leer los parametros que recibe.
+const { orderTableSpy } = vi.hoisted(() => ({ orderTableSpy: vi.fn() }));
+
+vi.mock('@/app/(private)/pedidos/components/order-table', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/app/(private)/pedidos/components/order-table')>();
+  return {
+    ...original,
+    OrderTable: (props: Parameters<typeof original.OrderTable>[0]) => {
+      orderTableSpy(props);
+      return original.OrderTable(props);
+    },
+  };
+});
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   listRecipeVersionsAction: vi.fn(async () => ({ status: 'success' as const, data: [] })),
@@ -872,7 +888,7 @@ describe('el filtro «Cliente» de la barra', () => {
     return within(screen.getByTestId(ORDER_CUSTOMER_FILTER_TESTID)).getByRole('combobox');
   }
 
-  it('R29: con customer=<uuid> pide la opcion EN PARALELO al listado y la muestra en el control', async () => {
+  it('R29: con customer=<uuid> resuelve la opcion ANTES de listar y la muestra en el control', async () => {
     let resolverOpcion: (value: OrderCustomerFilterOptionResult) => void = () => undefined;
     getCustomerFilterOptionMock.mockReturnValue(
       new Promise((resolve) => {
@@ -884,14 +900,18 @@ describe('el filtro «Cliente» de la barra', () => {
     const seccion = OrderListSection({ params: conCliente(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null });
     await Promise.resolve();
 
-    // Las dos salieron antes de que la opcion respondiera.
+    // Mientras la opcion no responde, el listado no sale: depende de ella.
     expect(getCustomerFilterOptionMock).toHaveBeenCalledWith(CLIENTE.id);
-    expect(listOrdersActionMock).toHaveBeenCalledWith(conCliente());
+    expect(listOrdersActionMock).not.toHaveBeenCalled();
 
     resolverOpcion({ status: 'success', data: CLIENTE });
     render(await seccion);
 
     expect(listOrdersActionMock).toHaveBeenCalledTimes(1);
+    expect(listOrdersActionMock).toHaveBeenCalledWith(conCliente());
+    expect(getCustomerFilterOptionMock.mock.invocationCallOrder[0]).toBeLessThan(
+      listOrdersActionMock.mock.invocationCallOrder[0],
+    );
     expect(campoFiltro()).toHaveValue('Ana Garcia');
   });
 
@@ -901,9 +921,24 @@ describe('el filtro «Cliente» de la barra', () => {
 
     render(await OrderListSection({ params: conCliente(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
-    expect(listOrdersActionMock).toHaveBeenCalledTimes(2);
-    expect(listOrdersActionMock).toHaveBeenLastCalledWith(parametros());
+    expect(listOrdersActionMock).toHaveBeenCalledTimes(1);
+    expect(listOrdersActionMock).toHaveBeenCalledWith(parametros());
     expect(campoFiltro()).toHaveValue('');
+  });
+
+  it('R29: con un uuid que no se resuelve lista UNA sola vez, sin customerId, y la tabla no recibe customer', async () => {
+    getCustomerFilterOptionMock.mockResolvedValue(errorInesperado());
+    listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
+
+    render(await OrderListSection({ params: conCliente(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
+
+    expect(listOrdersActionMock).toHaveBeenCalledTimes(1);
+    const filtros = (listOrdersActionMock.mock.calls[0][0] as DataTableParams).filters;
+    expect(filtros).not.toHaveProperty(CUSTOMER_COLUMN_ID);
+    expect(filtros).not.toHaveProperty('customerId');
+    const tabla = orderTableSpy.mock.lastCall?.[0] as { params: DataTableParams };
+    expect(tabla.params.filters).not.toHaveProperty(CUSTOMER_COLUMN_ID);
+    expect(orderListHref(tabla.params)).not.toContain(`${CUSTOMER_PARAM}=`);
   });
 
   it('R29: con customer=none NO llama a la action de opcion y lista con customerPresence', async () => {
@@ -926,7 +961,7 @@ describe('el filtro «Cliente» de la barra', () => {
     expect(campoFiltro()).toHaveValue('');
   });
 
-  it('R32: canEditCustomer sale de la misma comprobacion que canEditDistribution', async () => {
+  it('R32: canEditCustomer sale de la comprobacion de pedidos.modificar', async () => {
     for (const [permisos, visible] of [
       [['pedidos.consultar', 'pedidos.modificar'], true],
       [['pedidos.consultar'], false],

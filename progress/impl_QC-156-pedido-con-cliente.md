@@ -309,6 +309,31 @@ typecheck y lint en verde; 366 archivos, 360 pasan; 5692 casos pasan, 9 fallan, 
   efecto de QC-156: la feature solo añadió `customerCatalog` a sus deps. Queda señalado para el
   `./init.sh` completo de F2.4.
 
+## Review (OK, 0 bloqueantes) — menores
+
+- **m1:** TZ pasa a `[x]` con el `./init.sh` completo de F2.4 (ver abajo).
+- **m2 (cerrado):** `canEditCustomer` tiene su propia variable, derivada de `pedidos.modificar`, y ya no
+  reutiliza `canEditDistribution`.
+- **m3 (cerrado):** con `customer=<uuid>` la sección resuelve primero la opción del filtro y lista
+  **una sola vez**, con el filtro si existe y sin él si no (design § 8: «quita el filtro antes de
+  listar»). Esto sustituye el «en paralelo» de tasks F7; el test cambia de «en paralelo» a «antes» y
+  se añade uno que cuenta una sola llamada al listado cuando el uuid no se resuelve.
+- **m4 (riesgo conocido, aceptado por el leader):** R40(d) de `e2e/pedido-con-cliente.spec.ts` saca el id
+  de `setOrderCustomerAction` del JS servido y hace `POST` con `Next-Action`. Es el primer E2E del repo
+  que llama así a una Server Action y depende del formato interno del bundle de Next: una actualización
+  de Next puede romperlo sin que cambie el comportamiento. No debe copiarse sin conocer esto.
+- **m5 (riesgo conocido, aceptado por el leader):** el atajo de R13 y `setOrderCustomer` no bloquean la
+  fila ni vuelven a comprobar el estado dentro de la transacción (decidido en design § 4.1.1, § 4.2 y
+  A9). Una edición concurrente que cambie la cantidad entre la lectura y la escritura del atajo no se
+  revierte. Es lo deseado, pero ningún test de concurrencia lo prueba.
+
+## F2.3 — sincronización con `dev`
+
+`git fetch origin dev` + `git merge origin/dev` → `f545a186`, sin conflictos. Llegan solo cambios del
+arnés (agentes, docs, `init.sh`, guardias nuevas, `tests/baseline-rojos.json`); ningún archivo en común
+con la feature y **ninguna migración nueva**, así que no hizo falta `migrate deploy` sobre
+`QuimiCloude_QC156`.
+
 ## CHECKPOINTS (revisión del implementer; el veredicto es del reviewer)
 
 - Especificación: existen los tres archivos; tasks T0, B1–B6, F1–F7 y TI marcadas `[x]`. TZ queda

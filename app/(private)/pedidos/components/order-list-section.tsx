@@ -110,10 +110,10 @@ async function canModifyResponsibles(): Promise<boolean> {
 const PERMISSION_DENIED = new Error('permiso denegado');
 
 /**
- * Presentacion, no autorizacion: decide si se pinta la edicion acotada de reparto y unidad. La
- * Server Action vuelve a exigir el permiso.
+ * Presentacion, no autorizacion: decide si se pintan las ediciones del pedido. Cada Server Action
+ * vuelve a exigir el permiso.
  */
-async function canEditOrderDistribution(): Promise<boolean> {
+async function hasOrderModifyPermission(): Promise<boolean> {
   const user = await identity.getSessionUser();
   try {
     assertPermission(user, 'pedidos.modificar', () => PERMISSION_DENIED);
@@ -233,15 +233,11 @@ async function loadCustomerFilterOption(params: DataTableParams) {
 }
 
 /**
- * Lista y resuelve el filtro de cliente a la vez. Si el cliente de la direccion no se resuelve, el
- * filtro se descarta y se lista otra vez sin el: la pantalla no puede filtrar por algo que no
- * sabe nombrar.
+ * Resuelve el cliente de la direccion antes de listar: si no se resuelve, se lista sin el filtro,
+ * porque la pantalla no puede filtrar por algo que no sabe nombrar.
  */
 async function listWithCustomerFilter(params: DataTableParams) {
-  const [listed, option] = await Promise.all([
-    listOrdersAction(params),
-    loadCustomerFilterOption(params),
-  ]);
+  const option = await loadCustomerFilterOption(params);
 
   if (option === null) {
     const withoutFilter = withFilter(params, CUSTOMER_COLUMN_ID, null);
@@ -254,7 +250,7 @@ async function listWithCustomerFilter(params: DataTableParams) {
       : params.filters[CUSTOMER_PRESENCE_COLUMN_ID] !== undefined
         ? { kind: 'none' }
         : null;
-  return { params, result: listed, customerFilter };
+  return { params, result: await listOrdersAction(params), customerFilter };
 }
 
 export async function OrderListSection({
@@ -314,13 +310,15 @@ export async function OrderListSection({
     Las tres lecturas de aqui si van en paralelo entre si: ninguna depende de otra, y esperarlas
     en fila solo sumaria latencia.
   */
-  const [responsiblesByOrder, responsiblesCatalog, coverageByOrder, canEditDistribution] =
+  const [responsiblesByOrder, responsiblesCatalog, coverageByOrder, canModifyOrders] =
     await Promise.all([
       loadResponsibles(items.map((order) => order.id)),
       loadResponsiblesCatalog(),
       loadCoverage(items.map((order) => order.id)),
-      canEditOrderDistribution(),
+      hasOrderModifyPermission(),
     ]);
+  const canEditDistribution = canModifyOrders;
+  const canEditCustomer = canModifyOrders;
 
   return (
     <div className="flex flex-col gap-4" data-testid="order-list">
@@ -342,7 +340,7 @@ export async function OrderListSection({
         responsiblesCatalog={responsiblesCatalog}
         coverageByOrder={coverageByOrder}
         canEditDistribution={canEditDistribution}
-        canEditCustomer={canEditDistribution}
+        canEditCustomer={canEditCustomer}
         customerFilter={customerFilter}
       />
     </div>
