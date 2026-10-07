@@ -75,11 +75,21 @@ export type StepReaderProps = {
   }) => void;
 };
 
+/**
+ * Posicion de entrada, desde 1, recortada a los pasos que hay; `null` si no hay pasos. Exportada
+ * para que quien registra la posicion mande la misma que se ve.
+ */
+export function clampStepPosition(
+  position: number | null | undefined,
+  stepsCount: number,
+): number | null {
+  if (stepsCount === 0) return null;
+  if (position === null || position === undefined || !Number.isFinite(position)) return 1;
+  return Math.min(Math.max(Math.trunc(position), 1), stepsCount);
+}
+
 function initialIndexFor(position: number | undefined, total: number): number {
-  if (position === undefined || !Number.isFinite(position) || total === 0) {
-    return 0;
-  }
-  return Math.min(Math.max(Math.trunc(position), 1), total) - 1;
+  return (clampStepPosition(position, total) ?? 1) - 1;
 }
 
 /** Clave de un item marcado. El paso entra en la clave: marcar en el paso 2 no marca en el 1. */

@@ -7,6 +7,7 @@ import { setupUser } from '../../helpers/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { StepReader } from '@/components/shared/step-reader';
+import { clampStepPosition } from '@/components/shared/step-reader/step-reader';
 import type { RecipeStepDocument } from '@/lib/modules/recetas';
 import {
   NARROW_VIEWPORT,
@@ -1069,3 +1070,14 @@ describe.each(['lectura', 'ejecucion'] as const)(
     });
   },
 );
+
+describe('StepReader — R37: recorte de la posicion de entrada', () => {
+  it('R37: clampStepPosition deja la posicion dentro, sube a 1, baja al maximo y sin pasos da null', () => {
+    expect(clampStepPosition(2, 3)).toBe(2);
+    expect(clampStepPosition(0, 3)).toBe(1);
+    expect(clampStepPosition(-4, 3)).toBe(1);
+    expect(clampStepPosition(null, 3)).toBe(1);
+    expect(clampStepPosition(9, 3)).toBe(3);
+    expect(clampStepPosition(2, 0)).toBeNull();
+  });
+});

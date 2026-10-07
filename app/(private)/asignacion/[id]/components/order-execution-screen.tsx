@@ -5,6 +5,7 @@ import { useActionState, useRef, useState } from 'react';
 import { ConfirmActionDialog } from '@/components/shared/confirm-action-dialog';
 import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import { StepReader } from '@/components/shared/step-reader';
+import { clampStepPosition } from '@/components/shared/step-reader/step-reader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
@@ -65,12 +66,6 @@ const IGNORED_PREV_STATE: FinishAssignedOrderResult = { status: 'success' };
 
 type StepChange = { readonly direction: 'advance' | 'go_back'; readonly position: number };
 
-/** Igual que el recorte de `StepReader`: una receta sin pasos no tiene posicion. */
-function entryStepPosition(resume: number | null, total: number): number | null {
-  if (total === 0) return null;
-  return Math.min(Math.max(resume ?? 1, 1), total);
-}
-
 /** Con la receta dada de baja el titulo queda solo con el numero: el aviso va aparte. */
 export function formatOrderExecutionTitle(numberText: string, recipeName: string | null): string {
   return recipeName === null ? numberText : `${numberText} - ${recipeName}`;
@@ -84,7 +79,7 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [stepPosition, setStepPosition] = useState(() =>
-    entryStepPosition(execution.resumeStepPosition, execution.steps.length),
+    clampStepPosition(execution.resumeStepPosition, execution.steps.length),
   );
   // Encadenadas para que lleguen en el orden de los clics; un fallo se pierde sin avisar.
   const stepMoves = useRef<Promise<void>>(Promise.resolve());
