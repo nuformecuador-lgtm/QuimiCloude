@@ -288,24 +288,26 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
 // R28 — ningun test E2E nombra clientes
 // ---------------------------------------------------------------------------------------------
 
-describe('R28 — el UNICO E2E que nombra clientes es e2e/clientes.spec.ts', () => {
-  const E2E_DE_CLIENTES = 'clientes.spec.ts'
+describe('R28 — los UNICOS E2E que nombran clientes son e2e/clientes.spec.ts y la excepcion de QC-156', () => {
+  // Lista cerrada. La segunda entrada es el E2E de R40 de QC-156: su nombre lo fija
+  // specs/QC-156-pedido-con-cliente/design.md > 10 e importa el barrel de `clientes`.
+  const E2E_PERMITIDOS: ReadonlySet<string> = new Set(['clientes.spec.ts', 'pedido-con-cliente.spec.ts'])
   const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
 
-  /** Archivos de e2e/, por nombre o por contenido, que delatan clientes fuera del unico spec
-   *  permitido. Parametrizado por directorio para que la sensibilidad pueda fabricar su propio
+  /** Archivos de e2e/, por nombre o por contenido, que delatan clientes fuera de los specs
+   *  permitidos. Parametrizado por directorio para que la sensibilidad pueda fabricar su propio
    *  arbol en un tmpdir. */
   function e2eAjenosAClientes(e2eDir: string = join(repoRoot, 'e2e')): string[] {
     return filesIn(e2eDir)
       .map((ruta) => relative(e2eDir, ruta).split(sep).join('/'))
-      .filter((relativa) => relativa !== E2E_DE_CLIENTES)
+      .filter((relativa) => !E2E_PERMITIDOS.has(relativa))
       .filter(
         (relativa) => /cliente/i.test(relativa) || MARCADORES_DE_CLIENTES.test(leer(join(e2eDir, relativa))),
       )
   }
 
   it('ningun otro archivo de e2e/, ni por nombre ni por contenido, nombra clientes', () => {
-    // Se compara TODO archivo de e2e/ salvo `e2e/clientes.spec.ts`: cualquier otro spec que
+    // Se compara TODO archivo de e2e/ salvo los de E2E_PERMITIDOS: cualquier otro spec que
     // nombre clientes es un hallazgo.
     const hallazgos = e2eAjenosAClientes()
     expect(hallazgos, `spec E2E ajeno con marca de clientes: ${hallazgos.join(', ')}`).toEqual([])
@@ -317,6 +319,21 @@ describe('R28 — el UNICO E2E que nombra clientes es e2e/clientes.spec.ts', () 
       const relativoFabricado = 'otro-clientes.spec.ts'
       writeFileSync(join(raiz, relativoFabricado), "test('nombra clientes', () => {})\n")
       expect(e2eAjenosAClientes(raiz)).toContain(relativoFabricado)
+    } finally {
+      rmSync(raiz, { recursive: true, force: true })
+    }
+  })
+
+  it('la excepcion es exacta: un fabricado e2e/pedido-con-cliente-otro.spec.ts dispara', () => {
+    const raiz = mkdtempSync(join(tmpdir(), 'qc156-scope-'))
+    try {
+      const permitido = 'pedido-con-cliente.spec.ts'
+      const relativoFabricado = 'pedido-con-cliente-otro.spec.ts'
+      writeFileSync(join(raiz, permitido), "import '@/lib/modules/clientes'\n")
+      writeFileSync(join(raiz, relativoFabricado), "test('nombra clientes', () => {})\n")
+      const hallazgos = e2eAjenosAClientes(raiz)
+      expect(hallazgos).toContain(relativoFabricado)
+      expect(hallazgos).not.toContain(permitido)
     } finally {
       rmSync(raiz, { recursive: true, force: true })
     }

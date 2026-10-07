@@ -283,7 +283,15 @@ estaban previstos en design § 9:
    `e2e/clientes.spec.ts`»): el archivo casa por nombre (`/cliente/i`, el nombre lo fija tasks.md) y por
    contenido (`import … from '@/lib/modules/clientes'` casa con `/clientes\b`).
 
-Pendiente de la decisión del leader.
+**Decisiones del leader (2026-10-06):**
+
+1. `pedido-con-cliente.spec.ts` entra en `E2E_ESPERADOS` de `guard-identificador-de-request.test.ts`,
+   con su motivo, como `aislamiento-pedidos.spec.ts` y `proveedores.spec.ts`. No ejercita el cruce
+   borde → acción del identificador de petición: el diferimiento de QC-71 R21 sigue intacto.
+2. Opción (a): en `tests/unit/clientes/scope.test.ts:291`, `e2e/pedido-con-cliente.spec.ts` entra como
+   **única** excepción nombrada además de `clientes.spec.ts`, con un comentario que cita QC-156 y design
+   § 10. La lista sigue cerrada. El nombre del archivo y el import del barrel de `clientes` se quedan
+   como están.
 
 ## CHECKPOINTS (revisión del implementer; el veredicto es del reviewer)
 
