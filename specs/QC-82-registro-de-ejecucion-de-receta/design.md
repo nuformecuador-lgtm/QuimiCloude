@@ -705,6 +705,7 @@ como hizo `DELIVERED_ORDER_PARAM`; el valor no puede aludir al asistente (el mis
 **encima de las pestañas de vista** (QC-145), así que se ve sea cual sea la vista.
 
 ## 7. Guardias y listas cerradas: qué se toca y qué muerde después
+> **Enmiendas F2.1 (humano, 2026-10-06).** (1) `tests/unit/asignaciones/packing-limits.test.ts` (QC-168) se enmienda con nota fechada: su R44 admite el registro de ejecución en `start-packing.ts` y `finish-packing.ts`, y su R45 deja de barrer `specs/QC-82-*`; el resto del archivo no cambia. (2) En `order-execution-screen.test.tsx`, además del mock y el fixture, la aserción de R18 (QC-125) pasa a `[orderId, stepPosition]`; lo que protege, que no viaje nada de la espera, se mantiene. (3) La carrera de R16 abierta por T10 se cierra en `startAssignedOrder`: el `OrderNotFoundError` de la rama `PENDIENTE` cuando el pedido ya está `EN_CURSO` se trata como `stale` y se vuelve a leer.
 
 | Guardia / lista | Qué exige | Qué pasa aquí | Cuándo |
 | --- | --- | --- | --- |
