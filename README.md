@@ -30,6 +30,7 @@ código, estado en disco, trazabilidad requisito→test y un gate ejecutable.
 
 | Para | Mira |
 | --- | --- |
+| **Cómo se usa, con el agente o a mano** | `docs/guia-de-uso.md` |
 | El flujo completo y quién hace qué | `AGENTS.md` |
 | Trabajo en equipo, candado, cupo | `docs/equipo.md` |
 | El gate (local rápido, CI completo) | `docs/gate.md` |

@@ -185,7 +185,7 @@ app/(public)/login/
 `.claude/agents/frontend_dev.md > Reglas`.)
 
 1. NUNCA inventes componentes si los tiene shadcn/ui. Usa `pnpm exec shadcn add <component>`.
-2. Usa `kebab-case.tsx` para componentes UI, `PascalCase.tsx` para shared/private.
+2. Usa `kebab-case.tsx` para todos los archivos de componentes (UI, shared y private); el nombre exportado va en `PascalCase` (`docs/conventions.md > Nombres`).
 5. No hagas `fetch` a `/api/*` del mismo proyecto para mutaciones; usa Server Actions.
 6. La carga de datos va por Server Components; no fetchees del cliente sin libreria aprobada.
 7. Si un componente es privado (datos de usuario especifico), vive en `components/private/`

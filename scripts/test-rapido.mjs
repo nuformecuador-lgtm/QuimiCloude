@@ -68,7 +68,22 @@ function runVitest(args, label) {
   return result.status ?? 1;
 }
 
-const files = changedFiles();
+// Rojos heredados (`tests/baseline-rojos.json`): deuda AJENA ya registrada. El modo rapido no compara
+// contra el baseline como el completo, asi que sin esto bastaba con tocar un archivo de la lista
+// (un comentario, una cita) para que el gate local saliera rojo por algo que no es tuyo. Se
+// excluyen de la seleccion y se dice cuales; el CI los sigue corriendo y comparando.
+function rojosHeredados() {
+  try {
+    return Object.keys(JSON.parse(readFileSync('tests/baseline-rojos.json', 'utf8')).archivos ?? {});
+  } catch {
+    return [];
+  }
+}
+const HEREDADOS = rojosHeredados();
+const EXCLUIR = HEREDADOS.flatMap((f) => ['--exclude', f]);
+
+// Un test heredado que esta en el diff entraria por nombre aunque se excluya por glob: fuera tambien.
+const files = changedFiles().filter((f) => !HEREDADOS.includes(f));
 
 let status = 0;
 
@@ -76,13 +91,17 @@ if (files.length === 0) {
   console.log(`[test:rapido] el diff vs ${BASE_REF} no toca codigo con tests: nada que relacionar.`);
 } else {
   status = runVitest(
-    ['related', '--run', '--passWithNoTests', ...files],
+    ['related', '--run', '--passWithNoTests', ...EXCLUIR, ...files],
     `tests relacionados con ${files.length} archivo(s) del diff vs ${BASE_REF}`,
   );
 }
 
 if (status === 0) {
-  status = runVitest(['run', 'guard', '--passWithNoTests'], 'todas las guardias');
+  status = runVitest(['run', 'guard', '--passWithNoTests', ...EXCLUIR], 'todas las guardias');
 }
 
+if (HEREDADOS.length > 0) {
+  console.log(`
+[test:rapido] ${HEREDADOS.length} rojo(s) heredado(s) del baseline excluidos de esta seleccion; el CI los compara.`);
+}
 process.exit(status);

@@ -75,6 +75,7 @@ Después:
 
 ## Mapa rápido
 
+- **Cómo se usa, con el agente o a mano** → `docs/guia-de-uso.md`
 - Cómo delegar y en qué orden → `AGENTS.md`
 - Qué leer, cuándo y cuánto → `docs/lectura.md`
 - Trabajar en equipo: candado, cupo personal, conflictos → `docs/equipo.md`

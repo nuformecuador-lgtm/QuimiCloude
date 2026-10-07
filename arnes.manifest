@@ -18,6 +18,7 @@ docs/jira.md
 docs/worktrees.md
 docs/gate.md
 docs/lectura.md
+docs/guia-de-uso.md
 docs/equipo.md
 docs/grafo-de-codigo.md
 scripts/validate-features.mjs

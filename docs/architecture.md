@@ -236,13 +236,19 @@ guarda**, y la razon escrita fue «el ERP es de un solo tenant». Esa premisa ya
 - **ORM:** Prisma 6 (`prisma` / `@prisma/client` ^6.19). Migraciones versionadas, con `down.sql`
   **de convencion propia** (ver `## Migraciones up/down`).
 - **Validacion:** zod (v4) en el borde de toda entrada externa.
-- **Data fetching cliente:** SWR para queries publicas/no sensibles.
+- **Data fetching cliente:** no hay libreria aprobada (SWR NO esta instalado). Los datos se leen en
+  Server Components y bajan por props; si una pantalla necesita fetch de cliente, la libreria se
+  propone en su `design.md` y pasa por `## Dependencias de terceros`.
 - **Mutaciones internas:** Server Actions (`'use server'`) para crear/editar/eliminar
   dentro del mismo proyecto. No usar `fetch` a rutas API internas para mutaciones.
 - **API externa/webhooks:** Route handlers en `app/api/` con zod + firma/idempotencia.
 - **Deploy:** Vercel. Secretos en variables de entorno, nunca en repo.
-- **Integraciones externas:** ninguna definida todavia. Cuando entre la primera, se
-  documenta aqui con su cliente en `lib/modules/<modulo>/adapters/driven/`.
+- **Integraciones externas** (cada una con su cliente en `lib/modules/<modulo>/adapters/driven/` y
+  su fila en `docs/dependencias.md`):
+  - Anthropic (`@anthropic-ai/sdk`) y Google Gemini (`@google/genai`): lectura de PDFs con IA.
+  - Upstash QStash (`@upstash/qstash`): cola de procesamiento de PDFs.
+  - Supabase Storage (`@supabase/storage-js`): imagenes de recetas.
+  - Resend (`resend`): correo para establecer la contrasena.
 
 ## Dependencias de terceros
 
@@ -515,7 +521,7 @@ error mas comun al montar Prisma sobre Supabase.
 - El corte va en **los dos sentidos**: sin sesion valida en una ruta privada, redirige al login con
   la ruta pedida en `next`; con sesion valida en el login, redirige al dashboard.
 - Componentes `private/` reciben datos por props desde el Server Component padre.
-- Datos publicos: el cliente fetchea con SWR desde el navegador.
+- Datos publicos: tambien se leen en el Server Component (no hay libreria de fetch de cliente aprobada).
 - Datos privados (balances, PII): pre-fetch en Server Component, stream al cliente.
 - **El corte por permiso vive en la pagina.** Cada `page.tsx` de `app/(private)/` abre con
   `requirePagePermission('<modulo>.consultar')`, antes de cualquier lectura de datos. Si el permiso
@@ -737,7 +743,7 @@ que la motive: la regla es preventiva, no reactiva.
   en un ERP el redondeo binario se acumula y descuadra.
 - **Cantidad sin unidad de medida** en cualquier tabla de producto o existencias, mientras
   la pregunta abierta 1 del dominio no este cerrada en `null`.
-- Server component fetcheando datos publicos del cliente (usa SWR en el cliente).
+- Fetch de datos desde el cliente sin libreria aprobada en el `design.md` de la feature.
 - Componente privado haciendo fetch de datos sensibles (recibe por props).
 - **Componentes de ruta sueltos junto a `page.tsx`**, o importados por ruta profunda
   (`./components/login-form`) saltandose el barrel `index.ts` de la ruta

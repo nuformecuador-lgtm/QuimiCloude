@@ -3,16 +3,19 @@
 
 ## TypeScript
 - `strict: true`. Prohibido `any` salvo justificación explícita en comentario.
-- Tipos de dominio en `lib/types.ts` o colocados junto al módulo que los usa.
+- Tipos de dominio junto al módulo que los usa (`lib/modules/<modulo>/domain/`). No hay un
+  `lib/types.ts` global: la raíz de `lib/` solo admite `modules/`, `shared/`, `composition/` y `utils.ts`.
 - Validación de entrada externa con un validador (p. ej. zod) en el borde.
 
 ## Nombres
-- Archivos: `kebab-case.ts`. Componentes React: `PascalCase.tsx`.
+- Archivos: `kebab-case.ts`, y también los componentes: `kebab-case.tsx` (así están los 283 de
+  `app/` y `components/`). El **nombre exportado** del componente sí va en `PascalCase`.
 - Funciones y variables: `camelCase`. Constantes de entorno: `UPPER_SNAKE`.
 - Tablas y columnas Supabase: `snake_case`.
 
 ## Estilo
-- Formateo con la config del repo (Prettier/ESLint). No se discute manualmente.
+- Formateo y estilo con la config de ESLint del repo (`eslint.config.mjs`). No hay Prettier
+  instalado; si se quiere, entra como dependencia por `docs/dependencias.md`.
 - Funciones cortas y con una sola responsabilidad. Si necesita comentario para
   explicar qué hace, probablemente hay que partirla.
 
