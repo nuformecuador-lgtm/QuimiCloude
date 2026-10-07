@@ -146,6 +146,9 @@ Contrato completo: `docs/jira.md`.
    - Lanza `spec_author` con el key de la feature. Produce `requirements.md` (EARS, `R1`…),
      `design.md` (con al menos una alternativa descartada) y `tasks.md` (con su sección de
      archivos esperados).
+   - Si `spec_author` devuelve `BLOQUEADO: ya existe <ref>`, **PARA y pregunta** al humano
+     (`docs/specs.md > Antes de especificar: lo que ya existe`). Relanza `spec_author` con su
+     decisión: él la escribe como fila en `Decisiones cerradas`.
 3. **(F1.3)** Cambia a `spec_ready`, mueve la tarjeta a *Spec en revisión*, comenta en el issue la
    ruta del spec y haz `git push`.
 4. **(F1.4) PARA. Pide aprobación humana.**

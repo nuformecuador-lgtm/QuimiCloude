@@ -14,6 +14,12 @@ Antes de escribir, lee: `docs/specs.md`, `docs/architecture.md`, `docs/conventio
 y la descripción de la feature (consúltala por `key` en `feature_list.json`, en la raíz del
 worktree principal; no leas el archivo entero) y su `progress/features/<key>.md`.
 
+**Antes de escribir, busca si esto ya existe** (`docs/specs.md > Antes de especificar: lo que ya
+existe`): `feature_list.json`, `specs/` y el grafo. Si aparece algo que no esté ya resuelto en
+`## Decisiones cerradas (no reabrir)`, **no escribas el spec**: anótalo en `## Preguntas abiertas`
+de `requirements.md` y devuelve `BLOQUEADO: ya existe <ref>`. Si sigues, `design.md` abre con
+`## Lo que ya existe`.
+
 Produce exactamente tres archivos en `specs/<feature>/`:
 
 1. `requirements.md` — requisitos numerados `R1`, `R2`… en notación EARS estricta.

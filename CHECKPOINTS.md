@@ -8,6 +8,9 @@ valida contra las dos listas, punto por punto.
 - [ ] Existe `specs/<feature>/requirements.md` con requisitos EARS numerados `R1`, `R2`…
 - [ ] Existe `specs/<feature>/design.md` con al menos una alternativa descartada y su porqué.
 - [ ] Existe `specs/<feature>/tasks.md` y todas las tasks estan marcadas `[x]`.
+- [ ] `specs/<feature>/design.md` abre con `## Lo que ya existe` (busqueda hecha) y el diff no
+      re-crea nada de lo listado ahi. Specs escritos desde 2026-10-06
+      (`docs/specs.md > Antes de especificar: lo que ya existe`).
 
 ## Equipo
 - [ ] La feature tiene assignee en Jira y su rama se publico con `wt.sh new` (candado).
