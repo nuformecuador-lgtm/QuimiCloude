@@ -190,3 +190,13 @@ cada migración / test de integración nuevo tiene que actualizar (mismo patrón
   rojas `guard-identificador-de-request` y `guard-aislamiento-integracion`).
 - `pnpm run typecheck`: verde. `pnpm run lint`: 0 errores, 8 warnings preexistentes ajenos.
 - `./init.sh` / `pnpm test` no se corrieron (indicación del leader).
+
+## Consolidación del implementer (T15 parcial)
+
+- **Mapa R1–R26:** en los mapas parciales de las dos tandas de arriba (T1–T3 / T7–T10 / T4–T6, T11–T14).
+- **R27** (sin E2E): revisión. `git diff --stat 1a1db86e -- e2e package.json db/schema.prisma app components middleware.ts lib/shared lib/modules/asignaciones lib/modules/inventario` sale vacío.
+- **R28** (sin dependencia ni modelo): `tests/guards/guard-dependencias-aprobadas.test.ts` + `tests/unit/identity/schema/conditioning-role-migration.test.ts` (sin DDL). `package.json` y `db/schema.prisma` no aparecen en el diff.
+- **Fuera de la lista declarada de `tasks.md`:** `tests/guards/guard-identificador-de-request.test.ts` y `tests/integration/aislamiento.json` (altas en los censos de migraciones y de tests de integración, mismo patrón que QC-213).
+- **Base propia:** `QuimiCloude_QC216`, con el `.env` original en `.env.bak-QuimiCloude`. Al cerrar hay que borrarla y restaurar el `.env`.
+- **`./init.sh --rapido`:** se para en la validación de `feature_list.json` porque la copia del worktree no tiene QC-216. Lo corrí a mano: typecheck verde y lint con 0 errores y 8 warnings preexistentes. El sistema mató `test:rapido` por falta de memoria (no por un fallo) y no lo relancé. Las tandas habían corrido por separado `vitest related` y las guardias: 51 archivos, 695 passed y 11 skipped, todo verde.
+- **T15 abierta:** faltan `./init.sh` completo (lo corre el leader) y la observación manual del selector de usuarios.
