@@ -546,6 +546,13 @@ asignaciones/adapters/driven/persistence/execution-transaction-prisma.ts
    └─ withExecutionTransaction(run) = prisma.$transaction(run, { maxWait: 10_000, timeout: 30_000 })
 ```
 
+> _Nota fechada, 2026-10-06 (F2.1): el código no sigue la última línea del diagrama al pie de la
+> letra. `startPackingAliveOrder` abre `prisma.$transaction` y delega en una función privada,
+> `lockAndStartPackingAlive(id, packerId, now, scope, tx)`, que es la que también usa
+> `createOrderPackingRepository(db)`. La forma literal pone roja `guard-ambito-empresa-pedidos`, que
+> sigue el ámbito por funciones con nombre y no a través de un método del objeto devuelto. Mismo
+> cuerpo y misma firma pública: **no se «arregla» hacia el diagrama**._
+
 - **Quién abre la transacción**: un driven de `asignaciones`, con los mismos `maxWait`/`timeout` que
   `withOrderTransaction` (Finalizar consume material dentro). No sabe nada de `pedidos`.
 - **Quién ata las partes**: `lib/composition`. `orderTransactionScopeOn` es la extracción del cuerpo

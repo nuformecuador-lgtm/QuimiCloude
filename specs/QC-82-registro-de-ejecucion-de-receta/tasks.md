@@ -437,7 +437,7 @@ Entrada `commit` en `aislamiento.json` con `motivo` y `desde`. Cada caso limpia 
 antes que pedidos (y lotes de producto terminado antes que productos, como hacen las E2E de empaque).
 **Depende de:** T13, T25, T26.
 
-### T20 [ ] — E2E
+### T20 [x] — E2E
 **Toca:** `e2e/registro-ejecucion.spec.ts`
 **Hacer:** usar `e2e/helpers/landing.ts` para entrar (lo exige `guard-e2e-landing`). Fixtures: dos
 pedidos asignados al **Operador** (no tiene `pedidos.consultar`, así que puede ser responsable) sobre
@@ -461,7 +461,7 @@ tensión de QC-125). **No** se reescriben R10 ni R18.
 **Hecho cuando:** la nota existe y no hay ningún otro cambio en ese archivo (`git diff` lo muestra).
 **Depende de:** nada.
 
-### T23 [ ] — Las limpiezas de las E2E existentes
+### T23 [x] — Las limpiezas de las E2E existentes
 **Toca:** las E2E cuya limpieza borra pedidos **después** de abrir la pantalla de ejecución, y las dos
 que A3 vuelve a anotar.
 **Hacer:** confirmar una a una si abre `assignedOrderRoute(...)`; en las que sí, borrar

@@ -399,3 +399,38 @@ typecheck verde; lint 0 errores. `test:rapido`: **393 archivos, 7 rojos / 386 ve
 Explícitos, porque `--rapido` no los incluye: `pnpm exec vitest run
 tests/unit/asignaciones/packing-limits.test.ts tests/integration/asignaciones/execution-atomicity.int.test.ts`
 ⇒ **2 archivos, 17/17 verdes**.
+
+## E2E de T20 y T23 (corrió el leader, 2026-10-06)
+
+Contra `QuimiCloude_QC82`, sin otra E2E en la máquina, `--workers=1`, chromium y webkit, los 10 specs:
+`registro-ejecucion`, `ejecucion-receta`, `empaque`, `envases-del-pedido`, `pasos-de-envasado`,
+`pedido-en-varias-presentaciones`, `pedidos-asignados`, `producto-terminado`, `recetas-porcentaje`,
+`reserva-de-material`.
+
+```
+Primera corrida: 1 failed / 41 passed (21.0m)
+  [webkit] pedidos-asignados.spec.ts:326
+  Test timeout of 180000ms exceeded while setting up "context"
+  browser.newContext: Test ended
+Repetición: pedidos-asignados.spec.ts --project=webkit -> 4 passed (31.1s)
+```
+
+El rojo fue un fallo al lanzar webkit (`browser.newContext`), no del test: la repetición pasa 4/4.
+Con eso **T20** (R39, R40) y **T23** (las 9 limpiezas; lista de confirmadas y descartadas arriba)
+quedan cerradas y marcadas.
+
+## Vuelta 1 de revisión (2026-10-06): `progress/review_QC-82-registro-de-ejecucion-de-receta.md` (`a13be33f`)
+
+Rechazada con 3 bloqueantes y 6 menores; se corrigen todos en esta vuelta.
+
+| # | Qué | Quién | Commit |
+| --- | --- | --- | --- |
+| 1 | `qc145-estado-solo-planta.test.ts`: la lista cerrada de `order-prisma.ts` ve `lockAndStartPackingAlive` (lista ajena tocada, nota fechada) | backend_dev | (abajo) |
+| 2 | `company-scope.int.test.ts`: soltar y restaurar `order_execution_entries_order_id_company_id_fkey` | backend_dev | (abajo) |
+| 3 | T20 y T23 marcadas; salida de Playwright arriba | implementer | este commit |
+| 4 | Nota fechada en `design.md > 4` sobre `lockAndStartPackingAlive` | implementer | este commit |
+| 5 | `progress/impl_QC-168-estado-por-empacar.md`: nota fechada, R45 sin test | implementer | este commit |
+| 6 | Barrido de fuente R37 sobre `packing-order-screen.tsx` | frontend_dev | (abajo) |
+| 7 | `cancelAssignedOrder`: `not_cancellable` si el pedido cambia entre lecturas | backend_dev | (abajo) |
+| 8 | Una sola regla de recorte de la posición (exportada desde `step-reader.tsx`) | frontend_dev | (abajo) |
+| 9 | Assignee en Jira: lo pone el leader; `progress/features/QC-82.md` no se toca | leader | — |
