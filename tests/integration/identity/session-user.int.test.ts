@@ -41,6 +41,7 @@ import { findActiveSessionUserById } from '@/lib/modules/identity/adapters/drive
 import {
   DOCUMENT_TYPE_CC,
   normalizeCompanyName,
+  ROLE_ACONDICIONAMIENTO,
   ROLE_MAESTRO,
   SEED_ROLE_PERMISSIONS,
 } from '@/lib/modules/identity';
@@ -432,6 +433,71 @@ describe('findActiveSessionUserById sin empresa (QC-161)', () => {
       expect(resuelta?.context).toBeNull();
     } finally {
       await prisma.user.deleteMany({ where: { id: maestro.id } });
+    }
+  });
+});
+
+describe('findActiveSessionUserById con el rol de acondicionamiento', () => {
+  async function crearAcondicionador(): Promise<{ id: string; username: string }> {
+    const marca = randomUUID();
+    const { id: rolAcondicionamientoId } = await prisma.role.findUniqueOrThrow({
+      where: { name: ROLE_ACONDICIONAMIENTO },
+      select: { id: true },
+    });
+    const username = `qc216_session_${marca}`;
+    const { id } = await prisma.user.create({
+      data: {
+        firstNames: 'Acondicionador',
+        lastNames: 'De Prueba',
+        birthDate: new Date('1990-01-01T00:00:00.000Z'),
+        email: `qc216.session.${marca}@example.test`,
+        phone: '+57 300 000 0000',
+        documentTypeCode: DOCUMENT_TYPE_CC,
+        documentNumber: `65${marca.replaceAll('-', '').slice(0, 18)}`,
+        username,
+        passwordHash: 'no-se-usa-en-este-test',
+        roleId: rolAcondicionamientoId,
+        companyId: empresaId,
+        accountStatus: 'active',
+      },
+      select: { id: true },
+    });
+    return { id, username };
+  }
+
+  it('QC-216 R20: la sesion de un usuario con el rol trae exactamente sus dos permisos, ni uno mas', async () => {
+    const usuario = await crearAcondicionador();
+
+    try {
+      const ahora = new Date();
+      const resolveSession = createResolveSession({
+        session: {
+          readClaims: async () => ({
+            sub: usuario.id,
+            roleName: ROLE_ACONDICIONAMIENTO,
+            companyId: empresaId,
+            sessionId: SID_SIN_CERRAR,
+            issuedAt: new Date(ahora.getTime() + 60_000),
+            expiresAt: new Date(ahora.getTime() + 3_600_000),
+          }),
+        },
+        users: { findActiveById: findActiveSessionUserById },
+        log: { log: () => undefined },
+      });
+
+      const resuelta = await resolveSession(new Date(ahora.getTime() + 120_000));
+
+      expect(resuelta?.user.id).toBe(usuario.id);
+      expect(resuelta?.user.roleName).toBe(ROLE_ACONDICIONAMIENTO);
+      expect([...(resuelta?.user.permissions ?? [])].sort()).toEqual([
+        'acondicionamiento.modificar',
+        'asignaciones.consultar',
+      ]);
+      expect([...(resuelta?.user.permissions ?? [])].sort()).toEqual(
+        [...(SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO] ?? [])].sort(),
+      );
+    } finally {
+      await prisma.user.deleteMany({ where: { id: usuario.id } });
     }
   });
 });

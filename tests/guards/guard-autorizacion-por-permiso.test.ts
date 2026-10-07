@@ -31,6 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  ROLE_ACONDICIONAMIENTO,
   ROLE_ADMINISTRADOR,
   ROLE_EMPACADOR,
   ROLE_MAESTRO,
@@ -186,6 +187,9 @@ export type ForbiddenPattern = {
  *
  * `ROLE_MAESTRO` y su literal, igual: lo que el Maestro puede hacer lo dicen sus permisos, y un
  * modulo de negocio que lo reconociera por su nombre se saltaria esa ruta.
+ *
+ * `ROLE_ACONDICIONAMIENTO` y su literal, igual. Su literal no casa con el del Administrador: la
+ * comilla va pegada a ambos lados del nombre completo.
  */
 export function buildForbiddenPatterns(): readonly ForbiddenPattern[] {
   const literal = (role: string) => new RegExp(`['"\`]${escapeRegExp(role)}['"\`]`);
@@ -194,10 +198,12 @@ export function buildForbiddenPatterns(): readonly ForbiddenPattern[] {
     { nombre: `literal del rol ${ROLE_OPERADOR}`, regex: literal(ROLE_OPERADOR) },
     { nombre: `literal del rol ${ROLE_EMPACADOR}`, regex: literal(ROLE_EMPACADOR) },
     { nombre: `literal del rol ${ROLE_MAESTRO}`, regex: literal(ROLE_MAESTRO) },
+    { nombre: `literal del rol ${ROLE_ACONDICIONAMIENTO}`, regex: literal(ROLE_ACONDICIONAMIENTO) },
     { nombre: 'ROLE_ADMINISTRADOR', regex: /\bROLE_ADMINISTRADOR\b/ },
     { nombre: 'ROLE_OPERADOR', regex: /\bROLE_OPERADOR\b/ },
     { nombre: 'ROLE_EMPACADOR', regex: /\bROLE_EMPACADOR\b/ },
     { nombre: 'ROLE_MAESTRO', regex: /\bROLE_MAESTRO\b/ },
+    { nombre: 'ROLE_ACONDICIONAMIENTO', regex: /\bROLE_ACONDICIONAMIENTO\b/ },
     { nombre: 'assertAdminRole', regex: /\bassertAdminRole\b/ },
     { nombre: 'requireAdmin', regex: /\brequireAdmin\b/ },
     { nombre: 'roleName', regex: /\broleName\b/ },
@@ -443,11 +449,12 @@ describe('guardia — ningun servicio de negocio autoriza por nombre de rol (R20
 
   // Ancla del valor (R21): si `identity` renombrara los roles, el patron derivado cambia con el, y
   // este caso lo dice en vez de dejar la guardia vigilando un nombre inexistente.
-  it('QC-161 R16: los patrones se derivan de los roles reales de identity, que siguen siendo Administrador, Operador, Empacador y Maestro', () => {
+  it('QC-161 R16, QC-216 R11: los patrones se derivan de los roles reales de identity, que siguen siendo Administrador, Operador, Empacador, Maestro y Administrador de acondicionamiento', () => {
     expect(ROLE_ADMINISTRADOR).toBe('Administrador');
     expect(ROLE_OPERADOR).toBe('Operador');
     expect(ROLE_EMPACADOR).toBe('Empacador');
     expect(ROLE_MAESTRO).toBe('Maestro');
+    expect(ROLE_ACONDICIONAMIENTO).toBe('Administrador de acondicionamiento');
 
     const nombres = buildForbiddenPatterns().map((pattern) => pattern.nombre);
     expect(nombres).toEqual([
@@ -455,10 +462,12 @@ describe('guardia — ningun servicio de negocio autoriza por nombre de rol (R20
       'literal del rol Operador',
       'literal del rol Empacador',
       'literal del rol Maestro',
+      'literal del rol Administrador de acondicionamiento',
       'ROLE_ADMINISTRADOR',
       'ROLE_OPERADOR',
       'ROLE_EMPACADOR',
       'ROLE_MAESTRO',
+      'ROLE_ACONDICIONAMIENTO',
       'assertAdminRole',
       'requireAdmin',
       'roleName',
@@ -548,6 +557,46 @@ describe('guardia — ningun servicio de negocio autoriza por nombre de rol (R20
     ).toEqual([]);
     expect(
       findForbiddenPatternsInSource(`/** ROLE_MAESTRO no se compara: se exige el permiso */`),
+    ).toEqual([]);
+  });
+
+  it('QC-216 R11: dispara con un actor.ts sintetico que compara el literal del rol Administrador de acondicionamiento', () => {
+    const conLiteral = (comilla: string) =>
+      [
+        'export function requireAcondicionador(actor: Actor): void {',
+        `  if (actor.role !== ${comilla}${ROLE_ACONDICIONAMIENTO}${comilla}) throw new UnauthorizedError();`,
+        '}',
+      ].join('\n');
+
+    for (const comilla of ["'", '"', '`']) {
+      expect(findForbiddenPatternsInSource(conLiteral(comilla)), `comilla ${comilla}`).toEqual([
+        `literal del rol ${ROLE_ACONDICIONAMIENTO}`,
+      ]);
+    }
+  });
+
+  it('QC-216 R11: dispara con un actor.ts sintetico que importa y usa ROLE_ACONDICIONAMIENTO', () => {
+    const conConstante = [
+      "import { ROLE_ACONDICIONAMIENTO } from '@/lib/modules/identity';",
+      '',
+      'export function requireAcondicionador(actor: Actor): void {',
+      '  if (actor.role !== ROLE_ACONDICIONAMIENTO) throw new UnauthorizedError();',
+      '}',
+    ].join('\n');
+
+    expect(findForbiddenPatternsInSource(conConstante)).toEqual(['ROLE_ACONDICIONAMIENTO']);
+  });
+
+  it('QC-216 R11: el caso simetrico — el rol Administrador de acondicionamiento dentro de un comentario NO dispara', () => {
+    expect(
+      findForbiddenPatternsInSource(
+        `// el acondicionador entra por su permiso, no por '${ROLE_ACONDICIONAMIENTO}'`,
+      ),
+    ).toEqual([]);
+    expect(
+      findForbiddenPatternsInSource(
+        `/** '${ROLE_ACONDICIONAMIENTO}' y ROLE_ACONDICIONAMIENTO no se comparan: se exige el permiso */`,
+      ),
     ).toEqual([]);
   });
 });
