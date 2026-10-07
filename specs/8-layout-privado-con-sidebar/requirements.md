@@ -219,7 +219,7 @@ revisión (a) están todas respondidas y trasladadas a `## Decisiones cerradas` 
 | 2026-08-06 | Base de shadcn/ui, Vitest y `components/ui/` | **Precondición heredada de la feature 7.** La 8 no la re-crea; sólo añade primitivas nuevas vía `pnpm dlx shadcn@latest add` |
 | 2026-08-06 | Librería de componentes | shadcn/ui. Ningún primitivo se escribe a mano ni se edita a mano en `components/ui/` |
 | 2026-08-06 | Mutaciones | Server Actions. Prohibido `fetch` a API routes propias |
-| 2026-08-06 | Datos del usuario | Entran **por props**; ningún componente privado los fetchea (`CHECKPOINTS.md > Permisos`) |
+| 2026-08-06 | Datos del usuario | Entran **por props**; ningún componente privado los fetchea (`docs/checkpoints-proyecto.md > Permisos`) |
 | 2026-08-06 | Cierre de sesión | Disparador vacío en esta feature; contrato congelado para que la feature 10 lo rellene sin tocar UI (`design.md > 3`) |
 | 2026-08-06 | Rutas | Siempre en constantes exportadas, nunca literales (R13) |
 | 2026-08-06 | Fase 2 bloqueada | La implementación no arranca hasta que la feature 7 esté `done` y su base esté en `dev` (`progress/current.md > Feature 8`) |

@@ -186,7 +186,7 @@ Bloque `6.c` en las dos: `base de desarrollo «QuimiCloude» al dia: 27 migracio
 
 ### Las pruebas de que el gate MUERDE
 
-`docs/verification.md > Cuando lo que verificas es el gate mismo` rige entera esta ficha. **Todo
+`docs/gate.md > Cuando lo que verificas es el gate mismo` rige entera esta ficha. **Todo
 check nuevo se probo con su caso verde y con uno por motivo de fallo**, rompiendo el archivo real
 y restaurando **desde copia (`cp`)**, nunca con `git checkout`:
 

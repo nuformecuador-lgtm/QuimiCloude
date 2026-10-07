@@ -179,7 +179,7 @@ de tocar nada, es lo que verifica R9.
 - **Restaurar desde una copia (`cp`), nunca con `git checkout`**: el worktree tiene cambios sin
   commitear que no son de esta ficha.
 - **No pipear la corrida a `head`/`tail` para leer el código de salida**: redirigir a archivo y
-  leer `$?` (`docs/verification.md > Trampas conocidas`).
+  leer `$?` (`docs/gate.md > Trampas conocidas`).
 - **Hecho cuando:** las cuatro salen en rojo con mensaje que nombra lo que falla, el árbol queda
   idéntico al de antes (`git status` sin residuos) y las cuatro salidas están pegadas en la
   bitácora.

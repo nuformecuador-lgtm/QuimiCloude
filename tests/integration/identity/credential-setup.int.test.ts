@@ -181,7 +181,10 @@ async function countLockWaiters(): Promise<number> {
 
 /** Espera a que haya al menos `expected` sesiones encoladas, o falla diciendo que no las hubo. */
 async function waitForLockWaiters(expected: number): Promise<void> {
-  const deadline = Date.now() + 5_000;
+  // 20 s en CI: el runner gratuito de GitHub (2 vCPU) corre la suite entera en paralelo y las dos
+  // emisiones tardaron mas de 5 s en encolarse en una corrida (2026-10-07), aunque pasaron en la
+  // repeticion. El plazo solo acota la espera; no cambia lo que se comprueba.
+  const deadline = Date.now() + (process.env.CI ? 20_000 : 5_000);
   for (;;) {
     if ((await countLockWaiters()) >= expected) return;
     if (Date.now() > deadline) {

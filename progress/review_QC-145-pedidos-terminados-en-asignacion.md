@@ -89,7 +89,7 @@
 ### MAYOR (bloqueante)
 
 **M1. Comentarios de producción, en líneas que añade o modifica el diff, citan requisitos o
-decisiones cerradas** (`docs/conventions.md > Comentarios`; checklist del reviewer n.º 9).
+decisiones cerradas** (`docs/conventions.md > Comentarios`; checklist del reviewer n.º 9, hoy en `docs/perfil-agentes.md > reviewer`).
 
 | Archivo:línea | Texto | Estado en `origin/dev` |
 |---|---|---|

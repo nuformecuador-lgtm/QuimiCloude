@@ -188,7 +188,7 @@ Los tres entregables de la ficha estan repartidos asi: **migracion** = bloque B 
 - En una terminal con la base accesible pero **sin** `SEED_ADMIN_PASSWORD` y con la base
   vacia de administradores: `pnpm run build` tiene que salir con codigo distinto de 0 y sin
   llegar a `next build`. Leer `$?` de un archivo redirigido, **no** de una tuberia a `head`
-  (`docs/verification.md > Trampas conocidas`).
+  (`docs/gate.md > Trampas conocidas`).
 - **Hecho cuando:** el codigo de salida y la salida (sin credenciales) quedan pegados en
   `progress/impl_QC-6-seed-roles-y-usuario-inicial.md`. Cierra R20 en su forma real.
 

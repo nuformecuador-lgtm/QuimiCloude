@@ -9,7 +9,7 @@ Ninguna task de esta ficha toca `app/`, `lib/`, `components/`, `db/`, `e2e/` ni 
 `tests/integration/**` que la decision 3 declara intocables (R22, R24). Si alguna acaba
 necesitandolo, es senal de que el alcance se rompio: se para y se pregunta.
 
-**Lo que se esta tocando es el gate mismo.** Rige entero `docs/verification.md > Cuando lo que
+**Lo que se esta tocando es el gate mismo.** Rige entero `docs/gate.md > Cuando lo que
 verificas es el gate mismo`: para cada validacion nueva hay que probar que **muerde**, no solo que
 pasa; no se pipea el gate a `head`/`tail` para leer su codigo de salida; y se restaura desde copia
 (`cp`), nunca con `git checkout`.
@@ -193,7 +193,7 @@ Dep de todo el bloque: **T4**.
 - Archivos: `init.sh`.
 - Bloque `6.c`, **despues** del `6.b` y **antes** de los tests, en los dos modos. `warn` si la base
   va atrasada o no se puede consultar; **`fail` si falta `scripts/test-db.ts`**
-  (`docs/verification.md > El anti-patron: la validacion opcional`).
+  (`docs/gate.md > El anti-patron: la validacion opcional`).
 - **Probar que muerde, con el archivo real:** (a) base atrasada a proposito → aviso amarillo y
   `./init.sh --rapido` sigue saliendo **0**; (b) base al dia → linea verde; (c) `DATABASE_URL`
   apuntando a un host inexistente → aviso y `exit 0`; (d) `scripts/test-db.ts` renombrado →

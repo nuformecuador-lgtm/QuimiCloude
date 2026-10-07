@@ -286,6 +286,6 @@ decisiones—.
 | 2026-09-03 | Nombre de las tablas | **`suppliers` y `supplier_catalog_lines`.** El `proveedor_catalogo` de la ficha del board nombra el **concepto**, no el identificador: los identificadores de base van en **inglés** y `snake_case`. Heredado de **QC-4** |
 | 2026-09-03 | RLS | **Activada y forzada** (`FORCE ROW LEVEL SECURITY`) en las dos tablas. Heredado de **QC-4 R19**. No sustituye a la autorización en el service (`docs/architecture.md > Acceso a datos y autorizacion`) |
 | 2026-09-03 | Migración | `migration.sql` (UP) más `down.sql` (DOWN) obligatorio, y revertirla deja el esquema exactamente como estaba. Heredado de **QC-4 R20** |
-| 2026-09-03 | Permisos | **Aquí no se deciden**: no hay service en esta ficha. Los fija **QC-43**, con su test (`CHECKPOINTS.md > Permisos`) |
+| 2026-09-03 | Permisos | **Aquí no se deciden**: no hay service en esta ficha. Los fija **QC-43**, con su test (`docs/checkpoints-proyecto.md > Permisos`) |
 | 2026-09-03 | E2E | **Diferido con motivo**: no hay pantalla ni flujo navegable que visitar, es esquema y migración. Lo decide **QC-44**. Mismo criterio que QC-14, QC-24 y QC-32 |
 | 2026-09-03 | Librería nueva | **Ninguna.** Es esquema Prisma, migración y el armazón del módulo. Regla 7 de `CLAUDE.md` sin propuesta que abrir |

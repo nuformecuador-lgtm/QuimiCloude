@@ -19,7 +19,7 @@
 //
 // Cada regla se autocomprueba sobre un fuente SINTETICO que la viola, igual que
 // `guard-password-hash-module`: un `expect(...).toEqual([])` sobre archivos que ya
-// cumplen no demuestra que la guardia muerda (`docs/verification.md > Probar que muerde`).
+// cumplen no demuestra que la guardia muerda (`docs/gate.md > Probar que muerde`).
 
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, extname, join, relative, sep } from 'node:path'

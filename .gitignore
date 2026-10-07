@@ -4,6 +4,9 @@
 /node_modules
 /.pnp
 .pnp.*
+# Un solo lockfile, el del `packageManager` de package.json (pnpm-lock.yaml).
+/package-lock.json
+/yarn.lock
 .yarn/*
 !.yarn/patches
 !.yarn/plugins
@@ -59,3 +62,13 @@ next-env.d.ts
 
 # Borradores de prompts de IA (QC-131/QC-157). R9 de QC-129: ningun archivo versionado contiene el texto de un prompt.
 /borradores-de-prompts/
+
+# Arnés v2 — estado que no se versiona (diseño v2 §4)
+# Logs de corridas (gate, E2E, suites): se generan en cada máquina y no se leen enteros.
+/progress/logs/
+# Sesión personal del humano/agente: dónde lo dejó cada uno; plantilla en progress/sesion.local.example.md.
+/progress/sesion.local.md
+# Configuración local del arnés (overrides por máquina sobre arnes.config.json).
+/.arnes.local.json
+# Copia del board de Jira: se regenera con F0 y se consulta con node/jq, nunca la fuente de verdad.
+/feature_list.json

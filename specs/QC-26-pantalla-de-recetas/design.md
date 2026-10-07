@@ -394,7 +394,7 @@ rol, lo decide esa ficha y R41 se relaja entonces.
   que es quien va a gestionar unidades.
 - **El contrato público NO reexporta la Server Action** (R42): `index.ts` gana `createListUnits`,
   `ListUnitsDeps` y `MAX_UNITS`, y nada con `'use server'` —lo dice su propia cabecera, y
-  `CHECKPOINTS.md > Modulos hexagonales` lo exige—.
+  `docs/checkpoints-proyecto.md > Modulos hexagonales` lo exige—.
 - **Cableado (R42):** `lib/composition/index.ts` gana una fachada
   `export const unidades = { listUnits: createListUnits({ units: unitRepository }) }` en un
   **bloque nuevo al final**, sin reordenar ni reformatear nada de lo existente (diff mínimo: hay
@@ -508,7 +508,7 @@ misma frontera que ya respeta `recetas`.
 
 **G — Consultar `prisma.unit` desde el Server Component de la página.** Dos líneas.
 **Descartada:** es acceso a un modelo ajeno desde fuera de su módulo, lo prohíbe
-`CHECKPOINTS.md > Modulos hexagonales` y lo caza `guard-arquitectura-modulos`.
+`docs/checkpoints-proyecto.md > Modulos hexagonales` y lo caza `guard-arquitectura-modulos`.
 
 **H — Filtrar productos en el cliente.** **Descartada por decisión humana**, con el motivo técnico
 escrito: el backend solo acepta `page`/`pageSize`, así que un buscador de cliente solo miraría

@@ -498,7 +498,7 @@ function tocadosBajo(base: string, rutas: readonly string[]): string[] {
  * senales estan presentes y los cuatro casos de R37 corren exactamente igual, con las mismas listas
  * cerradas y las mismas igualdades. Fuera de su rama quedan `skipped` —nunca verdes—: un verde
  * diria «he revisado el diff de QC-67 y no toca ningun intocable» sin haber mirado nada, que es el
- * anti-patron de la «validacion opcional» de `docs/verification.md`.
+ * anti-patron de la «validacion opcional» de `docs/gate.md`.
  */
 const ARCHIVO_CENTRAL_DE_QC67 = `${CARPETA_DE_LA_RUTA}/page.tsx`;
 const CARPETA_SPEC_DE_QC67 = 'specs/QC-67-pantalla-de-usuarios/';

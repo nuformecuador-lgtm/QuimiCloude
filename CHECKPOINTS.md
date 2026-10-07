@@ -1,78 +1,44 @@
 # CHECKPOINTS.md — Criterios de "estado final correcto"
 
-Una feature solo pasa a `done` si TODO esto se cumple. El reviewer valida contra
-esta lista.
+Una feature solo pasa a `done` si TODO esto se cumple **y** todo lo de
+`docs/checkpoints-proyecto.md`, que son los criterios propios del proyecto (perfil). El reviewer
+valida contra las dos listas, punto por punto.
 
 ## Especificacion
 - [ ] Existe `specs/<feature>/requirements.md` con requisitos EARS numerados `R1`, `R2`…
 - [ ] Existe `specs/<feature>/design.md` con al menos una alternativa descartada y su porqué.
 - [ ] Existe `specs/<feature>/tasks.md` y todas las tasks estan marcadas `[x]`.
 
+## Equipo
+- [ ] La feature tiene assignee en Jira y su rama se publico con `wt.sh new` (candado).
+
 ## Trazabilidad
 - [ ] Cada `R<n>` de requirements.md mapea a al menos un test concreto.
-- [ ] `progress/impl_<feature>.md` contiene el mapa `R<n> -> test`.
+- [ ] `progress/impl_<key>.md` contiene el mapa `R<n> -> test`.
 
 ## Calidad de codigo
-- [ ] `pnpm run typecheck` pasa sin errores (TypeScript strict).
-- [ ] `pnpm run lint` pasa sin errores.
-- [ ] `pnpm test` pasa (unit/integracion).
-- [ ] Si la feature toca un flujo critico (autenticacion, permisos, movimientos de
-      inventario, importes, webhooks), hay al menos un test E2E (Playwright) que lo cubre.
-- [ ] Si la feature toca UI, cumple `docs/architecture.md > Componentes > Regla:
-      multiplataforma — web, iOS y Android`, o el `design.md` declara la excepcion y su porque.
+- [ ] El typecheck pasa sin errores (comando: `docs/checkpoints-proyecto.md > Calidad de codigo`).
+- [ ] El lint pasa sin errores.
+- [ ] El check `gate-completo` del CI esta en verde en el PR: suite completa sin rojos NUEVOS
+      respecto de `tests/baseline-rojos.json` (`docs/gate.md`).
+- [ ] Si la feature toca un flujo critico (la lista: `docs/checkpoints-proyecto.md > Flujos
+      criticos`), hay al menos un test E2E que lo cubre, y su salida local esta en
+      `progress/impl_<key>.md`.
 - [ ] Si la feature añadió dependencias, cada una tiene su fila en `docs/dependencias.md`
       con los cuatro checks y la aprobacion humana citada en el `design.md`.
 
-
-## Datos y seguridad (Supabase)
-- [ ] **Toda tabla de operacion nueva lleva su columna de empresa** y toda consulta suya
-      filtra por la empresa de quien pide, con test del rechazo cruzado. Exentas solo las
-      de la lista cerrada de `docs/architecture.md > Dominio` n.º 1, que hace cumplir
-      `tests/guards/guard-empresa-en-esquema.test.ts` (`users` no es exenta).
-- [ ] **Cada permiso de la feature se valida en el SERVICE y tiene su test.** Esta es la
-      frontera real: Prisma se conecta como dueño de las tablas y las policies de RLS no
-      filtran sus queries (`docs/architecture.md > Acceso a datos y autorizacion`). Un
-      permiso implementado solo como policy NO cuenta como implementado.
-- [ ] Toda tabla nueva con datos de usuario/operacion tiene RLS activado **y**
-      `FORCE ROW LEVEL SECURITY`. Es defensa en profundidad, no reemplaza lo anterior.
-- [ ] El acceso a datos de negocio pasa solo por el repositorio (Prisma). No se coló
-      ninguna lectura/escritura con el cliente de Supabase.
-- [ ] Las migraciones son versionadas y reversibles: toda migracion nueva tiene su
-      `down.sql` (convencion propia; Prisma no genera downs) y `pnpm run db:rollback`
-      revierte y deja `_prisma_migrations` coherente.
+## Seguridad
 - [ ] Ningun secreto quedo hardcodeado; todo va por variables de entorno.
 - [ ] Webhooks nuevos validan firma/token y son idempotentes.
-
-## Modulos hexagonales
-- [ ] `domain/` y `ports/` no importan framework, base de datos, `shared` ni adaptadores.
-- [ ] De otro modulo se importa solo su contrato (`@/lib/modules/<otro>`), nunca ruta profunda.
-- [ ] Ningun adaptador `driving` instancia su `driven`: lo pide a `lib/composition`.
-- [ ] `lib/shared/**` no importa modulos ni `composition` (es hoja del grafo).
-- [ ] Ningun `'use server'` sale reexportado desde el barrel del modulo.
-- [ ] Todo modelo de `db/schema.prisma` tiene `/// @module`, y ningun modulo consulta un
-      modelo ajeno.
-- [ ] No reaparecen `lib/services/`, `lib/repositories/` ni `lib/interfaces/`.
-- [ ] En la raiz de `lib/` solo hay `modules/`, `shared/`, `composition/` y `utils.ts`. Todo
-      codigo de negocio nuevo cuelga de un modulo, no de `lib/`. **La guardia tampoco lo
-      comprueba**: prohibe siete nombres concretos, no todo lo que no sea esos cuatro, asi
-      que un `lib/helpers/` o un `lib/dominio/` nuevo pasa en verde.
-- [ ] La logica de negocio esta en `domain/`, no en la Server Action. **Esto la guardia no
-      lo comprueba**: un caso de uso que solo llama al adaptador y devuelve pasa en verde y
-      esta mal.
-
-## Permisos
-- [ ] Paginas protegidas validan permisos en el servidor via `cookies()`.
-- [ ] Componentes `private/` reciben datos por props; no fetchean datos sensibles.
-- [ ] Mutaciones internas usan Server Actions, no fetch a API routes.
 
 ## Configuracion
 - [ ] Nada que cambie entre entornos (URLs, credenciales, limites) quedo hardcodeado;
       todo se resuelve por configuracion o variables de entorno.
 
 ## Verificacion final
-- [ ] `./init.sh` termina en verde.
-- [ ] `progress/review_<feature>.md` existe y su veredicto es OK.
-- [ ] Se añadio una entrada a `progress/history.md`.
-- [ ] El worktree de la feature se desmonto (`./scripts/wt.sh done <id>-<slug>`), o
-      quedo anotado en `progress/current.md > Deudas y cosas abiertas` con la razon
+- [ ] `./init.sh` (rapido) termina en verde en el worktree, y `gate-completo` en verde en CI.
+- [ ] `progress/review_<key>.md` existe y su veredicto es OK.
+- [ ] `progress/features/<key>.md > Cierre` esta completo (resumen, PR, deudas que deja).
+- [ ] El worktree de la feature se desmonto (`./scripts/wt.sh done <key>-<slug>`), o
+      quedo anotado en `progress/deudas.md` con la razon
       del HOLD. Lo que no vale es dejarlo ahi en silencio.
