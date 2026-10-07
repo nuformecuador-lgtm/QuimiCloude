@@ -518,6 +518,11 @@
       "archivo": "inventario/inventory-import-idempotency.int.test.ts",
       "motivo": "Doble confirmacion con la misma clave: la reserva tiene que quedar CONFIRMADA en 'inventory_imports' para que la segunda choque con 'inventory_imports_company_key_unique', y cada fila escribe con el cliente Prisma GLOBAL en su propia transaccion. Cada caso fabrica su empresa efimera con randomUUID y 'afterAll' la borra entera por 'company_id' en orden de FK (asientos -> lotes -> productos -> importaciones -> presentaciones -> recetas -> unidades -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-06"
+    },
+    {
+      "archivo": "pedidos/order-customer.int.test.ts",
+      "motivo": "B6 (QC-156): ejercita el cambio de cliente, la edicion que solo cambia el cliente y los filtros de cliente del listado con los adaptadores reales; 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' sobre el cliente GLOBAL y el listado y el catalogo de clientes leen con ese mismo cliente, asi que una transaccion del test con ROLLBACK no los envolveria. Cada caso fabrica sus empresas efimeras con randomUUID (dos usuarios, rol, tipo de documento, unidad, presentacion, recetas, materias primas, clientes) y las limpia en un 'finally' en orden de FK (los tres libros -> pedidos -> clientes -> recetas -> lotes y productos -> presentacion -> unidad -> usuarios -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-06"
     }
   ]
 }

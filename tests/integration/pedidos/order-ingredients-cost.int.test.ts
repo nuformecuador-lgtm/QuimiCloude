@@ -73,6 +73,11 @@ import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedid
 import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
+import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma'
+
+const customerCatalog = {
+  findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
+}
 
 const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
@@ -353,7 +358,7 @@ describe('el alta lo deja guardado en la fila (R10)', () => {
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-01T12:00:00.000Z') })
+      const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-01T12:00:00.000Z') })
       const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
 
@@ -376,8 +381,8 @@ describe('la edicion lo reescribe, incluso a nulo (R11)', () => {
 
     try {
       const now = () => new Date('2026-05-02T12:00:00.000Z')
-      const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now })
-      const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now })
+      const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now })
+      const edicion = createUpdateOrder({ customerCatalog, orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now })
 
       const creado = await alta({ recipeId, quantity: '4.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
@@ -385,14 +390,14 @@ describe('la edicion lo reescribe, incluso a nulo (R11)', () => {
       expect(await ingredientsCostCrudo(orderId)).toBe('20.0000')
 
       // Edicion #1: sube la cantidad sin desbordar la existencia. Recalcula a OTRO numero.
-      const editadoInput: NewOrder = { recipeId, quantity: '8.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [], customerId: null }
+      const editadoInput: Omit<NewOrder, 'customerId'> = { recipeId, quantity: '8.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [] }
       await edicion(orderId, editadoInput, actorDe(A))
       // necesaria = 8 * 100 % = 8, cubierta (stock 10) -> 8 * 5 = 40.0000.
       expect(await ingredientsCostCrudo(orderId)).toBe('40.0000')
 
       // Edicion #2: sube la cantidad hasta que la existencia YA NO cubre -> sustituye por NULL.
       // QC-138 R6/R11: sin confirmar no se escribe nada; confirmada, el pedido queda BLOQUEADO.
-      const editadoSinCubrir: NewOrder = { recipeId, quantity: '200.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [], customerId: null }
+      const editadoSinCubrir: Omit<NewOrder, 'customerId'> = { recipeId, quantity: '200.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [] }
       await edicion(orderId, { ...editadoSinCubrir, confirmBlocked: true }, actorDe(A))
       expect(await ingredientsCostCrudo(orderId)).toBeNull()
       const pedido = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { status: true } })
@@ -412,7 +417,7 @@ describe('comprar un lote despues no cambia el importe de un pedido ya creado (R
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-03T12:00:00.000Z') })
+      const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-03T12:00:00.000Z') })
       const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
@@ -443,7 +448,7 @@ describe('un pedido anterior a la columna sigue sin importe (R8, R13)', () => {
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-05T12:00:00.000Z') })
+      const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-05T12:00:00.000Z') })
       const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
@@ -501,7 +506,7 @@ describe('un pedido de otra empresa no se alcanza ni por identificador (R14, R21
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-06T12:00:00.000Z') })
+      const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-06T12:00:00.000Z') })
       const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
 
@@ -528,8 +533,8 @@ describe('tras el alta y la edicion, los lotes y los asientos quedan intactos (R
       const antesDeAlta = await fotoDeInventario(A)
 
       const now = () => new Date('2026-05-07T12:00:00.000Z')
-      const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now })
-      const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now })
+      const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now })
+      const edicion = createUpdateOrder({ customerCatalog, orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now })
 
       const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
@@ -538,7 +543,7 @@ describe('tras el alta y la edicion, los lotes y los asientos quedan intactos (R
       expect(despuesDeAlta.batches).toBe(antesDeAlta.batches)
       expect(despuesDeAlta.movements).toBe(antesDeAlta.movements)
 
-      const editado: NewOrder = { recipeId, quantity: '8.0000', priority: 'ALTA', status: 'PENDIENTE', unitId, presentationLines: [], customerId: null }
+      const editado: Omit<NewOrder, 'customerId'> = { recipeId, quantity: '8.0000', priority: 'ALTA', status: 'PENDIENTE', unitId, presentationLines: [] }
       await edicion(orderId, editado, actorDe(A))
 
       const despuesDeEdicion = await fotoDeInventario(A)
@@ -584,7 +589,7 @@ describe('D22: el importe promedia TODOS los lotes con disponible, sin acumular 
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-09T12:00:00.000Z') })
+      const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-09T12:00:00.000Z') })
       const creado = await alta({ recipeId, quantity: '30.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
 
@@ -627,7 +632,7 @@ describe('D22: el importe promedia TODOS los lotes con disponible, sin acumular 
     let ordenBajoPrueba: string | null = null
 
     try {
-      const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-10T12:00:00.000Z') })
+      const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-10T12:00:00.000Z') })
 
       // El primer pedido necesita exactamente lo del lote mas antiguo: lo aparta entero, y ese
       // lote queda con disponible cero para cualquier OTRO pedido.
@@ -663,7 +668,7 @@ describe('D22: el importe promedia TODOS los lotes con disponible, sin acumular 
     let ordenBajoPrueba: string | null = null
 
     try {
-      const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-11T12:00:00.000Z') })
+      const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-11T12:00:00.000Z') })
 
       // Aparta 8 de los 10: quedan solo 2 disponibles, aunque la existencia total siga siendo 10.
       const primero = await alta({ recipeId, quantity: '8.0000', priority: 'MEDIA', unitId }, actorDe(A))
@@ -709,7 +714,7 @@ describe('D22: el importe promedia TODOS los lotes con disponible, sin acumular 
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-12T12:00:00.000Z') })
+      const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-12T12:00:00.000Z') })
       const creado = await alta({ recipeId, quantity: '10.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
 
@@ -754,7 +759,7 @@ describe('D22: el importe promedia TODOS los lotes con disponible, sin acumular 
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-13T12:00:00.000Z') })
+      const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-13T12:00:00.000Z') })
       const creado = await alta({ recipeId, quantity: '10.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
 
@@ -779,7 +784,7 @@ describe('el pedido queda creado con el importe en blanco y la base no lanza 220
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-08T12:00:00.000Z') })
+      const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-08T12:00:00.000Z') })
 
       // necesaria = 100 * 100 % = 100, cubierta EXACTAMENTE por el lote (stock 100).
       // importe = 100 * 9999999999.9999 = 999999999999.9900, muy por encima de 9999999999.9999.
@@ -820,7 +825,7 @@ describe('QC-199 — los lotes de insumo sin presentacion cuentan en el costeo',
     let orderId: string | null = null
 
     try {
-      const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-01T12:00:00.000Z') })
+      const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date('2026-05-01T12:00:00.000Z') })
       const creado = await alta({ recipeId, quantity: '6.0000', priority: 'MEDIA', unitId }, actorDe(A))
       orderId = creado.id
 

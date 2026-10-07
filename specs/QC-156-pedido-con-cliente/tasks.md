@@ -235,6 +235,8 @@ tests de `order-distribution` siguen en verde sin editarlos.
 
 ### B6 — Adaptador y composición · depende de: B1, B2, B3, B4, B5 · R3, R13, R15, R23, R24
 
+**Estado:** [x] hecha (B6)
+
 - `adapters/driven/persistence/order-prisma.ts`: el `select`, `toOrderRow`, `create`,
   `updateAlive`, `orderCustomerFilterWhere` (los dos campos del filtro juntos en un solo término,
   `design.md > 4.4.1`) y `setCustomerAlive` real en lugar del stub de T0 (`design.md > 5`).

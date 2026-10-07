@@ -54,6 +54,13 @@ import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
+import { findAliveCustomerRefById, findCustomerRefsIncludingDeleted } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+
+const customerCatalog = {
+  findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
+  findRefsIncludingDeleted: (ids: readonly string[], companyId: string) =>
+    findCustomerRefsIncludingDeleted(ids, { companyId }),
+};
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -103,8 +110,8 @@ const units: UnitCatalog = {
   findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany,
 };
 
-const createOrder = createCreateOrder({ recipes, products, units, presentations, packaging, unitOfWork, now: () => new Date() });
-const getOrder = createGetOrder({ orders, recipes, presentations, packaging, units });
+const createOrder = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging, unitOfWork, now: () => new Date() });
+const getOrder = createGetOrder({ customerCatalog, orders, recipes, presentations, packaging, units });
 
 type Fixture = {
   readonly companyId: string;

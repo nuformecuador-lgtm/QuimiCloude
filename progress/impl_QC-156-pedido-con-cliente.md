@@ -130,3 +130,65 @@ pnpm run db:migrate
 Ninguno se ha editado: la instruccion era dejar los tests de `clientes` sin tocar.
 
 Veredicto: B1 y B2 implementados y en verde en sus tests; quedan dos tests de `clientes` rojos por la FK, a decidir.
+
+## B6 — Adaptador y composicion (backend_dev, 2026-10-06)
+
+### Archivos
+
+- `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts`: `customerId` en `ORDER_SELECT`,
+  `toOrderRow`, `INSERT` de `create` y `updateAliveOrder`; `orderCustomerFilterWhere` (exportada) y
+  su uso en `buildOrderWhere` (los dos campos salen de `query.filters` antes del `map`, un solo
+  termino al final del `AND`); `setAliveOrderCustomer` real (`updateMany` con ambito y
+  `deletedAt: null`, `data` = `customerId`, `updatedBy`, `updatedAt`).
+- `lib/composition/index.ts`: imports de `customer-catalog-prisma` y de las tres factorias;
+  `buildCustomerCatalog()` (declaracion de funcion) al final del archivo y
+  `const customerCatalog = buildCustomerCatalog()` justo antes de `pedidos`; `customerCatalog` en
+  create/get/list/update; `setOrderCustomer`, `searchOrderCustomers`, `getOrderCustomerFilterOption`
+  en la fachada.
+- `tests/unit/pedidos/order-customer-filter-where.test.ts` (nuevo).
+- `tests/integration/pedidos/order-customer.int.test.ts` (nuevo) y su entrada `commit` en
+  `tests/integration/aislamiento.json`.
+- `customerCatalog` en las deps de 14 tests de `tests/integration/pedidos/` y de
+  `documentos/formula-import.int.test.ts`: catalogo real (`customer-catalog-prisma`) en los que
+  cablean adaptadores reales; en `order-crud` (dobles ligados a `tx`), un doble que falla si se le
+  llama.
+
+### Decision no trivial
+
+- La composicion no puede declarar `const customerCatalog` al final del archivo: `pedidos` se evalua
+  antes y leeria la constante en zona muerta temporal. Por eso el bloque final es una declaracion de
+  funcion (se eleva) y la unica instancia se crea justo encima de `pedidos`.
+
+### R -> test (B6)
+
+| R | Test |
+| --- | --- |
+| R13 | `order-customer.int.test.ts` «R13: no recalcula ni toca lo apartado; solo cambian customer_id, updated_by y updated_at» |
+| R14, R15 | int «R14, R15: en un pedido entregado y empacado, solo cambian customer_id, updated_by y updated_at; los libros no cambian» · «R15: con el ambito de otra empresa no escribe nada y responde not_found» |
+| R19, R20 | int «R19, R20: la pagina trae el nombre del cliente, tambien si se dio de baja» |
+| R23, R24 | `order-customer-filter-where.test.ts` (7 casos) · int «R23, R24: por cliente, «sin cliente» y los dos a la vez, sin salir de la empresa» |
+
+### Verificacion
+
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: 0 errores, 8 warnings preexistentes en archivos ajenos.
+- `vitest run tests/unit/pedidos tests/unit/clientes/scope.test.ts`: 108 archivos, 1953 pasan, 3 skipped.
+- `vitest run guard`: 51 archivos, 694 pasan, 11 skipped.
+- `--project integration order-customer.int.test.ts`: 5/5.
+- `--project integration` sobre los 15 archivos de integracion tocados: **31 rojos / 180** en 5 archivos
+  (`order-reservation`, `order-reservation-concurrency`, `order-expiry`, `order-ingredients-cost`,
+  `order-cost-quote`). Causa unica: pasan un `NewOrder` con `customerId: null` (cambio de T0) como
+  ENTRADA de `createOrder`/`updateOrder`, y `createOrderSchema.customerId` (B3,
+  `z.string().optional()`) rechaza `null` -> `ValidationError`. Comprobado: con `.nullish()` en el
+  esquema pasan los 180 (experimento revertido). Pendiente de decision del leader.
+
+Veredicto: B6 implementado y en verde salvo 31 casos de integracion rojos por el esquema de entrada de B3 ante `customerId: null`, a decidir.
+
+### Decisión del implementer en B6 (2026-10-06)
+
+31 casos de integración (`order-reservation`, `order-reservation-concurrency`, `order-expiry`,
+`order-ingredients-cost`, `order-cost-quote`) mandaban `customerId: null` como **entrada** a
+`createOrder`/`updateOrder`, por el cambio mecánico de T0 sobre `NewOrder`. Se mantiene design § 4.1
+(`customerId: z.string().optional()`, sin aceptar `null`) y se corrigen las entradas de test
+(`Omit<NewOrder, 'customerId'>`); sin cambio de lógica ni de aserciones. Resultado: 16/16 archivos,
+185/185 casos de integración en verde.
