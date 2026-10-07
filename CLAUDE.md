@@ -52,11 +52,13 @@ Cuando abres Claude Code en la raíz de este repo, actúas como **leader**. El l
      cuenta: los cuatro checks de salud y la fila en `docs/dependencias.md` son condición, y el
      humano aprueba.
    - El gate lo hace cumplir. Detalle en `docs/architecture.md > Dependencias de terceros`.
-8. **El arnés no se edita en caliente.**
-   - Las mejoras al arnés entran por `/afinar-regla`.
-   - En un proyecto, los archivos del arnés (`arnes.manifest`) se actualizan desde la plantilla
-     con `scripts/arnes-sync.sh`. Si el cambio sirve a todos los proyectos, va primero a la
-     plantilla.
+8. **Las mejoras al arnés viajan a la plantilla por un camino mecánico.**
+   - Una mejora al arnés entra por `/afinar-regla`. Se aplica aquí y se **sube** a la plantilla
+     con `./scripts/arnes-sync.sh --subir`, que abre un PR allí; un humano lo revisa y lo mergea.
+   - Los archivos del arnés (`arnes.manifest`) se **bajan** de la plantilla con
+     `./scripts/arnes-sync.sh --aplicar`. El sync nunca pisa una mejora local sin subir: la
+     reconoce por `arnes.lock.json` y el gate avisa de ella hasta que se sube.
+   - Nadie edita la plantilla a mano ni copia archivos entre repos a mano.
 
 ## Arranque de sesión
 

@@ -79,6 +79,28 @@ en curso a la vez).
 | Soltar una feature | «suelta QC-123» | quítate de responsable, anota en `progress/features/QC-123.md` hasta dónde llegaste y haz push |
 | Anotar una deuda sin feature en curso | «anota la deuda …» | rama `chore/deudas-<fecha>` desde `dev`, bloque `### D<n>` en `progress/deudas.md`, PR |
 | El gate avisa que el perfil está vencido | `/arnes-init revisar` | relee el doc, corrígelo y actualiza `revisado=` en su primera línea |
-| Proponer una mejora al arnés | `/afinar-regla <la mejora>` | PR a `singularis-co/harness_config` y luego `./scripts/arnes-sync.sh --aplicar` en cada proyecto |
+| Mejorar el arnés | `/afinar-regla <la mejora>` (aplica, prueba y la sube) | aplica el cambio · `./init.sh` · commit · `./scripts/arnes-sync.sh --subir -m "<qué mejora>"` → abre el PR en la plantilla |
+| Ver si tengo mejoras sin subir | lo dice `./init.sh` (aviso amarillo) | `./scripts/arnes-sync.sh --estado` |
 | Traer la última versión del arnés | «sincroniza el arnés» | `./scripts/arnes-sync.sh` (ver) · `./scripts/arnes-sync.sh --aplicar` · `./init.sh` · commit |
+| El sync dice «conflicto» | «resuelve el conflicto del arnés» | integra a mano los dos cambios en el archivo · `./scripts/arnes-sync.sh --aplicar --resuelto <archivo>` · `--subir` |
 | Proyecto nuevo con el arnés | `/arnes-init` | copia `harness_config` · `cp arnes.config.example.json arnes.config.json` · rellena los docs del perfil · copia `plantillas/github/gate.yml` a `.github/workflows/` |
+
+## 8. Cómo viajan las mejoras del arnés
+
+```
+proyecto A ──(--subir)──► PR en harness_config ──(humano mergea)──► plantilla
+                                                                       │
+proyecto A, B, C ◄──────────────(--aplicar)────────────────────────────┘
+```
+
+- **Bajar** (`--aplicar`) trae lo que cambió en la plantilla. **Nunca pisa** un archivo que
+  cambiaste tú y no has subido.
+- **Subir** (`--subir -m "…"`) lleva tus cambios a archivos del arnés a un PR en la plantilla.
+  No sube nada del perfil del proyecto.
+- `arnes.lock.json` (versionado) recuerda qué versión de cada archivo trajo el último sync. Con él
+  el script sabe, archivo por archivo, si cambió la plantilla (`↓`), si cambiaste tú (`↑`) o si
+  cambiaron los dos (`!`, conflicto).
+- Mientras tengas una mejora sin subir, `./init.sh` lo avisa en amarillo. No bloquea, pero no se
+  olvida.
+- **No se edita `harness_config` a mano ni se copian archivos entre repos.** Todo pasa por estos
+  dos comandos y por un PR que revisa un humano.
