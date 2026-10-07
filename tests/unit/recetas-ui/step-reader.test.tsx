@@ -1081,3 +1081,15 @@ describe('StepReader — R37: recorte de la posicion de entrada', () => {
     expect(clampStepPosition(2, 0)).toBeNull();
   });
 });
+
+describe('StepReader — R37: la pantalla de empaque no recibe las props nuevas', () => {
+  const PACKING_SCREEN = join(
+    HERE,
+    '../../../app/(private)/asignacion/empaque/[id]/components/packing-order-screen.tsx',
+  );
+
+  it('R37: packing-order-screen.tsx no pasa onStepChange ni initialStepPosition', () => {
+    const fuente = sinComentarios(readFileSync(PACKING_SCREEN, 'utf8'));
+    expect(fuente).not.toMatch(/\b(onStepChange|initialStepPosition)\b/);
+  });
+});
