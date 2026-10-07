@@ -536,7 +536,13 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // `data-table-row-<n>`; despues busca lo importado en el listado de inventario, ya en esta lista,
   // por `data-table-cell-name`. El centinela pasa de VEINTISIETE a VEINTIOCHO; la lista sigue
   // CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos veintiocho', () => {
+  //
+  // 2026-10-06: entra `e2e/registro-ejecucion.spec.ts` (QC-82), y no afloja la lista. No estrena
+  // pantalla: recorre la de asignacion, ya en esta lista, y localiza la fila de «Mis asignados» por
+  // `data-table-row-<id>` y `data-table-cell-orderNumber`. El centinela pasa de VEINTIOCHO a
+  // VEINTINUEVE; la lista sigue CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla
+  // en rojo.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos veintinueve', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -546,7 +552,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos veintiocho E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos veintinueve E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
       // ya consumen la tabla compartida -inventario y presentaciones- y localiza
       // `data-table-cell-name` porque lo que afirma son LAS FILAS SERVIDAS: ninguna de la empresa
@@ -612,6 +618,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // '-' precede a '.', igual que en pedidos.
       'e2e/recetas-pasos.spec.ts',
       'e2e/recetas.spec.ts',
+      // Ver la nota de arriba (2026-10-06, QC-82). Va antes que `reserva-de-material` porque la
+      // lista esta ORDENADA y 'g' precede a 's'.
+      'e2e/registro-ejecucion.spec.ts',
       // La DECIMOCTAVA entra el 2026-09-23: ver la nota de arriba. Llega a la tabla por las listas
       // de pedidos e inventario, que ya la consumian.
       'e2e/reserva-de-material.spec.ts',
