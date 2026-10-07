@@ -365,3 +365,80 @@ describe('cancelAssignedOrder — la escritura (R22, R23, R24, R29)', () => {
     expect(d.append.mock.calls[0]?.[0]).toMatchObject({ stepPosition: null });
   });
 });
+
+const RESUMEN_VACIO = { items: [], total: 0, page: 1, pageSize: 1, totalPages: 0 };
+
+/**
+ * El pedido se lee con `inicial` y el resumen filtrado por ese estado sale vacio: otro lo movio
+ * entre las dos lecturas. La relectura devuelve `releido` (o nada si es `null`).
+ */
+function conCarreraEntreLecturas(inicial: OrderStatus, releido: OrderStatus | null, outcome?: CancelOutcome) {
+  const d = montar({ status: inicial, ...(outcome === undefined ? {} : { outcome }) });
+  d.findAliveById
+    .mockImplementationOnce(async () => ({ id: PEDIDO, status: inicial }))
+    .mockImplementationOnce(async () => (releido === null ? null : { id: PEDIDO, status: releido }));
+  d.listAliveSummariesByIds.mockResolvedValueOnce(RESUMEN_VACIO as never);
+  return d;
+}
+
+// Nota 2026-10-06: revision vuelta 1, hallazgo 7. Misma ventana que la carrera de R16 en
+// startAssignedOrder: el resumen se filtra por el estado leido justo antes.
+describe('cancelAssignedOrder — el pedido cambia de estado entre las dos lecturas (R27, R29)', () => {
+  it('R29: lo Finalizan en medio (EN_CURSO -> POR_EMPACAR) => not_cancellable de `pedidos`, sin anotar', async () => {
+    const d = conCarreraEntreLecturas('EN_CURSO', 'POR_EMPACAR', 'not_cancellable');
+
+    await expect(createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA)).rejects.toBeInstanceOf(NotCancellableError);
+    expect(d.findAliveById).toHaveBeenCalledTimes(2);
+    expect(d.listAliveSummariesByIds).toHaveBeenCalledTimes(2);
+    expect(d.listAliveSummariesByIds).toHaveBeenLastCalledWith(EMPRESA, [PEDIDO], ['POR_EMPACAR'], 1, 1);
+    expect(d.cancelAliveById).toHaveBeenCalledTimes(1);
+    expect(d.append).not.toHaveBeenCalled();
+    expect(d.eventos).not.toContain('run:commit');
+  });
+
+  it('R29: si el estado nuevo es BLOQUEADO, `pedidos` lo cancela y se anota (asignaciones no decide)', async () => {
+    const d = conCarreraEntreLecturas('EN_CURSO', 'BLOQUEADO', 'ok');
+
+    const result = await createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA);
+    expect(result.numberText).toMatch(/7/);
+    expect(d.cancelAliveById).toHaveBeenCalledTimes(1);
+    expect(d.append).toHaveBeenCalledTimes(1);
+  });
+
+  it('R27: si al releer el pedido ya no existe, sigue siendo not_found y no se abre la transaccion', async () => {
+    const d = conCarreraEntreLecturas('EN_CURSO', null);
+
+    await expect(createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA)).rejects.toBeInstanceOf(OrderNotFoundError);
+    expect(d.findAliveById).toHaveBeenCalledTimes(2);
+    expect(d.listAliveSummariesByIds).toHaveBeenCalledTimes(1);
+    expect(d.run).not.toHaveBeenCalled();
+  });
+
+  it('R27: si al releer el estado no cambio, sigue siendo not_found y no se abre la transaccion', async () => {
+    const d = conCarreraEntreLecturas('EN_CURSO', 'EN_CURSO');
+
+    await expect(createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA)).rejects.toBeInstanceOf(OrderNotFoundError);
+    expect(d.listAliveSummariesByIds).toHaveBeenCalledTimes(1);
+    expect(d.run).not.toHaveBeenCalled();
+  });
+
+  it('R27: si al releer ya no esta asignado al actor, sigue siendo not_found y no se abre la transaccion', async () => {
+    const d = conCarreraEntreLecturas('EN_CURSO', 'POR_EMPACAR', 'not_cancellable');
+    d.listOrderIdsByUserInCompany.mockResolvedValueOnce([PEDIDO]).mockResolvedValueOnce([]);
+
+    await expect(createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA)).rejects.toBeInstanceOf(OrderNotFoundError);
+    expect(d.listOrderIdsByUserInCompany).toHaveBeenCalledTimes(2);
+    expect(d.listAliveSummariesByIds).toHaveBeenCalledTimes(1);
+    expect(d.run).not.toHaveBeenCalled();
+  });
+
+  it('R27: el reintento es uno solo: si el segundo resumen tambien falta, not_found sin abrir la transaccion', async () => {
+    const d = conCarreraEntreLecturas('EN_CURSO', 'POR_EMPACAR', 'not_cancellable');
+    d.listAliveSummariesByIds.mockResolvedValueOnce(RESUMEN_VACIO as never);
+
+    await expect(createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA)).rejects.toBeInstanceOf(OrderNotFoundError);
+    expect(d.findAliveById).toHaveBeenCalledTimes(2);
+    expect(d.listAliveSummariesByIds).toHaveBeenCalledTimes(2);
+    expect(d.run).not.toHaveBeenCalled();
+  });
+});

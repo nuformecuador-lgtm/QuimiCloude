@@ -32,11 +32,12 @@ export type CancelAssignedOrderResult = {
  * la cancelacion con el mismo motivo, todo en una transaccion: o quedan las dos cosas o ninguna.
  *
  * Que el estado sea cancelable lo decide `pedidos` bajo el candado de la fila, no esta funcion:
- * por eso no hay reintento por carrera, y `POR_EMPACAR`, `EN_EMPAQUE`, `ENTREGADO` y `CANCELADO`
- * salen todos por `not_cancellable`.
+ * por eso la escritura no se reintenta por carrera, y `POR_EMPACAR`, `EN_EMPAQUE`, `ENTREGADO` y
+ * `CANCELADO` salen todos por `not_cancellable`.
  *
  * El numero visible se lee antes de escribir, para que la lista pueda confirmar que pedido se
- * cancelo.
+ * cancelo. Si el pedido cambia de estado mientras se lee, se relee una vez y la cancelacion se
+ * pide igual: el estado nuevo lo juzga `pedidos`, no esta funcion.
  */
 export function createCancelAssignedOrder(
   deps: CancelAssignedOrderDeps,
@@ -57,15 +58,20 @@ export function createCancelAssignedOrder(
     const order = await deps.orders.findAliveById(orderId, actor.companyId);
     if (order === null) throw new OrderNotFoundError();
 
-    const summaryPage = await deps.orders.listAliveSummariesByIds(
-      actor.companyId,
-      [orderId],
-      [order.status],
-      1,
-      1,
-    );
-    const summary = summaryPage.items[0];
-    if (summary === undefined) throw new OrderNotFoundError();
+    const readSummary = async (status: typeof order.status) =>
+      (await deps.orders.listAliveSummariesByIds(actor.companyId, [orderId], [status], 1, 1)).items[0];
+
+    let summary = await readSummary(order.status);
+    if (summary === undefined) {
+      // El resumen se filtra por el estado recien leido: si otro mueve el pedido entre las dos
+      // lecturas sale vacio aunque el pedido exista. Se relee una vez y la cancelacion decide.
+      const reread = await deps.orders.findAliveById(orderId, actor.companyId);
+      if (reread === null || reread.status === order.status) throw new OrderNotFoundError();
+      const stillAssigned = await deps.assignments.listOrderIdsByUserInCompany(actor.companyId, actor.id);
+      if (!stillAssigned.includes(orderId)) throw new OrderNotFoundError();
+      summary = await readSummary(reread.status);
+      if (summary === undefined) throw new OrderNotFoundError();
+    }
     const numberText = formatOrderNumber(summary.number);
 
     const now = deps.now?.() ?? new Date();
