@@ -17,6 +17,7 @@ import {
 import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
+import { OrderCancelDialog } from './order-cancel-dialog';
 import { OrderExecutionLines } from './order-execution-lines';
 import { OrderExecutionTools } from './order-execution-tools';
 
@@ -107,9 +108,12 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
 
   return (
     <div className="flex min-h-dvh flex-col gap-4 p-4 md:p-6">
-      <h1 className="text-2xl font-semibold" data-testid={ORDER_EXECUTION_TITLE_TESTID}>
-        {title}
-      </h1>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <h1 className="text-2xl font-semibold" data-testid={ORDER_EXECUTION_TITLE_TESTID}>
+          {title}
+        </h1>
+        <OrderCancelDialog orderId={execution.orderId} stepPosition={stepPosition} />
+      </div>
 
       <p
         className="text-base font-medium"
