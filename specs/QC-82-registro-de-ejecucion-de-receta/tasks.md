@@ -125,7 +125,7 @@ siguen verdes; `tests/unit/pedidos/module-contract.test.ts` y `authorization.tes
 `cancelInsideTransaction` ya impide cancelar un pedido que otro acaba de entregar, y el cliente
 transaccional llega por `OrderUnitOfWork`. `order-prisma.ts` queda fuera del diff.
 
-### T5 [ ] — `guard-ambito-empresa-pedidos`, tensada
+### T5 [x] — `guard-ambito-empresa-pedidos`, tensada
 **Toca:** `tests/guards/guard-ambito-empresa-pedidos.test.ts`
 **Hacer:** un caso nuevo, con **nota fechada** (`2026-09-24`) encima: `OrderCancellation.cancelAliveById`
 declara `companyId: string`; `cancelInsideTransaction` lleva `{ companyId }` a `lockAliveById` y
@@ -267,7 +267,7 @@ roja (R24); un campo de marcado sigue siendo `invalid_input`; `asignaciones.cons
 (R26). Los tests de auto-asignado de empacadores existentes siguen verdes sin tocar sus aserciones.
 **Depende de:** T6. En serie con T10 (las dos cambian las deps que consume T12).
 
-### T12 [ ] — El contrato del módulo, su lista cerrada y los consumidores de las deps
+### T12 [x] — El contrato del módulo, su lista cerrada y los consumidores de las deps
 **Toca:** `lib/modules/asignaciones/index.ts`, `tests/unit/asignaciones/module-contract.test.ts`,
 `tests/unit/asignaciones/empacador-authorization.test.ts`,
 `tests/unit/asignaciones/authorization.test.ts` **[2026-10-06]**,
@@ -302,7 +302,7 @@ tests tocados, verdes contra `QuimiCloude_QC82`.
 
 ## Bloque D — Cableado y Server Actions
 
-### T13 [ ] — `lib/composition`
+### T13 [x] — `lib/composition`
 **Toca:** `lib/composition/index.ts`
 **Hacer:** `design.md > 4`. Extraer el cuerpo que hoy construye el ámbito dentro de `orderUnitOfWork` a
 `orderTransactionScopeOn(tx)` (sin cambiar lo que construye) y que `orderUnitOfWork` lo use;
@@ -331,7 +331,7 @@ comprobar antes del PR es `origin/dev` (`design.md > 2.2`). _2026-10-06: «cuatr
 regla: copiar lo que haya el día de T13._
 **Depende de:** T3, T7, T12, T25, T26; la P5 respondida.
 
-### T14 [ ] — Las acciones
+### T14 [x] — Las acciones
 **Toca:** `lib/modules/asignaciones/adapters/driving/order-execution-actions.ts`,
 `tests/unit/asignaciones/order-execution-actions.test.ts`
 **Hacer:** `cancelAssignedOrderAction` y `recordStepMoveAction` **en este mismo archivo**

@@ -174,3 +174,65 @@ Permiso de la primera línea: `asignaciones.ejecutar` en T8–T11 (P3); `empaque
   fallar `append` ⇒ rojo el caso R24 de `deleteOne`.
 - T25: 10, todas rojas; comparar con `'ok'` en Terminar ⇒ 7 rojos; `already_mine` anota ⇒ 1 rojo;
   `already_mine` aborta ⇒ 2; log/orders globales en vez de los de `run` ⇒ 4 y 4.
+
+## Tanda 4 (2026-10-06) — T12, T13, T5, T14, T20, T23, T19 y T16 (parada)
+
+| Task | Commit | Archivos |
+| --- | --- | --- |
+| T12 | `6ad9d7f7` | `lib/modules/asignaciones/index.ts`, `tests/unit/asignaciones/{module-contract,empacador-authorization,authorization}.test.ts`, `tests/integration/asignaciones/{responsible-eligibility,finished-orders,batch-states,finish-auto-assign-packers}.int.test.ts`, `tests/integration/pedidos/finish-with-finished-goods.int.test.ts`, `tests/helpers/execution-transaction-on-client.ts` (nuevo) |
+| T13 | `498514f8` | `lib/composition/index.ts`, `tests/unit/composition/asignaciones-facade.test.ts` |
+| T5 | `403b44be` | `tests/guards/guard-ambito-empresa-pedidos.test.ts` (incluye el recuento de seis miembros del ámbito de T13) |
+| T14 | `1b54c13b` | `lib/modules/asignaciones/adapters/driving/order-execution-actions.ts`, `tests/unit/asignaciones/order-execution-actions.test.ts` (+13) |
+| T23 | `557d6a85` | 9 E2E: `ejecucion-receta`, `empaque`, `envases-del-pedido`, `pasos-de-envasado`, `pedido-en-varias-presentaciones`, `pedidos-asignados` (solo el describe del Empacador), `producto-terminado`, `recetas-porcentaje`, `reserva-de-material` |
+| T20 | `e28e33a0` | `e2e/registro-ejecucion.spec.ts` (nuevo) |
+| — | `bc015757` | `tests/guards/guard-identificador-de-request.test.ts`: alta de `registro-ejecucion.spec.ts` en `E2E_ESPERADOS` y de `20261006180000_order_execution_entries` en `MIGRACIONES_ESPERADAS` (extensión por diseño de esas listas; no afloja nada) |
+| T19 | `90eb4275` | `tests/integration/asignaciones/execution-atomicity.int.test.ts` (nuevo), `tests/integration/aislamiento.json` (`commit`) |
+
+### Notas para el reviewer
+
+- **T12**: los tipos de los puertos **no** se publican en el barril: la regla R10 de
+  `guard-arquitectura-modulos` solo deja reexportar `./domain`; `lib/composition` los importa por ruta,
+  como ya hacía con el de asignación. `finish-with-finished-goods.int.test.ts` (no listado en T12)
+  rompía el tipado; es `commit` y su limpieza borra ahora `orderExecutionEntry` antes que los pedidos.
+- **T13**: `tests/unit/composition/asignaciones-facade.test.ts` (lista cerrada no listada en el spec)
+  crece con `cancelAssignedOrder` y `recordStepMove`, nota fechada, +2 casos R26.
+- **T14**: `finishAssignedOrderAction` exige `stepPosition` en el `FormData` (vacío ⇒ `null`; ausente ⇒
+  `invalid_input`).
+- **T23**: descartadas `pedidos-terminados` (el `goto` es de un Administrador no asignado y espera el
+  error), `pedido-bloqueado` (Entrar deshabilitado), `pedido-conversion-de-unidad` y
+  `versiones-de-receta` (solo la lista de pedidos), `recetas-pasos` (fuera por tasks.md) y las de
+  `pedidos*`/`aislamiento-pedidos` (no van a asignación ni a empaque).
+- **T20 y T23 están escritas, no ejecutadas**: el E2E lo lanza el leader. Selectores que T20 asume para
+  la UI de T17: botón `Cancelar pedido` (exacto), `alertdialog`, `textbox` /motivo/i, confirmar
+  `Cancelar pedido` dentro del diálogo y cerrar con otro nombre; posición en `step-reader-position`.
+
+### Mutaciones
+
+- T12: quitar `record-step-move.ts` de `CASOS_DE_USO_QC63` ⇒ rojo; nombrar `asignaciones.consultar` o
+  `asignaciones.ejecutar` en `start-packing.ts`/`finish-packing.ts` ⇒ rojo (4 casos).
+- T13: quitar `units` del ámbito ⇒ rojo.
+- T5: (a) sin `companyId` en `cancelInsideTransaction`, (b) `createCancelAliveOrder` con otra unidad,
+  (c) `createOrderPackingRepository(prisma)`, (d) `createFinishPacking` de `executionTransaction` con
+  `orderUnitOfWork` ⇒ las cuatro rojas.
+
+### Tests (subagentes)
+
+- T12–T14: `module-contract`, consumidores, `asignaciones-facade`, `guard-arquitectura-modulos`,
+  `guard-ambito-empresa-pedidos` (50/50), `guard-aislamiento-integracion`, `guard-catalogo-de-errores`,
+  5 integraciones (40/40), `session-once-per-request-actions` sin tocar. typecheck y lint 0 errores.
+- T20/T23: `guard-e2e-landing` y `guard-dobles-e2e` 21/21. `guard-identificador-de-request` 23/23 tras `bc015757`.
+
+### Bloqueos de la tanda 4 (parados, vuelven al leader)
+
+1. **`tests/unit/asignaciones/packing-limits.test.ts` (QC-168) prohíbe lo que QC-82 hace.** 3 rojos:
+   R44 «el dominio de empezar/terminar/listar empaque no … menciona un puerto de registro de ejecución»
+   (`/ExecutionLog/` en `start-packing.ts`, `finish-packing.ts`) — lo rompe T25 (A3, R41, R42);
+   R45 ×2 «ningún archivo de QC-82 menciona `QC-168` / `POR_EMPACAR`/`EN_EMPAQUE`» — lo rompe el propio
+   spec de QC-82 desde la enmienda del 2026-09-26. No está en el baseline. Ni el spec ni el design lo
+   mencionan.
+2. **T16: el caso «R18: el envío no lleva la espera y remontar la reinicia» de
+   `order-execution-screen.test.tsx:318-345` exige que el `FormData` de Finalizar lleve solo `orderId`**;
+   §6.2/T16 añaden `stepPosition`, y §7 dice que en ese test solo se tocan mock y fixture. T16 está
+   implementada **sin commit** en el worktree (pantalla, `components/index.ts`, mock/fixture, fixture de
+   `order-execution-tools.test.tsx` por tipado, `order-execution-step-log.test.tsx` 8/8); ese caso queda
+   rojo (35/36). T17 no empezó.
