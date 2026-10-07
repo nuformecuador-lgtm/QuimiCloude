@@ -35,7 +35,7 @@ import { SUPPLIERS_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
  *
  * Las tres ultimas no se pueden ver leyendo un archivo: son propiedades del **cambio**, no del
  * arbol. Se miran sobre el diff de la rama y sobre el arbol de trabajo. Y siguiendo lo que pide
- * `docs/verification.md > Rojos heredados`, cuando el rango `origin/dev..HEAD` **no existe** el
+ * `docs/gate.md > Rojos heredados`, cuando el rango `origin/dev..HEAD` **no existe** el
  * caso se **salta explicitamente** en vez de ponerse rojo: asi este archivo no necesita entrar en
  * `tests/baseline-rojos.json` y sus otros casos siguen mordiendo en cualquier rama.
  */

@@ -172,7 +172,7 @@ entero: se aplico a R4/R5/R6/R28/R31 y se quedo a medias.
 ### M4. R14, R15, R16 — el aviso del gate no tiene test automatico
 - **Donde:** `scripts/test-db.ts:119-142` (`commandStatus`); `init.sh:133-174` (bloque `6.c`).
 - **Que pasa:** los tres desenlaces («al dia», «va N atras», «no se pudo consultar») estan
-  medidos una vez en `progress/qc77-mediciones/T12.md` y ya. `docs/verification.md > Cuando lo que
+  medidos una vez en `progress/qc77-mediciones/T12.md` y ya. `docs/gate.md > Cuando lo que
   verificas es el gate mismo` pide probar que cada validacion nueva **muerde**; probarlo una vez a
   mano no es dejarlo probado. R15 es el mas delicado: el dia que alguien quite el `|| true` o
   toque el `set -e`, el estado de una base local empezaria a tumbar el gate de todos.

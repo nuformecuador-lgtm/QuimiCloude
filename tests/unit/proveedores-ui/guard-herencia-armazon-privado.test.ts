@@ -33,7 +33,7 @@ import { SUPPLIERS_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
  * mira `readdirSync`, no los `import`.
  *
  * El unico caso que necesita `git` —«no hay componente nuevo en `components/`»— se **salta
- * explicitamente** cuando el rango no existe (`docs/verification.md > Rojos heredados`), y usa el
+ * explicitamente** cuando el rango no existe (`docs/gate.md > Rojos heredados`), y usa el
  * MISMO criterio que el archivo hermano: commits del rango filtrados por la marca `QC-44` mas el
  * arbol de trabajo. El rango entero no vale: arrastra fusiones de `dev` con trabajo ajeno
  * (`components/ui/textarea.tsx` viene de `1b88d69 fix(ui)`, que no es de QC-44).
@@ -309,7 +309,7 @@ describe('herencia del armazon privado en la feature de proveedores (R50)', () =
     // No se barre `tests/` entero a proposito: `tests/unit/theme/*` instala su propio doble de
     // `matchMedia` para `prefers-color-scheme` —otra consulta, otra feature, y anterior a esta—,
     // y ponerse rojo por eso seria un rojo heredado que R50 no reclama
-    // (`docs/verification.md > Rojos heredados`). R50 habla de lo que duplica QC-44.
+    // (`docs/gate.md > Rojos heredados`). R50 habla de lo que duplica QC-44.
     const tocadosBajoTests = (TOCADOS_POR_LA_FEATURE ?? []).filter(
       (ruta) => ruta.startsWith('tests/') && /\.tsx?$/.test(ruta) && existsSync(join(RAIZ, ruta)),
     );

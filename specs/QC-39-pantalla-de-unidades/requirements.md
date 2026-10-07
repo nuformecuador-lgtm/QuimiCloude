@@ -331,8 +331,8 @@ Ninguna.
 | 2026-09-08 | ¿Dónde vive la constante de ruta? | **En un solo sitio, reutilizada** por el ítem del menú, la lista de prefijos y cualquier destino de la propia pantalla. Nunca un literal (**QC-11 R13**, **QC-45 R2**) |
 | 2026-09-08 | Route group y componentes | **`app/(private)/`**, y los componentes en `<ruta>/components/` con barrel `index.ts`, importados por el barrel y nunca por ruta profunda (**QC-12**, **QC-45**) |
 | 2026-09-08 | Mutaciones | **Server Actions**, las tres que **QC-38** ya expone. Prohibido `fetch` a una ruta del propio origen (**QC-11**, `docs/architecture.md > Server Actions vs Route Handlers`) |
-| 2026-09-08 | ¿Dónde se valida la autorización? | **En el service**, que es donde ya está: los casos de uso de **QC-38** exigen el permiso con su test. La pantalla **no la repite ni la sustituye** (**QC-20 D2**, `CHECKPOINTS.md > Permisos`) |
-| 2026-09-08 | Datos de sesión | **Por props**, nunca fetcheados por el componente privado (**QC-11**, `CHECKPOINTS.md > Permisos`) |
+| 2026-09-08 | ¿Dónde se valida la autorización? | **En el service**, que es donde ya está: los casos de uso de **QC-38** exigen el permiso con su test. La pantalla **no la repite ni la sustituye** (**QC-20 D2**, `docs/checkpoints-proyecto.md > Permisos`) |
+| 2026-09-08 | Datos de sesión | **Por props**, nunca fetcheados por el componente privado (**QC-11**, `docs/checkpoints-proyecto.md > Permisos`) |
 | 2026-09-08 | Librería de componentes | **shadcn/ui por CLI.** Ningún primitivo se escribe ni se edita a mano en `components/ui/` (**QC-11**). Si hiciera falta una librería de verdad, el `frontend_dev` **para y la propone**; no la instala (regla 7 de `CLAUDE.md`) |
 | 2026-09-08 | Asserts de los tests | Sobre **roles ARIA, `data-testid` y constantes exportadas**; **nunca** sobre literales de copy (**QC-11**, **QC-22**, **QC-45**) |
 | 2026-09-08 | Multiplataforma | Se valida contra angosto y ancho con `tests/helpers/viewport.ts`. **Ninguna excepción de escritorio.** El desbordamiento se resuelve con scroll horizontal **contenido en la tabla**, nunca del `body`. La columna de equivalencia entra en esa cuenta: es la que más ancho pide |

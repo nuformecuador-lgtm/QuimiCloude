@@ -261,7 +261,7 @@ queda bloqueada.
   permiso y comprueba que lanza **sin que el repositorio reciba una sola llamada**.
 - **Aislamiento por empresa: no entra, y está registrado.** `presentations` no tiene `company_id`;
   dárselo —y filtrar con él este selector— es **QC-49**. Esta ficha no crea ninguna tabla nueva, así
-  que no dispara la exigencia de `CHECKPOINTS.md > Datos y seguridad` («toda tabla de operación
+  que no dispara la exigencia de `docs/checkpoints-proyecto.md > Datos y seguridad` («toda tabla de operación
   nueva lleva su columna de empresa»), y no puede filtrar por una columna que no existe (R27).
 - RLS: `presentations` y `units` terminan la migración `ENABLE` + `FORCE` y **sin policies**, como
   empezaron. Es defensa en profundidad, no la frontera: la frontera es el `requirePermission` del

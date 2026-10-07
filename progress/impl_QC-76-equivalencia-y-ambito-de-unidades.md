@@ -111,7 +111,7 @@ habia detectado, resuelto y documentado para los **tres** fixtures de dentro de
 `tests/integration/unidades`, que es justo donde el problema **no** estaba, y `--rapido`
 selecciona por grafo de imports: ningun test de `pedidos` importa nada de `unidades`, asi que
 **ningun modo del gate corto por debajo de la suite completa lo iba a seleccionar**. Es el agujero
-que `docs/verification.md > Lo que --rapido NO cubre` describe -«acoplamientos que no son
+que `docs/gate.md > Lo que --rapido NO cubre` describe -«acoplamientos que no son
 imports»-, y aqui el acoplamiento era **una restriccion de la base de datos compartida**, que es
 la forma mas invisible que puede tomar.
 

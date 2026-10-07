@@ -161,7 +161,7 @@ No se rellenan con supuestos (regla 6 de `CLAUDE.md`). Ninguna bloquea el modelo
    decidió aquí porque el lote vive en el movimiento, no en la ficha del producto. Sigue
    abierta y sigue siendo cara: la cierra la feature que registre movimientos.
 4. **Quién puede ver y tocar productos.** Es autorización de service y aquí no hay service:
-   la decide QC-20 junto con su test (`CHECKPOINTS.md > Permisos`).
+   la decide QC-20 junto con su test (`docs/checkpoints-proyecto.md > Permisos`).
 
 ## Decisiones cerradas (no reabrir)
 

@@ -8,7 +8,7 @@ observable**. Por eso hay dos familias de requisitos:
 
 - **Estructurales (R1-R17, R19-R21):** propiedades del arbol de archivos y del grafo de
   imports. Se verifican con una guardia ejecutable que recorre archivos, no con tests de
-  comportamiento (`docs/verification.md > Las guardias van SIEMPRE`).
+  comportamiento (`docs/gate.md > Las guardias van SIEMPRE`).
 - **De no-regresion (R18):** el comportamiento actual queda intacto.
 
 Vocabulario usado en todos los requisitos:

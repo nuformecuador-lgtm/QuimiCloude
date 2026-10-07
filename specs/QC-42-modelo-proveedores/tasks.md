@@ -284,7 +284,7 @@ da por hecho:**
   con QC-32 **conservando los dos bloques de modelos y los comentarios OJO de ambos** → `./init.sh`
   **sin flags**. El modo rápido no vale aquí: lo que esta feature acopla es SQL, nombres de archivo
   y la forma del árbol de módulos, y el grafo de imports no lo ve
-  (`docs/verification.md > Lo que --rapido NO cubre`).
+  (`docs/gate.md > Lo que --rapido NO cubre`).
 - Comprobación específica del merge: que **QC-32 no haya tocado `supplier_catalog_lines`** y que
   `products` siga sin ninguna columna añadida por QC-42.
 - **Hecho cuando:** `./init.sh` termina en `== init OK ==`, con todas las guardias en verde, y T10

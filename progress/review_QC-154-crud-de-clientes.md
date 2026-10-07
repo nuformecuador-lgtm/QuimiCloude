@@ -80,7 +80,7 @@ pnpm exec vitest run --project node  tests/unit/clientes/{authorization,customer
 
 ### B1 — BLOQUEANTE · Comentarios de produccion que citan fichas, requisitos y `design.md` en lineas anadidas
 
-La regla esta en `docs/conventions.md > Comentarios` y en el punto 9 del reviewer. `tasks.md` tambien lo avisaba («Los comentarios de produccion no citan fichas ni requisitos»). `git diff dev...HEAD -U0 -- lib db` da **unas 70 lineas anadidas** con `R<n>`, `QC-<n>`, `P3`/`P5`, `T11`/`T12` o `design.md`. Todas son archivos nuevos o bloques nuevos de esta rama:
+La regla esta en `docs/conventions.md > Comentarios` y en el punto 9 del reviewer (`docs/perfil-agentes.md > reviewer`). `tasks.md` tambien lo avisaba («Los comentarios de produccion no citan fichas ni requisitos»). `git diff dev...HEAD -U0 -- lib db` da **unas 70 lineas anadidas** con `R<n>`, `QC-<n>`, `P3`/`P5`, `T11`/`T12` o `design.md`. Todas son archivos nuevos o bloques nuevos de esta rama:
 
 - `db/migrations/20260924190000_customers_search_normalized/migration.sql`: la linea 1 cita `QC-154 (F1.4)` y la linea 4 `design.md > 17.2`.
 - `.../down.sql`: la linea 1 cita `(QC-154, F1.4)`.

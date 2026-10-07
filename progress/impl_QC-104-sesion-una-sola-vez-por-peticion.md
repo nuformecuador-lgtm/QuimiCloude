@@ -482,7 +482,7 @@ borradas** y el invariante **9 archivos con las dos caras / 9 con ambito**, cont
 recursivo.
 
 Con eso queda cubierto lo que los modos rapido y acotado **no** responden
-(`docs/verification.md > Lo que --rapido NO cubre`): que esta rama no haya roto nada lejano que
+(`docs/gate.md > Lo que --rapido NO cubre`): que esta rama no haya roto nada lejano que
 ningun grafo de imports relacione con el cambio. Es la razon por la que el gate completo antes del
 PR no es opcional.
 
@@ -490,7 +490,7 @@ PR no es opcional.
 
 ## 8. T7 — prueba de que el conteo MUERDE (R15)
 
-`docs/verification.md > Probar que muerde, no que pasa`: un check probado solo con su caso verde
+`docs/gate.md > Probar que muerde, no que pasa`: un check probado solo con su caso verde
 no esta probado. Se rompio el codigo de produccion **a mano**, se comprobo el rojo y se restauro
 **desde copia con `cp`**, nunca con `git checkout`. Los tests **no se tocaron**: las mutaciones
 van en produccion.

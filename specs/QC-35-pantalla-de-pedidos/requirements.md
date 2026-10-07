@@ -362,7 +362,7 @@ No se rellenan con supuestos (regla 6 de `CLAUDE.md`).
 | 2026-09-06 | Estados de la pantalla | **Vacío, cargando y error**, los tres declarados. `resolveDataTableState` de QC-55 ya los despacha; esta pantalla aporta los textos, no la lógica |
 | 2026-09-06 | Desbordamiento de la tabla | **Scroll horizontal contenido en la propia tabla**, nunca del `body`, con las acciones de fila siempre alcanzables. Se comprueba en viewport angosto |
 | 2026-09-06 | Route group y componentes | **`app/(private)/`** (QC-11 D1) y componentes en `<ruta>/components/` con barrel `index.ts` (QC-12) |
-| 2026-09-06 | Datos de sesión | **Por props**, nunca fetcheados por el componente privado (QC-11, `CHECKPOINTS.md > Permisos`) |
+| 2026-09-06 | Datos de sesión | **Por props**, nunca fetcheados por el componente privado (QC-11, `docs/checkpoints-proyecto.md > Permisos`) |
 | 2026-09-06 | Librería de componentes | **shadcn/ui por CLI**; ningún primitivo se escribe ni se edita a mano. Si hiciera falta una librería de verdad, el `frontend_dev` **para y la propone** (regla 7 de `CLAUDE.md`) |
 | 2026-09-06 | Rutas y asserts | Rutas siempre en constantes exportadas. Los tests afirman sobre roles ARIA, `data-testid` y constantes exportadas; **nunca** sobre literales de copy. Heredado de QC-11, QC-22 y QC-44 |
 | 2026-09-06 | Multiplataforma | Se valida contra angosto y ancho con `tests/helpers/viewport.ts`. **Sin excepción de escritorio.** Heredado de QC-11 |

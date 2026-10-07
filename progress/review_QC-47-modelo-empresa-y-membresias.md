@@ -288,7 +288,7 @@ del PR, o anadir un `.gitattributes` con `text=auto eol=lf` en ficha propia.
 `scripts/db-rollback.ts:64-81` (`findLastMigration`) ordena los NOMBRES DE CARPETA del sistema
 de archivos y coge el ultimo, sin mirar nunca `_prisma_migrations`. Como `dev` trajo
 `20260904181500_recipe_steps_reset`, que ordena DESPUES, el comando revierte siempre esa.
-`CHECKPOINTS.md > Datos y seguridad` pide que db:rollback revierta y deje `_prisma_migrations`
+`docs/checkpoints-proyecto.md > Datos y seguridad` pide que db:rollback revierta y deje `_prisma_migrations`
 coherente, y para QC-47 eso solo se cumple aplicando el `down.sql` a mano.
 
 Es un agujero del ARNES, no de esta feature: le pasa a cualquier migracion que no sea la ultima

@@ -55,7 +55,7 @@ La ficha se lee en una línea —«devuelve los roles con id y nombre»— y la 
 un `findMany` dentro de la Server Action. No se hace, y el motivo no es ceremonia:
 
 - **La autorización tiene que estar en el service** (`docs/architecture.md > Acceso a datos y
-  autorizacion`, `CHECKPOINTS.md > Permisos`). Un `findMany` en la action deja la comprobación en el
+  autorizacion`, `docs/checkpoints-proyecto.md > Permisos`). Un `findMany` en la action deja la comprobación en el
   borde, que es exactamente lo que el arnés llama «un permiso no implementado».
 - **Un adaptador driving no puede importar `@prisma/client`** (`docs/architecture.md > La regla de
   dependencias`): `guard-arquitectura-modulos.test.ts` se pondría roja.
@@ -338,7 +338,7 @@ Los dos permisos de usuarios ya delimitan exactamente a quién le hace falta.
 
 **Decisión cerrada 2**, segunda mitad. El argumento a favor existe —el nombre de un rol no es un dato
 sensible— y aun así no se hace: toda operación de este repo valida un permiso en el service y
-`CHECKPOINTS.md > Permisos` exige su test. Una excepción «porque este dato no importa» es exactamente
+`docs/checkpoints-proyecto.md > Permisos` exige su test. Una excepción «porque este dato no importa» es exactamente
 la clase de precedente que después se cita para la siguiente.
 
 ---

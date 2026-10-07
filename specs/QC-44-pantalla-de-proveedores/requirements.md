@@ -398,7 +398,7 @@ reporta al leader**; no la rellena con supuestos.
 | 2026-09-04 | Mutaciones | **Server Actions**, las nueve que ya expone QC-43. Prohibido `fetch` a API routes propias. Heredado de QC-11 |
 | 2026-09-04 | Librería de componentes | **shadcn/ui por CLI**; ningún primitivo se escribe ni se edita a mano. El formulario usa `<form action>` + `useActionState` + los esquemas zod del contrato público de `proveedores`: **no entra `react-hook-form`** (QC-22 P2, resuelta al aprobar su spec). Si hiciera falta una librería de verdad, el `frontend_dev` **para y la propone** (regla 7 de `CLAUDE.md`) |
 | 2026-09-04 | Route group y componentes | **`app/(private)/`** (QC-11 D1) y componentes en `<ruta>/components/` con barrel `index.ts` (QC-12) |
-| 2026-09-04 | Datos de sesión | **Por props**, nunca fetcheados por el componente privado (QC-11, `CHECKPOINTS.md > Permisos`) |
+| 2026-09-04 | Datos de sesión | **Por props**, nunca fetcheados por el componente privado (QC-11, `docs/checkpoints-proyecto.md > Permisos`) |
 | 2026-09-04 | Rutas y asserts | Rutas siempre en constantes exportadas. Los tests afirman sobre roles ARIA, `data-testid` y constantes exportadas; **nunca** sobre literales de copy. Heredado de QC-11 y QC-22 |
 | 2026-09-04 | Multiplataforma | Se valida contra angosto y ancho con `tests/helpers/viewport.ts`. **Sin excepción de escritorio.** Heredado de QC-11 |
 | 2026-09-04 | Base heredada | shadcn/ui, Vitest, Playwright, layout privado, sidebar y `<Toaster />` **están montados y no se re-crean**. El choque entre las features 4 y 10 ya ocurrió una vez en este repo |

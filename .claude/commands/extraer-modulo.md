@@ -1,6 +1,6 @@
 ---
 description: Analiza un modulo ya construido y extrae su prompt portable y el cuestionario de decisiones que tomo en silencio
-argument-hint: <el modulo: un nombre de dominio (login), una carpeta (lib/actions) o un key de feature (10)>
+argument-hint: <el modulo: un nombre de dominio (login), una carpeta (lib/modules/identity) o un key de feature (QC-14)>
 ---
 
 Vas a convertir un módulo **ya construido** de este repo en material que otro proyecto pueda
@@ -25,11 +25,11 @@ Para, di por qué y no escribas nada si:
 - El argumento **no resuelve a ningún archivo**, o resuelve a **uno solo**. Un módulo de un
   archivo no necesita extracción: se pega.
 - El código del módulo **solo existe en `.worktrees/`**. No se extrae de una rama sin mergear: el
-  prompt describiría algo que nadie tiene, y esas decisiones aún pueden cambiar en el PR. Hoy
-  aplica al layout privado y a la capa hexagonal.
+  prompt describiría algo que nadie tiene, y esas decisiones aún pueden cambiar en el PR.
 - Ya existe `extracciones/<slug>/`. **No se sobrescribe.** Ofrece dos salidas y solo esas: añadir
   filas a su `decisiones.md`, o crear `extracciones/<slug>-<fecha>/` como versión nueva.
-- La ficha existe en `feature_list.json` en `pending` o `spec_ready` **y no hay archivos en
+- La ficha existe en `feature_list.json` (consúltala por `key`, no la leas entera) en `pending`
+  o `spec_ready` **y no hay archivos en
   disco**. No hay nada que extraer; lo que se quiere ahí es `/afinar-feature`.
 - El cierre transitivo supera **25 archivos** y el humano no ha fijado la frontera. Un módulo de
   60 archivos no produce un prompt portable, produce ruido.
@@ -39,8 +39,8 @@ Para, di por qué y no escribas nada si:
 Resuelve el argumento por estos tres modos, en este orden de precedencia, y **anuncia cuál
 usaste** — delimitar mal es el fallo caro aquí:
 
-1. **Key de feature** (`10`, `QC-14`): busca la ficha en `feature_list.json` y toma como semillas
-   los archivos citados en `specs/<key>-<slug>/tasks.md`. Es el modo más rico: el mapa
+1. **Key de feature** (`QC-14`, o el número suelto de las fichas antiguas como `10`): busca la
+   ficha en `feature_list.json` por `key` y toma como semillas los archivos citados en `specs/<key>-<slug>/tasks.md`. Es el modo más rico: el mapa
    `R<n> → test` y las alternativas descartadas de `design.md` vienen ya escritos.
 2. **Ruta o glob** (contiene `/`): las semillas son los archivos de esa carpeta.
 3. **Nombre de dominio** (`login`, `identity`): semillas por `grep -rl` sobre el término.
@@ -105,7 +105,7 @@ consecuencia**. Si no, es RESUELTO. Sin esto el cuestionario llega a 60 filas y 
 5. **Estado y duración de la sesión.** Cookie, JWT o servidor; expiración, renovación, cierre, qué
    pasa al recargar.
 6. **Autorización y roles.** Quién puede qué y **dónde se valida** — en este repo, en el service
-   (`docs/architecture.md > Acceso a datos y autorizacion`), con test exigido por `CHECKPOINTS.md`.
+   (`docs/architecture.md > Acceso a datos y autorizacion`), con test exigido por `docs/checkpoints-proyecto.md > Datos y seguridad`.
 7. **Política de fallo hacia el usuario.** Mensaje genérico o específico, enumeración de usuarios,
    rate limit o bloqueo por intentos, auditoría del intento fallido, timing. Es el eje con más
    decisiones implícitas de cualquier módulo de autenticación, y el que el receptor más necesita
@@ -152,7 +152,7 @@ consecuencia**. Si no, es RESUELTO. Sin esto el cuestionario llega a 60 filas y 
     y va al prompt.
 20. **Tests como criterio de aceptación.** Por cada uno: qué caso fija, qué `R<n>` cubre, y si es
     **transferible** (comportamiento) o **del stack**. Si falta E2E, decirlo con motivo:
-    `CHECKPOINTS.md` lo exige para autenticación.
+    `CHECKPOINTS.md` lo exige para los flujos críticos de `docs/checkpoints-proyecto.md > Flujos criticos`, autenticación incluida.
 21. **Dependencias asumidas ya montadas.** Lo que el módulo da por hecho y no crea: primitivos de
     `components/ui/`, Tailwind, el layout público, el tooling de tests. Omitir esto es la causa
     clásica de que el receptor reimplemente shadcn entero.
@@ -185,13 +185,14 @@ Anexa las respuestas al `inventario.md` y delega la **pasada 2** en `extractor`,
 Después:
 
 - Si la extracción destapó **deuda real del módulo** (una ruta que da 404, un copy provisional que
-  nadie iba a revisar), añade una línea en `progress/current.md > Deudas y cosas abiertas`. Por ser
+  nadie iba a revisar), añade una línea en `progress/deudas.md`, en la sección que le toque. Por ser
   deuda, no por ser extracción: `progress/` es el estado del ciclo de features y una extracción no
   es una feature — no tiene status, ni worktree, ni PR.
 - **No corras `./init.sh`.** Este comando no toca código ni `feature_list.json`: escribe tres
   markdown en una carpeta que nada valida. Un verde garantizado que no significa nada es justo el
   agujero que el gate vino a cerrar.
-- **No toques Jira.** `docs/jira.md` fija los cuatro empujones del ciclo y este no es ninguno.
+- **No toques Jira.** Ninguno de los empujones de `docs/jira.md > Quién sincroniza y cuándo` es
+  de este comando.
 
 Termina listando las tres rutas y una línea de veredicto. No pegues el contenido en el chat.
 
