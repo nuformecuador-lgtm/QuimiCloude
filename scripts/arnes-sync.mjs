@@ -133,11 +133,20 @@ if (MODO === 'subir') {
 
   const proyecto = config.jira?.project ?? path.basename(process.cwd());
   const slug = mensaje.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
-  const rama = `mejora/${proyecto.toLowerCase()}-${slug}-${new Date().toISOString().slice(0, 10)}`;
+  // Fecha y hora UTC: dos subidas el mismo dia con el mismo titulo no chocan en el nombre de rama.
+  const sello = new Date().toISOString().slice(0, 16).replace(/[-:]/g, '').replace('T', '-');
+  const rama = `mejora/${proyecto.toLowerCase()}-${slug}-${sello}`;
   git(P, 'checkout', '-q', '-b', rama);
   for (const f of grupos.local) {
     const destino = path.join(P, f);
-    if (existsSync(f)) { mkdirSync(path.dirname(destino), { recursive: true }); cpSync(f, destino); }
+    if (existsSync(f)) {
+      mkdirSync(path.dirname(destino), { recursive: true });
+      cpSync(f, destino);
+      // El bit de ejecucion viaja por el indice de git, no por el disco (en Windows no existe):
+      // se copia del indice del proyecto al de la plantilla.
+      const modo = (() => { try { return git('.', 'ls-files', '-s', '--', f).split(' ')[0]; } catch { return ''; } })();
+      if (modo === '100755') { git(P, 'add', '--', f); git(P, 'update-index', '--chmod=+x', '--', f); }
+    }
     else rmSync(destino, { force: true });   // la borraste tu en el proyecto
   }
   const autor = (() => { try { return git('.', 'config', 'user.name'); } catch { return 'desconocido'; } })();
