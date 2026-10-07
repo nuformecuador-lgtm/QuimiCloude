@@ -61,6 +61,7 @@ import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-reposito
 import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work'
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
+import type { CustomerCatalog } from '@/lib/modules/clientes'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 
 const {
@@ -825,6 +826,11 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
         findRefs: explota('packaging.findRefs'),
         findCostingBatches: explota('packaging.findCostingBatches'),
       } as unknown as PackagingCatalog,
+      customerCatalog: {
+        findRefsIncludingDeleted: explota('customerCatalog.findRefsIncludingDeleted'),
+        findAliveRefById: explota('customerCatalog.findAliveRefById'),
+        searchRefs: explota('customerCatalog.searchRefs'),
+      } as unknown as CustomerCatalog,
       log,
     }
 

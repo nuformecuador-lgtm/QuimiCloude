@@ -476,7 +476,7 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
     ])
   })
 
-  it('solo dos migraciones del repo tocan la tabla customers: la de QC-153 y la de esta ficha', () => {
+  it('solo tres migraciones del repo tocan la tabla customers: la de QC-153, la de esta ficha y la de QC-156', () => {
     const migracionesDir = join(repoRoot, 'db', 'migrations')
     const tocanCustomers = readdirSync(migracionesDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
@@ -490,7 +490,11 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
       })
       .map((entry) => entry.name)
       .sort()
-    expect(tocanCustomers).toEqual(['20260924120000_customers', '20260924200000_customers_search_normalized'])
+    expect(tocanCustomers).toEqual([
+      '20260924120000_customers',
+      '20260924200000_customers_search_normalized',
+      '20261006160000_orders_customer',
+    ])
   })
 
   it('el censo de campos dispara con un campo fabricado de mas', () => {

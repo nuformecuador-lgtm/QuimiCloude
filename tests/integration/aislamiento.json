@@ -45,6 +45,7 @@
     "pedidos/order-packing-constraints.int.test.ts",
     "pedidos/order-packing-states-rollback.int.test.ts",
     "pedidos/order-status-blocked-rollback.int.test.ts",
+    "pedidos/orders-customer-constraints.int.test.ts",
     "pedidos/pedidos-constraints.int.test.ts",
     "pedidos/qc170-backfill.int.test.ts",
     "proveedores/catalog-line.int.test.ts",
@@ -442,6 +443,11 @@
       "archivo": "clientes/list-query-customers.int.test.ts",
       "motivo": "T14 (QC-154): ejercita listAliveCustomers de customer-prisma.ts, que usa el cliente Prisma GLOBAL, asi que una transaccion del test con ROLLBACK no lo envolveria. Cada caso siembra sus propios clientes con un marcador irrepetible y los borra por id exacto en su finally; las empresas efimeras (usuario, rol y tipo de documento incluidos) se limpian en afterAll, con el mismo conteo de defensa que customer-repository.int.test.ts. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-24"
+    },
+    {
+      "archivo": "clientes/customer-catalog.int.test.ts",
+      "motivo": "B2 (QC-156): ejercita las tres funciones de customer-catalog-prisma.ts, que llaman al cliente Prisma GLOBAL (mismo criterio que list-query-customers.int.test.ts), asi que una transaccion del test con ROLLBACK no las envolveria. Dos empresas efimeras (randomUUID) nacen en beforeAll; sus clientes llevan un marcador irrepetible y afterAll los borra por company_id, cuenta que no quedo ninguno y despues borra las empresas. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-06"
     },
     {
       "archivo": "proveedores/catalog-image-url.int.test.ts",

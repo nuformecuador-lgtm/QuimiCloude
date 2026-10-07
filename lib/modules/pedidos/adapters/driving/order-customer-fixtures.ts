@@ -1,6 +1,7 @@
 // Datos fijos de las acciones del cliente del pedido mientras los casos de uso no estan
 // cableados: dan a la pantalla respuestas con la forma real. Se borra al integrar.
 import type { OrderCustomer, OrderCustomerSearchPurpose, Page } from '@/lib/modules/pedidos';
+import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 const FIXTURE_PAGE_SIZE = 2;
 
@@ -45,15 +46,8 @@ export function orderCustomerFixturePage(
   const matching = ORDER_CUSTOMER_FIXTURES.filter(
     (customer) => (purpose === 'filter' || !customer.isDeleted) && customer.name.toLowerCase().includes(term),
   );
-  const totalPages = Math.ceil(matching.length / FIXTURE_PAGE_SIZE);
-  const start = (page - 1) * FIXTURE_PAGE_SIZE;
-  return {
-    items: matching.slice(start, start + FIXTURE_PAGE_SIZE),
-    total: matching.length,
-    page,
-    pageSize: FIXTURE_PAGE_SIZE,
-    totalPages,
-  };
+  const { offset, limit } = toOffsetLimit(page, FIXTURE_PAGE_SIZE);
+  return buildPage(matching.slice(offset, offset + limit), matching.length, page, limit);
 }
 
 export function orderCustomerFixtureById(id: string): OrderCustomer | null {

@@ -451,6 +451,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261006120000_inventory_imports',
   // La existencia de antes y el total contado del asiento de ajuste; no toca el identificador.
   '20261006140000_inventory_movements_adjustment_count',
+  // El cliente del pedido; no toca el identificador.
+  '20261006160000_orders_customer',
 ] as const
 
 export function hallazgosDeMigraciones(
@@ -632,6 +634,12 @@ export const SUPERFICIES_QUE_APLANAN: readonly SuperficieAplanada[] = [
       'el resultado de listProductsAction muere dentro del cargador de AsyncAutocomplete, cuyo ' +
       'canal `error` esta tipado `string`; el mensaje viaja como `cause` y se pinta abajo. Para ' +
       'no aplanar haria falta que ese contrato aceptara un ErrorState (Opcion A, descartada).',
+  },
+  {
+    archivo: 'app/(private)/pedidos/components/order-customer-picker.tsx',
+    idioma: 'throw-new-error',
+    ocurrencias: 1,
+    motivo: 'mismo canal `error: string` de AsyncAutocomplete que product-name-picker.',
   },
   {
     archivo: 'app/(private)/pedidos/components/order-form.tsx',

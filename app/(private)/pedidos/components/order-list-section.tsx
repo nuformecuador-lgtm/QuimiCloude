@@ -8,7 +8,9 @@ import {
 } from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions';
 import { assertPermission } from '@/lib/modules/identity';
 import { listWorkGroupsAction } from '@/lib/modules/identity/adapters/driving/work-group-actions';
+import { withFilter } from '@/components/shared/data-table';
 import {
+  getOrderCustomerFilterOptionAction,
   listOrderCoverageAction,
   listOrdersAction,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
@@ -17,13 +19,19 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 // Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
 import type { OrderCoverage } from '@/lib/modules/inventario';
 
+import type { OrderCustomerChoice } from './order-customer-label';
 import { OrderListEmpty } from './order-list-empty';
 import {
   EMPTY_RESPONSIBLES_CATALOG,
   type OrderResponsiblesCatalog,
 } from './order-responsibles';
 import { OrderListError } from './order-list-error';
-import { FIRST_PAGE, orderListHref } from './order-list-params';
+import {
+  CUSTOMER_COLUMN_ID,
+  CUSTOMER_PRESENCE_COLUMN_ID,
+  FIRST_PAGE,
+  orderListHref,
+} from './order-list-params';
 import { OrderTable } from './order-table';
 import type { RecipePickerPage } from './recipe-picker';
 
@@ -214,8 +222,48 @@ async function loadResponsiblesCatalog(): Promise<OrderResponsiblesCatalog> {
   };
 }
 
-export async function OrderListSection({ params, recipes, units, bridge }: OrderListSectionProps) {
-  const result = await listOrdersAction(params);
+/** El cliente que trae la direccion, o `null` si no es de la empresa o no se pudo resolver. */
+async function loadCustomerFilterOption(params: DataTableParams) {
+  const filter = params.filters[CUSTOMER_COLUMN_ID];
+  const id = filter?.kind === 'select' ? filter.values[0] : undefined;
+  if (id === undefined) return undefined;
+
+  const result = await getOrderCustomerFilterOptionAction(id);
+  return result.status === 'success' ? result.data : null;
+}
+
+/**
+ * Lista y resuelve el filtro de cliente a la vez. Si el cliente de la direccion no se resuelve, el
+ * filtro se descarta y se lista otra vez sin el: la pantalla no puede filtrar por algo que no
+ * sabe nombrar.
+ */
+async function listWithCustomerFilter(params: DataTableParams) {
+  const [listed, option] = await Promise.all([
+    listOrdersAction(params),
+    loadCustomerFilterOption(params),
+  ]);
+
+  if (option === null) {
+    const withoutFilter = withFilter(params, CUSTOMER_COLUMN_ID, null);
+    return { params: withoutFilter, result: await listOrdersAction(withoutFilter), customerFilter: null };
+  }
+
+  const customerFilter: OrderCustomerChoice | null =
+    option !== undefined
+      ? { kind: 'customer', customer: option }
+      : params.filters[CUSTOMER_PRESENCE_COLUMN_ID] !== undefined
+        ? { kind: 'none' }
+        : null;
+  return { params, result: listed, customerFilter };
+}
+
+export async function OrderListSection({
+  params: requestedParams,
+  recipes,
+  units,
+  bridge,
+}: OrderListSectionProps) {
+  const { params, result, customerFilter } = await listWithCustomerFilter(requestedParams);
 
   if (result.status === 'error') {
     return <OrderListError error={result} />;
@@ -250,6 +298,7 @@ export async function OrderListSection({ params, recipes, units, bridge }: Order
           recipes={recipes}
           units={units}
           bridge={bridge}
+          customerFilter={customerFilter}
           noMatches={{ clearHref: orderListHref({ ...params, search: '', page: FIRST_PAGE }) }}
         />
       </div>
@@ -293,6 +342,8 @@ export async function OrderListSection({ params, recipes, units, bridge }: Order
         responsiblesCatalog={responsiblesCatalog}
         coverageByOrder={coverageByOrder}
         canEditDistribution={canEditDistribution}
+        canEditCustomer={canEditDistribution}
+        customerFilter={customerFilter}
       />
     </div>
   );

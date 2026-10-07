@@ -108,6 +108,7 @@ Commit propio: `feat(QC-156): T0 contrato pedido-cliente`.
 Ningún archivo de esta pista está en `app/`, en `components/` ni en `tests/unit/pedidos-ui/`.
 
 ### B1 [P] — Esquema y migración · depende de: T0 · R1, R2, R3, R4, R5
+**Estado:** [x] hecha (tanda 1)
 
 - `db/schema.prisma`: `Order.customerId`, `@@index` y el comentario de cabecera
   (`design.md > 2.1`).
@@ -132,6 +133,7 @@ revierte limpia, y los tres tests están en verde. Salida pegada en
 `progress/impl_QC-156-pedido-con-cliente.md`.
 
 ### B2 [P] — Servicio de clientes real · depende de: T0 · R27, R28, R37
+**Estado:** [x] hecha (tanda 1)
 
 - `customer-catalog-prisma.ts`, real (`design.md > 3`): reutiliza `searchCondition` de
   `customer-prisma.ts` exportándola, y no la copia.
@@ -152,6 +154,7 @@ revierte limpia, y los tres tests están en verde. Salida pegada en
   de los cambios ya hechos en T0 y de la lista de la guardia.
 
 ### B3 [P] — Alta y edición con cliente · depende de: T0 · R10, R11, R12, R13, R15
+**Estado:** [x] hecha (tanda 1)
 
 - `lib/modules/pedidos/domain/order-input.ts`: `customerId` en los dos esquemas, con el vacío como
   `null` y sin `.uuid()`.
@@ -184,6 +187,7 @@ revierte limpia, y los tres tests están en verde. Salida pegada en
 tests de `order-distribution` siguen en verde sin editarlos.
 
 ### B4 [P] — Cambio de cliente y búsqueda de opciones · depende de: T0 · R6, R7, R8, R14–R18, R27, R28, R29
+**Estado:** [x] hecha (tanda 1)
 
 - `set-order-customer.ts`, `search-order-customer-options.ts` y `get-order-customer-filter-option.ts`,
   reales (`design.md > 4.2`, `> 4.3`).
@@ -204,6 +208,7 @@ tests de `order-distribution` siguen en verde sin editarlos.
 **Hecho cuando:** los tres tests están en verde.
 
 ### B5 [P] — Listado, ficha y filtro · depende de: T0 · R19–R26
+**Estado:** [x] hecha (tanda 1)
 
 - `order-queryable.ts`: `customerId: 'select'` y `customerPresence: 'select'`
   (`design.md > 4.4`, `> 4.4.1`).
@@ -267,6 +272,7 @@ Todo se prueba contra las actions **stub** de T0, mockeadas en los tests con `vi
 los tests existentes de `pedidos-ui`.
 
 ### F1 [P] — `AsyncAutocomplete.defaultInputValue` · depende de: T0 · R29, R31
+**Estado:** [x] hecha (tanda 1)
 
 - `components/shared/async-autocomplete.tsx`: la prop opcional (`design.md > 8`).
 - `tests/unit/async-autocomplete.test.tsx` (modifica): con la prop, el campo arranca con ese texto
@@ -276,6 +282,7 @@ los tests existentes de `pedidos-ui`.
 **Hecho cuando:** el test está en verde y nadie más que `pedidos` pasa la prop.
 
 ### F2 — Etiqueta y selector · depende de: F1 · R20, R27, R28, R34, R35
+**Estado:** [x] hecha (tanda 1)
 
 - `app/(private)/pedidos/components/order-customer-label.ts` (nuevo, con
   `ORDER_CUSTOMER_NONE_LABEL` y `orderCustomerChoiceLabel`) y `order-customer-picker.tsx` (nuevo,
@@ -293,6 +300,7 @@ los tests existentes de `pedidos-ui`.
 **Hecho cuando:** el test está en verde.
 
 ### F3 [P] — Parámetro de la dirección · depende de: T0 · R24, R34
+**Estado:** [x] hecha (tanda 1)
 
 - `order-list-params.ts`: `CUSTOMER_PARAM`, `CUSTOMER_COLUMN_ID`, `CUSTOMER_PRESENCE_COLUMN_ID` y
   `CUSTOMER_NONE_PARAM_VALUE`, con lectura y escritura (`design.md > 8`).
@@ -304,18 +312,21 @@ los tests existentes de `pedidos-ui`.
 **Hecho cuando:** el test está en verde.
 
 ### F4 — Columna «Cliente» · depende de: F2 · R20, R26, R30
+**Estado:** [x] hecha (tanda 1)
 
 - `order-columns.tsx`.
 - `tests/unit/pedidos-ui/order-columns.test.tsx` (modifica): el nombre, el sufijo de baja, el
   marcador de ausencia, sin `sortable` y sin `filter`, y la posición detrás de «Receta».
 
 ### F5 — Campo en el formulario · depende de: F2 · R31
+**Estado:** [x] hecha (tanda 1)
 
 - `order-form.tsx`.
 - `tests/unit/pedidos-ui/order-form-customer.test.tsx` (nuevo): el alta envía `customerId` vacío o
   con id, la edición viene precargada, y vaciar el campo envía vacío.
 
 ### F6 — Diálogo y acción de fila · depende de: F2 · R32, R33, R35
+**Estado:** [x] hecha (tanda 1)
 
 - `order-customer-dialog.tsx` (nuevo), `order-row-actions.tsx`, `order-sheet.tsx` e `index.ts`.
 - `tests/unit/pedidos-ui/order-customer-dialog.test.tsx` (nuevo):
@@ -328,6 +339,7 @@ los tests existentes de `pedidos-ui`.
   lista de items).
 
 ### F7 — Filtro en la barra · depende de: F2, F3 · R29, R34, R35
+**Estado:** [x] hecha (tanda 1)
 
 - `order-customer-filter.tsx` (nuevo), `order-table.tsx`, `order-list-section.tsx` e `index.ts`.
 - `tests/unit/pedidos-ui/order-customer-filter.test.tsx` (nuevo):

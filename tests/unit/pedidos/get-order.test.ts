@@ -9,6 +9,7 @@ import { createGetOrder, toOrderView } from '@/lib/modules/pedidos/domain/get-or
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { CustomerRef } from '@/lib/modules/clientes'
 import type { PresentationCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
@@ -58,13 +59,23 @@ function fila(recipeId: string): OrderRow {
   }
 }
 
-function dobles(row: OrderRow | null, refs: readonly RecipeRef[] = [REF_ORIGINAL, REF_VERSION]) {
+function dobles(
+  row: OrderRow | null,
+  refs: readonly RecipeRef[] = [REF_ORIGINAL, REF_VERSION],
+  customerRefs: readonly CustomerRef[] = [],
+) {
   const findRefsIncludingDeleted = vi.fn(async (ids: readonly string[], companyId: string) => {
     void companyId
     return refs.filter((ref) => ids.includes(ref.id))
   })
   const findRefs = vi.fn(async () => [])
+  const findCustomerRefs = vi.fn(async (ids: readonly string[], companyId: string) => {
+    void companyId
+    return customerRefs.filter((ref) => ids.includes(ref.id))
+  })
   return {
+    customerCatalog: { findRefsIncludingDeleted: findCustomerRefs },
+    findCustomerRefs,
     orders: { findAliveById: vi.fn(async () => row) } as unknown as OrderRepository,
     recipes: { findRefsIncludingDeleted } as unknown as RecipeCatalog,
     presentations: { findRefs } as unknown as PresentationCatalog,
@@ -120,6 +131,48 @@ describe('getOrder — pedido con version de receta', () => {
 
     await expect(createGetOrder(d)(ORDER_ID, ADMIN)).rejects.toBeInstanceOf(OrderNotFoundError)
     expect(d.findRefsIncludingDeleted).not.toHaveBeenCalled()
+    expect(d.findCustomerRefs).not.toHaveBeenCalled()
+  })
+})
+
+describe('getOrder — el cliente del pedido (QC-156)', () => {
+  const CLIENTE = '99999999-9999-4999-8999-999999999999'
+  const REF_CLIENTE: CustomerRef = { id: CLIENTE, firstNames: 'Ana Maria', lastNames: 'Perez Soto', isDeleted: false }
+
+  it('R19: la ficha trae el cliente como id, nombre y marca de baja, con una sola llamada', async () => {
+    const d = dobles({ ...fila(ORIGINAL), customerId: CLIENTE }, undefined, [REF_CLIENTE])
+
+    const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
+
+    expect(vista.customer).toEqual({ id: CLIENTE, name: 'Ana Maria Perez Soto', isDeleted: false })
+    expect(d.findCustomerRefs).toHaveBeenCalledTimes(1)
+    expect(d.findCustomerRefs).toHaveBeenCalledWith([CLIENTE], COMPANY)
+  })
+
+  it('R20: un cliente dado de baja sigue saliendo con su nombre y isDeleted', async () => {
+    const d = dobles({ ...fila(ORIGINAL), customerId: CLIENTE }, undefined, [{ ...REF_CLIENTE, isDeleted: true }])
+
+    const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
+
+    expect(vista.customer).toEqual({ id: CLIENTE, name: 'Ana Maria Perez Soto', isDeleted: true })
+  })
+
+  it('R21: un pedido sin cliente no consulta el catalogo de clientes y sale con customer null', async () => {
+    const d = dobles(fila(ORIGINAL))
+
+    const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
+
+    expect(vista.customer).toBeNull()
+    expect(d.findCustomerRefs).not.toHaveBeenCalled()
+  })
+
+  it('R19: un id que no vuelve del catalogo se pinta sin cliente y la ficha sigue saliendo', async () => {
+    const d = dobles({ ...fila(ORIGINAL), customerId: CLIENTE }, undefined, [])
+
+    const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
+
+    expect(vista.customer).toBeNull()
+    expect(vista.id).toBe(ORDER_ID)
   })
 })
 

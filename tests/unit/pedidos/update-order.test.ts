@@ -32,6 +32,7 @@ import type { CostingBatch, PackagingCatalog, PresentationCatalog, ProductCatalo
 import type { RecipeCatalog, RecipeExecutionLine, RecipeRef } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitConversion, UnitRef } from '@/lib/modules/unidades';
 import { fakePackagingCatalog, packagingRef } from '../../helpers/packaging-catalog-double';
+import { fakeCustomerCatalog } from '../../helpers/customer-catalog-double';
 
 const EMPRESA_A = '33333333-3333-4333-8333-333333333333';
 const EMPRESA_B = '44444444-4444-4444-8444-444444444444';
@@ -233,6 +234,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -253,6 +255,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
     const repo2 = repositorioDePedidos();
     await expect(
       createUpdateOrder({
+        customerCatalog: fakeCustomerCatalog(),
         orders: repo2.orders,
         unitOfWork: repo2.unitOfWork,
         recipes: cat.recipes,
@@ -268,6 +271,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
     const cat2 = catalogoDeRecetas();
     const repo3 = repositorioDePedidos();
     const errorInexistente = await createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo3.orders,
       unitOfWork: repo3.unitOfWork,
       recipes: cat2.recipes,
@@ -287,6 +291,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -306,6 +311,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -325,6 +331,7 @@ describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empre
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -348,6 +355,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
     const repo = repositorioDePedidos();
     const pres = catalogoDePresentaciones();
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -372,6 +380,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
     const repo = repositorioDePedidos();
     const pres = catalogoDePresentaciones();
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -400,6 +409,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
         new Map([[OTRA_UNIDAD, { id: OTRA_UNIDAD, baseUnitId: null, factor: null }]]),
       );
       const updateOrder = createUpdateOrder({
+        customerCatalog: fakeCustomerCatalog(),
         orders: repo.orders,
         unitOfWork: repo.unitOfWork,
         recipes: cat.recipes,
@@ -428,6 +438,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
       const repo = repositorioConEstado(status);
       const pres = catalogoDePresentaciones();
       const updateOrder = createUpdateOrder({
+        customerCatalog: fakeCustomerCatalog(),
         orders: repo.orders,
         unitOfWork: repo.unitOfWork,
         recipes: cat.recipes,
@@ -455,6 +466,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
     const pres = catalogoDePresentaciones();
     const UNIDAD_INEXISTENTE = '40404040-4040-4404-8404-404040404040';
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -482,6 +494,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -515,6 +528,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -535,6 +549,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -568,6 +583,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
       new Map([[OTRA_UNIDAD_INCOMPATIBLE, { id: OTRA_UNIDAD_INCOMPATIBLE, baseUnitId: null, factor: null }]]),
     );
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -599,6 +615,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -637,6 +654,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
       packagingCost: null,
     });
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -669,6 +687,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
       packagingCost: null,
     });
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -697,6 +716,7 @@ describe('QC-145 R6 — la edicion no mueve el estado', () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -722,6 +742,7 @@ describe('QC-145 R6 — la edicion no mueve el estado', () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -753,6 +774,7 @@ describe('QC-150 — la edicion no da de alta producto terminado', () => {
       finishedGoods: { receiveFromOrder },
     });
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork,
       recipes: cat.recipes,
@@ -779,6 +801,7 @@ describe('QC-150 — la edicion no da de alta producto terminado', () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       // `fakeUnitOfWork` por defecto (helper compartido) explota si algo llama a
       // `finishedGoods.receiveFromOrder`: que la edicion termine sin lanzar demuestra que no lo hizo.
@@ -806,6 +829,7 @@ describe('QC-150 — la edicion no da de alta producto terminado', () => {
       finishedGoods: { receiveFromOrder },
     });
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork,
       recipes: cat.recipes,
@@ -833,6 +857,7 @@ describe('QC-145 R8 — un pedido ENTREGADO, CANCELADO, POR_EMPACAR o EN_EMPAQUE
       const repo = repositorioConEstado(status);
       const pres = catalogoDePresentaciones();
       const updateOrder = createUpdateOrder({
+        customerCatalog: fakeCustomerCatalog(),
         orders: repo.orders,
         unitOfWork: repo.unitOfWork,
         recipes: cat.recipes,
@@ -923,6 +948,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
     const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -946,6 +972,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
     const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -976,6 +1003,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
       const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
       const repo = repositorioDePedidos();
       const updateOrder = createUpdateOrder({
+        customerCatalog: fakeCustomerCatalog(),
         orders: repo.orders,
         unitOfWork: repo.unitOfWork,
         recipes: cat.recipes,
@@ -999,6 +1027,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
     const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
     const repo = repositorioDePedidos();
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -1022,6 +1051,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
       permissions: ['pedidos.consultar'],
     };
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: catalogos.orders,
       unitOfWork: catalogos.unitOfWork,
       recipes: catalogos.recipes,
@@ -1077,6 +1107,7 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
     const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
     const repo = repositorioConOrden({ sync: 'reserved' });
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -1098,6 +1129,7 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
     const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
     const repo = repositorioConOrden({ sync: 'reserved' });
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -1118,6 +1150,7 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
     const cat = catalogoDeRecetas()
     const repo = repositorioConOrden({ sync: 'not_reserved' })
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: repo.orders,
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
@@ -1147,6 +1180,7 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
       throw new Error('orders.findAliveById no deberia llamarse sin permiso');
     });
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: { findAliveById, listAlive: vi.fn() } as unknown as OrderRepository,
       unitOfWork: unitOfWork as unknown as ReturnType<typeof repositorioConOrden>['unitOfWork'],
       recipes: cat.recipes,
@@ -1208,6 +1242,7 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
       recipes: { findExecutionContentById: findExecutionContentByIdDeLaTransaccion },
     });
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: { findAliveById, listAlive: vi.fn() } as unknown as OrderRepository,
       unitOfWork,
       recipes: recipesGlobal,
@@ -1284,6 +1319,7 @@ describe('edicion con version de receta', () => {
     });
     const run = vi.spyOn(unitOfWork, 'run');
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders,
       unitOfWork,
       recipes: cat.recipes,
@@ -1440,7 +1476,7 @@ describe('edicion con version de receta', () => {
   });
 
   it('R39: con version se exige el mismo permiso de hoy y sin el no se lee nada', async () => {
-    const updateOrder = createUpdateOrder({ ...catalogosQueExplotan(), now: () => AHORA });
+    const updateOrder = createUpdateOrder({ customerCatalog: fakeCustomerCatalog(), ...catalogosQueExplotan(), now: () => AHORA });
     const SIN_PERMISO: Actor = { id: 'u-1', companyId: EMPRESA_A, permissions: ['pedidos.consultar'] };
 
     await expect(updateOrder(ORDER_ID, entrada(VERSION_DE_A), SIN_PERMISO)).rejects.toBeInstanceOf(
@@ -1475,6 +1511,7 @@ describe('QC-138 — la edicion bloquea y desbloquea (R1, R2, R6, R8, R10, R11, 
       reservations: { syncForOrder },
     });
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders,
       unitOfWork,
       recipes: catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]])).recipes,
@@ -1589,7 +1626,7 @@ describe('QC-138 — la edicion bloquea y desbloquea (R1, R2, R6, R8, R10, R11, 
 
   it('R37: sin pedidos.modificar -> unauthorized antes de leer nada', async () => {
     const catalogos = catalogosQueExplotan();
-    const updateOrder = createUpdateOrder({ ...catalogos, now: () => AHORA });
+    const updateOrder = createUpdateOrder({ customerCatalog: fakeCustomerCatalog(), ...catalogos, now: () => AHORA });
     const SIN_PERMISO: Actor = { id: 'u-1', companyId: EMPRESA_A, permissions: ['inventario.modificar'] };
 
     await expect(
@@ -1627,6 +1664,7 @@ describe('QC-204 — la edicion convierte la necesidad con la unidad editada', (
       units: fakeScopeUnits([GRAMO, KILO, PIEZA]),
     });
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders,
       unitOfWork,
       recipes: cat.recipes,

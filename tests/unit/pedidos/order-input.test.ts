@@ -184,6 +184,7 @@ describe('pedidos — createOrderSchema (alta)', () => {
     })
     expect(Object.keys(parsed).sort()).toEqual([
       'confirmBlocked',
+      'customerId',
       'presentationLines',
       'priority',
       'quantity',
@@ -218,6 +219,7 @@ describe('pedidos — updateOrderSchema (edicion)', () => {
     expect(updateOrderSchema).toBe(createOrderSchema)
     expect(Object.keys(updateOrderSchema.parse(edicionValida)).sort()).toEqual([
       'confirmBlocked',
+      'customerId',
       'presentationLines',
       'priority',
       'quantity',

@@ -6,6 +6,8 @@ import {
   ValidationError,
 } from './errors';
 import type { OrderStatus } from './order-classification';
+import { requireAliveCustomer } from './order-customer';
+import { isCustomerOnlyEdit } from './order-edit-change';
 import { updateOrderSchema } from './order-input';
 import { orderRecipeIds, requireOrderRecipe } from './order-recipe';
 import { buildOrderRequirement } from './order-requirement';
@@ -15,6 +17,7 @@ import type { OrderScope } from './order-scope';
 import { assertTransition } from './order-transitions';
 import { resolveStoredOrderCost } from './resolve-ingredients-cost';
 
+import type { CustomerCatalog } from '@/lib/modules/clientes';
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
@@ -37,6 +40,8 @@ export type UpdateOrderDeps = {
   readonly presentations: PresentationCatalog;
   /** Contrato PUBLICO de `inventario`: los envases del reparto y su presentacion fija. */
   readonly packaging: PackagingCatalog;
+  /** Contrato PUBLICO de `clientes`: comprueba el cliente cuando la edicion lo cambia. */
+  readonly customerCatalog: Pick<CustomerCatalog, 'findAliveRefById'>;
   readonly unitOfWork: OrderUnitOfWork;
   /** Ver el comentario identico de `create-order.ts` sobre el origen de este reloj. */
   readonly now?: () => Date;
@@ -96,16 +101,40 @@ export function createUpdateOrder(
     // modifica ninguna fila.
     assertTransition(row.status, row.status);
 
+    // Si solo cambia el cliente se escribe solo el cliente: sin leer catalogos, sin recalcular
+    // el coste y sin tocar lo apartado. Se decide con la lectura previa y sin bloquear la fila,
+    // porque esta escritura no pisa ningun otro dato que otra edicion haya cambiado entre medias.
+    const requestedRecipeId = data.recipeVersionId ?? data.recipeId;
+    if (
+      data.customerId !== row.customerId &&
+      isCustomerOnlyEdit(row, { ...data, recipeId: requestedRecipeId })
+    ) {
+      const customerId = data.customerId;
+      if (customerId !== null) {
+        await requireAliveCustomer(deps.customerCatalog, customerId, actor.companyId);
+      }
+      await deps.unitOfWork.run(async (transaction) => {
+        const result = await transaction.orders.setCustomerAlive(id, customerId, actor.id, now(), scope);
+        if (result === 'not_found') throw new OrderNotFoundError();
+      });
+      return;
+    }
+
     // Si la receta del pedido no cambia se acepta aunque este dada de baja o por revisar:
     // corregir la cantidad de un pedido viejo no puede obligar a cambiarle la formula. Si
     // cambia, se exige lo mismo que en el alta.
-    let effectiveId = data.recipeVersionId ?? data.recipeId;
+    let effectiveId = requestedRecipeId;
     if (effectiveId !== row.recipeId) {
       const refs = await deps.recipes.findRefsIncludingDeleted(
         orderRecipeIds(data.recipeId, data.recipeVersionId),
         actor.companyId,
       );
       effectiveId = requireOrderRecipe(refs, data.recipeId, data.recipeVersionId);
+    }
+
+    // El mismo cliente que ya tiene se acepta aunque este dado de baja, como la receta.
+    if (data.customerId !== null && data.customerId !== row.customerId) {
+      await requireAliveCustomer(deps.customerCatalog, data.customerId, actor.companyId);
     }
 
     // El coste se recalcula con la receta del DATO ENTRANTE, no con la de la fila vieja: una
@@ -174,7 +203,7 @@ export function createUpdateOrder(
           priority: data.priority,
           unitId: data.unitId,
           presentationLines: distribution.lines,
-          customerId: null,
+          customerId: data.customerId,
         },
         actor.id,
         instant,

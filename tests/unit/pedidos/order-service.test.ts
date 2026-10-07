@@ -32,6 +32,7 @@ import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/li
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
+import { fakeCustomerCatalog } from '../../helpers/customer-catalog-double';
 
 // QC-74: el actor lleva PERMISOS, no el nombre del rol (R18). Los dos codigos de `pedidos`,
 // porque este archivo ejercita lecturas y escrituras con el mismo fixture.
@@ -92,6 +93,7 @@ type Dobles = {
   readonly units: UnitCatalog
   readonly presentations: PresentationCatalog
   readonly packaging: PackagingCatalog
+  readonly customerCatalog: ReturnType<typeof fakeCustomerCatalog>
   readonly unitOfWork: ReturnType<typeof fakeUnitOfWork>['unitOfWork']
   readonly now: () => Date
 }
@@ -165,6 +167,7 @@ function dobles(opciones: {
     } as unknown as UnitCatalog,
     presentations: { findRefs: findPresentationRefs } as unknown as PresentationCatalog,
     packaging: fakePackagingCatalog(),
+    customerCatalog: fakeCustomerCatalog(),
     unitOfWork,
     now: () => AHORA,
     create,
@@ -442,6 +445,7 @@ describe('lecturas — el importe se devuelve a quien tiene pedidos.consultar (R
     const log = { ignoredFields: vi.fn() }
 
     const pagina = await createListOrders({
+      customerCatalog: fakeCustomerCatalog(),
       orders,
       recipes: { findRefsIncludingDeleted, findIdsMatchingName } as unknown as RecipeCatalog,
       presentations: { findRefs: vi.fn(async () => []) } as unknown as PresentationCatalog,
