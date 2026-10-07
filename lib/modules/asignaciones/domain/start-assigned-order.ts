@@ -27,7 +27,8 @@ export type StartAssignedOrderDeps = GetAssignedOrderExecutionDeps & {
  * `PENDIENTE` transiciona a `EN_CURSO` y anota el arranque en la misma transaccion; `EN_CURSO`
  * anota el retomar en la ultima posicion anotada; `BLOQUEADO` rechaza con `order_blocked` sin
  * anotar, tambien si una edicion lo bloqueo entre la lectura y la transicion; cualquier otro
- * estado rechaza con el error de `order-state.ts`.
+ * estado rechaza con el error de `order-state.ts`. Si otro responsable arranca mientras se lee la
+ * vista, se relee una vez y se sigue por la rama del estado nuevo.
  * La legalidad de la escritura la decide `pedidos` dentro de `transitionAliveById`, nunca esta
  * funcion.
  */
@@ -55,6 +56,7 @@ export function createStartAssignedOrder(
     );
     // Los pasos no cambian al transicionar: tras un `stale` se reutiliza la vista ya leida.
     let view: AssignedOrderExecutionView | null = null;
+    let viewRaceRetried = false;
 
     for (;;) {
       if (order === null) throw new OrderNotFoundError();
@@ -80,7 +82,22 @@ export function createStartAssignedOrder(
         throw new OrderNotFoundError();
       }
 
-      view ??= await getAssignedOrderExecution(actor, { orderId });
+      if (view === null) {
+        try {
+          view = await getAssignedOrderExecution(actor, { orderId });
+        } catch (error) {
+          if (!(error instanceof OrderNotFoundError) || viewRaceRetried) throw error;
+          // La vista lee el estado y luego el resumen filtrado por ese estado: si otro responsable
+          // arranca entre las dos lecturas, el resumen sale vacio aunque el pedido siga asignado.
+          viewRaceRetried = true;
+          const reread = await deps.orders.findAliveById(orderId, actor.companyId);
+          if (reread === null || reread.status === 'PENDIENTE') throw error;
+          const stillAssigned = await deps.assignments.listOrderIdsByUserInCompany(actor.companyId, actor.id);
+          if (!stillAssigned.includes(orderId)) throw error;
+          order = reread;
+          continue;
+        }
+      }
       const position = view.steps.length === 0 ? null : 1;
       const now = deps.now?.() ?? new Date();
       try {

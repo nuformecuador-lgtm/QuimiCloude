@@ -618,3 +618,97 @@ describe('QC-82 — startAssignedOrder: el prologo no cambia', () => {
     expect(append).not.toHaveBeenCalled();
   });
 });
+
+const RESUMEN_VACIO = { items: [], total: 0, page: 1, pageSize: 1, totalPages: 0 };
+
+/** La vista lee PENDIENTE y el resumen filtrado por PENDIENTE sale vacio: otro arranco en medio. */
+function conVistaQuePierdeLaCarrera(dobles: Dobles): ReturnType<typeof vi.fn> {
+  const listAliveSummariesByIds = dobles.deps.orders.listAliveSummariesByIds as ReturnType<typeof vi.fn>;
+  listAliveSummariesByIds.mockResolvedValueOnce(RESUMEN_VACIO);
+  return listAliveSummariesByIds;
+}
+
+describe('QC-82 — startAssignedOrder: carrera de arrancar al leer la vista', () => {
+  it('R16: el pedido pasa a EN_CURSO entre las dos lecturas de la vista => cero `start`, exactamente un `resume`', async () => {
+    // Lectura inicial, lectura de la vista, relectura tras la carrera, vista de la rama EN_CURSO.
+    const dobles = montar({
+      ordenDeEstados: ['PENDIENTE', 'PENDIENTE', 'EN_CURSO', 'EN_CURSO'],
+      pasos: 4,
+      ultimaPosicion: 2,
+    });
+    const listAliveSummariesByIds = conVistaQuePierdeLaCarrera(dobles);
+
+    const view = await createStartAssignedOrder(dobles.deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(dobles.transitionAliveById).not.toHaveBeenCalled();
+    expect(dobles.run).not.toHaveBeenCalled();
+    expect(dobles.anotaciones.map(({ entry }) => entry.action)).toEqual(['resume']);
+    expect(dobles.anotaciones[0]?.entry.stepPosition).toBe(2);
+    expect(listAliveSummariesByIds).toHaveBeenLastCalledWith(EMPRESA, [PEDIDO], ['EN_CURSO'], 1, 1);
+    expect(view.status).toBe('EN_CURSO');
+    expect(view.resumeStepPosition).toBe(2);
+  });
+
+  it('R16: si al releer el pedido esta BLOQUEADO rechaza con `order_blocked` sin anotar', async () => {
+    const dobles = montar({ ordenDeEstados: ['PENDIENTE', 'PENDIENTE', 'BLOQUEADO'], pasos: 2 });
+    conVistaQuePierdeLaCarrera(dobles);
+
+    await expect(createStartAssignedOrder(dobles.deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      OrderBlockedError,
+    );
+    expect(dobles.append).not.toHaveBeenCalled();
+    expect(dobles.run).not.toHaveBeenCalled();
+  });
+
+  it('R26: si al releer el pedido sigue PENDIENTE, el `order_not_found` se propaga sin escribir', async () => {
+    const dobles = montar({ ordenDeEstados: ['PENDIENTE', 'PENDIENTE', 'PENDIENTE', 'PENDIENTE'], pasos: 2 });
+    conVistaQuePierdeLaCarrera(dobles);
+
+    await expect(createStartAssignedOrder(dobles.deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      OrderNotFoundError,
+    );
+    expect(dobles.transitionAliveById).not.toHaveBeenCalled();
+    expect(dobles.append).not.toHaveBeenCalled();
+  });
+
+  it('R26: si al releer el pedido ya no existe, el `order_not_found` se propaga sin escribir', async () => {
+    const dobles = montar({ ordenDeEstados: ['PENDIENTE', 'PENDIENTE'], pasos: 2 });
+    conVistaQuePierdeLaCarrera(dobles);
+    dobles.findAliveById.mockImplementationOnce(async () => ({ id: PEDIDO, status: 'PENDIENTE' }));
+    dobles.findAliveById.mockImplementationOnce(async () => ({ id: PEDIDO, status: 'PENDIENTE' }));
+    dobles.findAliveById.mockImplementationOnce(async () => null);
+
+    await expect(createStartAssignedOrder(dobles.deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      OrderNotFoundError,
+    );
+    expect(dobles.findAliveById).toHaveBeenCalledTimes(3);
+    expect(dobles.transitionAliveById).not.toHaveBeenCalled();
+    expect(dobles.append).not.toHaveBeenCalled();
+  });
+
+  it('R26: si al releer el pedido ya no esta asignado al actor, el `order_not_found` se propaga sin anotar', async () => {
+    const dobles = montar({ ordenDeEstados: ['PENDIENTE', 'PENDIENTE', 'EN_CURSO', 'EN_CURSO'], pasos: 2 });
+    conVistaQuePierdeLaCarrera(dobles);
+    dobles.listOrderIdsByUserInCompany
+      .mockResolvedValueOnce([PEDIDO])
+      .mockResolvedValueOnce([PEDIDO])
+      .mockResolvedValueOnce([]);
+
+    await expect(createStartAssignedOrder(dobles.deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      OrderNotFoundError,
+    );
+    expect(dobles.append).not.toHaveBeenCalled();
+  });
+
+  it('R16: el reintento por la carrera es uno solo: si la vista vuelve a faltar, se propaga', async () => {
+    const dobles = montar({ ordenDeEstados: ['PENDIENTE', 'PENDIENTE', 'EN_CURSO', 'EN_CURSO'], pasos: 2 });
+    const listAliveSummariesByIds = conVistaQuePierdeLaCarrera(dobles);
+    listAliveSummariesByIds.mockResolvedValueOnce(RESUMEN_VACIO);
+
+    await expect(createStartAssignedOrder(dobles.deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      OrderNotFoundError,
+    );
+    expect(listAliveSummariesByIds).toHaveBeenCalledTimes(2);
+    expect(dobles.append).not.toHaveBeenCalled();
+  });
+});
