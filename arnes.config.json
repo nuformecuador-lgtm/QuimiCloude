@@ -1,6 +1,6 @@
 {
   "$comment": "Perfil del proyecto para el arnes v2. Versionado. Lo genera /arnes-init y lo lee el gate (scripts/validate-features.mjs, scripts/check-perfil.mjs). docs/equipo.md explica cada campo.",
-  "arnes_version": "2.0.0",
+  "arnes_version": "2.1.0",
   "plantilla": {
     "url": "https://github.com/singularis-co/harness_config.git",
     "ref": "main"
