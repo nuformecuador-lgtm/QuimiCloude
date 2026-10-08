@@ -17,7 +17,7 @@ y se anota en el impl.
 
 ## Tanda 0 — Congelar el «antes» (bloquea todo lo demás)
 
-- [ ] **T0. Paridad del árbol accesible** (R1, R2, R16-R18, R20, D9).
+- [x] **T0. Paridad del árbol accesible** (R1, R2, R16-R18, R20, D9).
   - **Qué se escribe:**
     - el helper `tests/unit/paridad/arbol-accesible.ts` (`design.md > 12.1`);
     - un `*-paridad.test.tsx` por cada lista de `design.md > 5.4` y `5.5`, con los estados filas,
