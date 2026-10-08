@@ -556,3 +556,24 @@ Cierre del implementer (T17):
 - Salida tras el arreglo: `recipe-route-contract`, `private-layout-menu`, `app-sidebar` y
   `dashboard-route-contract`: `Test Files 4 passed (4)`, `Tests 69 passed (69)`.
   typecheck exit 0.
+
+### Dos rojos de CI del PR #171, de esta rama (2026-10-08)
+
+`tests/unit/shared/data-table-alcance.test.ts`, con notas fechadas y sin quitar ninguna aserción:
+- **Pantallas autorizadas:** el dashboard entra como décima pantalla autorizada, a partir de
+  `DASHBOARD_ROUTE`. El caso pasa a «solo las diez pantallas…» y el ancla a `> 9`.
+- **Specs E2E que referencian `data-table`:** `e2e/recorrido-ejecucion.spec.ts` entra en la lista
+  cerrada, que pasa de treinta a treinta y uno.
+
+`recipe-route-contract` (otro rojo de CI) ya quedó arreglado en el commit de T17 (`executionTraceRoute`).
+
+**Barrido de censos:** se corrieron 115 archivos de `tests/unit` y `tests/guards` (scope, contract,
+convenciones, alcance, intacta, route, facade, viewport, nav, sidebar y menu).
+- Resultado: `113 passed | 2 failed`, con `Tests 2 failed | 1549 passed | 119 skipped`.
+- Los dos rojos son `recetas/scope` y `recetas/module-contract`. Fallan por `app/(private)/pedidos/page.tsx`,
+  la deuda que ya está en `tests/baseline-rojos.json`, y no por archivos de esta rama.
+
+**Resto de la salida:**
+- guardias: `Test Files 55 passed (55)`;
+- `data-table-alcance`: `14 passed | 2 skipped`;
+- typecheck exit 0; lint 0 errores.
