@@ -1,6 +1,7 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 
+import { touchTarget } from "@/lib/shared/ui/touch-target"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
@@ -34,10 +35,15 @@ const buttonVariants = cva(
           "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
         "icon-lg": "size-9",
       },
+      touch: {
+        true: touchTarget,
+        false: "",
+      },
     },
     defaultVariants: {
       variant: "default",
       size: "default",
+      touch: false,
     },
   }
 )
@@ -46,12 +52,13 @@ function Button({
   className,
   variant = "default",
   size = "default",
+  touch = false,
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
   return (
     <ButtonPrimitive
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(buttonVariants({ variant, size, touch, className }))}
       {...props}
     />
   )
