@@ -1349,6 +1349,10 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // asistente de lectura.
         'newRecipeVersionRoute',
         'recipeVersionRoute',
+        // Las tres rutas de integraciones, bajo /integraciones: ninguna es del asistente de lectura.
+        'AI_PROVIDER_INTEGRATION_ROUTE',
+        'INVENTORY_INTEGRATION_ROUTE',
+        'WHATSAPP_INTEGRATION_ROUTE',
       ].sort(),
     );
   });

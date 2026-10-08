@@ -31,7 +31,7 @@
 
 ## T1–T2 — El permiso
 
-- [ ] **T1.** Cambios en `permissions.ts`, con el texto de `design.md > 2`:
+- [x] **T1.** Cambios en `permissions.ts`, con el texto de `design.md > 2`:
       - la entrada `integraciones.modificar` **al final** de `PERMISSIONS`;
       - el párrafo de enmienda del JSDoc: como mucho 5 líneas y sin citas;
       - `'integraciones.modificar'` como **última** entrada de `[ROLE_ADMINISTRADOR]` en
@@ -42,7 +42,7 @@
       párrafo nuevo no casa con `/QC-\d+|\bR\d+\b|design\.md|decisi[oó]n cerrada/i`.
       Depende de: —.
 
-- [ ] **T2.** Actualizar los tests rojos de `design.md > 6`:
+- [x] **T2.** Actualizar los tests rojos de `design.md > 6`:
       - `permissions.test.ts`;
       - `qc75-convenciones.test.ts`;
       - `order-assignments-migration.test.ts`.
@@ -55,14 +55,14 @@
 
 ## T3–T5 — La migración
 
-- [ ] **T3.** `pnpm run db:migrate:create` con el nombre `integrations_permission`. En
+- [x] **T3.** `pnpm run db:migrate:create` con el nombre `integrations_permission`. En
       `migration.sql`, las dos sentencias de `design.md > 5.1` y la cabecera (solo datos,
       idempotente, literales duplicados). Si Prisma genera DDL por drift, se borra y se dice en
       la cabecera.
       **Hecho cuando:** no hay `CREATE`, `ALTER`, `DROP` ni escrituras en `"roles"`, y
       `pnpm run db:migrate` la aplica sobre la base local. Depende de: T1.
 
-- [ ] **T4.** `down.sql` con los dos `DELETE` de `design.md > 5.2`, en ese orden y con cabecera.
+- [x] **T4.** `down.sql` con los dos `DELETE` de `design.md > 5.2`, en ese orden y con cabecera.
       **Hecho cuando:**
       - `pnpm run db:rollback` devuelve la base al estado previo;
       - `pnpm run db:migrate` la vuelve a aplicar;
@@ -70,7 +70,7 @@
 
       Depende de: T3.
 
-- [ ] **T5. [P]** `tests/unit/identity/schema/integrations-permission-migration.test.ts`
+- [x] **T5. [P]** `tests/unit/identity/schema/integrations-permission-migration.test.ts`
       (plantilla: `documents-permissions-migration.test.ts`), con el contenido de
       `design.md > 7` y los casos de sensibilidad.
       **Hecho cuando:** está en verde, y cada caso de sensibilidad falla si se revierte su
@@ -78,7 +78,7 @@
 
 ## T6–T7 — El módulo y las rutas
 
-- [ ] **T6. [P]** Armazón de `lib/modules/integraciones/`:
+- [x] **T6. [P]** Armazón de `lib/modules/integraciones/`:
       - `index.ts` con `export {};`;
       - `.gitkeep` en `domain/`, `ports/`, `adapters/driven/` y `adapters/driving/`
         (`design.md > 3.1`).
@@ -90,7 +90,7 @@
       `guard-arquitectura-modulos`), y añadir un `domain/x.ts` sintético pone R11 en rojo.
       Depende de: T1 (por R9).
 
-- [ ] **T7. [P]** Las tres constantes de `design.md > 3.2` en `lib/shared/routes.ts`, con un
+- [x] **T7. [P]** Las tres constantes de `design.md > 3.2` en `lib/shared/routes.ts`, con un
       comentario de como mucho tres líneas y sin citas. **No** se tocan `PRIVATE_ROUTE_PREFIXES`
       ni `private-nav.ts`. Test `tests/unit/integraciones/integration-routes.test.ts` con R14
       (valores, literal único, `decideRouteAccess` por segmentos) y R15.
@@ -99,16 +99,16 @@
 
 ## T8–T10 — Integración (base real)
 
-- [ ] **T8. [P]** `tests/integration/identity/integrations-permission-migration.int.test.ts`
+- [x] **T8. [P]** `tests/integration/identity/integrations-permission-migration.int.test.ts`
       (plantilla: `documents-permissions-migration.int.test.ts`): R16, R17 y R20, con el SQL
       leído de los archivos.
       **Hecho cuando:** está en verde contra el Postgres local. Depende de: T4.
 
-- [ ] **T9. [P]** Ampliar `identity-seed.int.test.ts` con R18 y R21: el código lo tiene solo el
+- [x] **T9. [P]** Ampliar `identity-seed.int.test.ts` con R18 y R21: el código lo tiene solo el
       Administrador, y dos corridas producen lo mismo que una.
       **Hecho cuando:** está en verde. Depende de: T1.
 
-- [ ] **T10. [P]** Ampliar `session-user.int.test.ts` con R7: el Administrador tiene el código en
+- [x] **T10. [P]** Ampliar `session-user.int.test.ts` con R7: el Administrador tiene el código en
       su sesión, y el Operador y el Administrador de acondicionamiento no.
       **Hecho cuando:** está en verde. Depende de: T1.
 

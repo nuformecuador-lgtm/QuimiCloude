@@ -474,6 +474,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261007120000_order_conditioning_states',
   // El indice de pedidos terminados; no toca el identificador.
   '20261007120100_order_terminated_finished_index',
+  // El permiso integraciones.modificar y su asignacion al Administrador; no toca el identificador.
+  '20261008120843_integrations_permission',
 ] as const
 
 export function hallazgosDeMigraciones(
