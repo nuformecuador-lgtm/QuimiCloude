@@ -38,7 +38,7 @@ aviso para las personas y la rama publicada es el cerrojo de verdad.
 ## Soltar una feature
 
 Si abandonas una feature sin terminarla:
-1. Quita tu assignee en Jira y devuelve la tarjeta a su columna.
+1. Quita tu assignee en Jira y devuelve la tarjeta a su estado anterior.
 2. Anota en `progress/features/<key>.md` hasta dónde llegaste y haz push.
 3. La rama queda publicada. Quien la retome debe asignársela y correr `wt.sh --retomar new`.
 
