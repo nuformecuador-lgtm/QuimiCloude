@@ -33,7 +33,7 @@ y se anota en el impl.
 
 ## Tanda 1 — Piezas compartidas, con sus tests (todas [P] entre sí; dependen de T0)
 
-- [ ] **T1 [P]. Talla táctil** (R5, R6).
+- [x] **T1 [P]. Talla táctil** (R5, R6).
   - **Qué se escribe:**
     - `lib/shared/ui/touch-target.ts`;
     - el eje `touch` en `components/ui/button.tsx`;
@@ -42,14 +42,14 @@ y se anota en el impl.
     - sin `touch`, las clases son idénticas a las de hoy;
     - con `touch`, se añade exactamente `touchTarget`;
     - `touch` se combina con `size="icon"` y con `variant="outline"`.
-- [ ] **T2 [P]. `ErrorAlert`** (R9-R11).
+- [x] **T2 [P]. `ErrorAlert`** (R9-R11).
   - **Qué se escribe:** `components/shared/error-alert.tsx` y
     `tests/unit/shared-ui/error-alert.test.tsx`.
   - **Hecho cuando:** el test prueba que:
     - la rama inesperada pinta `unexpected-error-notice` y su referencia;
     - la rama de catálogo pinta sin referencia;
     - `role`, `testId`, `id`, `className`, `data-code` y `renderCatalogued` se respetan.
-- [ ] **T3 [P]. `EmptyState`, `ErrorState`, `TableSkeleton`** (R13-R15).
+- [x] **T3 [P]. `EmptyState`, `ErrorState`, `TableSkeleton`** (R13-R15).
   - **Inventario previo:** las copias locales (`design.md > 5.4`), para fijar las props de
     variación (`withImage`, `headCellClassName`…). Se anota en `progress/impl_QC-231-…md`.
   - **Tests:**
@@ -59,9 +59,9 @@ y se anota en el impl.
       `aria-busy`.
   - **Hecho cuando:** los tests están en verde y cada copia local tiene su combinación de props
     escrita en el impl.
-- [ ] **T4 [P]. `Spinner`** (R22): `components/shared/spinner.tsx` y
+- [x] **T4 [P]. `Spinner`** (R22): `components/shared/spinner.tsx` y
   `tests/unit/shared-ui/spinner.test.tsx`, con `size="sm"` / `inherit` y `aria-hidden`.
-- [ ] **T5 [P]. Fecha y marca** (R23-R25).
+- [x] **T5 [P]. Fecha y marca** (R23-R25).
   - **Qué se escribe:**
     - `formatCivilDate` en `lib/shared/ui/date-civil.ts`;
     - `lib/shared/ui/empty-mark.ts`;
@@ -69,11 +69,11 @@ y se anota en el impl.
     - `tests/unit/shared-ui/date-cell.test.tsx`.
   - **Hecho cuando:** el test compara `formatCivilDate` con `toISOString().slice(0, 10)` en
     instantes alrededor de la medianoche UTC, y comprueba que `DateCell` no añade ningún elemento.
-- [ ] **T6 [P]. `SubmitButton`** (R26): `components/shared/submit-button.tsx` y
+- [x] **T6 [P]. `SubmitButton`** (R26): `components/shared/submit-button.tsx` y
   `tests/unit/shared-ui/submit-button.test.tsx`.
   - **Hecho cuando:** el test prueba `pending` desde un `<form>` ancestro, `disabled`, `aria-busy`,
     las dos etiquetas, `touch` y el `testId`.
-- [ ] **T7 [P]. `EntityImage` con `size`** (R28):
+- [x] **T7 [P]. `EntityImage` con `size`** (R28):
   `tests/unit/shared-ui/entity-image-size.test.tsx`.
   - **Hecho cuando:** `fill` reproduce el marcado de `OrderRecipeImage` (envoltorio, `key`, `alt`
     vacío y marcador) y `thumbnail` no cambia.
