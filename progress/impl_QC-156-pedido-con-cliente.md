@@ -350,3 +350,25 @@ con la feature y **ninguna migración nueva**, así que no hizo falta `migrate d
 - Stubs: `grep "sin implementar|order-customer-fixtures"` sobre `lib app tests e2e` da 0 resultados.
 - Pendiente fuera de esta fase: `progress/review_*.md`, `history.md`, desmontar el worktree, borrar
   `QuimiCloude_QC156` y restaurar `.env` desde `.env.bak-QuimiCloude` al cerrar la feature.
+
+## F2.3 (2026-10-07)
+
+- **Merge** `origin/dev` (36 commits, trae QC-216) en `e5942e93`. Un solo conflicto, trivial:
+  `tests/guards/guard-identificador-de-request.test.ts > MIGRACIONES_ESPERADAS`, cada lado
+  añadía su migración al final. Se quedaron las dos, por orden de timestamp:
+  `20261006160000_orders_customer` y luego `20261006234105_conditioning_role`. El resto
+  (`db/schema.prisma`, `tests/integration/aislamiento.json`, el seed de roles) se fusionó solo.
+- **Migraciones:** `prisma migrate status` sobre `QuimiCloude_QC156` mostraba solo
+  `20261006234105_conditioning_role` pendiente (la nuestra ya estaba aplicada y su timestamp es anterior, así que el orden se respeta).
+  `prisma migrate deploy` la aplicó y `prisma generate` quedó al día. El gate confirma: 73 migraciones
+  aplicadas y el cliente de Prisma al día.
+- **`./init.sh` (rápido):** typecheck, lint, guardias, validador y perfil en verde. `test:rapido`:
+  364/369 archivos y 5777 tests en verde, con **7 rojos en 5 archivos**, todos ya listados en
+  `tests/baseline-rojos.json` y con la causa documentada allí:
+  `configuracion-ui/unidades-viewport`, `configuracion-ui/usuarios-viewport`,
+  `inventario/product-page`, `recetas-ui/recipe-page` y `navegacion/pantallas-exigen-permiso`
+  (`'/pedidos'` con TypeError `reading 'status'` en `loadFormCatalogs`, porque el test no mockea
+  `listRecipesAction`). Ninguno viene del merge ni de QC-156. Sale exit=1 porque esos
+  archivos, aunque `test-rapido` los pasa como `--exclude`, **corrieron igual**: el
+  `--exclude` no los filtró en `vitest related` (Windows). Es un defecto del arnés y queda para el leader.
+- **Push:** primera publicación de `feature/QC-156-pedido-con-cliente` en origin.
