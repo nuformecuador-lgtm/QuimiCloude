@@ -128,6 +128,14 @@ const SPECS_E2E_AJENOS_QUE_COINCIDEN_POR_NOMBRE = new Set(['e2e/pedidos-asignado
 const RUTA_CRON_CADUCIDAD = 'app/api/cron/caducar-pedidos/route.ts'
 
 /**
+ * 2026-10-08 (QC-167): el formato del recorrido de ejecucion del dashboard consume el TIPO
+ * `OrderStatus` del contrato publico de `pedidos` para su mapa de etiquetas. Exclusion NOMBRADA,
+ * por ARCHIVO, igual que `RUTA_CRON_CADUCIDAD`: otro archivo del dashboard que importe `pedidos`
+ * sigue cayendo, y `consumosPorDentroDelModulo` le sigue prohibiendo el interior del modulo.
+ */
+const FORMATO_RECORRIDO_DASHBOARD = 'app/(private)/dashboard/components/execution-trace-format.ts'
+
+/**
  * R57, INVERTIDO por QC-35: la pantalla de pedidos vive en `carpetaDeLaPantalla` -derivada de
  * `ORDERS_ROUTE`- y en NINGUN otro sitio de `app/` ni de `components/`.
  *
@@ -187,6 +195,9 @@ export function consumidoresDeUiFueraDeSuCarpeta(
     // El Route Handler del cron consume el driving de `pedidos` por su ruta exacta, no la
     // pantalla (ver `RUTA_CRON_CADUCIDAD` arriba).
     .filter((entrada) => entrada.nombre !== RUTA_CRON_CADUCIDAD)
+    // El formato del recorrido del dashboard consume solo el tipo `OrderStatus` del contrato
+    // publico (ver `FORMATO_RECORRIDO_DASHBOARD` arriba).
+    .filter((entrada) => entrada.nombre !== FORMATO_RECORRIDO_DASHBOARD)
     .map((entrada) => entrada.nombre)
 }
 
