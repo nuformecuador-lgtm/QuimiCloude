@@ -238,3 +238,20 @@ B2 listo: salida física, lectura de lotes entregables y las tres guardias enmen
 
 ### Salida real
 - `deliver-order.test.ts` + `get-order-delivery.test.ts`: `Test Files 2 passed (2)`, `Tests 65 passed (65)`.
+
+## FK compuesta del autor de la entrega (decisión del humano, backend_dev, tanda 2, 2026-10-08)
+
+### Archivos modificados
+- `db/migrations/20261008150100_order_deliveries/migration.sql` (editada en el sitio): `order_deliveries_created_by_fkey` = `FOREIGN KEY ("created_by", "company_id") REFERENCES "users"("id", "company_id") ON DELETE RESTRICT ON UPDATE CASCADE`, como `orders_conditioned_by_company_id_fkey` (`20261007120000`). El índice `order_deliveries_created_by_idx` sigue en una columna, igual que `orders_conditioned_by_idx` en el precedente. `down.sql` sin cambio (hace `DROP TABLE`).
+- `db/schema.prisma`: solo el comentario de `OrderDelivery` (las FK del cliente y del autor son compuestas). Sin `@relation`, como `packedBy`/`conditionedBy`.
+- `tests/unit/pedidos/schema/order-deliveries-migration.test.ts`: caso nuevo «R31: el autor va contra la clave (id, company_id) de users, y la FK simple ya no esta» (nota fechada).
+- `tests/integration/pedidos/order-delivery-constraints.int.test.ts`: caso nuevo «R31: una entrega registrada por un usuario de otra empresa es rechazada por la base» (nota fechada). Con la FK simple el `INSERT` se aceptaría: el usuario de B existe.
+
+### Ciclo contra `QuimiCloude_QC223` (salida real)
+- `db:rollback` (150200 aparte la segunda vez) → «20261008150200_delivery_permission revertida.», «20261008150100_order_deliveries revertida.»; carpeta repuesta; `db:migrate` → «All migrations have been successfully applied.»
+- Otra vez los tres (`150200` y `150100` apartadas por turno) → «…150200… revertida.», «…150100… revertida.», «20261008150000_inventory_movement_kind_delivery revertida.»; carpetas repuestas; `db:migrate` → «All migrations have been successfully applied.»
+- `prisma migrate status` → «79 migrations found in prisma/migrations» / «Database schema is up to date!». `prisma generate` → «Generated Prisma Client (v6.19.3)». `db:seed` → «db:seed: nada que crear».
+
+### Tests (salida real)
+- `order-deliveries-migration` + `order-delivery-constraints.int` + `order-delivery-repository.int` (plantilla nueva `qct_tpl_add408c2fe85`): `Test Files 3 passed (3)`, `Tests 34 passed (34)`.
+- Suites que escriben entregas o reaplican downs (`finished-goods-dispatch.int`, `ledger-cuadre.int`, `reservations-and-decimal-stock-migration.int`, `pedidos/company-scope.int`, `clientes/scope`, `guard-identificador-de-request`, `delivery-permission-migration.int`, `identity-seed.int`): `Test Files 8 passed (8)`, `Tests 111 passed (111)`.

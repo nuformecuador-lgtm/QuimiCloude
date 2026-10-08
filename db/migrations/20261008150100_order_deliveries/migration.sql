@@ -30,7 +30,7 @@ ALTER TABLE "order_deliveries" ADD CONSTRAINT "order_deliveries_customer_id_fkey
 ALTER TABLE "order_deliveries" ADD CONSTRAINT "order_deliveries_company_id_fkey"
   FOREIGN KEY ("company_id") REFERENCES "companies"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "order_deliveries" ADD CONSTRAINT "order_deliveries_created_by_fkey"
-  FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  FOREIGN KEY ("created_by", "company_id") REFERENCES "users"("id", "company_id") ON DELETE RESTRICT ON UPDATE CASCADE;
 CREATE INDEX "order_deliveries_order_id_idx" ON "order_deliveries"("order_id");
 CREATE INDEX "order_deliveries_customer_id_idx" ON "order_deliveries"("company_id", "customer_id");
 CREATE INDEX "order_deliveries_created_by_idx" ON "order_deliveries"("created_by");

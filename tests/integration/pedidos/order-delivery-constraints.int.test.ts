@@ -325,6 +325,28 @@ describe('order_deliveries y order_delivery_lines contra Postgres real', () => {
     })
   })
 
+  // QC-223 2026-10-08: decision del humano, la FK del autor es compuesta con company_id.
+  it('R31: una entrega registrada por un usuario de otra empresa es rechazada por la base', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const b = await createTenant(tx, 'B')
+
+      expect(
+        await expectRejectedByDatabase(
+          tx,
+          () =>
+            rawInsertDelivery(tx, {
+              companyId: a.companyId,
+              orderId: a.orderId,
+              customerId: a.customerId,
+              createdBy: b.userId,
+            }),
+          'usuario de B',
+        ),
+      ).toBe(FOREIGN_KEY_VIOLATION)
+    })
+  })
+
   it('R29, R31: la clave de entrega es unica por empresa; la misma clave en otra empresa se acepta', async () => {
     await inRolledBackTransaction(async (tx) => {
       const a = await createTenant(tx, 'A')

@@ -779,7 +779,7 @@ model OrderPresentationLine {
 /// Una entrega al cliente del producto terminado de un pedido. Solo de insercion: sin `updatedAt`
 /// ni `deletedAt`. `deliveryKey` la hace idempotente por empresa. `customerId`, `createdBy` y
 /// `companyId` no llevan `@relation`: `Customer`, `User` y `Company` son de otros modulos; sus FK
-/// estan escritas a mano y son drift, y la del cliente es compuesta con `companyId`. La FK de
+/// estan escritas a mano y son drift, y las del cliente y del autor son compuestas con `companyId`. La FK de
 /// `order` tambien es compuesta en la base (`(order_id, company_id)`).
 /// @module pedidos
 model OrderDelivery {

@@ -295,6 +295,15 @@ describe('order_deliveries migration.sql', () => {
     )
   })
 
+  // QC-223 2026-10-08: decision del humano, la FK del autor pasa a ser compuesta con company_id.
+  it('R31: el autor va contra la clave (id, company_id) de users, y la FK simple ya no esta', () => {
+    const sentencias = statements(upSource)
+    expect(sentencias).toContain(
+      `ALTER TABLE "order_deliveries" ADD CONSTRAINT "order_deliveries_created_by_fkey" FOREIGN KEY ("created_by", "company_id") REFERENCES "users"("id", "company_id") ON DELETE RESTRICT ON UPDATE CASCADE`,
+    )
+    expect(sentencias.some((s) => s.includes(`FOREIGN KEY ("created_by") REFERENCES "users"("id")`))).toBe(false)
+  })
+
   it('R31: los CHECK de inventory_movements comparan "kind"::text, y cae si uno usa el literal del tipo', () => {
     expect(kindChecksWithoutTextCast(upSource)).toEqual([])
 
