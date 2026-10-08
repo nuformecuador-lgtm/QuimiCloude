@@ -26,7 +26,8 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167 y QC-
   // 2026-10-08 (QC-167): crece con DOS operaciones de solo lectura del recorrido de ejecucion,
   // `listExecutionTraces` y `getExecutionTrace` (`design.md` de QC-167). Ninguna previa se quita.
   // 2026-10-08 (QC-215): crece con `startConditioning` y `finishConditioning`.
-  it('expone las doce anteriores, las CUATRO de QC-168, las DOS de QC-82, las DOS de QC-167 y las DOS de QC-215, y ninguna mas', () => {
+  // 2026-10-08: crece con `listConditioningOrders`, `listConditionedOrders` y `getConditioningOrder`.
+  it('expone las doce anteriores, las CUATRO de QC-168, las DOS de QC-82, las DOS de QC-167, las DOS de QC-215 y las TRES del acondicionamiento, y ninguna mas', () => {
     expect(Object.keys(asignaciones).sort()).toEqual([
       'assignResponsibles',
       'cancelAssignedOrder',
@@ -34,10 +35,13 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167 y QC-
       'finishConditioning',
       'finishPacking',
       'getAssignedOrderExecution',
+      'getConditioningOrder',
       'getExecutionTrace',
       'getPackingOrder',
       'listAssignedOrders',
       'listCompanyOrders',
+      'listConditionedOrders',
+      'listConditioningOrders',
       'listExecutionTraces',
       'listFinishedOrders',
       'listOrderResponsibles',
@@ -200,6 +204,30 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167 y QC-
   it('R15: `finishConditioning` rechaza sin `acondicionamiento.modificar` sin llegar a la base', async () => {
     const error = await asignaciones
       .finishConditioning({ id: 'u', companyId: 'c', permissions: ['empaque.modificar'] }, { orderId: 'o' })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('R19: `listConditioningOrders` rechaza sin `acondicionamiento.modificar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .listConditioningOrders({ id: 'u', companyId: 'c', permissions: ['empaque.modificar'] }, { page: 1 })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('R19: `listConditionedOrders` rechaza sin `acondicionamiento.modificar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .listConditionedOrders({ id: 'u', companyId: 'c', permissions: ['terminados.consultar'] }, { page: 1 })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('R19: `getConditioningOrder` rechaza sin `acondicionamiento.modificar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .getConditioningOrder({ id: 'u', companyId: 'c', permissions: ['pedidos.consultar'] }, { orderId: 'o' })
       .catch((caught: unknown) => caught);
 
     expect((error as { code?: string }).code).toBe('unauthorized');

@@ -558,7 +558,13 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // lista del recorrido de ejecucion del dashboard, decima pantalla autorizada, y localiza sus filas
   // por `data-table-row-<id>`. El centinela pasa de TREINTA a TREINTA Y UNO; la lista sigue
   // CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos treinta y uno', () => {
+  //
+  // 2026-10-08: entra `e2e/acondicionamiento.spec.ts`, y no afloja la lista. No estrena tabla:
+  // recorre las pestanas del acondicionador en la pantalla de asignacion, ya en esta lista, y
+  // localiza la fila de cada pedido por `data-table-row-<id>` y `data-table-cell-orderNumber`. El
+  // centinela pasa de TREINTA Y UNO a TREINTA Y DOS; la lista sigue CERRADA, y un spec mas que
+  // referencie `data-table` vuelve a ponerla en rojo.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos treinta y dos', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -568,7 +574,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos treinta y uno E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos treinta y dos E2E pueden referenciar la tabla compartida (R36)').toEqual([
+      // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
+      'e2e/acondicionamiento.spec.ts',
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
       // ya consumen la tabla compartida -inventario y presentaciones- y localiza
       // `data-table-cell-name` porque lo que afirma son LAS FILAS SERVIDAS: ninguna de la empresa

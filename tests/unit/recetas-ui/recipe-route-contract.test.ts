@@ -1336,6 +1336,8 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // Vive en /asignacion (pantalla de empaque), no en Pedidos: no estrena ninguna ruta del
         // asistente de lectura.
         'packingOrderRoute',
+        // Igual que `packingOrderRoute`: el detalle del acondicionador, en /asignacion.
+        'conditioningOrderRoute',
         'USERS_ROUTE',
         'recipeEditRoute',
         // Alta el 2026-09-24: la revision de un catalogo importado desde PDF, derivada de
@@ -1353,6 +1355,10 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // asistente de lectura.
         'newRecipeVersionRoute',
         'recipeVersionRoute',
+        // Las tres rutas de integraciones, bajo /integraciones: ninguna es del asistente de lectura.
+        'AI_PROVIDER_INTEGRATION_ROUTE',
+        'INVENTORY_INTEGRATION_ROUTE',
+        'WHATSAPP_INTEGRATION_ROUTE',
       ].sort(),
     );
   });

@@ -880,6 +880,7 @@ describe('down.sql — revertir deja la base exactamente como estaba antes del U
       'empresas.consultar',
       'empresas.modificar',
       'acondicionamiento.modificar',
+      'integraciones.modificar',
     ]
     const CODIGOS_QC66 = [
       'dashboard.consultar',

@@ -413,6 +413,9 @@ import {
   createGetExecutionTrace,
   createStartConditioning as createStartConditioningOrder,
   createFinishConditioning as createFinishConditioningOrder,
+  createListConditioningOrders,
+  createListConditionedOrders,
+  createGetConditioningOrder,
 } from '@/lib/modules/asignaciones';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
@@ -1783,6 +1786,33 @@ export const asignaciones = {
   }),
   finishConditioning: createFinishConditioningOrder({
     orders: orderCatalog,
+    now: () => new Date(),
+  }),
+  listConditioningOrders: createListConditioningOrders({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    recipes: recipeCatalog,
+    people: peopleDirectory,
+    presentations: presentationCatalog,
+    units: unitCatalog,
+    now: () => new Date(),
+  }),
+  listConditionedOrders: createListConditionedOrders({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    recipes: recipeCatalog,
+    people: peopleDirectory,
+    presentations: presentationCatalog,
+    units: unitCatalog,
+    now: () => new Date(),
+  }),
+  getConditioningOrder: createGetConditioningOrder({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    recipes: recipeCatalog,
+    people: peopleDirectory,
+    presentations: presentationCatalog,
+    units: unitCatalog,
     now: () => new Date(),
   }),
 } as const;
