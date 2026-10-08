@@ -1,7 +1,7 @@
 # QC-223 — entregar-producto-terminado · design.md
 
-> Zona fullstack · Complejidad high · Requisitos en `requirements.md` (R1–R40, decisiones D1–D11,
-> preguntas P1 y P2). Sin dependencias nuevas (R40): todo sale de `zod`, Prisma, la aritmética
+> Zona fullstack · Complejidad high · Requisitos en `requirements.md` (R1–R40, decisiones D1–D13;
+> P1 y P2 se cerraron en F1.3 como D12 y D13). Sin dependencias nuevas (R40): todo sale de `zod`, Prisma, la aritmética
 > `BigInt` de `decimal-quantity.ts` y los primitivos de UI que ya usa `/pedidos`.
 
 ## Lo que ya existe
@@ -15,7 +15,8 @@ sitios.
 - **Specs** (`grep -ril`): las coincidencias usan «entregar» en el sentido viejo de «finalizar el
   pedido» (QC-34, QC-63, QC-145, QC-168). QC-215 R33 dice «ningún camino de aplicación escribe
   `ENTREGADO`», y QC-215 D11 deja expresamente `TERMINADO → ENTREGADO` como «la entrega al
-  cliente». Esta ficha es ese camino y enmienda la primera frase de QC-215 R33 (§8). Ningún spec
+  cliente». Esta ficha es ese camino y enmienda la primera frase de QC-215 R33 (§8; enmienda aprobada por el humano en F1.3,
+  2026-10-08). Ningún spec
   define un modelo de entrega.
 - **Código** (Grep; no usé el MCP del grafo en esta tanda):
   - No existe ningún modelo, tabla ni caso de uso de entrega.
@@ -560,6 +561,8 @@ luego lote). No aparece ningún ciclo nuevo.
 
 ### 4.1 Idempotencia (R29)
 
+*R29 y la clave de entrega, aprobados por el humano en F1.3 (2026-10-08).*
+
 La pantalla genera la clave de entrega (`crypto.randomUUID()`) al crear el borrador y la guarda con
 él (R35). Si la misma clave llega dos veces (doble clic, reintento tras perder la respuesta, recarga
 con el borrador intacto), el `INSERT` choca con `order_deliveries_company_key_unique`.
@@ -626,7 +629,7 @@ El `CHECK stock >= 0` sigue siendo el respaldo.
 
 ## 6. UI
 
-### 6.1 Acción de fila (R4, P1)
+### 6.1 Acción de fila (R4, D12)
 
 - `order-row-actions.tsx` gana el prop `canDeliver?: boolean` y el callback
   `onDeliver?: (order) => void`.
@@ -719,7 +722,7 @@ QC-167).
 | `tests/unit/pedidos/scope.test.ts`, `tests/unit/inventario/scope.test.ts`, `company-scope.test.ts` (los dos) | ámbito de empresa y alcance del módulo | revisar con las fuentes nuevas; enmendar solo si un caso lo exige | TC |
 | `tests/unit/pedidos/order-customer-contract.test-d.ts` | tipo `OrderCustomerSearchPurpose` | + `'deliver'` | T0 |
 | `tests/unit/errores/*` (unicidad del catálogo) | textos únicos | dos códigos nuevos | T0 |
-| QC-215 R33, primera frase («ningún camino escribe `ENTREGADO`») | — | queda enmendada por R27. Ningún test la afirma como barrido (los de R33 citados en `order-finished-at.int.test.ts:199` y `qc145-estado-solo-planta.test.ts:180` miran `finishedAt` y siguen valiendo) | TC (verificar) |
+| QC-215 R33, primera frase («ningún camino escribe `ENTREGADO`») | — | queda enmendada por R27 (aprobado por el humano en F1.3, 2026-10-08). Ningún test la afirma como barrido (los de R33 citados en `order-finished-at.int.test.ts:199` y `qc145-estado-solo-planta.test.ts:180` miran `finishedAt` y siguen valiendo) | TC (verificar) |
 
 Llamadores de tipos que cambian, todos en `typecheck`:
 - `BatchHistoryEntry['kind']`: `batch-history.tsx` (`KIND_LABELS`) y `tests/fixtures/adjust-batch-stock.ts`, si enumera.

@@ -26,8 +26,8 @@
 
 **Leyenda.** `[D<n>]` es la fila n de `## Decisiones cerradas (no reabrir)`, contando desde arriba:
 D1 origen de la entrega · D2 entrega parcial · D3 tope · D4 cliente · D5 lote · D6 permiso ·
-D7 anular · D8 interfaz · D9 historial · D10 unidad · D11 E2E. `[P<n>]` marca un requisito que
-depende de una pregunta abierta. `[A]` marca una regla de `docs/architecture.md` (aislamiento por
+D7 anular · D8 interfaz · D9 historial · D10 unidad · D11 E2E · D12 punto de entrada (era P1) ·
+D13 contenido de conversión (era P2). `[A]` marca una regla de `docs/architecture.md` (aislamiento por
 empresa; operación que mueve existencias idempotente y auditable).
 
 **Términos.**
@@ -41,7 +41,7 @@ empresa; operación que mueve existencias idempotente y auditable).
   menos un envase entero disponible, y da igual de dónde venga: de este pedido, de otro o de una
   importación.
 - **Envases disponibles** de un lote: la parte entera de su existencia dividida por el contenido de
-  envase del lote [P2].
+  envase del lote [D13].
 - **Clave de entrega**: identificador que la pantalla genera para cada borrador y que viaja con la
   entrega.
 
@@ -57,7 +57,7 @@ empresa; operación que mueve existencias idempotente y auditable).
 - **R3** [D6] El servidor DEBE decidir el acceso por el permiso y nunca por el rol: un actor con
   `entregas.modificar` y un rol distinto de Administrador DEBE ser aceptado, y un Administrador sin
   ese permiso en su conjunto DEBE ser rechazado.
-- **R4** [D1, D6, P1] MIENTRAS el actor tenga `entregas.modificar`, el menú de fila de la pantalla
+- **R4** [D1, D6, D12] MIENTRAS el actor tenga `entregas.modificar`, el menú de fila de la pantalla
   de Pedidos DEBE ofrecer la acción «Entregar» en los pedidos `TERMINADO` y en ningún otro estado.
   SI el actor no tiene el permiso, ENTONCES la acción NO DEBE existir en el DOM.
 
@@ -119,7 +119,7 @@ empresa; operación que mueve existencias idempotente y auditable).
   uuid, envases no enteros o menores que uno, la misma línea y lote repetidos, ninguna línea, una
   línea del reparto que no es del pedido, un campo de más o un campo ausente.
 - **R23** [D10] CUANDO el servidor aplica una entrega, DEBE descontar de cada lote elegido sus
-  envases por el contenido de envase del lote, en la unidad base del lote [P2]. DEBE recalcular la
+  envases por el contenido de envase del lote, en la unidad base del lote [D13]. DEBE recalcular la
   existencia del producto terminado como la suma de sus lotes.
 - **R24** [D10, A] CUANDO el servidor aplica una entrega, DEBE escribir en el libro de movimientos,
   en la misma transacción, un asiento de tipo entrega por cada lote. El asiento DEBE llevar la
@@ -141,7 +141,7 @@ empresa; operación que mueve existencias idempotente y auditable).
   ningún caso la existencia de un lote DEBE quedar negativa.
 - **R29** [A] CUANDO llega una entrega cuya clave de entrega ya está registrada en la empresa, el
   servidor NO DEBE escribir nada y DEBE responder que la entrega ya estaba registrada, con el mismo
-  estado del pedido que dejó la primera.
+  estado del pedido que dejó la primera. *(Aprobado por el humano en F1.3, 2026-10-08.)*
 - **R30** [A] SI cualquier paso de una entrega falla, ENTONCES NO DEBE quedar escrito nada de ella:
   ni entrega, ni línea, ni asiento, ni cambio de existencia, ni cambio de estado del pedido.
 - **R31** [A, D10] La base DEBE rechazar cada uno de estos casos:
@@ -210,23 +210,16 @@ empresa; operación que mueve existencias idempotente y auditable).
 | D9 historial | R6, R25, R38 |
 | D10 unidad | R13, R23, R24, R31, R38 |
 | D11 E2E | R39 |
+| D12 punto de entrada | R4 |
+| D13 contenido de conversión | R23 |
+
+R27 enmienda la primera frase de QC-215 R33 («ningún camino de aplicación escribe `ENTREGADO`»):
+la entrega que completa el pedido es ese camino. *(Enmienda aprobada por el humano en F1.3,
+2026-10-08; `design.md > 8`.)*
 
 ## Preguntas abiertas
 
-- **Punto de entrada del sheet.** La propuesta es la acción «Entregar» en la fila de un pedido
-  TERMINADO de la pantalla de Pedidos. El humano aprobó el alcance sin confirmarlo: se confirma en
-  F1.3.
-  - *spec_author, 2026-10-08:* se mantiene la propuesta. Es R4 y `design.md > 6.1`, y está marcada
-    `[P1]`. La razón es que el menú de fila de `/pedidos` ya agrupa las acciones del pedido
-    (Cliente, Reparto y unidad) y ya tiene a mano el permiso y el estado. Si el humano elige otro
-    punto, solo cambian R4, F1 y el primer paso del E2E.
-- **P2 — Con qué contenido se convierten los envases de un lote.** La decisión D10 dice «se
-  convierte con el contenido de la presentación». **Propuesta:** usar el contenido de envase
-  guardado en el lote (`product_batches.package_content`), que es el contenido de la presentación
-  con el que se contaron los envases de ese lote. Solo difiere del contenido vigente de la
-  presentación si este cambió después de producir el lote, y en ese caso los envases físicos son
-  los del lote. Afecta a R23 y a la definición de «envases disponibles». Pendiente de confirmar en
-  F1.3.
+Ninguna.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -243,3 +236,5 @@ empresa; operación que mueve existencias idempotente y auditable).
 | 2026-10-08 | ¿Historial de entregas? | En el sheet solo se ve lo que falta por entregar. El detalle de cada entrega queda guardado; su pantalla es QC-225. |
 | 2026-10-08 | ¿Unidad de la existencia? | La existencia sigue en unidades base, con un producto por receta y presentación (hereda QC-150). La entrega se pide en envases y se convierte con el contenido de la presentación. |
 | 2026-10-08 | ¿E2E? | Obligatorio: es un movimiento de inventario (hereda QC-213 D10). |
+| 2026-10-08 | ¿Punto de entrada del sheet? (era P1) | La acción «Entregar» va en el menú de fila de `/pedidos`, solo en pedidos TERMINADO y solo con `entregas.modificar` (R4). Humano, F1.3. |
+| 2026-10-08 | ¿Con qué contenido se convierten los envases de un lote? (era P2) | Con el contenido de envase guardado en cada lote (`product_batches.package_content`), no con el contenido vigente de la presentación (R23). Humano, F1.3. |
