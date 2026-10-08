@@ -6,8 +6,10 @@
  *   1. Los tests que el GRAFO DE IMPORTS relaciona con el diff contra `origin/dev`,
  *      calculado con TRES puntos (merge-base), no contra el ultimo commit: una tanda de
  *      tres commits mirando solo el tercero es un agujero.
- *   2. TODAS las guardias (patron `guard`), siempre. Las guardias recorren el arbol de
- *      archivos en vez de importar lo que vigilan, asi que ningun grafo las selecciona.
+ *   2. SIEMPRE, todos los tests que casan con `arnes.config.json > gate.siempre` (por defecto
+ *      `["guard"]`): las guardias y los demas tests que recorren el arbol de archivos en vez de
+ *      importar lo que vigilan (contratos de modulo, de ruta...), que ningun grafo selecciona.
+ *      Que ninguno se quede fuera lo vigila `tests/guards/guard-tests-de-arbol-en-el-gate.test.ts`.
  *
  * Sale en verde cuando la seleccion esta vacia (`--passWithNoTests`): el diff puede no tocar
  * ningun archivo con tests, y un repo recien montado puede no tener guardias. "Sin tests seleccionados" no es un
@@ -138,8 +140,24 @@ function rojosHeredados() {
   }
 }
 
+// Patrones que corren siempre (`arnes.config.json > gate.siempre`). Por defecto, solo las guardias.
+export function patronesSiempre(config) {
+  const lista = config?.gate?.siempre;
+  if (!Array.isArray(lista) || lista.length === 0) return ['guard'];
+  return lista.filter((p) => typeof p === 'string' && p.trim() !== '');
+}
+
+function leerConfig() {
+  try {
+    return JSON.parse(readFileSync('arnes.config.json', 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
 function main() {
   const heredados = rojosHeredados();
+  const siempre = patronesSiempre(leerConfig());
   // `--exclude` se mantiene porque `vitest run` (las guardias) si lo respeta. En `related` no
   // basta, y lo cubre el veredicto sobre el informe.
   const excluir = heredados.flatMap((f) => ['--exclude', f]);
@@ -157,7 +175,11 @@ function main() {
     );
   }
   if (status === 0) {
-    status = runVitest(['run', 'guard', '--passWithNoTests', ...excluir], 'todas las guardias', heredados);
+    status = runVitest(
+      ['run', ...siempre, '--passWithNoTests', ...excluir],
+      `tests que corren siempre (gate.siempre: ${siempre.join(', ')})`,
+      heredados,
+    );
   }
   if (heredados.length > 0) {
     console.log(`
