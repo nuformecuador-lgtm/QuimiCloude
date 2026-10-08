@@ -47,6 +47,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { INVENTORY_IMPORT_ROUTE, INVENTORY_ROUTE } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import { exactProductNameCellText } from './helpers/product-name-cell';
 
 const FIXTURE_PREFIX = 'qc209_e2e_';
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -129,11 +130,6 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** La celda de nombre puede llevar «· unidad» detras; el nombre tiene que ser exacto. */
-function exactNameCellText(value: string): RegExp {
-  return new RegExp(`^\\s*${escapeRegExp(value)}(?:\\s*·\\s*\\S.*)?\\s*$`);
-}
-
 /** La existencia exacta va en el `aria-label`, seguida de la unidad si la hay. */
 function stockLabel(amount: string): RegExp {
   return new RegExp(`^${escapeRegExp(amount)}(?:\\s|$)`);
@@ -178,7 +174,7 @@ async function expectPreviewStatuses(page: Page, statuses: Readonly<Record<numbe
 }
 
 function inventoryRow(page: Page, nameTestId: string, name: string): Locator {
-  const nameCell = page.getByTestId(nameTestId).filter({ hasText: exactNameCellText(name) });
+  const nameCell = page.getByTestId(nameTestId).filter({ hasText: exactProductNameCellText(name) });
   return page.locator('[data-testid^="data-table-row-"]').filter({ has: nameCell });
 }
 

@@ -56,12 +56,13 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 // `companies.name_normalized` se calcula con esta y con ninguna otra.
 import { normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
-import { PRODUCT_TYPES } from '@/lib/modules/inventario';
+import { PRODUCT_TYPES, productDisplayName } from '@/lib/modules/inventario';
 import { normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 
 import { loginAndLand, permissionsForUsername } from './helpers/landing';
+import { exactProductNameCellText } from './helpers/product-name-cell';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc22_e2e_';
@@ -273,7 +274,7 @@ async function findProductCell(
   // llevan sus `data-testid` (`data-table-cell-<columna>`, `data-table-next`).
   const cell = page
     .getByTestId('data-table-cell-name')
-    .filter({ hasText: exact ? textoExacto(name) : name });
+    .filter({ hasText: exact ? exactProductNameCellText(name) : name });
 
   for (;;) {
     if ((await cell.count()) > 0) return cell;
@@ -297,36 +298,49 @@ async function avanzarPagina(page: Page): Promise<boolean> {
   return true;
 }
 
-/** `hasText` con cadena busca subcadena: un nombre que contenga a otro casaria con ambos. */
-function textoExacto(texto: string): RegExp {
-  return new RegExp(`^\\s*${texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`);
+/** Una fila de la lista de inventario: el texto de su celda de nombre y el de su existencia. */
+type FilaDeInventario = { readonly nombre: string; readonly existencia: string };
+
+function textoNormalizado(texto: string | null): string {
+  return (texto ?? '').replace(/\s+/g, ' ').trim();
 }
 
 /**
- * La existencia de CADA fila cuyo nombre es exactamente `name`, recargando la lista desde la
- * primera pagina. Los homonimos salen contiguos (nombre y luego id), pero pueden partirse entre
- * dos paginas: si la ultima fila de una pagina es uno, se sigue en la siguiente.
+ * El nombre y la existencia de CADA fila cuyo nombre es exactamente `name` (con o sin la unidad
+ * detras), recargando la lista desde la primera pagina. Los homonimos salen contiguos (nombre y
+ * luego id), pero pueden partirse entre dos paginas: si la ultima fila de una pagina es uno, se
+ * sigue en la siguiente.
  */
-async function existenciasDeHomonimos(page: Page, name: string): Promise<string[]> {
+async function filasDeHomonimos(page: Page, name: string): Promise<FilaDeInventario[]> {
   await page.goto(`${INVENTORY_ROUTE}?pageSize=${LIST_PAGE_SIZE}`);
   await expect(page.getByTestId('product-list')).toBeVisible({ timeout: 60_000 });
 
-  const exacto = textoExacto(name);
+  const exacto = exactProductNameCellText(name);
   const celdas = await findProductCell(page, name, { exact: true });
-  const existencias: string[] = [];
+  const filas: FilaDeInventario[] = [];
 
   for (;;) {
-    const textos = await celdas
-      .locator('xpath=ancestor::tr[1]')
-      .getByTestId('product-stock')
-      .allTextContents();
-    existencias.push(...textos.map((texto) => texto.replace(/\s+/g, ' ').trim()));
+    const total = await celdas.count();
+    for (let indice = 0; indice < total; indice += 1) {
+      const celda = celdas.nth(indice);
+      filas.push({
+        nombre: textoNormalizado(await celda.textContent()),
+        existencia: textoNormalizado(
+          await celda.locator('xpath=ancestor::tr[1]').getByTestId('product-stock').textContent(),
+        ),
+      });
+    }
 
     const ultimaCelda = page.getByTestId('data-table-cell-name').last();
-    if ((await ultimaCelda.count()) === 0) return existencias;
-    if (!exacto.test((await ultimaCelda.textContent()) ?? '')) return existencias;
-    if (!(await avanzarPagina(page))) return existencias;
+    if ((await ultimaCelda.count()) === 0) return filas;
+    if (!exacto.test((await ultimaCelda.textContent()) ?? '')) return filas;
+    if (!(await avanzarPagina(page))) return filas;
   }
+}
+
+/** Orden estable para comparar filas sin depender del orden de la lista. */
+function porNombre(filas: readonly FilaDeInventario[]): FilaDeInventario[] {
+  return [...filas].sort((a, b) => a.nombre.localeCompare(b.nombre));
 }
 
 /** Abre el panel lateral de alta y espera a que este montado. */
@@ -896,17 +910,22 @@ test.describe('catalogo de productos', () => {
     // productos que una pagina, asi que las dos caben en la actual.
     const filasHomonimas = page
       .getByTestId('data-table-cell-name')
-      .filter({ hasText: textoExacto(sameNameProductName) })
+      .filter({ hasText: exactProductNameCellText(sameNameProductName) })
       .locator('xpath=ancestor::tr[1]');
     await expect(filasHomonimas).toHaveCount(2, { timeout: 60_000 });
 
-    // --- 3. El listado muestra DOS filas «X», y es la existencia, con su unidad, lo que las
-    // distingue: la celda de nombre ya no lleva la unidad.
+    // --- 3. El listado muestra DOS filas, «X · kg» y «X · <litro>»: cada celda de nombre lleva
+    // su propia unidad, y cada fila su propia existencia.
+    const kgRowName = productDisplayName(sameNameProductName, kg.label);
+    const literRowName = productDisplayName(sameNameProductName, liter.label);
     expect(
-      (await existenciasDeHomonimos(page, sameNameProductName)).sort(),
-      'dos filas con el mismo nombre, cada una con su propia existencia y su unidad',
+      porNombre(await filasDeHomonimos(page, sameNameProductName)),
+      'dos filas con el mismo nombre, cada una con su unidad en el nombre y su propia existencia',
     ).toEqual(
-      [`${sameNameKgFirstStock} ${kg.label}`, `${sameNameLiterStock} ${liter.label}`].sort(),
+      porNombre([
+        { nombre: kgRowName, existencia: `${sameNameKgFirstStock} ${kg.label}` },
+        { nombre: literRowName, existencia: `${sameNameLiterStock} ${liter.label}` },
+      ]),
     );
 
     // Contra Postgres: dos productos vivos "X", con unidad distinta y la existencia que muestra
@@ -953,9 +972,14 @@ test.describe('catalogo de productos', () => {
       filasHomonimas.getByTestId('product-stock').filter({ hasText: kg.label }),
     ).toHaveText(`${kgStockAfter} ${kg.label}`, { timeout: 60_000 });
     expect(
-      (await existenciasDeHomonimos(page, sameNameProductName)).sort(),
+      porNombre(await filasDeHomonimos(page, sameNameProductName)),
       'sube solo la fila en kg; la de L queda igual y no aparece una tercera',
-    ).toEqual([`${kgStockAfter} ${kg.label}`, `${sameNameLiterStock} ${liter.label}`].sort());
+    ).toEqual(
+      porNombre([
+        { nombre: kgRowName, existencia: `${kgStockAfter} ${kg.label}` },
+        { nombre: literRowName, existencia: `${sameNameLiterStock} ${liter.label}` },
+      ]),
+    );
 
     const productosTrasSegundoLote = await prisma.product.findMany({
       where: { name: sameNameProductName, deletedAt: null },

@@ -25,11 +25,11 @@
 
 ## T3. Inventario: E2E adaptados como «deuda QC-177» (D5) — R8
 Depende de: T2.
-- [ ] `e2e/inventario.spec.ts`: R26 distingue las filas homónimas por «X · kg» / «X · L». Las
+- [x] `e2e/inventario.spec.ts`: R26 distingue las filas homónimas por «X · kg» / «X · L». Las
       líneas 275 y 325 localizan con nombre exacto y sufijo de unidad opcional.
-- [ ] `e2e/insumo-por-unidad.spec.ts:91` y `e2e/inventario-importar.spec.ts` (`inventoryRow`),
+- [x] `e2e/insumo-por-unidad.spec.ts:91` y `e2e/inventario-importar.spec.ts` (`inventoryRow`),
       con el mismo criterio.
-- [ ] Barrido de `e2e/` buscando `data-table-cell-name` sobre `/inventario`; el resultado se anota
+- [x] Barrido de `e2e/` buscando `data-table-cell-name` sobre `/inventario`; el resultado se anota
       en `progress/impl_QC-177-*.md`.
 - **Hecho:** `pnpm exec playwright test e2e/inventario.spec.ts e2e/insumo-por-unidad.spec.ts
   e2e/inventario-importar.spec.ts e2e/aislamiento-inventario.spec.ts` en verde en Chromium y WebKit.
@@ -63,9 +63,9 @@ Depende de: T2.
 
 ## T7. Baseline y cierre — R14, R15, R17
 Depende de: T1-T6.
-- [ ] Se borran de `tests/baseline-rojos.json` las entradas de `product-page`, `recipe-page`,
+- [x] Se borran de `tests/baseline-rojos.json` las entradas de `product-page`, `recipe-page`,
       `unidades-viewport`, `usuarios-viewport` y `account-status-scope`. No se añade ninguna.
-- [ ] Mapa R → test en `progress/impl_QC-177-rojos-heredados-de-tabla-y-filtro-de-usuarios.md`,
+- [x] Mapa R → test en `progress/impl_QC-177-rojos-heredados-de-tabla-y-filtro-de-usuarios.md`,
       según `design.md > 7`.
 - [ ] `./init.sh` en verde. Se pide el gate completo de CI.
 - **Hecho:** `gate-completo` verde sin esas cinco entradas y sin `package.json` en el diff.
