@@ -377,3 +377,4 @@ con la feature y **ninguna migración nueva**, así que no hizo falta `migrate d
   `prisma generate` y son 4). Deuda ajena, no de QC-156: entra en `tests/baseline-rojos.json` (desde 2026-10-07),
   sin tocar el test ni `package.json`. Comparador sobre `.vitest-rojos.json`: «sin rojos nuevos (9 rojos, todos
   en el baseline de 11); 2 por limpiar» (`credential-setup.int` y `catalog-line.int` ya pasan), exit 0.
+- **Merge 2 (2026-10-07):** `origin/dev` (`6b7cc441` smtp nodemailer, `d9578d4c` baseline). Único conflicto en `tests/baseline-rojos.json`: una sola entrada de `deploy-hook.test.ts` (texto de dev) + `recipe-form-packing-steps.test.tsx`; 12 entradas, ninguna perdida. Sin migraciones nuevas. `./init.sh` rápido: verde salvo los mismos 7 rojos en 5 archivos del baseline que `--exclude` no filtra (exit 1, defecto conocido).

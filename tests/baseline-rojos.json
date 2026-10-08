@@ -42,7 +42,11 @@
       "desde": "2026-10-07"
     },
     "tests/unit/identity/seed/deploy-hook.test.ts": {
-      "motivo": "Deuda ajena de dev, roja desde b79a43c4 (fix build command, commit directo en dev): anadio 'prisma generate' a package.json > scripts.build, que pasa a tener 4 tramos separados por &&, y el test sigue esperando 3. No es de QC-156, que no toca package.json ni el seed. Al alinear el test con el build, se borra esta entrada.",
+      "motivo": "Deuda ajena de dev, roja desde b79a43c4 (fix build command, 2026-10-07): scripts.build paso a 'prisma migrate deploy && prisma generate && tsx scripts/seed.ts && next build' (cuatro tramos) y el test exige tres. Falla igual en origin/dev puro. Ajeno a feature/mail-smtp-nodemailer, que no toca scripts.build. Salida limpia: actualizar el test al build de cuatro tramos y borrar esta entrada.",
+      "desde": "2026-10-07"
+    },
+    "tests/unit/recetas-ui/recipe-form-packing-steps.test.tsx": {
+      "motivo": "Intermitente en el runner de GitHub: el caso R8 (QC-211, error del paso de envasado vacio) tardo 5068 ms, por encima del plazo de 5 s, y no encontro recipe-packing-step-field-error-1. Pasa en local (10/10) tanto en origin/dev puro como en feature/mail-smtp-nodemailer, que no toca recetas. Salida limpia: acotar el render del caso o subirle el plazo, y borrar esta entrada.",
       "desde": "2026-10-07"
     }
   }
