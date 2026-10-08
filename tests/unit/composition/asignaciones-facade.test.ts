@@ -16,7 +16,7 @@ vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }));
 
 import { asignaciones } from '@/lib/composition';
 
-describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82 y QC-167) — la fachada de `asignaciones` lista sus VEINTE operaciones', () => {
+describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167 y QC-215) — la fachada de `asignaciones` lista sus VEINTIDOS operaciones', () => {
   // El censo CRECE, no se afloja: primero llegaron las tres de la pantalla de ejecucion, luego
   // las tres de las vistas nuevas -`listFinishedOrders`, `listCompanyOrders`,
   // `listResponsibleCandidates`- y ahora las CUATRO del empaque de QC-168. Siguen nombradas UNA A
@@ -25,11 +25,13 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82 y QC-167) —
   // 2026-10-06 (QC-82): crece con `cancelAssignedOrder` y `recordStepMove`.
   // 2026-10-08 (QC-167): crece con DOS operaciones de solo lectura del recorrido de ejecucion,
   // `listExecutionTraces` y `getExecutionTrace` (`design.md` de QC-167). Ninguna previa se quita.
-  it('expone las doce anteriores, las CUATRO de QC-168, las DOS de QC-82 y las DOS de QC-167, y ninguna mas', () => {
+  // 2026-10-08 (QC-215): crece con `startConditioning` y `finishConditioning`.
+  it('expone las doce anteriores, las CUATRO de QC-168, las DOS de QC-82, las DOS de QC-167 y las DOS de QC-215, y ninguna mas', () => {
     expect(Object.keys(asignaciones).sort()).toEqual([
       'assignResponsibles',
       'cancelAssignedOrder',
       'finishAssignedOrder',
+      'finishConditioning',
       'finishPacking',
       'getAssignedOrderExecution',
       'getExecutionTrace',
@@ -45,6 +47,7 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82 y QC-167) —
       'recordStepMove',
       'removeWorkGroupFromOrder',
       'startAssignedOrder',
+      'startConditioning',
       'startPacking',
       'unassignResponsible',
     ]);
@@ -180,6 +183,23 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82 y QC-167) —
   it('R26: `recordStepMove` rechaza sin `asignaciones.ejecutar` sin llegar a la base', async () => {
     const error = await asignaciones
       .recordStepMove({ id: 'u', companyId: 'c', permissions: ['asignaciones.consultar'] }, { orderId: 'o' })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  // QC-215: mismo criterio, con un actor que tiene los permisos del empaque pero no el suyo.
+  it('R15: `startConditioning` rechaza sin `acondicionamiento.modificar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .startConditioning({ id: 'u', companyId: 'c', permissions: ['empaque.modificar'] }, { orderId: 'o' })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('R15: `finishConditioning` rechaza sin `acondicionamiento.modificar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .finishConditioning({ id: 'u', companyId: 'c', permissions: ['empaque.modificar'] }, { orderId: 'o' })
       .catch((caught: unknown) => caught);
 
     expect((error as { code?: string }).code).toBe('unauthorized');

@@ -126,6 +126,8 @@ function ordersReales(): OrderCatalog {
     transitionAliveById: transitionAliveByIdReal,
     startPackingAliveById: async () => noLlamar('orders.startPackingAliveById'),
     finishPackingAliveById: async () => noLlamar('orders.finishPackingAliveById'),
+    startConditioningAliveById: async () => noLlamar('orders.startConditioningAliveById'),
+    finishConditioningAliveById: async () => noLlamar('orders.finishConditioningAliveById'),
   };
 }
 

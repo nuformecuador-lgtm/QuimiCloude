@@ -32,9 +32,11 @@ import { type OrderStatus, type OrderSummary } from '@/lib/modules/pedidos';
  * puerta al dato: de responsables no dice nada.
  *
  * **Un solo predicado para el estado final** (`isFinalOrderStatus`): con el pedido en
- * `ENTREGADO`, `CANCELADO`, `POR_EMPACAR` o `EN_EMPAQUE` los items de editar/cancelar/borrar van
- * `disabled` dentro del menu, sin ningun texto aparte que lo explique, y **no se monta ningun
- * dialogo**. La pantalla anticipa la regla; el backend la impide igual (`invalid_transition`,
+ * `ENTREGADO`, `CANCELADO`, `POR_EMPACAR`, `EN_EMPAQUE`, en cualquiera de los estados de
+ * acondicionamiento (`POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO`) o en `TERMINADO` (el estado
+ * que sigue a terminar el acondicionamiento) los items de editar/cancelar/borrar van `disabled`
+ * dentro del menu, sin ningun texto aparte que lo explique, y **no se monta ningun dialogo**.
+ * La pantalla anticipa la regla; el backend la impide igual (`invalid_transition`,
  * `not_cancellable`, `not_deletable`), asi que anticipar no es confiar.
  *
  * **`BLOQUEADO` NO es final** (QC-138): un pedido sin material se edita y se cancela como uno
@@ -69,6 +71,9 @@ const ORDER_STATUS_IS_FINAL: Readonly<Record<OrderStatus, boolean>> = {
   ENTREGADO: true,
   CANCELADO: true,
   BLOQUEADO: false,
+  POR_ACONDICIONAR: true,
+  EN_ACONDICIONAMIENTO: true,
+  TERMINADO: true,
 };
 
 /**
@@ -94,11 +99,29 @@ const ORDER_STATUS_ACCEPTS_DISTRIBUTION_EDIT: Readonly<Record<OrderStatus, boole
   CANCELADO: false,
   // La edicion general sigue abierta en BLOQUEADO y ya cubre reparto y unidad.
   BLOQUEADO: false,
+  POR_ACONDICIONAR: false,
+  EN_ACONDICIONAMIENTO: false,
+  TERMINADO: false,
 };
 
 export function acceptsDistributionEdit(status: OrderStatus): boolean {
   return ORDER_STATUS_ACCEPTS_DISTRIBUTION_EDIT[status];
 }
+
+// No reutiliza `ORDER_STATUS_IS_FINAL`: los estados de acondicionamiento y `TERMINADO` cierran la
+// edicion pero siguen aceptando el cambio de cliente.
+const ORDER_STATUS_ACCEPTS_CUSTOMER_CHANGE: Readonly<Record<OrderStatus, boolean>> = {
+  PENDIENTE: true,
+  EN_CURSO: true,
+  POR_EMPACAR: true,
+  EN_EMPAQUE: true,
+  ENTREGADO: false,
+  CANCELADO: false,
+  BLOQUEADO: true,
+  POR_ACONDICIONAR: true,
+  EN_ACONDICIONAMIENTO: true,
+  TERMINADO: true,
+};
 
 export const ORDER_ACTION_DISTRIBUTION_TESTID = 'order-action-distribution';
 export const ORDER_ACTION_CUSTOMER_TESTID = 'order-action-customer';
@@ -176,13 +199,13 @@ export function OrderRowActions({
     },
   ];
 
-  // Sin `disabled`: el cliente se puede cambiar en cualquier estado.
   if (canEditCustomer) {
     items.push({
       key: 'customer',
       label: 'Cliente',
       icon: UserIcon,
       onSelect: () => onCustomer?.(order),
+      disabled: !ORDER_STATUS_ACCEPTS_CUSTOMER_CHANGE[order.status],
       testId: ORDER_ACTION_CUSTOMER_TESTID,
     });
   }

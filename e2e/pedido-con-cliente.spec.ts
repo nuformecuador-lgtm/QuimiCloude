@@ -1,6 +1,6 @@
 /**
  * E2E del cliente del pedido (QC-156, R40): alta con cliente y su columna, filtro por cliente,
- * cambio de cliente en un pedido cancelado sin tocar su estado, y el rechazo a quien solo consulta.
+ * la accion «Cliente» deshabilitada en un pedido cancelado, y el rechazo a quien solo consulta.
  *
  * DATOS: empresa, usuarios, rol, clientes, receta, presentacion, envase y pedidos son efimeros,
  * con el prefijo `qc156_e2e_` y el `RUN_ID` del worker, y se borran en `afterAll` por los ids y
@@ -97,7 +97,6 @@ const CUSTOMER_ACTION = 'order-action-customer';
 const RESPONSIBLES_ACTION = 'order-action-responsibles';
 const CANCEL_ACTION = 'order-action-cancel';
 const CUSTOMER_DIALOG = 'order-customer-dialog';
-const CUSTOMER_DIALOG_SUBMIT = 'order-customer-dialog-submit';
 const CANCEL_DIALOG = 'cancel-order-dialog';
 const CANCEL_REASON = 'cancel-order-reason';
 const CANCEL_CONFIRM = 'cancel-order-confirm';
@@ -483,16 +482,15 @@ test.describe('pedido con cliente', () => {
     }
   });
 
-  test('R40(c) — cambia el cliente de un pedido CANCELADO sin que cambie su estado (R14, R32, R33)', async ({
+  test('R40(c) — en un pedido CANCELADO la accion «Cliente» esta deshabilitada y el cliente no cambia (R39)', async ({
     page,
   }) => {
     const orderId = required(cancelOrderId, 'el pedido a cancelar');
-    const mainId = required(customerMainId, 'el cliente principal');
+    const otherId = required(customerOtherId, 'el otro cliente');
     await loginAndLand(page, adminUser);
     await page.goto(ordersUrl());
     await expect(page.getByTestId(ORDERS_TITLE)).toBeVisible({ timeout: 60_000 });
 
-    // La cancelacion existente lleva el pedido a CANCELADO.
     await (await openOrderRowMenu(page, orderMenuTrigger(page, orderId), CANCEL_ACTION)).click();
     await expect(page.getByTestId(CANCEL_DIALOG)).toBeVisible({ timeout: 60_000 });
     await page.getByTestId(CANCEL_REASON).fill(CANCELLATION_REASON);
@@ -509,20 +507,26 @@ test.describe('pedido con cliente', () => {
       .toBe('CANCELADO');
     const before = await prisma.order.findUniqueOrThrow({
       where: { id: orderId },
-      select: { status: true, cancellationReason: true, quantity: true, deletedAt: true },
+      select: {
+        customerId: true,
+        status: true,
+        cancellationReason: true,
+        quantity: true,
+        deletedAt: true,
+      },
     });
+    expect(before.customerId, 'el pedido conserva su cliente al cancelarse').toBe(otherId);
 
-    // El cambio de cliente sigue disponible en un pedido cerrado.
-    await (await openOrderRowMenu(page, orderMenuTrigger(page, orderId), CUSTOMER_ACTION)).click();
-    await expect(page.getByTestId(CUSTOMER_DIALOG)).toBeVisible({ timeout: 60_000 });
-    await chooseCustomer(page, CUSTOMER_DIALOG, customerLabel(CUSTOMER_MAIN));
-    await page.getByTestId(CUSTOMER_DIALOG_SUBMIT).click();
-    await expect(page.getByTestId(CUSTOMER_DIALOG)).toHaveCount(0, { timeout: 60_000 });
+    // Se espera a que la fila pinte el estado nuevo: el menu de antes de refrescar aun la tendria habilitada.
+    await expect(async () => {
+      const item = await openOrderRowMenu(page, orderMenuTrigger(page, orderId), CUSTOMER_ACTION);
+      await expect(item).toHaveAttribute('aria-disabled', 'true', { timeout: 5_000 });
+    }).toPass({ timeout: 60_000 });
 
-    await expect(orderRow(page, orderId).getByTestId(CUSTOMER_CELL)).toHaveText(
-      customerLabel(CUSTOMER_MAIN),
-      { timeout: 60_000 },
-    );
+    // `force` salta la comprobacion de accionabilidad: lo que se prueba es que el item no abre nada.
+    await page.getByRole('menu').getByTestId(CUSTOMER_ACTION).click({ force: true });
+    await expect(page.getByTestId(CUSTOMER_DIALOG)).toHaveCount(0);
+    await expect(orderRow(page, orderId).getByTestId(CUSTOMER_CELL)).toHaveText(customerLabel(CUSTOMER_OTHER));
 
     const after = await prisma.order.findUniqueOrThrow({
       where: { id: orderId },
@@ -534,16 +538,7 @@ test.describe('pedido con cliente', () => {
         deletedAt: true,
       },
     });
-    expect(after.customerId, 'el cliente se cambia').toBe(mainId);
-    expect(
-      {
-        status: after.status,
-        cancellationReason: after.cancellationReason,
-        quantity: after.quantity,
-        deletedAt: after.deletedAt,
-      },
-      'el estado y el resto del pedido no cambian',
-    ).toEqual(before);
+    expect(after, 'ni el cliente ni el resto del pedido cambian').toEqual(before);
   });
 
   test('R40(d) — con solo pedidos.consultar no ve «Cliente» y el servidor rechaza el cambio con unauthorized (R6, R32)', async ({

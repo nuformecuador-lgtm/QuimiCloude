@@ -310,3 +310,23 @@ describe('QC-211 — getPackingOrder: los pasos de envasado', () => {
     for (const doble of todos) expect(doble).not.toHaveBeenCalled();
   });
 });
+
+describe('getPackingOrder — un pedido en un estado de acondicionamiento no tiene detalle de empaque', () => {
+  it.each(['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const)(
+    'R23: un pedido %s responde `order_not_found` sin leer recibos ni pasos',
+    async (status) => {
+      const { deps, listAliveSummariesByIds, findFinishedGoodsReceipts, findPackingStepsById } = montar();
+      // El catalogo filtra por los estados que recibe, como el adaptador real.
+      listAliveSummariesByIds.mockImplementation(async (...args: unknown[]) => {
+        const statuses = args[2] as readonly string[];
+        const items = statuses.includes(status) ? [{ ...RESUMEN, status, packedBy: ANA }] : [];
+        return { items, total: items.length, page: 1, pageSize: 1, totalPages: items.length };
+      });
+      const getPackingOrder = createGetPackingOrder(deps);
+
+      await expect(getPackingOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(OrderNotFoundError);
+      expect(findFinishedGoodsReceipts).not.toHaveBeenCalled();
+      expect(findPackingStepsById).not.toHaveBeenCalled();
+    },
+  );
+});

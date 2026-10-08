@@ -84,6 +84,12 @@ const orders: OrderCatalog = {
   finishPackingAliveById: async () => {
     throw new Error('QC-87: los casos de uso de asignacion no escriben el estado del pedido');
   },
+  startConditioningAliveById: async () => {
+    throw new Error('los casos de uso de asignacion no escriben el estado del pedido');
+  },
+  finishConditioningAliveById: async () => {
+    throw new Error('los casos de uso de asignacion no escriben el estado del pedido');
+  },
 };
 
 export type UseCases = {

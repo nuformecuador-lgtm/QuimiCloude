@@ -12,6 +12,9 @@
  * | `EN_CURSO`          | admitida (R9)                             |
  * | `POR_EMPACAR`       | `order_produced_frozen`                   |
  * | `EN_EMPAQUE`        | `order_produced_frozen`                   |
+ * | `POR_ACONDICIONAR`  | `order_produced_frozen`                   |
+ * | `EN_ACONDICIONAMIENTO` | `order_produced_frozen`                |
+ * | `TERMINADO`         | `order_produced_frozen`                   |
  * | `ENTREGADO`         | `order_delivered_frozen` (R10)            |
  * | `CANCELADO`         | `order_cancelled_not_assignable` (R11)    |
  * | no existe / de baja | `order_not_found` (R8)                    |
@@ -61,6 +64,9 @@ const ERROR_POR_ESTADO = {
   EN_EMPAQUE: (): AsignacionesError => new OrderProducedFrozenError(),
   ENTREGADO: (): AsignacionesError => new OrderDeliveredFrozenError(),
   CANCELADO: (): AsignacionesError => new OrderCancelledNotAssignableError(),
+  POR_ACONDICIONAR: (): AsignacionesError => new OrderProducedFrozenError(),
+  EN_ACONDICIONAMIENTO: (): AsignacionesError => new OrderProducedFrozenError(),
+  TERMINADO: (): AsignacionesError => new OrderProducedFrozenError(),
 } satisfies Record<OrderStatus, (() => AsignacionesError) | null>;
 
 /**

@@ -34,7 +34,9 @@ import {
   AssignedOrdersListSection,
   AssignedOrdersSkeleton,
   AssignmentViewTabs,
+  COMPANY_ORDERS_SKELETON_BASE_COLUMN_COUNT,
   CompanyOrdersListSection,
+  CompanyOrdersSkeleton,
   FinishedOrdersListSection,
   PackingOrdersListSection,
 } from '@/app/(private)/asignacion/components';
@@ -188,6 +190,43 @@ describe('R27 — «Terminados» y «Todos» reciben los mismos parametros de pa
 
     const [seccion] = encontrarPorTipo(arbol, FinishedOrdersListSection);
     expect(seccion.props).toMatchObject({ params: { page: 1, pageSize: 10 } });
+  });
+});
+
+describe('R32 — el skeleton de «Todos» suma la columna de fecha con el filtro exacto', () => {
+  async function fallbackDeTodos(status?: string) {
+    getSessionUserMock.mockResolvedValue(sesionCon(ADMINISTRADOR));
+    const arbol = await AsignacionPage({
+      searchParams: Promise.resolve(
+        status === undefined ? { vista: 'todos' } : { vista: 'todos', status },
+      ),
+    });
+    const [limite] = encontrarPorTipo(arbol, Suspense);
+    const fallback = (limite.props as { fallback: ReactElement }).fallback;
+    expect(fallback.type).toBe(CompanyOrdersSkeleton);
+    return fallback.props as { showFinishedAt?: boolean };
+  }
+
+  it.each(['TERMINADO', 'ENTREGADO'])('con exactamente %s, `showFinishedAt: true`', async (status) => {
+    expect(await fallbackDeTodos(status)).toMatchObject({ showFinishedAt: true });
+  });
+
+  it.each([undefined, 'TERMINADO,ENTREGADO', 'POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO'])(
+    'con el filtro %s, `showFinishedAt: false`',
+    async (status) => {
+      expect(await fallbackDeTodos(status)).toMatchObject({ showFinishedAt: false });
+    },
+  );
+
+  it('con `showFinishedAt` pinta una columna mas que sin ella', () => {
+    const { unmount } = render(<CompanyOrdersSkeleton rows={1} />);
+    const base = screen.getAllByRole('columnheader').length;
+    expect(base).toBe(COMPANY_ORDERS_SKELETON_BASE_COLUMN_COUNT);
+    unmount();
+
+    render(<CompanyOrdersSkeleton rows={1} showFinishedAt />);
+    expect(screen.getAllByRole('columnheader')).toHaveLength(base + 1);
+    cleanup();
   });
 });
 

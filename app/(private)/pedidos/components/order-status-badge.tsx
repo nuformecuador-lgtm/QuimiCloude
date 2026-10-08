@@ -37,6 +37,9 @@ export const ORDER_STATUS_LABELS: Readonly<Record<OrderStatus, string>> = {
   ENTREGADO: 'Entregado',
   CANCELADO: 'Cancelado',
   BLOQUEADO: 'Bloqueado',
+  POR_ACONDICIONAR: 'Por acondicionar',
+  EN_ACONDICIONAMIENTO: 'En acondicionamiento',
+  TERMINADO: 'Terminado',
 };
 
 /** Como se lee cada prioridad del contrato. Exhaustivo por tipo, mismo motivo. */
@@ -61,6 +64,9 @@ const STATUS_VARIANTS: Readonly<Record<OrderStatus, 'default' | 'secondary' | 'o
   // El mismo tono que `CANCELADO`: los dos son los estados que impiden trabajar el pedido, y el
   // color acompana a la etiqueta, nunca la sustituye.
   BLOQUEADO: 'destructive',
+  POR_ACONDICIONAR: 'secondary',
+  EN_ACONDICIONAMIENTO: 'default',
+  TERMINADO: 'secondary',
 };
 
 const PRIORITY_VARIANTS: Readonly<Record<OrderPriority, 'default' | 'secondary' | 'outline' | 'destructive'>> = {

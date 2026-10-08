@@ -480,6 +480,10 @@ export const MIGRACIONES_ESPERADAS = [
   '20261006180000_order_execution_entries',
   // El rol Administrador de acondicionamiento y su permiso; no toca el identificador.
   '20261006234105_conditioning_role',
+  // Los estados de acondicionamiento y TERMINADO; no toca el identificador.
+  '20261007120000_order_conditioning_states',
+  // El indice de pedidos terminados; no toca el identificador.
+  '20261007120100_order_terminated_finished_index',
 ] as const
 
 export function hallazgosDeMigraciones(

@@ -145,15 +145,23 @@ describe('deleteOrder — borrado logico (R31, R32, R33)', () => {
     expect(d.softDeleteAlive).toHaveBeenCalledTimes(1)
   })
 
-  it('R27: BLOQUEADO no engaña a la lista de no borrables, que son los cuatro estados de antes', async () => {
+  it('R27: BLOQUEADO no engaña a la lista de no borrables (y QC-215 R19, R30: los diez estados)', async () => {
     // La lista es explicita a proposito, asi que el caso anterior no basta: si alguien colara
-    // BLOQUEADO en ella, ese caso caeria, y aqui se afirma el conjunto entero de los siete.
+    // BLOQUEADO en ella, ese caso caeria, y aqui se afirma el conjunto entero de los diez.
     for (const status of ['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'] as const) {
       const d = dobles({ fila: fila(status) })
       await createDeleteOrder(d)(ORDER_ID, ADMIN)
       expect(d.softDeleteAlive, status).toHaveBeenCalledTimes(1)
     }
-    for (const status of ['ENTREGADO', 'CANCELADO', 'POR_EMPACAR', 'EN_EMPAQUE'] as const) {
+    for (const status of [
+      'ENTREGADO',
+      'CANCELADO',
+      'POR_EMPACAR',
+      'EN_EMPAQUE',
+      'POR_ACONDICIONAR',
+      'EN_ACONDICIONAMIENTO',
+      'TERMINADO',
+    ] as const) {
       const d = dobles({ fila: fila(status) })
       expect(await codigoDelFallo(() => createDeleteOrder(d)(ORDER_ID, ADMIN)), status).toBe(
         'not_deletable',
@@ -178,6 +186,19 @@ describe('deleteOrder — borrado logico (R31, R32, R33)', () => {
 
   it('no borra un POR_EMPACAR ni un EN_EMPAQUE: el material ya se consumio (R32)', async () => {
     for (const status of ['POR_EMPACAR', 'EN_EMPAQUE'] as const) {
+      const d = dobles({ fila: fila(status) })
+
+      expect(
+        await codigoDelFallo(() => createDeleteOrder(d)(ORDER_ID, ADMIN)),
+        status,
+      ).toBe('not_deletable')
+      expect(d.softDeleteAlive, status).not.toHaveBeenCalled()
+      expect(d.releaseForOrder, status).not.toHaveBeenCalled()
+    }
+  })
+
+  it('R19, R30 (QC-215): no borra un POR_ACONDICIONAR, un EN_ACONDICIONAMIENTO ni un TERMINADO, sin escribir ni liberar', async () => {
+    for (const status of ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const) {
       const d = dobles({ fila: fila(status) })
 
       expect(

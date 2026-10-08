@@ -15,6 +15,7 @@
  * intactos.
  */
 import type { OrderPriority, OrderStatus } from './order-classification';
+import type { FinishConditioningAliveById, StartConditioningAliveById } from './order-conditioning';
 import type { OrderNumber } from './order-number';
 import type { Page } from './page';
 
@@ -128,9 +129,10 @@ export interface OrderCatalog {
    * existian para esa alta (`'presentation_without_content'`, `'no_whole_package'`,
    * `'recipe_not_found'`).
    *
-   * `'EN_EMPAQUE'` y `'ENTREGADO'` no son destino valido de este metodo: se rechazan con
-   * `InvalidTransitionError`, aunque la matriz de transiciones los admita, porque solo los
-   * alcanzan las dos acciones de empaque, que si conocen a quien empaca.
+   * `'EN_EMPAQUE'`, `'POR_ACONDICIONAR'`, `'EN_ACONDICIONAMIENTO'`, `'TERMINADO'` y `'ENTREGADO'`
+   * no son destino valido de este metodo: se rechazan con `InvalidTransitionError`, aunque la
+   * matriz de transiciones los admita, porque solo los alcanzan acciones propias que conocen a
+   * quien empaca o acondiciona.
    */
   transitionAliveById(
     id: string,
@@ -157,8 +159,8 @@ export interface OrderCatalog {
   ): Promise<'ok' | 'already_mine' | 'taken' | 'not_packable' | 'not_found' | 'without_distribution'>;
 
   /**
-   * Terminar el empaque: `EN_EMPAQUE -> ENTREGADO`, con `finishedAt` en la MISMA escritura que
-   * el cambio de estado, solo si `packerId` es quien tiene el pedido en empaque. `'not_packer'`
+   * Terminar el empaque: `EN_EMPAQUE -> POR_ACONDICIONAR`, sin `finishedAt` -el pedido aun no esta
+   * terminado-, solo si `packerId` es quien tiene el pedido en empaque. `'not_packer'`
    * es un pedido `EN_EMPAQUE` de otro empacador; `'not_packable'` es cualquier otro estado;
    * `'not_found'` es el mismo caso que en `findAliveById`.
    *
@@ -192,6 +194,33 @@ export interface OrderCatalog {
     | 'order_without_unit'
     | 'insufficient_material'
   >;
+
+  /**
+   * Comenzar el acondicionamiento: `POR_ACONDICIONAR -> EN_ACONDICIONAMIENTO` con `conditionerId`
+   * como quien acondiciona, en un solo `UPDATE` condicional. `'already_mine'` es el mismo
+   * acondicionador sobre su propio `EN_ACONDICIONAMIENTO`, sin escribir; `'taken'`, ese estado a
+   * nombre de otro; `'not_conditionable'`, cualquier otro estado; `'not_found'`, el mismo caso que
+   * en `findAliveById`.
+   */
+  startConditioningAliveById(
+    id: string,
+    companyId: string,
+    conditionerId: string,
+    now: Date,
+  ): ReturnType<StartConditioningAliveById>;
+
+  /**
+   * Terminar el acondicionamiento: `EN_ACONDICIONAMIENTO -> TERMINADO` con `finishedAt = now` en la
+   * misma escritura, solo si `conditionerId` es quien lo acondiciona. `'not_conditioner'` es ese
+   * estado a nombre de otro; `'not_conditionable'`, cualquier otro estado; `'not_found'`, igual que
+   * arriba.
+   */
+  finishConditioningAliveById(
+    id: string,
+    companyId: string,
+    conditionerId: string,
+    now: Date,
+  ): ReturnType<FinishConditioningAliveById>;
 }
 
 /**

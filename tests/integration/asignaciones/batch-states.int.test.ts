@@ -138,6 +138,8 @@ function casosDelOperador(fixture: Fixture) {
     transitionAliveById: noUsado('transitionAliveById'),
     startPackingAliveById: noUsado('startPackingAliveById'),
     finishPackingAliveById: noUsado('finishPackingAliveById'),
+    startConditioningAliveById: noUsado('startConditioningAliveById'),
+    finishConditioningAliveById: noUsado('finishConditioningAliveById'),
   };
   const recipes = {
     findRefsIncludingDeleted: findRecipeRefsIncludingDeleted,

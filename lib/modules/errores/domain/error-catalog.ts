@@ -67,6 +67,8 @@ export const ERROR_MESSAGE_KEY = {
   order_packing_taken: 'errors.order_packing_taken',
   order_not_packable: 'errors.order_not_packable',
   order_produced_frozen: 'errors.order_produced_frozen',
+  order_conditioning_taken: 'errors.order_conditioning_taken',
+  order_not_conditionable: 'errors.order_not_conditionable',
   order_would_block: 'errors.order_would_block',
   order_blocked: 'errors.order_blocked',
   order_without_distribution: 'errors.order_without_distribution',
@@ -177,6 +179,9 @@ export const ERROR_MESSAGES_ES = {
   'errors.order_not_packable': 'El pedido no esta en un estado que admita esa accion de empaque.',
   'errors.order_produced_frozen':
     'Un pedido ya producido conserva sus responsables tal como estaban.',
+  'errors.order_conditioning_taken': 'Otra persona esta acondicionando este pedido.',
+  'errors.order_not_conditionable':
+    'El pedido no esta en un estado que admita esa accion de acondicionamiento.',
   'errors.order_would_block':
     'No hay material suficiente para este pedido: si lo guardas, quedara bloqueado hasta que entre inventario.',
   'errors.order_blocked': 'Falta material: el pedido esta bloqueado y no se puede iniciar.',

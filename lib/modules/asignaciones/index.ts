@@ -59,6 +59,8 @@ export {
   OrderPackingTakenError,
   OrderNotPackableError,
   OrderProducedFrozenError,
+  OrderConditioningTakenError,
+  OrderNotConditionableError,
   OrderBlockedError,
   OrderWithoutDistributionError,
 } from './domain/errors';
@@ -242,3 +244,13 @@ export {
   type GetExecutionTraceDeps,
 } from './domain/get-execution-trace';
 export type { ExecutionTrace, TraceDuration, TraceStep } from './domain/execution-trace';
+
+// ---------------------------------------------------------------------------------------
+// El acondicionamiento: Comenzar y Terminar. Bloque NUEVO al final.
+// ---------------------------------------------------------------------------------------
+export { createStartConditioning, type StartConditioningDeps } from './domain/start-conditioning';
+export {
+  createFinishConditioning,
+  type FinishConditioningDeps,
+  type FinishConditioningResult,
+} from './domain/finish-conditioning';
