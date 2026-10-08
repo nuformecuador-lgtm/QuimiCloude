@@ -20,14 +20,147 @@ warn() { echo "${YELLOW}! $1${NC}"; }
 # El rapido NO sustituye al completo: lo sustituye el CI. La leccion de dos PRs de un proyecto
 # anterior sigue en pie -se mergeo mirando el estado del PR, que es un build y NO corre tests, y
 # entro un guard rojo en `dev`-: por eso no se mergea sin el check `gate-completo` en verde.
+#
+# EN CI LA SUITE VA EN SHARDS (docs/gate.md > En CI la suite va en shards). Tres piezas, las tres
+# SOLO para CI; en local `--completo` sigue corriendo todo de una vez:
+#   GATE_PARTE=estatico ./init.sh --completo   todo MENOS la suite de vitest (typecheck, lint...)
+#   GATE_SHARD=i/N      ./init.sh --completo   solo el shard i de N de la suite, SIN veredicto
+#   ./init.sh --unir <dir> <N>                 une los N informes y da el veredicto UNA vez
+# Ningun shard da veredicto: un shard puede no traer ni un archivo de `integration`, y la
+# garantia «los tres proyectos corrieron» solo vale sobre el informe unido.
+USO="uso: ./init.sh [--rapido|--completo|--unir <dir> <N>]   (default: --rapido)"
 MODO="rapido"
 case "${1:-}" in
   ""|--rapido) MODO="rapido" ;;
   --completo)  MODO="completo" ;;
-  *) echo "uso: ./init.sh [--rapido|--completo]   (default: --rapido)"; exit 2 ;;
+  --unir)
+    MODO="unir"; UNIR_DIR="${2:-}"; UNIR_N="${3:-}"
+    { [ -n "$UNIR_DIR" ] && [ -n "$UNIR_N" ]; } || { echo "$USO"; exit 2; } ;;
+  *) echo "$USO"; exit 2 ;;
 esac
 
-echo "== Arnes SDD :: init (modo: $MODO) =="
+GATE_PARTE="${GATE_PARTE:-}"
+GATE_SHARD="${GATE_SHARD:-}"
+# Las combinaciones sin sentido son `fail` y no se ignoran en silencio: un GATE_SHARD colado en
+# un `--rapido` haria creer que se corrio un shard cuando no se corrio nada de eso.
+if [ -n "$GATE_PARTE" ] && [ -n "$GATE_SHARD" ]; then
+  fail "GATE_PARTE y GATE_SHARD a la vez: el job estatico y los shards son jobs distintos"
+fi
+if { [ -n "$GATE_PARTE" ] || [ -n "$GATE_SHARD" ]; } && [ "$MODO" != "completo" ]; then
+  fail "GATE_PARTE y GATE_SHARD solo valen con --completo (son las partes del completo de CI)"
+fi
+if [ -n "$GATE_PARTE" ] && [ "$GATE_PARTE" != "estatico" ]; then
+  fail "GATE_PARTE='$GATE_PARTE' no existe; el unico valor es 'estatico'"
+fi
+if [ -n "$GATE_SHARD" ]; then
+  case "$GATE_SHARD" in
+    *[!0-9/]*|/*|*/|*/*/*|"") fail "GATE_SHARD='$GATE_SHARD' no es i/N" ;;
+    */*) ;;
+    *) fail "GATE_SHARD='$GATE_SHARD' no es i/N" ;;
+  esac
+  SHARD_I=${GATE_SHARD%/*}; SHARD_N=${GATE_SHARD#*/}
+  { [ "$SHARD_N" -ge 1 ] && [ "$SHARD_I" -ge 1 ] && [ "$SHARD_I" -le "$SHARD_N" ]; } \
+    || fail "GATE_SHARD='$GATE_SHARD' fuera de rango: hace falta 1 <= i <= N"
+fi
+
+# VEREDICTO DE LA SUITE: baseline de rojos + las dos garantias. Es una funcion porque lo aplican
+# dos caminos -el `--completo` de una sola corrida y el `--unir` de los shards de CI- y tiene que
+# ser EXACTAMENTE el mismo veredicto en los dos. Uso: veredicto_tests <informe> <codigo de vitest>.
+veredicto_tests() {
+  local INFORME="$1" ESTADO_TESTS="$2"
+  # stderr sale directo a la consola a proposito: asi el detalle esta de verdad "justo
+  # arriba" y el mensaje de fallo no promete algo que no entrega.
+  COMPARACION=$(node scripts/comparar-baseline-rojos.mjs "$INFORME") || fail "hay rojos NUEVOS respecto del baseline (el detalle esta justo arriba)"
+
+  # GARANTIA 1: LOS TRES PROYECTOS APARECEN EN EL INFORME. Es la comprobacion que nos habria
+  # salvado el 2026-09-13. Los nombres salen de `vitest.config.mts` (`ui`, `node`,
+  # `integration`) y el reparto es el mismo de ahi, por convencion de nombre y carpeta,
+  # porque el informe JSON de vitest NO trae el proyecto de cada archivo: solo su ruta.
+  # Si falta un proyecto ENTERO, no corrio, y el gate no puede afirmar nada sobre el.
+  LEER_PROYECTOS=$(cat <<'JS'
+const { readFileSync } = require('node:fs');
+const { relative, resolve } = require('node:path');
+let ESPERADOS = ['ui', 'node', 'integration'];
+try {
+  const cfg = JSON.parse(readFileSync('arnes.config.json', 'utf8'));
+  if (Array.isArray(cfg.gate?.proyectos_vitest)) ESPERADOS = cfg.gate.proyectos_vitest;
+} catch { /* sin config: los tres de siempre */ }
+const rutaInforme = process.argv[1];
+let informe;
+try {
+  informe = JSON.parse(readFileSync(rutaInforme, 'utf8'));
+} catch (err) {
+  console.log(`no se pudo leer el informe ${rutaInforme}: ${err.message}`);
+  process.exit(1);
+}
+const norm = (p) => relative(process.cwd(), resolve(p)).split('\\').join('/');
+const proyecto = (r) =>
+  r.endsWith('.test.tsx') || r.startsWith('tests/ui/')
+    ? 'ui'
+    : r.startsWith('tests/integration/')
+      ? 'integration'
+      : 'node';
+if (ESPERADOS.length === 0) {
+  console.log('comprobacion de proyectos de vitest desactivada (arnes.config.json > gate.proyectos_vitest = [])');
+  process.exit(0);
+}
+const vistos = new Set();
+for (const suite of informe.testResults ?? []) vistos.add(proyecto(norm(suite.name)));
+const faltan = ESPERADOS.filter((p) => !vistos.has(p));
+if (faltan.length > 0) {
+  console.log(`el informe no trae NI UN archivo del proyecto: ${faltan.join(', ')}.`);
+  console.log(`ese proyecto no llego a correr (global setup, config o un proceso caido), asi que el gate no puede afirmar nada sobre el.`);
+  process.exit(1);
+}
+console.log(`los tres proyectos corrieron (${ESPERADOS.join(', ')})`);
+JS
+)
+  PROYECTOS=$(node -e "$LEER_PROYECTOS" "$INFORME" 2>&1) || fail "$PROYECTOS"
+  ok "$PROYECTOS"
+
+  # GARANTIA 2: CONTRADICCION = ROJO. `test:json` salio distinto de cero, el comparador no ve
+  # rojos nuevos y el informe NO TRAE NI UN ARCHIVO EN ROJO que explique ese codigo. Eso es
+  # contradictorio: algo fallo FUERA de los tests (arranque, global setup, configuracion, un
+  # proceso que se cayo). Ahi no se da verde.
+  #
+  # El disparador NO es "codigo distinto de cero y sin rojos NUEVOS" a secas, y la diferencia
+  # importa: con rojos HEREDADOS en el baseline (hoy son 8 archivos) la suite sana termina
+  # distinta de cero en cada corrida, asi que esa version pondria el gate rojo SIEMPRE y en
+  # dos dias se ignoraria. Lo contradictorio es que el informe no explique el codigo: si hay
+  # al menos un archivo en rojo, el codigo ya tiene duena y el baseline sigue mandando.
+  #
+  # Con shards el codigo es el MAXIMO de los N (lo calcula `scripts/unir-informes-vitest.mjs`) y
+  # el informe es el unido: si un shard salio distinto de cero sin rojos en NINGUN shard, rojo.
+  ROJOS_EN_INFORME=$(node -e "const {readFileSync} = require('node:fs'); const i = JSON.parse(readFileSync(process.argv[1], 'utf8')); console.log((i.testResults ?? []).filter((s) => s.status === 'failed').length)" "$INFORME" 2>/dev/null || echo 0)
+  if [ "$ESTADO_TESTS" -ne 0 ] && [ "$ROJOS_EN_INFORME" -eq 0 ]; then
+    fail "contradiccion: 'pnpm run test:json' salio con codigo $ESTADO_TESTS y el informe no trae NI UN archivo en rojo.
+algo fallo FUERA de los tests (arranque, global setup, configuracion, un proceso caido); un fallo asi no escribe rojos y por eso era invisible.
+Que hacer: mira la salida de vitest de aqui arriba, arreglalo y vuelve a correr el gate."
+  fi
+
+  ok "tests: $COMPARACION"
+}
+
+echo "== Arnes SDD :: init (modo: $MODO${GATE_PARTE:+, parte: $GATE_PARTE}${GATE_SHARD:+, shard: $GATE_SHARD}) =="
+
+# --unir (solo CI, job `gate-completo`): une los informes de los shards y da el veredicto. Va
+# ANTES de todo lo demas y a proposito no necesita pnpm ni node_modules: el veredicto es Node puro
+# sobre JSON, y typecheck, lint y validadores ya los corrio el job estatico, que `gate-completo`
+# exige en verde. Asi el job final no paga una instalacion para leer tres archivos.
+if [ "$MODO" = "unir" ]; then
+  command -v node >/dev/null 2>&1 || fail "node no esta instalado"
+  [ -f scripts/unir-informes-vitest.mjs ] || fail "falta scripts/unir-informes-vitest.mjs: sin el, los shards no se pueden unir"
+  # Mismo motivo que en `--completo`: sin informe de ESTA union, el comparador tiene que fallar,
+  # no leer uno viejo.
+  rm -f .vitest-rojos.json
+  # stderr sale directo a la consola: el detalle del fallo queda justo arriba.
+  CODIGO_UNIDO=$(node scripts/unir-informes-vitest.mjs "$UNIR_DIR" "$UNIR_N" --out .vitest-rojos.json) \
+    || fail "no se pudieron unir los informes de los shards (el detalle esta justo arriba)"
+  ok "informes de $UNIR_N shards unidos (codigo de salida maximo de vitest: $CODIGO_UNIDO)"
+  veredicto_tests .vitest-rojos.json "$CODIGO_UNIDO"
+  echo "${GREEN}== init OK ==${NC}"
+  exit 0
+fi
 
 # 1. Herramientas base
 command -v node >/dev/null 2>&1 || fail "node no esta instalado"
@@ -170,12 +303,38 @@ if [ -f scripts/gate-proyecto.sh ]; then
 fi
 
 if [ -f package.json ]; then
-  run_if typecheck
-  run_if lint
+  # Un shard NO repite typecheck ni lint: los corre el job estatico una sola vez.
+  if [ -z "$GATE_SHARD" ]; then
+    run_if typecheck
+    run_if lint
+  fi
   if [ "$MODO" = "rapido" ]; then
     run_if test:rapido
     warn "modo rapido: solo los tests relacionados con tus cambios + las guardias."
     warn "La suite completa corre en CI al abrir el PR (check 'gate-completo'): no se mergea sin el en verde."
+  elif [ "$GATE_PARTE" = "estatico" ]; then
+    warn "parte estatica: la suite de vitest NO corre aqui; la corren los jobs de shard del CI"
+    warn "y el veredicto lo da el job 'gate-completo' al unir sus informes (docs/gate.md)."
+  elif [ -n "$GATE_SHARD" ]; then
+    pnpm run 2>/dev/null | grep -q "^  test:json$" || fail "falta el script 'test:json' en package.json (lo necesita la comparacion contra el baseline)"
+    # Borrar informe y codigo ANTES de correr, por lo mismo que en el completo: si vitest revienta
+    # sin escribirlos, el artefacto del shard tiene que salir SIN informe -y `--unir` dar rojo-
+    # en vez de subir los de una corrida anterior.
+    rm -f .vitest-rojos.json .vitest-codigo
+    # `--shard=` va SIN `--` delante: con pnpm 10, `pnpm run x -- --flag` le pasa a vitest un `--`
+    # literal, que lo deja fuera de las opciones, y el shard correria la suite ENTERA (medido el
+    # 2026-10-07). Sin `--`, vitest lo recibe y lo valida.
+    echo "-> pnpm run test:json --shard=$GATE_SHARD"
+    ESTADO_TESTS=0
+    pnpm run test:json --shard="$GATE_SHARD" || ESTADO_TESTS=$?
+    echo "$ESTADO_TESTS" > .vitest-codigo
+    # SIN veredicto, y por eso sale en verde aunque haya rojos: un shard no ve la suite entera,
+    # asi que ni el baseline ni la garantia 1 significan nada aqui. Lo decide `--unir`.
+    if [ -f .vitest-rojos.json ]; then
+      ok "shard $GATE_SHARD: informe escrito (vitest salio con $ESTADO_TESTS); el veredicto lo da 'gate-completo'"
+    else
+      warn "shard $GATE_SHARD: vitest (codigo $ESTADO_TESTS) NO escribio informe; 'gate-completo' dara rojo"
+    fi
   else
     # Suite completa + comparacion contra el baseline de rojos heredados. NO es `run_if test`
     # porque la pregunta al cerrar una feature no es "¿esta todo verde?" sino "¿rompi algo YO?":
@@ -202,74 +361,9 @@ if [ -f package.json ]; then
     # por si solo (lo decide el comparador), pero deja de perderse.
     ESTADO_TESTS=0
     pnpm run test:json || ESTADO_TESTS=$?
-    # stderr sale directo a la consola a proposito: asi el detalle esta de verdad "justo
-    # arriba" y el mensaje de fallo no promete algo que no entrega.
-    COMPARACION=$(node scripts/comparar-baseline-rojos.mjs .vitest-rojos.json) || fail "hay rojos NUEVOS respecto del baseline (el detalle esta justo arriba)"
-
-    # GARANTIA 1: LOS TRES PROYECTOS APARECEN EN EL INFORME. Es la comprobacion que nos habria
-    # salvado el 2026-09-13. Los nombres salen de `vitest.config.mts` (`ui`, `node`,
-    # `integration`) y el reparto es el mismo de ahi, por convencion de nombre y carpeta,
-    # porque el informe JSON de vitest NO trae el proyecto de cada archivo: solo su ruta.
-    # Si falta un proyecto ENTERO, no corrio, y el gate no puede afirmar nada sobre el.
-    LEER_PROYECTOS=$(cat <<'JS'
-const { readFileSync } = require('node:fs');
-const { relative, resolve } = require('node:path');
-let ESPERADOS = ['ui', 'node', 'integration'];
-try {
-  const cfg = JSON.parse(readFileSync('arnes.config.json', 'utf8'));
-  if (Array.isArray(cfg.gate?.proyectos_vitest)) ESPERADOS = cfg.gate.proyectos_vitest;
-} catch { /* sin config: los tres de siempre */ }
-const rutaInforme = process.argv[1];
-let informe;
-try {
-  informe = JSON.parse(readFileSync(rutaInforme, 'utf8'));
-} catch (err) {
-  console.log(`no se pudo leer el informe ${rutaInforme}: ${err.message}`);
-  process.exit(1);
-}
-const norm = (p) => relative(process.cwd(), resolve(p)).split('\\').join('/');
-const proyecto = (r) =>
-  r.endsWith('.test.tsx') || r.startsWith('tests/ui/')
-    ? 'ui'
-    : r.startsWith('tests/integration/')
-      ? 'integration'
-      : 'node';
-if (ESPERADOS.length === 0) {
-  console.log('comprobacion de proyectos de vitest desactivada (arnes.config.json > gate.proyectos_vitest = [])');
-  process.exit(0);
-}
-const vistos = new Set();
-for (const suite of informe.testResults ?? []) vistos.add(proyecto(norm(suite.name)));
-const faltan = ESPERADOS.filter((p) => !vistos.has(p));
-if (faltan.length > 0) {
-  console.log(`el informe no trae NI UN archivo del proyecto: ${faltan.join(', ')}.`);
-  console.log(`ese proyecto no llego a correr (global setup, config o un proceso caido), asi que el gate no puede afirmar nada sobre el.`);
-  process.exit(1);
-}
-console.log(`los tres proyectos corrieron (${ESPERADOS.join(', ')})`);
-JS
-)
-    PROYECTOS=$(node -e "$LEER_PROYECTOS" .vitest-rojos.json 2>&1) || fail "$PROYECTOS"
-    ok "$PROYECTOS"
-
-    # GARANTIA 2: CONTRADICCION = ROJO. `test:json` salio distinto de cero, el comparador no ve
-    # rojos nuevos y el informe NO TRAE NI UN ARCHIVO EN ROJO que explique ese codigo. Eso es
-    # contradictorio: algo fallo FUERA de los tests (arranque, global setup, configuracion, un
-    # proceso que se cayo). Ahi no se da verde.
-    #
-    # El disparador NO es "codigo distinto de cero y sin rojos NUEVOS" a secas, y la diferencia
-    # importa: con rojos HEREDADOS en el baseline (hoy son 8 archivos) la suite sana termina
-    # distinta de cero en cada corrida, asi que esa version pondria el gate rojo SIEMPRE y en
-    # dos dias se ignoraria. Lo contradictorio es que el informe no explique el codigo: si hay
-    # al menos un archivo en rojo, el codigo ya tiene duena y el baseline sigue mandando.
-    ROJOS_EN_INFORME=$(node -e "const {readFileSync} = require('node:fs'); const i = JSON.parse(readFileSync(process.argv[1], 'utf8')); console.log((i.testResults ?? []).filter((s) => s.status === 'failed').length)" .vitest-rojos.json 2>/dev/null || echo 0)
-    if [ "$ESTADO_TESTS" -ne 0 ] && [ "$ROJOS_EN_INFORME" -eq 0 ]; then
-      fail "contradiccion: 'pnpm run test:json' salio con codigo $ESTADO_TESTS y el informe no trae NI UN archivo en rojo.
-algo fallo FUERA de los tests (arranque, global setup, configuracion, un proceso caido); un fallo asi no escribe rojos y por eso era invisible.
-Que hacer: mira la salida de vitest de aqui arriba, arreglalo y vuelve a correr el gate."
-    fi
-
-    ok "tests: $COMPARACION"
+    # El veredicto (baseline + garantias 1 y 2) vive en `veredicto_tests`, arriba: es el mismo
+    # que aplica `--unir` sobre los shards de CI.
+    veredicto_tests .vitest-rojos.json "$ESTADO_TESTS"
   fi
 fi
 
@@ -301,5 +395,10 @@ else
   ok ".env presente"
 fi
 
+if [ -n "$GATE_SHARD" ]; then
+  # No es «init OK»: un shard no da veredicto, y un verde aqui no dice nada de la suite.
+  echo "${GREEN}== shard $GATE_SHARD terminado (sin veredicto: lo da 'gate-completo') ==${NC}"
+  exit 0
+fi
 echo "${GREEN}== init OK ==${NC}"
 echo "Siguiente: abre AGENTS.md y sigue el flujo desde ahi."
