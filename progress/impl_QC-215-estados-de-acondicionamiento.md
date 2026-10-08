@@ -125,3 +125,12 @@ gate se pone rojo, con el cambio mínimo y anotado en «Excepciones».
   R28 → `company-orders-columns.test.tsx`, `assignment-view-params.test.ts`, `list-company-orders`;
   R32 (Todos) → `list-company-orders`, `assignment-view-params`, `asignacion-page.test.tsx`;
   R7 → `packed-order-notice.test.tsx`.
+- Commit c3bc8989. Antes del corte: typecheck verde, lint 0 errores, tests unitarios de la tanda en
+  verde, y `module-contract` + `order-conditioning` 22/22 tras la excepción. **Gate SIN CERRAR:**
+  `./init.sh` (2026-10-08) lo mató el sistema por falta de memoria tras pasar las comprobaciones
+  de board/perfil y antes de typecheck/tests. Hay que relanzarlo antes de empezar la fase C.
+
+## Pendiente
+
+- Cerrar el gate de A2+A3 (`./init.sh`).
+- C1, C2 (aplicar antes el parche del catálogo de errores), C3, C4 + T19.
