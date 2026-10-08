@@ -85,3 +85,23 @@ El worktree no tiene `.env`: se corrió cargando el del repo principal (`set -a 
 Decisiones del E2E que el spec no fijaba:
 - R23 no afirma que falte la fila de A: el Administrador cae en «Todos», que lista legítimamente todos los pedidos.
 - «Sin botones» se mira dentro de `conditioning-order-screen`; el layout privado tiene botones de navegación.
+
+## Integración con `origin/dev` (57fa8326, 2026-10-08)
+
+`git merge origin/dev`. Siete conflictos, todos de unión (ninguno decide comportamiento):
+
+- `lib/modules/pedidos/domain/order-catalog.ts`: se conservan los dos tipos nuevos, `OrderSummaryFilter` (con `conditionedBy`) y `OrderHistorySummary`.
+- `lib/modules/pedidos/ports/order-summary-reader.ts`: el import trae `OrderHistorySummary`, `OrderSummaryFilter` y `OrderNumber`.
+- `lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts`: el import trae los dos tipos; el filtro por `conditionedBy` queda intacto.
+- `lib/shared/routes.ts`: conviven `conditioningOrderRoute` y `executionTraceRoute`.
+- `tests/guards/guard-pantallas-exigen-permiso.test.ts`: la lista ya tenía las dos rutas; nota de dev + nota propia, contador de veintiuna a VEINTIDOS.
+- `tests/unit/composition/asignaciones-facade.test.ts`: censo con las dos de dev (`getExecutionTrace`, `listExecutionTraces`) y las tres propias.
+- `tests/unit/shared/data-table-alcance.test.ts`: entran `recorrido-ejecucion` y `acondicionamiento`; centinela de treinta y uno a TREINTA Y DOS (32 specs de `e2e/` referencian `data-table`).
+
+Sin cambios en `pnpm-lock.yaml`. El merge trae `db/migrations/20261008120843_integrations_permission` (solo datos); `prisma migrate status` sobre la base local: «Database schema is up to date!».
+
+Verificación (con `DATABASE_URL` del `.env` del repo principal):
+- `pnpm typecheck`: sin errores.
+- `pnpm lint`: `0 errors, 7 warnings` (warnings preexistentes en tests ajenos).
+- `pnpm exec vitest run tests/guards tests/unit/shared/data-table-alcance.test.ts tests/unit/composition/asignaciones-facade.test.ts`: `Test Files 51 passed (51)`, `Tests 710 passed | 7 skipped (717)`.
+- `pnpm exec vitest related --run` sobre los cuatro fuentes en conflicto: `Test Files 3 failed | 344 passed (347)`, `Tests 3 failed | 5087 passed | 45 skipped`. Los tres rojos están en `tests/baseline-rojos.json`: `tests/unit/recetas/scope.test.ts`, `tests/unit/recetas/module-contract.test.ts`, `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`.

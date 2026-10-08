@@ -1329,6 +1329,10 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'UNITS_ROUTE',
         'assignedOrderRoute',
         'credentialSetupRoute',
+        // Alta el 2026-10-08 (QC-167): el recorrido de ejecucion de un pedido, derivado de
+        // `DASHBOARD_ROUTE` (`/dashboard/recorrido/<id>`). No es del asistente de lectura: no la
+        // marca el patron de arriba ni apunta a ninguna de sus URL. La lista sigue CERRADA.
+        'executionTraceRoute',
         // Vive en /asignacion (pantalla de empaque), no en Pedidos: no estrena ninguna ruta del
         // asistente de lectura.
         'packingOrderRoute',
@@ -1351,6 +1355,10 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // asistente de lectura.
         'newRecipeVersionRoute',
         'recipeVersionRoute',
+        // Las tres rutas de integraciones, bajo /integraciones: ninguna es del asistente de lectura.
+        'AI_PROVIDER_INTEGRATION_ROUTE',
+        'INVENTORY_INTEGRATION_ROUTE',
+        'WHATSAPP_INTEGRATION_ROUTE',
       ].sort(),
     );
   });

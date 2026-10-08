@@ -122,6 +122,7 @@ function ordersReales(): OrderCatalog {
     findAliveById: findAliveOrderTargetById,
     listAliveSummariesByIds: summaryReaders.listAliveSummariesByIds,
     listAliveSummariesInCompany: async () => noLlamar('orders.listAliveSummariesInCompany'),
+    listSummariesByIdsIncludingDeleted: async () => noLlamar('orders.listSummariesByIdsIncludingDeleted'),
     transitionAliveById: transitionAliveByIdReal,
     startPackingAliveById: async () => noLlamar('orders.startPackingAliveById'),
     finishPackingAliveById: async () => noLlamar('orders.finishPackingAliveById'),

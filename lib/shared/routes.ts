@@ -262,6 +262,11 @@ export function conditioningOrderRoute(id: string): string {
   return `${ASSIGNED_ORDERS_ROUTE}/acondicionamiento/${id}`;
 }
 
+/** Ya cae bajo el prefijo privado de `DASHBOARD_ROUTE`: la comparacion es por segmentos. */
+export function executionTraceRoute(orderId: string): string {
+  return `${DASHBOARD_ROUTE}/recorrido/${orderId}`;
+}
+
 /**
  * Nombre del parametro de consulta con el que Terminar anuncia, al volver a la pestaña «Por
  * empacar», que un pedido acaba de quedar `ENTREGADO`: `?vista=por_empacar&empacado=<numero>`.
@@ -288,6 +293,12 @@ export const CANCELLED_ORDER_PARAM = 'cancelado';
  * en el panel lateral, sin pagina de `/clientes/[id]`.
  */
 export const CUSTOMERS_ROUTE = '/clientes';
+
+// Aun fuera de `PRIVATE_ROUTE_PREFIXES`: esa lista solo admite rutas con pantalla, y el corte por
+// permiso lo pondra cada pagina cuando exista.
+export const AI_PROVIDER_INTEGRATION_ROUTE = '/integraciones/proveedor-ia';
+export const INVENTORY_INTEGRATION_ROUTE = '/integraciones/inventarios';
+export const WHATSAPP_INTEGRATION_ROUTE = '/integraciones/whatsapp';
 
 /**
  * Prefijos de URL que cuelgan de `app/(private)/` y, por tanto, exigen sesion valida (R1).
