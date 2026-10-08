@@ -1,0 +1,63 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`paridad del login > R1 R2 — enviando 1`] = `
+"
+div role=generic
+  main role=main class="dark flex items-center justify-center min-h-svh p-6"
+    div role=generic aria-hidden="true"
+      svg
+      svg
+      svg
+    div role=generic class="*:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl [--card-spacing:--spacing(4)] bg-card data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 flex flex-col gap-(--card-spacing) group/card has-[>img:first-child]:pt-0 has-data-[slot=card-footer]:pb-0 max-w-sm overflow-hidden py-(--card-spacing) ring-1 ring-foreground/10 rounded-xl text-card-foreground text-sm w-full"
+      div role=generic class="@container/card-header [.border-b]:pb-(--card-spacing) auto-rows-min gap-1 grid group/card-header has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] items-start px-(--card-spacing) rounded-t-xl"
+        h1 role=heading name="QuimiCloude"
+          img role=img name="QuimiCloude" alt="QuimiCloude" decoding="async" height="79" loading="lazy" src="/brand/logo-vertical-dark.svg" style="color: transparent;" width="132"
+      div role=generic class="px-(--card-spacing)"
+        form data-testid="login-form" class="flex flex-col gap-4"
+          input data-testid="login-next" type="hidden"
+          div role=generic class="flex flex-col gap-2"
+            label class="flex font-medium gap-2 group-data-[disabled=true]:opacity-50 group-data-[disabled=true]:pointer-events-none items-center leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-50 select-none text-sm"
+              "Usuario"
+            input role=textbox name="Usuario" data-testid="login-username" type="text" class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 h-8 md:text-sm min-w-0 outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-base transition-colors w-full"
+          div role=generic class="flex flex-col gap-2"
+            label class="flex font-medium gap-2 group-data-[disabled=true]:opacity-50 group-data-[disabled=true]:pointer-events-none items-center leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-50 select-none text-sm"
+              "Contraseña"
+            input data-testid="login-password" type="password" class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 h-8 md:text-sm min-w-0 outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-base transition-colors w-full"
+          button role=button name="Entrando…" aria-busy="true" data-testid="login-submit" disabled="" type="submit" class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding bg-primary border border-transparent cursor-pointer dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium gap-1.5 group/button h-8 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 hover:bg-primary/80 inline-flex items-center justify-center outline-none px-2.5 rounded-lg select-none shrink-0 text-primary-foreground text-sm transition-all w-full whitespace-nowrap"
+            "Entrando…"
+      div role=generic class="bg-muted/50 border-t flex items-center p-(--card-spacing) rounded-b-xl"
+        a role=link name="¿Olvidaste tu contraseña?" data-testid="login-forgot-password" href="/recuperar-contrasena" class="hover:underline text-sm underline-offset-4"
+          "¿Olvidaste tu contraseña?"
+"
+`;
+
+exports[`paridad del login > R1 — en reposo 1`] = `
+"
+div role=generic
+  main role=main class="dark flex items-center justify-center min-h-svh p-6"
+    div role=generic aria-hidden="true"
+      svg
+      svg
+      svg
+    div role=generic class="*:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl [--card-spacing:--spacing(4)] bg-card data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 flex flex-col gap-(--card-spacing) group/card has-[>img:first-child]:pt-0 has-data-[slot=card-footer]:pb-0 max-w-sm overflow-hidden py-(--card-spacing) ring-1 ring-foreground/10 rounded-xl text-card-foreground text-sm w-full"
+      div role=generic class="@container/card-header [.border-b]:pb-(--card-spacing) auto-rows-min gap-1 grid group/card-header has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] items-start px-(--card-spacing) rounded-t-xl"
+        h1 role=heading name="QuimiCloude"
+          img role=img name="QuimiCloude" alt="QuimiCloude" decoding="async" height="79" loading="lazy" src="/brand/logo-vertical-dark.svg" style="color: transparent;" width="132"
+      div role=generic class="px-(--card-spacing)"
+        form data-testid="login-form" class="flex flex-col gap-4"
+          input data-testid="login-next" type="hidden"
+          div role=generic class="flex flex-col gap-2"
+            label class="flex font-medium gap-2 group-data-[disabled=true]:opacity-50 group-data-[disabled=true]:pointer-events-none items-center leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-50 select-none text-sm"
+              "Usuario"
+            input role=textbox name="Usuario" data-testid="login-username" type="text" class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 h-8 md:text-sm min-w-0 outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-base transition-colors w-full"
+          div role=generic class="flex flex-col gap-2"
+            label class="flex font-medium gap-2 group-data-[disabled=true]:opacity-50 group-data-[disabled=true]:pointer-events-none items-center leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-50 select-none text-sm"
+              "Contraseña"
+            input data-testid="login-password" type="password" class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 h-8 md:text-sm min-w-0 outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-base transition-colors w-full"
+          button role=button name="Entrar" aria-busy="false" data-testid="login-submit" type="submit" class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding bg-primary border border-transparent cursor-pointer dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium gap-1.5 group/button h-8 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 hover:bg-primary/80 inline-flex items-center justify-center outline-none px-2.5 rounded-lg select-none shrink-0 text-primary-foreground text-sm transition-all w-full whitespace-nowrap"
+            "Entrar"
+      div role=generic class="bg-muted/50 border-t flex items-center p-(--card-spacing) rounded-b-xl"
+        a role=link name="¿Olvidaste tu contraseña?" data-testid="login-forgot-password" href="/recuperar-contrasena" class="hover:underline text-sm underline-offset-4"
+          "¿Olvidaste tu contraseña?"
+"
+`;
