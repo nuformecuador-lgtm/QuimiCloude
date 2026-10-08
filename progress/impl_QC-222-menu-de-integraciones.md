@@ -2,11 +2,23 @@
 
 Implementer, 2026-10-08. Worktree `.worktrees/QC-222-menu-de-integraciones`.
 
-## Estado: BLOQUEADO (spec)
+## Estado (2026-10-08, tras la enmienda E1–E3): T0–T8 y T10 hechos; T9 BLOQUEADO
 
-Implementado T0, T2–T6 y T8. **Faltan rojos que el spec no prevé**: 7 tests (6 archivos), todos fuera de
-§7.2 y de `tasks.md > Archivos esperados`. Ninguno está en `tests/baseline-rojos.json`. No se han tocado:
-hace falta que el spec los añada (o que el leader/humano decida). T2, T5, T7, T8 y T9 quedan sin `[x]`.
+La enmienda (`design.md > 14`, commit `a27396d4`) resolvió los 7 rojos de la tabla de abajo. Se hicieron en
+T10 (commit `1bb7fc85`). T9 queda abierto por dos cosas:
+
+1. **Un rojo nuevo, fuera de spec y fuera del baseline.** Es
+   `tests/guards/guard-identificador-de-request.test.ts:893`, en el caso «no hay ningun archivo nuevo en e2e/ y existe
+   el test que lo sustituye (R21)». `E2E_ESPERADOS` es una lista cerrada de specs de `e2e/` y no incluye
+   `integraciones.spec.ts`. El arreglo es mecánico: darlo de alta con su comentario, como las otras entradas
+   («su punto de extension por diseno es darse de alta en ella»). Pero el archivo no está en
+   `tasks.md > Archivos esperados`, así que **no se ha tocado**: decide el leader/humano.
+2. **`./init.sh` sale rojo en `test:rapido` solo por los 3 rojos del baseline.** Son `recetas/scope.test.ts`,
+   `recetas/module-contract.test.ts` y `navegacion/pantallas-exigen-permiso.test.tsx`. `scripts/test-rapido.mjs:83`
+   los pasa como `--exclude`, pero `vitest related` los corrió igual y fallaron. Ningún otro test del diff
+   está rojo. Es un fallo del arnés, no de QC-222. init.sh se detuvo ahí y no llegó a la fase de guardias.
+
+### Tabla histórica: los rojos que bloquearon T0 (ya resueltos en T10)
 
 | # | Test | Por qué se pone rojo | Arreglo posible (tensar) |
 |---|---|---|---|
@@ -72,7 +84,7 @@ No tocados: `components/private/app-sidebar.tsx`, `components/ui/**`, `lib/modul
 | R11 | ídem «R11: $ruta exige integraciones.modificar una sola vez y como primera sentencia» |
 | R12 | ídem «R12: $ruta con sesion sin el permiso responde notFound y no pinta nada» + E2E R20 (404 en navegador) |
 | R13 | `integration-pages.test.tsx` «R13: $ruta sin sesion redirige al login…» + `integration-routes.test.ts` «R13: sin sesion, el borde redirige al login cada una de las tres rutas con los prefijos reales» |
-| R14 | `integration-routes.test.ts` «R14, R16: los prefijos privados bajo /integraciones son exactamente las tres constantes…» + guardias (`guard-rutas-privadas-cubiertas` 7/7 verde; `guard-pantallas-exigen-permiso` **rojo por bloqueo #5**) |
+| R14 | `integration-routes.test.ts` «R14, R16: los prefijos privados bajo /integraciones son exactamente las tres constantes…» + guardias (`guard-rutas-privadas-cubiertas` 7/7 verde; `guard-pantallas-exigen-permiso` verde tras T10, con las tres rutas como entradas de la lista) |
 | R15 | `integration-routes.test.ts` «R15: /integraciones/inventarios no cae bajo /inventario con una lista de prefijos sin las tres rutas…» |
 | R16 | ídem (a) prefijos, (b) «R16: los enlaces del menu privado bajo /integraciones son exactamente las tres constantes», (c) páginas |
 | R17 | `module-shape.test.ts` «R17: el codigo del permiso solo aparece en el catalogo, en db/migrations/, en las tres paginas…», «R17: el barrido ve el codigo del permiso en cada una de las cuatro rutas exactas admitidas», «R17: la regla admite… y rechaza un archivo vecino» |
@@ -124,4 +136,41 @@ spec afirma en su lugar que `private-logout` es visible y se puede enfocar con e
   ✓ 10 [webkit]   › e2e\integraciones.spec.ts:239:9 › R20: el rol 'Empacador' ... (6.0s)
   10 passed (1.0m)
   ```
-- `./init.sh` final: **no se corre**. Daría rojo por el bloqueo (filas 3 y 5 son guardias), y T9 queda pendiente.
+- (anterior) `./init.sh` no se corrió entonces por el bloqueo.
+
+## T10 — enmienda E1/E2 (2026-10-08)
+
+- E1 (frontend_dev): `app-sidebar.test.tsx:240-241` (`'nav-integraciones'` tras `'nav-unidades'`);
+  `private-layout-menu.test.tsx:115-116,336,362-364` (11 items, «once»);
+  `guard-nav-permisos-declarados.test.ts:106,112-114,119-121` (13, «trece», tres `nav-integraciones-*`);
+  `private-nav-unidades.test.ts:78-79,92-94` (3, «TRES»); `guard-pantallas-exigen-permiso.test.ts:254-257,268-270,286`
+  (las tres rutas como **entradas** de `RUTAS_ESPERADAS_HOY`, 24, «veinticuatro»). No hay excepción nueva ni `toContain`.
+- E2 (backend_dev): `inventario/scope.test.ts:65-71,217-241,292-317` y `proveedores/scope.test.ts:26-31,260-283,290-313`.
+  La carpeta sale de las constantes, con un `expect` de primer segmento común. Hay un `!relPath.startsWith` más
+  en `fueraDeSuCarpeta`, un comentario fechado y una defensa con la lista exacta: solo la `page.tsx` esperada,
+  y su fuente no es del catálogo ni de proveedores. `git diff -U0`: ningún hunk toca `screenPattern =` ni `PATRON_PROVEEDORES =`.
+- E3: `e2e/integraciones.spec.ts:278-285` ya cumplía §8 enmendado (`private-logout` visible + `toBeFocused()`). Sin cambios.
+- `pnpm exec vitest related --run <los 7 archivos de T10>`: `Test Files 7 passed (7)`, `Tests 68 passed (68)`.
+- `pnpm exec vitest run guard`: `Test Files 1 failed | 55 passed (56)`, `Tests 1 failed | 743 passed | 11 skipped (755)`.
+  El rojo es `guard-identificador-de-request.test.ts:893` (bloqueo 1 de arriba):
+  ```
+  - []
+  + [ "e2e/integraciones.spec.ts: archivo nuevo en e2e/. QC-71 difirio el E2E con motivo (R21): ..." ]
+  ```
+
+## T9 — `./init.sh` (rápido), 2026-10-08
+
+Sin corte por memoria: tardó unos 10 min y salió rojo en `test:rapido`.
+- Candado, cupo, specs, perfil, Prisma, migraciones (80): ✓. `typecheck`: ✓. `lint`: ✓ (0 errors, 7 warnings que ya estaban).
+- `test:rapido` (`vitest related` de 23 archivos del diff):
+  ```
+  Test Files  3 failed | 321 passed (324)
+       Tests  3 failed | 4919 passed | 45 skipped (4967)
+  [test:rapido] 3 rojo(s) heredado(s) del baseline excluidos de esta seleccion; el CI los compara.
+  ✗ 'pnpm run test:rapido' fallo
+  ```
+  Los 3 rojos son los del baseline (`recetas/scope`, `recetas/module-contract`, `navegacion/pantallas-exigen-permiso`),
+  aunque se pasaron como `--exclude` (bloqueo 2). init.sh se detuvo aquí y no corrió la fase de guardias.
+  Corrida aparte, la de guardias da 1 rojo (bloqueo 1).
+- Revisión del diff para R7/R22: sin cambios en `components/private/app-sidebar.tsx`, `components/ui/**`, `lib/modules/**`,
+  `lib/composition/**`, `db/**`, `middleware.ts`, `route-guard-middleware.ts` ni `package.json`.
