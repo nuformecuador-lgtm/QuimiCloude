@@ -219,6 +219,17 @@ echo "$PERFIL" | while IFS= read -r linea; do
   esac
 done
 
+# 4.b2 Tests de arbol que el gate rapido no corre (no casan con `gate.siempre`). Solo avisa:
+#      detalle y motivo en scripts/tests-de-arbol.mjs.
+if [ -f scripts/tests-de-arbol.mjs ]; then
+  ARBOL=$(node scripts/tests-de-arbol.mjs 2>&1) || true
+  case "$ARBOL" in
+    AVISO:*) warn "${ARBOL#AVISO: }" ;;
+    "") ;;
+    *) ok "$ARBOL" ;;
+  esac
+fi
+
 # 4.c El arnes frente a la plantilla (sin red: compara contra `arnes.lock.json`). `warn` si hay
 #     archivos del arnes cambiados aqui y sin subir: una mejora que no se sube se pierde para los
 #     demas proyectos. Se sube con /afinar-regla o `./scripts/arnes-sync.sh --subir`.
