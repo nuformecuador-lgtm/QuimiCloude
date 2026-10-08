@@ -1,5 +1,9 @@
 import type { ReactNode } from 'react';
 
+import type { EmptyStateProps } from '@/components/shared/empty-state';
+import type { ErrorStateProps } from '@/components/shared/error-state';
+import type { TableSkeletonProps } from '@/components/shared/table-skeleton';
+
 /**
  * Tipos del contrato de `components/shared/data-table` (`design.md > 3`, T3).
  *
@@ -159,6 +163,20 @@ export type DataTableTexts = {
 };
 
 /**
+ * Las piezas compartidas que sustituyen a TODA la tabla, barras incluidas, en cada estado
+ * (QC-231 R16-R18). Cada clave es opcional: la que falta deja ese estado como hoy (R19).
+ *
+ * `error` reutiliza `ErrorStateProps` tal cual: sus props de reintento son una union, y un `Omit`
+ * la aplanaria.
+ */
+export type DataTableStates = {
+  readonly loading?: TableSkeletonProps;
+  readonly error?: ErrorStateProps;
+  /** Solo sin búsqueda ni filtro activos: el «sin resultados» sigue dentro de la tabla (D5). */
+  readonly empty?: EmptyStateProps;
+};
+
+/**
  * Props del componente compuesto (`design.md > 3.3`). `status` es un estado unico de tres
  * valores, no tres booleanos: R21 exige que los tres estados sean mutuamente excluyentes, y esa
  * exclusividad la fija el tipo, no una cadena de `if`.
@@ -191,4 +209,6 @@ export type DataTableProps<TRow> = {
    * una cadena.
    */
   readonly searchable?: boolean;
+  /** Ausente = los estados internos de siempre (R19). */
+  readonly states?: DataTableStates;
 };
