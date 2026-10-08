@@ -6,19 +6,19 @@ tienen que estar hechas antes. Cada task acaba con `pnpm run typecheck`, `pnpm r
 
 ## Fase 1 — recursos y tokens
 
-- [ ] **T1 [P] — Versionar el kit.** Copiar sin modificar a `public/brand/`
+- [x] **T1 [P] — Versionar el kit.** Copiar sin modificar a `public/brand/`
   `logo-horizontal-dark.svg`, `logo-vertical-dark.svg`, `isotipo.svg` e `isotipo-dark.svg`. A
   `public/icons/`, `icon-192.png`, `icon-512.png` e `icon-maskable-512.png`. A `app/`,
   `favicon.ico` (reemplaza), `icon.svg`, `apple-icon.png` y `opengraph-image.png`, y crear
   `opengraph-image.alt.txt` con `QuimiCloude`. Anotar en `progress/impl_QC-226.md` las
   dimensiones IHDR de `apple-icon.png` y de `opengraph-image.png`.
   *Hecho:* los archivos están, y `cmp` contra `_trabajo/marca/` no da diferencias.
-- [ ] **T2 [P] — Tokens y fuentes en `globals.css`** (R1–R6, R32). Sustituir `:root`/`.dark` de
+- [x] **T2 [P] — Tokens y fuentes en `globals.css`** (R1–R6, R32). Sustituir `:root`/`.dark` de
   color, añadir las 16 entradas a `@theme inline`, `--radius: 0.5rem`, el `:root` de movimiento
   sin la regla global, y reenganchar `--font-*` a Plex. Limpiar los comentarios de las líneas
   tocadas.
   *Hecho:* `color-tokens.test.ts` reescrito (T10) y en verde.
-- [ ] **T3 — Fuentes y metadatos en `app/layout.tsx`** (R7, R8, R24). Plex Sans y Plex Mono con
+- [x] **T3 — Fuentes y metadatos en `app/layout.tsx`** (R7, R8, R24). Plex Sans y Plex Mono con
   sus pesos; `metadata` con el `title` y la `description` de D12. Dep.: T2.
   *Hecho:* `tests/unit/brand/fonts.test.ts` en verde y `theme-provider.test.tsx` actualizado.
 
