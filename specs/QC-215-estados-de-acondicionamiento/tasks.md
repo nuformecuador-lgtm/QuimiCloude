@@ -127,7 +127,7 @@
 
 ## Bloque 6 — E2E existentes y cierre
 
-- [ ] **T18.** Ajustar solo las aserciones de `ENTREGADO`, y de «Terminados», tras Terminar el
+- [x] **T18.** Ajustar solo las aserciones de `ENTREGADO`, y de «Terminados», tras Terminar el
   empaque (R34): `e2e/empaque.spec.ts`, `e2e/pasos-de-envasado.spec.ts`,
   `e2e/envases-del-pedido.spec.ts`, `e2e/pedido-en-varias-presentaciones.spec.ts`,
   `e2e/producto-terminado.spec.ts`, `e2e/pedidos-terminados.spec.ts` y

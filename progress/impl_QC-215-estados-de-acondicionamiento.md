@@ -266,10 +266,26 @@ gate se pone rojo, con el cambio mínimo y anotado en «Excepciones».
   worktrees; su rollback aborta si quedan filas en estados nuevos): decisión del humano.
 - Veredicto: aserciones editadas y compilando; T18 SIN marcar hasta que los 7 specs corran en verde.
 
+### T18 — E2E (2026-10-08)
+
+- Base compartida (`localhost:5432/QuimiCloude`) con M1 y M2 aplicadas por el leader. Cada spec
+  corrido solo, en serie, con `pnpm exec playwright test e2e/<spec> --reporter=line` (chromium +
+  webkit, `next dev` en el 3117):
+  - `e2e/empaque.spec.ts`: 2 passed (1.3m)
+  - `e2e/pasos-de-envasado.spec.ts`: 2 passed (1.2m)
+  - `e2e/envases-del-pedido.spec.ts`: 4 passed (1.5m)
+  - `e2e/pedido-en-varias-presentaciones.spec.ts`: 4 passed (1.5m)
+  - `e2e/producto-terminado.spec.ts`: 2 passed (1.1m)
+  - `e2e/pedidos-terminados.spec.ts`: 8 passed (48.1s)
+  - `e2e/pedidos-asignados.spec.ts`: 8 passed (50.8s)
+- Arreglos: ninguno (las aserciones de C4 pasaron a la primera). Rojos ajenos: ninguno. Sin
+  reintentos.
+- Veredicto: los 7 E2E en verde (30 passed, 0 failed, 0 skipped); T18 marcada.
+
 ## Pendiente
 
 - Cerrar el gate de A2+A3 (`./init.sh`).
-- T18: correr los 7 E2E (de uno en uno) con una base migrada con M1/M2.
+- ~~T18: correr los 7 E2E (de uno en uno) con una base migrada con M1/M2.~~ Hecho (ver «T18 — E2E»).
 - T19.
 
 ## Mapa R<n> → test (consolidado)
@@ -313,7 +329,7 @@ usan solo si además citan un estado de QC-215 en el nombre o van marcados «(QC
 | R31 | `tests/unit/asignaciones/list-finished-orders.test.ts`; `tests/integration/asignaciones/finished-orders.int.test.ts` | «R31: consulta el catalogo con la empresa del actor, solo TERMINADO -nunca ENTREGADO- y el orden de terminados»; «R31: la lista de estados que pide es exactamente TERMINADO, sin ENTREGADO ni estados de acondicionamiento»; «R31: un ENTREGADO antiguo, con o sin `finished_at`, NO aparece en «Terminados»» |
 | R32 | `tests/unit/asignaciones/list-company-orders.test.ts`; `tests/unit/asignaciones-ui/assignment-view-params.test.ts`; `tests/unit/asignaciones-ui/asignacion-page.test.tsx`; `tests/unit/pedidos-ui/order-columns.test.tsx` | «R32: exactamente `TERMINADO` ordena como «Terminados»»; «R32 - ["TERMINADO"] tambien cuenta como exacto»; describe «R32 — el skeleton de «Todos» suma la columna de fecha con el filtro exacto»; «R29, R32: la celda pinta %s …» |
 | R33 | `tests/unit/pedidos/order-catalog.test.ts`; `tests/unit/pedidos/qc145-estado-solo-planta.test.ts`; `tests/integration/pedidos/order-finished-at.int.test.ts` | «R33 (QC-215): ni a ENTREGADO ni a EN_CURSO escribe finishedAt»; «R33 (QC-215): order-prisma.ts tiene exactamente un bloque `data:` que nombra finishedAt, el de Terminar el acondicionamiento hacia TERMINADO»; describe «R33 (QC-215) — setAliveOrderStatus no escribe finished_at con ningun destino» |
-| R34 | E2E tocados: `e2e/empaque.spec.ts`, `e2e/envases-del-pedido.spec.ts`, `e2e/pasos-de-envasado.spec.ts`, `e2e/pedido-en-varias-presentaciones.spec.ts`, `e2e/pedidos-asignados.spec.ts`, `e2e/pedidos-terminados.spec.ts`, `e2e/producto-terminado.spec.ts` (+ esta tabla) | Aserciones ajustadas, sin spec nuevo. **Ejecución PENDIENTE:** la base compartida no tiene M1/M2 aplicadas (T18) |
+| R34 | E2E tocados: `e2e/empaque.spec.ts`, `e2e/envases-del-pedido.spec.ts`, `e2e/pasos-de-envasado.spec.ts`, `e2e/pedido-en-varias-presentaciones.spec.ts`, `e2e/pedidos-asignados.spec.ts`, `e2e/pedidos-terminados.spec.ts`, `e2e/producto-terminado.spec.ts` (+ esta tabla) | Aserciones ajustadas, sin spec nuevo. Ejecutados en T18: 7 specs, 30 passed |
 | R35 | `git diff --name-only origin/dev -- package.json pnpm-lock.yaml` | Salida vacía (exit 0); ver abajo |
 
 Salida real de R35:
@@ -341,7 +357,7 @@ asignados» y la revisión que desbloquea `BLOQUEADO`). Los e2e de R34 siguen si
 
 - Por OOM, el humano sustituyó `./init.sh` por typecheck + lint + tests concretos por tanda; el
   gate completo lo corre CI en el PR #170. T19 está marcada con esa salvedad.
-- Abierto: T18 (E2E sin ejecutar: la base compartida no tiene M1/M2; migrarla es decisión del leader).
+- Cerrado: T18 (7 E2E en verde, 30 passed; ver «T18 — E2E»).
 - Abierto: R19 en reparto y unidad: el código devuelve `not_editable`
   (`order_presentation_line_not_editable`), no `invalid_transition` como dice R19; design § 2.4 no
   lo cambia. Hay que corregir el texto de R19 o el código.
