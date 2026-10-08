@@ -14,42 +14,31 @@
 > Ningún comentario nuevo cita `QC-<n>`, `R<n>`, `design.md` ni «decisión cerrada». En los tests,
 > `R<n>` va en el nombre del caso.
 
-## Precondición (bloqueante)
+## Precondición
 
-**La implementación arranca cuando QC-221 (PR #176) esté mergeada en `dev`.** Sin ella:
-
-- `requirePagePermission('integraciones.modificar')` no compila;
-- no existen las tres constantes de ruta;
-- no existen los tests de QC-221 que §7.3 enmienda.
+QC-221 ya está en `dev` (PR #176, merge `57fa8326`) con `integraciones.modificar` y las tres
+constantes de ruta. Esta rama todavía no la tiene: T0 la trae.
 
 ## Tasks
 
+> No hay T1: la tarea de añadir la primitiva `empty` de shadcn se eliminó en F1.4 (D11). Los
+> demás números no cambian.
+
 - [ ] **T0 — Sincronizar con `dev`**
-  - Depende de: QC-221 en `dev`.
+  - Depende de: nada.
   - Hacer: `git fetch origin dev && git merge origin/dev`. Volver a medir contra el árbol
-    sincronizado los hallazgos 1, 8 y 10 de `design.md > 0` (líneas de los tests de §7.2 y §7.3,
-    nombre real del permiso y de las constantes). Si QC-221 entró con otros nombres, se adaptan
-    aquí sin reabrir nada más (Pregunta abierta 7).
+    sincronizado los hallazgos 1, 8 y 10 de `design.md > 0` (líneas de los tests de §7.2 y §7.3).
   - Hecho cuando: `lib/shared/routes.ts` exporta las tres constantes,
     `lib/modules/identity/domain/permissions.ts` contiene `integraciones.modificar`, `./init.sh`
     está en verde sobre la rama y las líneas reales de los tests rojos están anotadas en
     `progress/impl_QC-222-menu-de-integraciones.md`.
 
-- [ ] **T1 — Primitiva de estado vacío** (solo si F1.4 confirma la Pregunta abierta 4)
-  - Depende de: T0.
-  - Hacer: `pnpm exec shadcn add empty`. Corregir el import de `cn` a `@/lib/utils` si la CLI
-    escribe otro.
-  - Hecho cuando: existe `components/ui/empty.tsx`, `package.json` y `pnpm-lock.yaml` no cambian,
-    y `guard-primitivas-ui-usan-el-cn-del-repo` está verde.
-  - **Parada:** si la CLI no la ofrece para `base-nova` o toca dependencias, se revierte y se
-    sigue con el patrón del repo (`design.md > 4.2`), anotándolo en el `progress`.
-
 - [ ] **T2 [P] — Etiquetas, icono y grupo del menú**
   - Depende de: T0.
   - Hacer:
-    - en `private-nav.ts`: las cuatro `*_LABEL`, `'plug'` en `NavIconName` y el `NavGroup` como
-      último item de `PRIVATE_NAV_ITEMS` (`design.md > 3`);
-    - en `nav-icons.ts`: la fila `plug: Plug`.
+    - en `private-nav.ts`: las cuatro `*_LABEL`, `'puzzle'` en `NavIconName` y el `NavGroup` como
+      último item de `PRIVATE_NAV_ITEMS`, en la sección «Configuración» (`design.md > 3`);
+    - en `nav-icons.ts`: la fila `puzzle: Puzzle`.
 
     No se toca ningún tipo ni ninguna función.
   - Hecho cuando: `typecheck` está verde y `tests/unit/integraciones-ui/private-nav-integraciones.test.ts`
@@ -57,10 +46,14 @@
     lee las páginas.
 
 - [ ] **T3 [P] — Componente cascarón compartido**
-  - Depende de: T0 y T1 (o su parada).
+  - Depende de: T0.
   - Hacer: `app/(private)/integraciones/components/integration-placeholder.tsx` (Server Component,
-    sin `'use client'`) y su `index.ts`, que solo reexporta (`design.md > 4.2`).
-  - Hecho cuando: compila y no tiene botón, enlace, formulario ni campo.
+    sin `'use client'`) con `INTEGRATION_EMPTY_MESSAGE` = «Próximamente podrás configurar esta
+    integración.» y el marcado de estado vacío del repo
+    (`app/(private)/proveedores/components/supplier-list-empty.tsx:11-15`), y su `index.ts`, que
+    solo reexporta (`design.md > 4.2`). No se toca `components/ui/`.
+  - Hecho cuando: compila, no tiene botón, enlace, formulario ni campo, y no importa nada de
+    `components/ui/`.
 
 - [ ] **T4 — Las tres páginas**
   - Depende de: T2 y T3.
@@ -103,10 +96,11 @@
     salida se pega en `progress/impl_QC-222-menu-de-integraciones.md`.
 
 - [ ] **T9 — Cierre**
-  - Depende de: T1–T8.
+  - Depende de: T0 y T2–T8.
   - Hacer:
     - `./init.sh`;
     - revisar el diff contra R7 y R22: sin cambios en `components/private/app-sidebar.tsx`,
+      `components/ui/**`,
       `lib/modules/**`, `lib/composition/**`, `db/**`, `middleware.ts`, `route-guard-middleware.ts`
       ni `package.json`;
     - escribir el mapa `R<n> -> test` en `progress/impl_QC-222-menu-de-integraciones.md`.
@@ -136,7 +130,6 @@
 - `lib/shared/navigation/private-nav.ts`
 - `lib/shared/navigation/nav-icons.ts`
 - `lib/shared/routes.ts`
-- `components/ui/empty.tsx`
 - `app/(private)/integraciones/components/index.ts`
 - `app/(private)/integraciones/components/integration-placeholder.tsx`
 - `app/(private)/integraciones/proveedor-ia/page.tsx`

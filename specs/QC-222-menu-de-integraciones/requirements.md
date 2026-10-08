@@ -15,14 +15,15 @@
 > catálogo de permisos, al seed, a la base ni al módulo `lib/modules/integraciones/`. Ningún cambio
 > a `AppSidebar` ni a las funciones de filtrado del menú.
 >
-> Este archivo **no venía sembrado** por `/afinar-feature` y no hay `progress/features/QC-222.md`.
-> La tabla de «Decisiones cerradas» recoge la ficha de Jira QC-222 tal como la trae el encargo del
-> leader y lo que QC-221 dejó decidido para esta ficha. No es una conversación nueva con el humano.
+> Este archivo **no venía sembrado** por `/afinar-feature`. La tabla de «Decisiones cerradas»
+> recoge la ficha de Jira QC-222 tal como la trae el encargo del leader, lo que QC-221 dejó
+> decidido para esta ficha y las respuestas del humano en F1.4 (2026-10-08,
+> `progress/features/QC-222.md > Decisiones`).
 >
-> **Dependencia dura.** QC-221 (PR #176) aún no está en `dev`. Esta ficha no compila sin ella:
-> `requirePagePermission` recibe un `PermissionCode`, y `integraciones.modificar` solo existe en el
-> catálogo cuando QC-221 se mergea. Todo lo que aquí se cita de QC-221 se leyó de su worktree
-> (`.worktrees/QC-221-permiso-y-modulo-de-integraciones`).
+> **Dependencia.** QC-221 ya está en `dev` (PR #176, merge `57fa8326`) con el permiso
+> `integraciones.modificar` y las constantes `AI_PROVIDER_INTEGRATION_ROUTE`,
+> `INVENTORY_INTEGRATION_ROUTE` y `WHATSAPP_INTEGRATION_ROUTE`. Esta rama se sincroniza con
+> `origin/dev` antes de tocar código (`tasks.md > T0`).
 
 ## Requisitos (EARS)
 
@@ -36,6 +37,13 @@
 > - **[D5]** la E2E
 > - **[D6]** las rutas en los prefijos privados (herencia de QC-221)
 > - **[D7]** lo que no entra
+> - **[D8]** la sección del sidebar (F1.4)
+> - **[D9]** el icono del grupo (F1.4)
+> - **[D10]** el texto del estado vacío (F1.4)
+> - **[D11]** el estado vacío con el patrón del repo (F1.4)
+> - **[D12]** el Maestro fuera de la E2E (F1.4)
+> - **[D13]** el título de cada página (F1.4)
+> - **[D14]** el permiso y las constantes de QC-221, ya en `dev` (F1.4)
 >
 > Vocabulario fijo de este documento:
 >
@@ -48,8 +56,8 @@
 >   `NavLink`.
 > - «roles de semilla» = las claves de `SEED_ROLE_PERMISSIONS`. «Roles sin el permiso» = los roles
 >   de semilla cuyo conjunto no contiene el permiso, **derivados del conjunto y no escritos a
->   mano**. Medido en este worktree más QC-221: Operador, Empacador, Maestro y Administrador de
->   acondicionamiento.
+>   mano**. Medido con QC-221 en `dev`: Operador, Empacador, Maestro y Administrador
+>   de acondicionamiento.
 
 ### El grupo del menú
 
@@ -64,10 +72,10 @@ Ningún otro item del menú DEBE tener un destino igual a `/integraciones` o que
 `/integraciones/`. [D1]
 
 **R2.** Cada uno de los tres hijos DEBE declarar el permiso, y ese código DEBE ser el mismo que
-exige la página de su destino. [D2, D3]
+exige la página de su destino. [D2, D3, D14]
 
-**R3.** El grupo DEBE declarar un icono que tenga fila en `NAV_ICONS` y una sección del menú. El
-icono y la sección concretos son los de `design.md > 3` (Preguntas abiertas 1 y 2). [D1]
+**R3.** El grupo DEBE pertenecer a la sección «Configuración» del menú y DEBE declarar un icono
+con fila en `NAV_ICONS` que se resuelva al icono `Puzzle` de `lucide-react`. [D1, D8, D9]
 
 **R4.** CUANDO el menú se filtra con un conjunto de permisos que contiene el permiso, el resultado
 DEBE contener el grupo con sus tres hijos, en el orden de R1. [D1, D2]
@@ -75,7 +83,7 @@ DEBE contener el grupo con sus tres hijos, en el orden de R1. [D1, D2]
 **R5.** SI el conjunto de permisos con que se filtra el menú no contiene el permiso, ENTONCES el
 resultado NO DEBE contener el grupo ni ninguno de sus hijos: ni su etiqueta, ni sus destinos, ni
 sus `testId`, en ninguna parte de lo que se serializa hacia el cliente. Se comprueba para cada rol
-sin el permiso. [D2]
+sin el permiso, el Maestro incluido. [D2, D12]
 
 **R6.** Añadir el grupo NO DEBE cambiar, para ningún rol de semilla, el destino que da
 `firstVisibleNavHref` sobre el menú filtrado. Tampoco DEBE cambiar el orden, la sección ni el
@@ -94,18 +102,19 @@ NO DEBE existir ninguna otra página cuya URL sea `/integraciones` o empiece por
 **R9.** CUANDO un usuario con sesión y con el permiso abre una de las tres rutas, el sistema DEBE
 mostrar:
 
-- un título cuyo texto es la etiqueta del hijo del menú que lleva a esa ruta;
-- un estado vacío identificable, con un texto que dice que esa integración todavía no se puede
-  configurar.
+- un título cuyo texto es exactamente la etiqueta del hijo del menú que lleva a esa ruta, sin
+  prefijo ni sufijo;
+- un estado vacío identificable cuyo texto es exactamente «Próximamente podrás configurar esta
+  integración.», el mismo en las tres páginas.
 
-[D3]
+[D3, D10, D11, D13]
 
 **R10.** Las tres páginas NO DEBEN contener ningún formulario, campo de entrada, selector, botón
 ni dato de configuración o credencial. NO DEBEN leer datos: ni `searchParams`, ni `params`, ni
 Server Actions, ni casos de uso de ningún módulo. [D3, D7]
 
 **R11.** Cada página DEBE exigir el permiso con `requirePagePermission` antes de renderizar nada, y
-DEBE exigir exactamente ese código y ningún otro. [D3]
+DEBE exigir exactamente ese código y ningún otro. [D3, D14]
 
 **R12.** SI un usuario con sesión cuyo rol no tiene el permiso abre una de las tres rutas, ENTONCES
 el sistema DEBE responder con estado HTTP 404 y pintar la pantalla de «no encontrado» dentro del
@@ -166,8 +175,9 @@ comprobar lo siguiente:
 2. al pedir por URL cada una de las tres rutas, recibe estado HTTP 404 y la pantalla de «no
    encontrado» del layout privado.
 
-Se recorre con los roles Operador, Empacador y Administrador de acondicionamiento (Pregunta
-abierta 5). [D4, D5]
+Se recorre con todos los roles sin el permiso **salvo el Maestro**, que queda fuera de la E2E y
+cubre R5 en test unitario. Hoy son Operador, Empacador y Administrador de acondicionamiento.
+[D4, D5, D12]
 
 **R21.** La E2E DEBE cumplir estas condiciones:
 
@@ -187,10 +197,12 @@ abierta 5). [D4, D5]
 - `db/` ni `lib/modules/` (catálogo, seed, módulo `integraciones` incluidos);
 - `lib/composition/`;
 - `middleware.ts` ni `lib/modules/identity/adapters/driving/route-guard-middleware.ts`;
-- `components/private/app-sidebar.tsx`.
+- `components/private/app-sidebar.tsx`;
+- `components/ui/`: el estado vacío reutiliza el patrón de estado vacío que ya usa el repo y no
+  añade ninguna primitiva.
 
 Ninguna página DEBE ofrecer una vía para configurar una integración o guardar una credencial.
-[D7]
+[D7, D11]
 
 ### Cobertura de la tabla de decisiones
 
@@ -203,42 +215,18 @@ Ninguna página DEBE ofrecer una vía para configurar una integración o guardar
 | D5 E2E | R19, R20, R21 |
 | D6 Rutas en los prefijos privados (herencia de QC-221) | R13, R14, R15, R16, R17, R18 |
 | D7 Lo que no entra | R10, R22 |
+| D8 Sección «Configuración» | R3 |
+| D9 Icono `Puzzle` | R3 |
+| D10 Texto del estado vacío | R9 |
+| D11 Estado vacío con el patrón del repo | R9, R22 |
+| D12 Maestro fuera de la E2E, cubierto en unit | R5, R20 |
+| D13 Título = etiqueta del menú | R9 |
+| D14 Permiso y constantes de QC-221 en `dev` | R2, R11 |
 
 ## Preguntas abiertas
 
-1. **Sección del sidebar donde va el grupo.** Ni la ficha ni los docs la fijan. **Propuesta:**
-   `NAV_SECTION_CONFIGURATION` («Configuración»), como último item de esa sección y del array.
-   Conectar servicios externos es configuración de la empresa, no operación diaria ni cadena de
-   suministro. Hoy esa sección solo la ve el Administrador, que es también el único con el permiso.
-   **Coste:** tres tests que fijan «Configuración tiene exactamente dos items» se tensan a tres
-   (`design.md > 7`). Alternativas: sección propia («Integraciones», que repetiría la etiqueta del
-   grupo) o sin sección. Confirmar en F1.4.
-2. **Icono del grupo.** Ninguno de los once de `NavIconName` habla de conectar sistemas.
-   **Propuesta:** un nombre nuevo, `plug`, resuelto a `Plug` de `lucide-react`, que ya está
-   instalado: no es dependencia nueva. Precedente: `users` y `contact` entraron igual. Confirmar o
-   elegir otro en F1.4.
-3. **Texto del estado vacío.** La ficha dice «estado vacío» sin copy. **Propuesta:** «Esta
-   integración todavía no se puede configurar.», el mismo texto en las tres páginas. Confirmar o
-   cambiar en F1.4.
-4. **Pieza del estado vacío.** En el repo no hay un componente de estado vacío compartido: cada
-   pantalla tiene el suyo (`*-list-empty.tsx`), con el mismo `div` de borde discontinuo.
-   `docs/architecture.md` dice «nunca crees un componente si ya existe en shadcn/ui», y shadcn
-   tiene la primitiva `empty`. **Propuesta:** añadirla con `pnpm exec shadcn add empty` y usarla
-   desde un componente de ruta compartido por las tres páginas (`design.md > 4`). Si la CLI no la
-   ofrece para el estilo `base-nova`, o si toca `package.json`, se para y se cae al patrón del
-   repo. Confirmar en F1.4.
-5. **El Maestro fuera de la E2E.** El Maestro es el único usuario sin empresa, y QC-161 exige que
-   la base garantice que **solo un** Maestro tenga la empresa vacía. Crear un Maestro efímero por
-   worker (Chromium y WebKit en paralelo) chocaría con esa garantía o con el Maestro del seed.
-   **Propuesta:** la E2E recorre Operador, Empacador y Administrador de acondicionamiento. Que el
-   Maestro no ve el grupo lo cubre el test unitario de R5, que recorre **todos** los roles sin el
-   permiso. Confirmar en F1.4.
-6. **Título de cada página.** **Propuesta:** el título es la etiqueta del hijo del menú, sin
-   prefijo («Proveedor IA», no «Integración con Proveedor IA»). Es el mismo criterio que
-   `UNITS_LABEL`: el nombre de la pantalla y el de su enlace son el mismo dato. Confirmar en F1.4.
-7. **Decisiones de QC-221 aún sin confirmar en su F1.4.** Esta ficha da por hechos el código
-   `integraciones.modificar` y los nombres de las tres constantes. Si QC-221 los cambia antes de
-   mergearse, este spec se ajusta a lo que entre en `dev`, sin reabrir nada más.
+Ninguna. Las siete del borrador se cerraron en F1.4 (2026-10-08) y están en la tabla de abajo
+como D8–D14.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -251,3 +239,10 @@ Ninguna página DEBE ofrecer una vía para configurar una integración o guardar
 | 2026-10-08 (ficha) | ¿E2E? | **Sí.** El Administrador ve el grupo y entra a las tres páginas. Los demás roles no ven el grupo y, si escriben la URL a mano, no pasan. **Recoge la E2E diferida desde QC-221** |
 | 2026-10-08 (QC-221 `design.md > 4`) | ¿Cómo se protegen las rutas? | Las tres rutas entran en `PRIVATE_ROUTE_PREFIXES` **junto con su página**, para que `guard-rutas-privadas-cubiertas`, `guard-pantallas-exigen-permiso` y `guard-nav-permisos-declarados` queden en verde. El corte por permiso es el `requirePagePermission` de cada página; el middleware no decide por permiso (QC-75 R16, R18). Esta ficha enmienda R15 y relaja R9 de QC-221 |
 | 2026-10-08 (ficha) | ¿Qué NO entra? | **Configuración ni credenciales** de ninguna integración |
+| 2026-10-08 (F1.4) | ¿En qué sección del sidebar va el grupo? | **«Configuración»** (`NAV_SECTION_CONFIGURATION`), como último item del array |
+| 2026-10-08 (F1.4) | ¿Qué icono lleva el grupo? | **`Puzzle` de `lucide-react`** (ya instalado; no es dependencia nueva) |
+| 2026-10-08 (F1.4) | ¿Qué texto tiene el estado vacío? | **«Próximamente podrás configurar esta integración.»**, el mismo en las tres páginas |
+| 2026-10-08 (F1.4) | ¿Con qué pieza se dibuja el estado vacío? | **Con el patrón que ya usa el repo** (`design.md > 4.2`). No se añade la primitiva `empty` de shadcn |
+| 2026-10-08 (F1.4) | ¿El Maestro entra en la E2E? | **No.** Un test unitario cubre que no ve el grupo |
+| 2026-10-08 (F1.4) | ¿Qué título lleva cada página? | **La etiqueta del hijo del menú**, sin prefijo |
+| 2026-10-08 (F1.4) | ¿Están en `dev` el permiso y las constantes de QC-221? | **Sí.** PR #176, merge `57fa8326`: `integraciones.modificar`, `AI_PROVIDER_INTEGRATION_ROUTE`, `INVENTORY_INTEGRATION_ROUTE` y `WHATSAPP_INTEGRATION_ROUTE` |

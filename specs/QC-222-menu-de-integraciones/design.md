@@ -6,8 +6,9 @@
 > El **qué** está en `requirements.md` (R1–R22). Aquí va el **cómo**. Estos son los precedentes
 > directos:
 >
-> - **QC-221** (`specs/QC-221-permiso-y-modulo-de-integraciones/design.md > 4` y `> 8.1`, leído en
->   su worktree): dejó para esta ficha las tres piezas de protección y las enmiendas a sus R9 y R15.
+> - **QC-221** (`specs/QC-221-permiso-y-modulo-de-integraciones/design.md > 4` y `> 8.1`, en `dev`
+>   desde el PR #176, merge `57fa8326`): dejó para esta ficha las tres piezas de protección y las
+>   enmiendas a sus R9 y R15.
 > - **QC-75**: el `NavGroup` sin permiso propio y el corte por permiso en cada `page.tsx`.
 > - **QC-93**: el aterrizaje derivado con `e2e/helpers/landing.ts`.
 > - **Clientes y usuarios**: cómo se da de alta un item del menú con su pantalla, su fila de prefijo
@@ -32,11 +33,11 @@ Busqué los términos `integraciones`, `integración`, `whatsapp`, `proveedor-ia
 
 | Apareció | Qué es | Qué se hace |
 |---|---|---|
-| QC-221 `permiso-y-modulo-de-integraciones` (PR #176, aún no en `dev`) | Crea el permiso `integraciones.modificar`, el módulo vacío y las tres constantes de ruta. Su §4 deja para esta ficha la página, el prefijo y el enlace | **Se reutiliza entero**: es la dependencia. No se re-crea ni el permiso ni las constantes |
+| QC-221 `permiso-y-modulo-de-integraciones` (PR #176, en `dev`, merge `57fa8326`) | Crea el permiso `integraciones.modificar`, el módulo vacío y las tres constantes de ruta. Su §4 deja para esta ficha la página, el prefijo y el enlace | **Se reutiliza entero**: es la dependencia. No se re-crea ni el permiso ni las constantes |
 | QC-119 `webhook-whatsapp-recepcion` (`cancelled`) | Endpoint que recibe mensajes de WhatsApp | Nada que reutilizar. No se solapa |
 | QC-11, QC-40 y QC-75 (`done`) | El sidebar, el `NavGroup` con `Collapsible` y el filtrado por permiso | **Se reutilizan sin tocarlos** (R7). El grupo nuevo es un dato más en `PRIVATE_NAV_ITEMS` |
 | QC-93 (`done`) | `e2e/helpers/landing.ts` (`loginAndLand`) y `guard-e2e-landing` | La E2E entra por `loginAndLand` (R21) |
-| `app/(private)/*/components/*-empty.tsx` (diez, por ejemplo `supplier-list-empty.tsx`) y `components/shared/data-table/data-table-states.tsx > DataTableEmpty` | Estados vacíos **por pantalla** o **de tabla**. No hay un componente de estado vacío compartido | No se reutilizan tal cual: son de su dominio o de la tabla. Se propone la primitiva `empty` de shadcn (§4.2, Pregunta abierta 4) |
+| `app/(private)/*/components/*-empty.tsx` (trece, por ejemplo `proveedores/components/supplier-list-empty.tsx`) y `components/shared/data-table/data-table-states.tsx > DataTableEmpty` | Estados vacíos **por pantalla** o **de tabla**, todos con el mismo marcado: `div` de borde discontinuo y un `<p>` atenuado. No hay un componente de estado vacío compartido | Los componentes son de su dominio y no se importan, pero **se reutiliza su patrón de marcado** tal cual (§4.2, D11). No se añade la primitiva `empty` de shadcn |
 | Código de este worktree | Ningún símbolo, ruta, página ni enlace `integraciones` | — |
 
 Conclusión: no existe nada de esta ficha fuera de su dependencia, QC-221.
@@ -64,8 +65,8 @@ Conclusión: no existe nada de esta ficha fuera de su dependencia, QC-221.
    - sin sesión, `redirect(LOGIN_ROUTE_SESSION_ENDED)`;
    - sin el permiso, `notFound()`.
 
-   Como el parámetro es la unión de literales del catálogo, `'integraciones.modificar'` **no
-   compila** hasta que QC-221 esté en `dev`.
+   El parámetro es la unión de literales del catálogo; `'integraciones.modificar'` está en él
+   desde QC-221.
 6. **`guard-rutas-privadas-cubiertas` muerde en los dos sentidos** (`:132-161`): toda pantalla
    necesita un prefijo, y todo prefijo necesita alguna pantalla debajo. Se salta las carpetas
    `components/` (`NON_ROUTE_DIRS`). Una carpeta `app/(private)/integraciones/` **sin**
@@ -73,7 +74,8 @@ Conclusión: no existe nada de esta ficha fuera de su dependencia, QC-221.
 7. **Precedente de componentes compartidos entre rutas hermanas**:
    `app/(private)/produccion/formulas/nueva/page.tsx` y `[id]/page.tsx` importan de
    `'../components'`.
-8. **QC-221 deja tests que esta ficha tiene que enmendar.** Están en su rama:
+8. **QC-221 deja tests que esta ficha tiene que enmendar.** Llegaron a `dev` con ella (las líneas
+   se leyeron en su rama y se vuelven a medir en T0):
    - `tests/unit/integraciones/integration-routes.test.ts:138-151`, R14: afirma que
      `/integraciones/inventarios` sin sesión da `allow` con los prefijos reales, y eso deja de ser
      cierto en cuanto la ruta entra en la lista;
@@ -88,8 +90,15 @@ Conclusión: no existe nada de esta ficha fuera de su dependencia, QC-221.
     `PRIVATE_NAV_ITEMS`, «clientes es el último del array» y «Configuración tiene exactamente dos
     items».
 11. **El Maestro no tiene empresa**, y QC-161 exige que solo un Maestro tenga la empresa vacía
-    (`specs/QC-161-rol-maestro/requirements.md:277`). Ningún E2E de hoy crea un Maestro
-    (Pregunta abierta 5).
+    (`specs/QC-161-rol-maestro/requirements.md:277`). Ningún E2E de hoy crea un Maestro. Por eso
+    queda fuera de la E2E (D12).
+12. **El patrón de estado vacío del repo** es el mismo `div` en las trece pantallas que lo tienen.
+    Su forma canónica, sin acciones, es `app/(private)/proveedores/components/supplier-list-empty.tsx:11-15`:
+    `div` con `data-testid` propio y
+    `flex flex-col items-center gap-3 rounded-lg border border-dashed p-8 text-center`, y dentro un
+    `<p className="text-sm text-muted-foreground">` con el texto. La repiten, por ejemplo,
+    `app/(private)/configuracion/unidades/components/unit-list-empty.tsx:44-52` y
+    `app/(private)/clientes/components/customer-list-empty.tsx`.
 
 ---
 
@@ -97,18 +106,18 @@ Conclusión: no existe nada de esta ficha fuera de su dependencia, QC-221.
 
 | Pieza | Cambio |
 |---|---|
-| `lib/shared/navigation/private-nav.ts` | Cuatro etiquetas nuevas y el `NavGroup` «Integraciones» como **último** item del array. `NavIconName` suma `'plug'` |
-| `lib/shared/navigation/nav-icons.ts` | La fila `plug: Plug` |
+| `lib/shared/navigation/private-nav.ts` | Cuatro etiquetas nuevas y el `NavGroup` «Integraciones» como **último** item del array. `NavIconName` suma `'puzzle'` |
+| `lib/shared/navigation/nav-icons.ts` | La fila `puzzle: Puzzle` |
 | `lib/shared/routes.ts` | Las tres constantes entran en `PRIVATE_ROUTE_PREFIXES`. Se borra el comentario de QC-221 que decía lo contrario |
 | `app/(private)/integraciones/components/` | `integration-placeholder.tsx` y su `index.ts` |
 | `app/(private)/integraciones/{proveedor-ia,inventarios,whatsapp}/page.tsx` | Tres páginas cascarón |
-| `components/ui/empty.tsx` | Primitiva de shadcn (`pnpm exec shadcn add empty`), si se confirma la Pregunta abierta 4 |
 | Tests | Los nuevos de §7.1, los rojos de §7.2 y las enmiendas a QC-221 de §7.3 |
 | `e2e/integraciones.spec.ts` | Nuevo (§8) |
 
 **No se tocan**:
 
 - `components/private/app-sidebar.tsx`;
+- `components/ui/`: no se añade ninguna primitiva (D11);
 - los tipos y las funciones de `private-nav.ts`: solo se añade el dato;
 - `lib/modules/**`, `lib/composition/**`, `db/**`, `middleware.ts` y `route-guard-middleware.ts`;
 - `package.json`;
@@ -136,8 +145,8 @@ export const INVENTORY_INTEGRATION_LABEL = 'Inventarios';
 export const WHATSAPP_INTEGRATION_LABEL = 'WhatsApp';
 ```
 
-Son la **única copia** de cada texto. El título de cada página sale de la misma constante
-(Pregunta abierta 6), igual que `UNITS_LABEL`. Los tests afirman sobre las constantes, nunca sobre
+Son la **única copia** de cada texto. El título de cada página sale de la misma constante, sin
+prefijo (D13), igual que `UNITS_LABEL`. Los tests afirman sobre las constantes, nunca sobre
 el literal.
 
 ### 3.2 El grupo
@@ -149,7 +158,7 @@ Va como **último** elemento de `PRIVATE_NAV_ITEMS`, detrás de clientes:
   kind: 'group',
   label: INTEGRATIONS_LABEL,
   testId: 'nav-integraciones',
-  icon: 'plug',
+  icon: 'puzzle',
   section: NAV_SECTION_CONFIGURATION,
   items: [
     { kind: 'link', href: AI_PROVIDER_INTEGRATION_ROUTE, label: AI_PROVIDER_INTEGRATION_LABEL,
@@ -165,7 +174,7 @@ Va como **último** elemento de `PRIVATE_NAV_ITEMS`, detrás de clientes:
 - **Al final del array**: así no cambia el aterrizaje de nadie (hallazgo 3, R6) ni la posición de
   ningún item previo. `groupNavItemsBySection` lo dibuja dentro de «Configuración», detrás de
   «Unidades», porque agrupa por orden de aparición.
-- **Sección «Configuración»** (Pregunta abierta 1). Hoy solo la ve el Administrador:
+- **Sección «Configuración»** (D8). Hoy solo la ve el Administrador:
   `inventario.modificar` y `unidades.consultar` no los tiene otro rol de semilla. Así el grupo no
   abre un encabezado nuevo para nadie.
 - **`testId`**: siguen la forma de `nav-produccion` / `nav-produccion-recetas`.
@@ -179,8 +188,9 @@ Va como **último** elemento de `PRIVATE_NAV_ITEMS`, detrás de clientes:
 
 ### 3.3 El icono
 
-`NavIconName` suma `'plug'` y `NAV_ICONS` suma `plug: Plug`, importado de `lucide-react` (Pregunta
-abierta 2). `lucide-react` ya está instalado (`package.json`): **no hay dependencia nueva**. Sigue
+`NavIconName` suma `'puzzle'` y `NAV_ICONS` suma `puzzle: Puzzle`, importado de `lucide-react`
+(D9). `lucide-react` ya está instalado (`package.json`; la versión del lockfile, 1.53.0, trae
+`Puzzle`): **no hay dependencia nueva**. Sigue
 siendo una cadena, así que `guard-nav-serializable` no cambia.
 
 ---
@@ -210,23 +220,27 @@ app/(private)/integraciones/
 Es un Server Component sin estado y sin `'use client'`. Recibe `title: string` y dibuja dos cosas:
 
 - un `<h1 data-testid="integration-title">` con `title`;
-- el estado vacío `data-testid="integration-empty"`, con el texto de la Pregunta abierta 3: «Esta
-  integración todavía no se puede configurar.».
+- el estado vacío `data-testid="integration-empty"`, con el texto de D10: «Próximamente podrás
+  configurar esta integración.». El texto vive en una constante exportada del componente,
+  `INTEGRATION_EMPTY_MESSAGE`, que es su única copia y sobre la que afirman los tests.
 
 No tiene botón, enlace, formulario ni campo (R10).
 
-**La pieza del estado vacío** (Pregunta abierta 4):
+**La pieza del estado vacío** (D11). Se reutiliza el patrón que ya usa el repo (hallazgo 12), sin
+primitiva nueva:
 
-- **Propuesta:** la primitiva `empty` de shadcn, que se añade con `pnpm exec shadcn add empty` y
-  queda en `components/ui/empty.tsx`. Es código copiado al repo, no un paquete. La regla de
-  `docs/architecture.md > Componentes` dice «nunca crees un componente si ya existe en shadcn/ui».
-- **Al añadirla**, `guard-primitivas-ui-usan-el-cn-del-repo` exige que importe `cn` de
-  `@/lib/utils`. Si la CLI escribe otro origen, se corrige el import.
-- **Condición de parada:** si `shadcn add empty` no existe para el estilo `base-nova`, o si toca
-  `package.json` o `pnpm-lock.yaml`, **no se sigue**. Se cae al patrón del repo: el `div` con
-  `rounded-lg border border-dashed p-8 text-center` y su `<p className="text-sm
-  text-muted-foreground">`, el mismo de `supplier-list-empty.tsx`. Se anota en
-  `progress/impl_QC-222-*.md`.
+```tsx
+<div
+  data-testid="integration-empty"
+  className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-8 text-center"
+>
+  <p className="text-sm text-muted-foreground">{INTEGRATION_EMPTY_MESSAGE}</p>
+</div>
+```
+
+Es el marcado de `app/(private)/proveedores/components/supplier-list-empty.tsx:11-15`, sin el slot
+`children`, porque aquí no hay acción que ofrecer. No se importa `SupplierListEmpty`: es del
+dominio de proveedores y trae su propio texto y su `testId`.
 
 El contenedor exterior es un `div` con `flex flex-1 flex-col gap-4 p-4 md:p-6`, como
 `clientes/page.tsx`. **No** es `<main>`: ese papel ya lo hace `SidebarInset`.
@@ -313,8 +327,8 @@ No hay Server Actions, route handlers ni integraciones externas.
 
 | Archivo | Proyecto | Cubre |
 |---|---|---|
-| `tests/unit/integraciones-ui/private-nav-integraciones.test.ts` | unit | **R1**: un solo `NavGroup` con `INTEGRATIONS_LABEL`; hijos exactos (`href`, `label` por constante, `testId`) y en orden; ningún otro destino bajo `/integraciones`. **R2**: cada hijo declara el código que **lee** de la fuente de la `page.tsx` de su `href` (ruta derivada de la constante, como `private-nav-clientes`); un solo `requirePagePermission` por página. **R3**: `icon` con fila en `NAV_ICONS` y `section` = `NAV_SECTION_CONFIGURATION`. **R4**: con los permisos del Administrador (`SEED_ROLE_PERMISSIONS`) aparece el grupo con los tres hijos. **R5**: para **cada** rol de semilla sin el permiso (derivados del conjunto, con un ancla que exige que sean ≥ 1 y que el Administrador sí lo tenga), el filtrado no deja el grupo y `JSON.stringify` del resultado no contiene ni etiquetas, ni destinos, ni `testId` del grupo. **R6**: `firstVisibleNavHref` con y sin el grupo es igual para cada rol de semilla, y `PRIVATE_NAV_ITEMS` sin el grupo es igual, elemento a elemento, a los diez items previos (por `testId` y `section`) |
-| `tests/unit/integraciones-ui/integration-pages.test.tsx` | ui | Para cada una de las tres páginas, con `@/lib/composition` (`identity.getSessionUser`) y `next/navigation` (`notFound`, `redirect`) simulados y lanzando, como en `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`. **R9**: con una sesión que trae el permiso, el árbol renderizado tiene `integration-title`, cuyo texto es la etiqueta del hijo cuyo `href` es esa ruta, e `integration-empty` con el texto. **R10**: el render no tiene `form`, `input`, `select`, `textarea` ni `button`; por fuente, la página no declara `params` ni `searchParams`, y sus imports son exactamente `next` (tipo), el adaptador `require-page-permission`, `private-nav` y `'../components'`. **R11**: por fuente, sin comentarios, hay exactamente un `requirePagePermission('integraciones.modificar')` y es la primera sentencia del cuerpo. **R12**: con sesión sin el permiso, `notFound` se llama y no se renderiza nada. **R13** (parte de página): sin sesión, `redirect` se llama con `LOGIN_ROUTE_SESSION_ENDED` |
+| `tests/unit/integraciones-ui/private-nav-integraciones.test.ts` | unit | **R1**: un solo `NavGroup` con `INTEGRATIONS_LABEL`; hijos exactos (`href`, `label` por constante, `testId`) y en orden; ningún otro destino bajo `/integraciones`. **R2**: cada hijo declara el código que **lee** de la fuente de la `page.tsx` de su `href` (ruta derivada de la constante, como `private-nav-clientes`); un solo `requirePagePermission` por página. **R3**: `icon` con fila en `NAV_ICONS`, `NAV_ICONS[icon]` es `Puzzle` de `lucide-react`, y `section` = `NAV_SECTION_CONFIGURATION`. **R4**: con los permisos del Administrador (`SEED_ROLE_PERMISSIONS`) aparece el grupo con los tres hijos. **R5**: para **cada** rol de semilla sin el permiso (derivados del conjunto, con un ancla que exige que sean ≥ 1 y que el Administrador sí lo tenga), el filtrado no deja el grupo y `JSON.stringify` del resultado no contiene ni etiquetas, ni destinos, ni `testId` del grupo. **R6**: `firstVisibleNavHref` con y sin el grupo es igual para cada rol de semilla, y `PRIVATE_NAV_ITEMS` sin el grupo es igual, elemento a elemento, a los diez items previos (por `testId` y `section`) |
+| `tests/unit/integraciones-ui/integration-pages.test.tsx` | ui | Para cada una de las tres páginas, con `@/lib/composition` (`identity.getSessionUser`) y `next/navigation` (`notFound`, `redirect`) simulados y lanzando, como en `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`. **R9**: con una sesión que trae el permiso, el árbol renderizado tiene `integration-title`, cuyo texto es exactamente la etiqueta del hijo cuyo `href` es esa ruta, e `integration-empty` cuyo texto es exactamente `INTEGRATION_EMPTY_MESSAGE`; un caso aparte ancla esa constante al literal «Próximamente podrás configurar esta integración.». **R10**: el render no tiene `form`, `input`, `select`, `textarea` ni `button`; por fuente, la página no declara `params` ni `searchParams`, y sus imports son exactamente `next` (tipo), el adaptador `require-page-permission`, `private-nav` y `'../components'`. **R11**: por fuente, sin comentarios, hay exactamente un `requirePagePermission('integraciones.modificar')` y es la primera sentencia del cuerpo. **R12**: con sesión sin el permiso, `notFound` se llama y no se renderiza nada. **R13** (parte de página): sin sesión, `redirect` se llama con `LOGIN_ROUTE_SESSION_ENDED` |
 
 ### 7.2 Tests que hoy fijan la forma del menú y se ponen rojos
 
@@ -327,9 +341,6 @@ sincronizar. **Se tensan, nunca se relajan**: siguen exigiendo la lista exacta.
 | `tests/unit/clientes-ui/private-nav-clientes.test.ts:89-91` | Clientes es el **último** item del array | Pasa a decir: clientes es el **penúltimo**, y el último es el grupo `nav-integraciones`. Sigue fijando la posición exacta |
 | `tests/unit/configuracion-ui/private-nav-configuracion.test.ts:76` | «Configuración» tiene **2** items, y el primero es presentaciones | **3**. El primero sigue siendo presentaciones |
 | `tests/unit/configuracion-ui/private-nav-usuarios.test.ts:102` y `:108-111` | «Configuración» tiene **2** items, en el orden `[PRESENTATIONS_ROUTE, UNITS_ROUTE]` | **3**, en el orden `[PRESENTATIONS_ROUTE, UNITS_ROUTE, INTEGRATIONS_LABEL]`. El mapeo de ese test ya devuelve `label` para los grupos |
-
-Si la Pregunta abierta 1 se resuelve con otra sección, las dos filas de «Configuración» no cambian
-y se revisa cuál se pone roja en su lugar.
 
 **No se ponen rojos**, porque derivan del dato o miran otra cosa:
 
@@ -345,7 +356,7 @@ y se revisa cuál se pone roja en su lugar.
 
 ### 7.3 Enmiendas a los tests de QC-221
 
-| Archivo (rama QC-221) | Requisito | Cambio |
+| Archivo (llegó a `dev` con QC-221) | Requisito | Cambio |
 |---|---|---|
 | `tests/unit/integraciones/integration-routes.test.ts` R14, `:138-151` | **R15** | La decisión del borde se prueba con `PRIVATE_ROUTE_PREFIXES` **sin** las tres rutas: `/integraciones/inventarios` sin sesión da `allow`, y `/inventario` da `redirect`. Así se sigue probando que la comparación es por segmentos. El caso pasa a llamarse con R15 de esta ficha |
 | `tests/unit/integraciones/integration-routes.test.ts` R15, `:154-186` | **R13, R14, R16, R8** | El bloque se **invierte**: «las rutas de integraciones tienen pantalla». (a) Los prefijos bajo `/integraciones` son exactamente las tres constantes, y `/integraciones` no está. (b) Los `href` bajo `/integraciones` de los enlaces aplanados son exactamente las tres constantes. (c) Las páginas bajo `app/` cuya URL empieza por `integraciones` son exactamente las tres, por sus segmentos. (d) R13: `decideRouteAccess` con los prefijos reales y sin sesión da `redirect` para cada una de las tres. Se borra `AVISO_DE_ENMIENDA` |
@@ -356,8 +367,8 @@ solo `lib/shared/routes.ts` para cada URL.
 
 ### 7.4 Verificación en revisión, sin test nuevo
 
-- **R7 y R22**: el diff no toca `components/private/app-sidebar.tsx`, `lib/modules/**`,
-  `lib/composition/**`, `db/**`, `middleware.ts` ni `route-guard-middleware.ts`, y en
+- **R7 y R22**: el diff no toca `components/private/app-sidebar.tsx`, `components/ui/**`,
+  `lib/modules/**`, `lib/composition/**`, `db/**`, `middleware.ts` ni `route-guard-middleware.ts`, y en
   `private-nav.ts` solo añade constantes, el nombre de icono y el item. La lista exacta está en
   `tasks.md > Archivos esperados`. Para `package.json` está además `guard-dependencias-aprobadas`.
 
@@ -385,7 +396,7 @@ entra por `loginAndLand` (QC-93).
   `integraciones.modificar`. Un ancla exige que sea exactamente `[ROLE_ADMINISTRADOR]`: si cambia,
   la E2E se pone roja con un mensaje que lo dice.
 - **Sin el permiso:** el resto **menos `ROLE_MAESTRO`**, que se excluye por nombre, con su motivo
-  escrito: la empresa vacía es única (hallazgo 11, Pregunta abierta 5). Hoy son Operador, Empacador
+  escrito: la empresa vacía es única (hallazgo 11, D12). Hoy son Operador, Empacador
   y Administrador de acondicionamiento. Que el Maestro no vea el grupo lo cubre R5 en unit.
 
 **Casos**
@@ -441,9 +452,9 @@ No hay controles nuevos:
 4. **El título y el estado vacío escritos en cada `page.tsx`.** Serían tres copias del mismo
    marcado y del mismo texto que habría que cambiar a la vez. El componente compartido en
    `../components` tiene precedente (hallazgo 7).
-5. **Un `components/shared/empty-state.tsx` nuevo**, migrando a él los diez estados vacíos del
-   repo. Es un refactor fuera de alcance que tocaría diez pantallas ajenas. Si lo crea solo esta
-   ficha, inventa un componente que shadcn ya tiene.
+5. **Un `components/shared/empty-state.tsx` nuevo**, migrando a él los trece estados vacíos del
+   repo. Es un refactor fuera de alcance que tocaría trece pantallas ajenas. Si lo crea solo esta
+   ficha, abre un segundo patrón que nadie más usa.
 6. **Dar al grupo un permiso propio**, o comprobar el permiso en `AppSidebar`. QC-75 lo prohíbe:
    son dos verdades sobre lo mismo, y filtrar en el cliente haría viajar los items ocultos en el
    payload.
@@ -452,6 +463,9 @@ No hay controles nuevos:
 8. **Poner el grupo antes de otros items**, por ejemplo primero en «Configuración» o en
    «Operación». Movería posiciones fijadas por otras fichas y, en «Operación», podría cambiar el
    aterrizaje. Al final del array no cambia nada de lo que ya existe (R6).
+9. **La primitiva `empty` de shadcn** (`components/ui/empty.tsx`). Fue la propuesta del borrador.
+   El humano la descartó en F1.4 (D11): ninguna pantalla la usa, y meterla por una página cascarón
+   abriría un segundo patrón de estado vacío junto al de las trece que ya existen.
 
 ---
 
@@ -459,9 +473,8 @@ No hay controles nuevos:
 
 **Ninguna nueva** (R22):
 
-- `lucide-react` ya está (icono `Plug`).
-- La primitiva `empty` de shadcn, si se confirma, es código copiado a `components/ui/` por la CLI
-  `shadcn`, que ya es dependencia del repo. Si la CLI intentara añadir un paquete, se para (§4.2).
+- `lucide-react` ya está (icono `Puzzle`).
+- El estado vacío es marcado propio con clases de Tailwind (§4.2): no pasa por la CLI de shadcn.
 
 No hay librería que evaluar con los cuatro checks.
 
@@ -469,20 +482,26 @@ No hay librería que evaluar con los cuatro checks.
 
 ## 12. Orden y sincronización
 
-La implementación **no arranca** hasta que QC-221 esté mergeada en `dev`. Antes de T1, la rama se
-sincroniza con `git fetch origin dev && git merge origin/dev` (`docs/perfil-agentes.md >
-implementer`). Después se vuelven a medir los hallazgos 1, 8 y 10 contra lo que haya entrado.
+QC-221 ya está en `dev` (PR #176, merge `57fa8326`). En T0, antes de tocar código, la rama se sincroniza con
+`git fetch origin dev && git merge origin/dev` (`docs/perfil-agentes.md > implementer`). Después
+se vuelven a medir los hallazgos 1, 8 y 10 contra el árbol sincronizado: las líneas citadas aquí
+se leyeron antes del merge.
 
 ---
 
-## 13. Decisiones nuevas para F1.4 (las propone `spec_author`, las confirma el humano)
+## 13. Decisiones de F1.4 (2026-10-08)
 
-| # | Propuesta | Dónde |
+Todas cerradas por el humano; están en `requirements.md > Decisiones cerradas` como D8–D14.
+
+| # | Decisión | Dónde |
 |---|---|---|
-| N1 | Sección «Configuración», con el grupo como último item del array | §3.2, Pregunta abierta 1 |
-| N2 | Icono nuevo `plug` (`Plug` de `lucide-react`) | §3.3, Pregunta abierta 2 |
-| N3 | Texto del estado vacío: «Esta integración todavía no se puede configurar.» | §4.2, Pregunta abierta 3 |
-| N4 | Primitiva `empty` de shadcn, con vuelta al patrón del repo si la CLI no la da limpia | §4.2, Pregunta abierta 4 |
-| N5 | La E2E excluye al Maestro y lo cubre en unit | §8, Pregunta abierta 5 |
-| N6 | Título de la página = etiqueta del hijo del menú | §3.1, Pregunta abierta 6 |
-| N7 | Una fila de `PRIVATE_ROUTE_PREFIXES` por ruta | §5, alternativa 1 |
+| D8 | Sección «Configuración», con el grupo como último item del array | §3.2 |
+| D9 | Icono `puzzle` (`Puzzle` de `lucide-react`) | §3.3 |
+| D10 | Texto del estado vacío: «Próximamente podrás configurar esta integración.» | §4.2 |
+| D11 | Estado vacío con el patrón del repo (`supplier-list-empty.tsx:11-15`); sin primitiva `empty` | §4.2, hallazgo 12, alternativa 9 |
+| D12 | La E2E excluye al Maestro y lo cubre en unit (R5) | §8 |
+| D13 | Título de la página = etiqueta del hijo del menú | §3.1 |
+| D14 | Permiso y constantes de QC-221 ya en `dev` con los nombres previstos | §0, §12 |
+
+Queda como decisión técnica de este diseño, sin reabrir nada: una fila de
+`PRIVATE_ROUTE_PREFIXES` por ruta (§5, alternativa 1).
