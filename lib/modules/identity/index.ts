@@ -332,6 +332,7 @@ export {
 // `lib/composition`, el unico sitio que ata puerto -> implementacion (R47).
 // ---------------------------------------------------------------------------------------
 export type { PersonRef, PeopleDirectory, PeopleRefFilters } from './domain/people-directory';
+export { ACTIVE_ACCOUNTS_ONLY } from './domain/people-directory';
 export type { WorkGroupSnapshot, WorkGroupDirectory } from './domain/work-group-directory';
 
 // ---------------------------------------------------------------------------------------

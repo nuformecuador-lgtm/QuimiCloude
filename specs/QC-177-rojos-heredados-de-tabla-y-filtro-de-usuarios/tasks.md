@@ -3,24 +3,24 @@
 > Decisiones humanas cerradas el 2026-10-08: `requirements.md > Decisiones cerradas`, D4-D7.
 
 ## T1. [P] Viewports de usuarios y unidades: aceptar el truncado (D4) — R1-R5, R15
-- [ ] `usuarios-viewport.test.tsx`, caso de la columna de correo (R21). Se quita la aserción
+- [x] `usuarios-viewport.test.tsx`, caso de la columna de correo (R21). Se quita la aserción
       «sin `overflow-hidden`». Se mantienen: dentro del contenedor, visible, sin `hidden` y sin
       scroll del documento. Se añaden dos aserciones: el texto de la celda es el correo completo, y
       la celda lleva `text-ellipsis`.
-- [ ] `unidades-viewport.test.tsx`, caso de la columna de equivalencia (R27): el mismo cambio, con
+- [x] `unidades-viewport.test.tsx`, caso de la columna de equivalencia (R27): el mismo cambio, con
       la frase de equivalencia completa.
-- [ ] Ningún otro caso de los dos archivos cambia. Los comentarios de las líneas tocadas no citan
+- [x] Ningún otro caso de los dos archivos cambia. Los comentarios de las líneas tocadas no citan
       fichas.
 - **Hecho:** los dos archivos en verde en los dos viewports, con
   `pnpm exec vitest related --run` sobre ellos. `data-table-scroll.test.tsx` y `components/shared/`
   sin tocar.
 
 ## T2. [P] Inventario: «nombre · unidad» (D5) — R6, R7
-- [ ] Se compara la regla de `nameCell` con
+- [x] Se compara la regla de `nameCell` con
       `git show a543c84d^:app/(private)/inventario/components/product-columns.tsx`.
-- [ ] La columna `name` usa `productDisplayName(product.name, productUnitLabel(product, units))`.
+- [x] La columna `name` usa `productDisplayName(product.name, productUnitLabel(product, units))`.
       `width` y `hideText` se quedan.
-- [ ] Se limpian los comentarios de las líneas tocadas.
+- [x] Se limpian los comentarios de las líneas tocadas.
 - **Hecho:** `product-page.test.tsx` en verde sin tocarlo.
 
 ## T3. Inventario: E2E adaptados como «deuda QC-177» (D5) — R8
@@ -35,29 +35,29 @@ Depende de: T2.
   e2e/inventario-importar.spec.ts e2e/aislamiento-inventario.spec.ts` en verde en Chromium y WebKit.
 
 ## T4. [P] Recetas: acciones no fijables (D6) — R9, R10
-- [ ] `recipe-columns.tsx`: se quita `defaultPinned: 'right'` de `actions` y se mantiene
+- [x] `recipe-columns.tsx`: se quita `defaultPinned: 'right'` de `actions` y se mantiene
       `pinnable: false`.
 - **Hecho:** `recipe-page.test.tsx` en verde sin tocarlo.
 
 ## T5. [P] Estado de cuenta: filtro con nombre desde `identity` (D7) — R11, R12, R13
-- [ ] `people-directory.ts` exporta `ACTIVE_ACCOUNTS_ONLY: PeopleRefFilters` (un nombre sin
+- [x] `people-directory.ts` exporta `ACTIVE_ACCOUNTS_ONLY: PeopleRefFilters` (un nombre sin
       `account[_ ]?status`), y `lib/modules/identity/index.ts` lo reexporta.
-- [ ] `list-responsible-candidates.ts` lo usa, y ni su código ni su comentario nombran el estado de
+- [x] `list-responsible-candidates.ts` lo usa, y ni su código ni su comentario nombran el estado de
       cuenta.
-- [ ] `list-responsible-candidates.test.ts` sigue afirmando que el filtro que llega al puerto es
+- [x] `list-responsible-candidates.test.ts` sigue afirmando que el filtro que llega al puerto es
       `{ accountStatus: ['active'] }`; se ajusta solo si importa el literal.
-- [ ] `account-status-scope.test.ts` sin tocar.
+- [x] `account-status-scope.test.ts` sin tocar.
 - **Hecho:** `account-status-scope.test.ts` y `list-responsible-candidates.test.ts` en verde, y
   `pnpm exec vitest run guard` en verde (incluido `guard-qc87-no-reimplementado`).
 
 ## T6. [P] Enmiendas de specs con fecha 2026-10-08 — R16
-- [ ] `specs/QC-67-pantalla-de-usuarios/design.md`: la celda de correo puede llevar truncado por
+- [x] `specs/QC-67-pantalla-de-usuarios/design.md`: la celda de correo puede llevar truncado por
       defecto; el valor completo sigue en la celda; R21 no cambia (QC-177 D4).
-- [ ] `specs/QC-39-pantalla-de-unidades/design.md`: lo mismo para la celda de equivalencia, R27.
-- [ ] `specs/QC-55-tabla-de-datos-compartida/design.md`: el contrato de columna gana `width`,
+- [x] `specs/QC-39-pantalla-de-unidades/design.md`: lo mismo para la celda de equivalencia, R27.
+- [x] `specs/QC-55-tabla-de-datos-compartida/design.md`: el contrato de columna gana `width`,
       `hideText` (ausente o `true` = truncado) y `defaultPinned`, que entraron sin spec; el truncado
       por defecto queda aceptado.
-- [ ] `specs/QC-145-pedidos-terminados-en-asignacion/design.md > 3.6`: el paso 3 lo añadió
+- [x] `specs/QC-145-pedidos-terminados-en-asignacion/design.md > 3.6`: el paso 3 lo añadió
       `0dbcd68f` fuera del flujo, y la llamada usa el filtro con nombre de `identity`.
 - **Hecho:** las cuatro notas fechadas, y cada una cita QC-177 y su decisión.
 
