@@ -78,6 +78,9 @@ Depende de: T1-T6.
 - `e2e/inventario.spec.ts`
 - `e2e/insumo-por-unidad.spec.ts`
 - `e2e/inventario-importar.spec.ts`
+- `e2e/producto-terminado.spec.ts`
+- `e2e/helpers/product-name-cell.ts`
+- `tests/unit/inventario/scope.test.ts`
 - `app/(private)/produccion/formulas/components/recipe-columns.tsx`
 - `lib/modules/identity/domain/people-directory.ts`
 - `lib/modules/identity/index.ts`
