@@ -73,3 +73,24 @@ R1–R3 `assignment-views` / `acondicionamiento-authorization` / `asignacion-pag
 ## Veredicto
 
 **RECHAZADO** por el hallazgo 1, con dos rojos nuevos fuera del baseline. El resto está bien: trazabilidad R1–R24 completa, regla 9 limpia, `routes.ts` mínimo y aislado. Cuando el implementer dé de alta el E2E en las dos listas cerradas, la vuelta 2 puede acotarse a ese diff.
+
+## Vuelta 2 (acotada a 678cadfb..dad7b09d)
+
+Diff: `tests/guards/guard-identificador-de-request.test.ts` (+9), `tests/unit/shared/data-table-alcance.test.ts` (+10/-2), `progress/impl_…md` (+2).
+
+- [x] **Hallazgo 1 resuelto.** `e2e/acondicionamiento.spec.ts` entra en las dos listas cerradas:
+  - en `data-table-alcance`, el centinela pasa de treinta a treinta y uno;
+  - en `E2E_ESPERADOS`, el nombre queda en orden alfabético.
+- [x] **Motivo de cada alta, con el mismo formato que las anteriores.**
+  - En `data-table-alcance`, la nota fechada dice que no estrena tabla y que localiza `data-table-row-<id>` y `data-table-cell-orderNumber`. Lo comprobé en `e2e/acondicionamiento.spec.ts:119-120`.
+  - En `E2E_ESPERADOS`, la nota describe lo que ejercita y declara que no toca el identificador de petición ni `reference`. Lo comprobé con grep: el spec no los menciona.
+- [x] **Comentarios nuevos sin keys, `R<n>` ni `D<n>`.** Busqué en las líneas añadidas y solo aparece la ruta `progress/impl_QC-217…`, que es un nombre de archivo. El `(R36)` del mensaje de aserción ya estaba en esa línea; el diff solo cambia el número.
+- [x] **Tests:** `pnpm exec vitest run tests/guards tests/unit/shared/data-table-alcance.test.ts` da 49 archivos en verde, 686 tests pasados y 7 omitidos. No hay rojos.
+- [x] **`pnpm typecheck`:** `tsc --noEmit` en verde.
+- [x] **Sin regresiones en el diff.** Solo cambian listas de tests y la bitácora; el código de la app no se toca.
+
+Hallazgos nuevos: ninguno. Los menores 2–4 de la vuelta 1 quedan aceptados sin cambio por decisión del leader.
+
+### Veredicto vuelta 2
+
+**OK**
