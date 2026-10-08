@@ -84,6 +84,7 @@ if (MODO === 'estado') {
   const lock = leerLock();
   if (!lock) { console.log(`AVISO: sin ${LOCK}: el sync no sabe que version del arnes tienes. Corre ./scripts/arnes-sync.sh --aplicar`); process.exit(0); }
   const locales = [...archivosDe('.')].filter((f) => hashDe(f) !== (lock.archivos[f] ?? null));
+  for (const s of lock.subidos ?? []) console.log(`subido a la plantilla y pendiente de merge alli: ${s.pr} (${s.archivos.length} archivo/s)`);
   if (locales.length === 0) console.log(`arnes al dia con la plantilla ${lock.arnes_version ?? ''} (${lock.commit?.slice(0, 7) ?? '?'})`.trim());
   else console.log(`AVISO: ${locales.length} archivo(s) del arnes cambiados en este proyecto y sin subir a la plantilla: ${locales.join(', ')}. Subelos con /afinar-regla o ./scripts/arnes-sync.sh --subir -m "<que mejora>"`);
   process.exit(0);
@@ -169,8 +170,17 @@ if (MODO === 'subir') {
     fail(`la rama ${rama} quedo publicada, pero no pude abrir el PR: ${String(e.stderr ?? e.message).trim()}`);
   }
   pinta(C.g, '↑', grupos.local);
+  // El lock pasa a registrar TU version de cada archivo subido, como si la plantilla ya la tuviera:
+  // asi el commit del lock viaja en el MISMO PR del proyecto y, cuando se mergean los dos PRs, el
+  // proyecto ya esta "al dia" sin un PR extra. Si la plantilla rechaza o cambia la mejora, el
+  // siguiente --aplicar lo ve como cambio de la plantilla y baja su version: manda la plantilla.
+  for (const f of grupos.local) {
+    if (existsSync(f)) lock.archivos[f] = hashDe(f); else delete lock.archivos[f];
+  }
+  lock.subidos = [...(lock.subidos ?? []), { pr: url, archivos: grupos.local, fecha: new Date().toISOString().slice(0, 10) }];
+  writeFileSync(LOCK, `${JSON.stringify(lock, null, 2)}\n`);
   console.log(`\nPR en la plantilla: ${url}`);
-  console.log('Cuando se mergee, corre ./scripts/arnes-sync.sh --aplicar aqui: el lock se pone al dia y el aviso del gate desaparece.');
+  console.log(`${LOCK} actualizado: commitealo en el MISMO PR del proyecto. Cuando los dos PRs se mergeen, el proyecto queda al dia sin nada mas.`);
   process.exit(0);
 }
 
@@ -196,6 +206,8 @@ for (const f of grupos.bajar) {
 }
 // El lock registra la version de la PLANTILLA de cada archivo, no la local: asi una mejora local
 // sigue viendose como tal hasta que la plantilla la tenga.
+// Un PR subido deja de estar pendiente cuando la plantilla ya trae esos archivos tal cual.
+const subidosPendientes = (lock?.subidos ?? []).filter((s) => s.archivos.some((f) => hashDe(path.join(P, f)) !== (base[f] ?? null)));
 const nuevo = { $comment: 'Lo escribe scripts/arnes-sync.mjs. Hash de cada archivo del arnes tal como vino de la plantilla. No lo edites a mano.', plantilla: DESDE, ref: REF, commit: COMMIT, arnes_version: VERSION, archivos: {} };
 for (const f of [...archivosDe(P)].sort()) {
   const T = hashDe(path.join(P, f));
@@ -205,6 +217,7 @@ for (const f of [...archivosDe(P)].sort()) {
   const pendiente = (grupos.conflicto.includes(f) || grupos.sinBase.includes(f)) && !RESUELTOS.includes(f);
   nuevo.archivos[f] = pendiente ? (base[f] ?? T) : T;
 }
+if (subidosPendientes.length) nuevo.subidos = subidosPendientes;
 writeFileSync(LOCK, `${JSON.stringify(nuevo, null, 2)}\n`);
 if (VERSION !== '?') { config.arnes_version = VERSION; writeFileSync(CONFIG, `${JSON.stringify(config, null, 2)}\n`); }
 console.log(`Aplicado. ${LOCK} al dia. Siguiente: ./init.sh y commit "chore(arnes): sync a ${VERSION}".`);

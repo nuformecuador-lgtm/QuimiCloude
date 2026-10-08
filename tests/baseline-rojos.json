@@ -36,6 +36,10 @@
     "tests/integration/proveedores/catalog-line.int.test.ts": {
       "motivo": "Deuda ajena de dev: el caso R32 espera un PrismaClientKnownRequestError y hoy recibe un ValidationError (la entrada se valida antes de llegar a la base). Falla igual en origin/dev 1a1db86e, sin los cambios del arnes v2; llego con los merges del 2026-10-06 (QC-209/QC-213). Detectado por el primer gate completo del arnes v2. Ver progress/deudas.md D33.",
       "desde": "2026-10-06"
+    },
+    "tests/integration/identity/credential-setup.int.test.ts": {
+      "motivo": "Intermitente en el runner de GitHub (2 vCPU): en R11 (emisiones concurrentes) las dos conexiones a veces NO llegan a encolarse tras el bloqueo, y el test falla con su propio mensaje de 'carrera no ejercida' (o por timeout si se alarga la espera; subir el plazo a 20 s no lo arreglo). Paso en local y en 3 de 5 corridas de CI. No es un rojo de una rama: es el test. Ver progress/deudas.md D34; al arreglarlo, se borra esta entrada.",
+      "desde": "2026-10-07"
     }
   }
 }

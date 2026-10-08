@@ -15,15 +15,17 @@
 name: gate
 
 # Plan GRATUITO de GitHub (2000 min/mes en repos privados; agotados, no corre nada): cada
-# minuto cuenta. Por eso: nada en borradores, nada si el PR solo toca prosa o estado del
-# arnes, cancelacion de corridas viejas y timeouts ajustados. Y sin branch protection en
+# minuto cuenta. Por eso: nada en borradores, nada si el PR solo toca estado (`progress/`) o
+# specs, cancelacion de corridas viejas y timeouts ajustados. Y sin branch protection en
 # este plan: el check es INFORMATIVO; la convencion es mergear solo con el check en verde.
 on:
   pull_request:
     branches: [dev, main]
     types: [opened, synchronize, reopened, ready_for_review]
+    # Solo se salta lo que ningun test lee: el estado (`progress/`) y los specs. Los `.md` del arnes
+    # y del perfil NO: varias guardias leen docs y agentes, y un PR solo de texto puede romperlas
+    # (paso con el #155, que se mergeo sin CI).
     paths-ignore:
-      - '**/*.md'
       - 'progress/**'
       - 'specs/**'
   workflow_dispatch:

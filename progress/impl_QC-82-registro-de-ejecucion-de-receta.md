@@ -434,3 +434,11 @@ Rechazada con 3 bloqueantes y 6 menores; se corrigen todos en esta vuelta.
 | 7 | `cancelAssignedOrder`: `not_cancellable` si el pedido cambia entre lecturas | backend_dev | (abajo) |
 | 8 | Una sola regla de recorte de la posición (exportada desde `step-reader.tsx`) | frontend_dev | (abajo) |
 | 9 | Assignee en Jira: lo pone el leader; `progress/features/QC-82.md` no se toca | leader | — |
+
+## F2.3 — merge de `origin/dev` (2026-10-07)
+
+- Base: `2e6318a9`, 38 commits detrás (entra QC-216 rol administrador de acondicionamiento y ajustes del arnés).
+- Conflicto (1, trivial): `tests/guards/guard-identificador-de-request.test.ts > MIGRACIONES_ESPERADAS`. Cada lado añadía una fila; se quedan las dos en orden cronológico (`20261006180000_order_execution_entries`, luego `20261006234105_conditioning_role`). `tests/integration/aislamiento.json` se auto-mezcló.
+- Migraciones: entra `20261006234105_conditioning_role`, posterior a la de QC-82 (`20261006180000`); sin choque de orden. Aplicada con `prisma migrate deploy` a `QuimiCloude_QC82`; una segunda corrida dice "No pending migrations to apply".
+- `pnpm typecheck`: exit 0. `pnpm lint`: exit 0 (0 errores, 8 warnings ya existentes).
+- `pnpm exec vitest related --run` sobre el guard en conflicto, `qc145-estado-solo-planta.test.ts` y `company-scope.int.test.ts`: `Test Files 3 passed (3)`, `Tests 53 passed (53)` (la integración corre sobre la copia efímera de la plantilla `qct_tpl_9d7128117c80`, que se reconstruyó con las 73 migraciones).

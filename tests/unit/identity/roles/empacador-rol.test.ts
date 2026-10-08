@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  ROLE_ACONDICIONAMIENTO,
   ROLE_ADMINISTRADOR,
   ROLE_EMPACADOR,
   ROLE_MAESTRO,
@@ -156,12 +157,13 @@ describe('R1 — el rol Empacador nace en SEED_ROLES, los otros dos quedan intac
     expect(operador?.description).toBe('Operacion del dia a dia.');
   });
 
-  it('SEED_ROLES empieza exactamente por Administrador, Operador y Empacador; solo el Maestro va detras', () => {
+  it('SEED_ROLES empieza exactamente por Administrador, Operador y Empacador; detras solo van el Maestro y el Administrador de acondicionamiento', () => {
     expect(SEED_ROLES.map((rol) => rol.name)).toEqual([
       ROLE_ADMINISTRADOR,
       ROLE_OPERADOR,
       ROLE_EMPACADOR,
       ROLE_MAESTRO,
+      ROLE_ACONDICIONAMIENTO,
     ]);
   });
 });

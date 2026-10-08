@@ -5,6 +5,55 @@ Produce tres archivos en `specs/<key>-<slug>/`, dentro del worktree de la featur
 rama, `docs/equipo.md > Qué estado es de quién`). Hay una puerta de aprobación humana
 entre la especificación y la implementación.
 
+## Antes de especificar: lo que ya existe
+
+Antes de sembrar un `requirements.md`, de crear una ficha o de escribir un spec, busca si eso ya
+existe. Es **bloqueante**: si aparece algo, para y pregunta al humano.
+
+Se busca siempre en los tres sitios:
+
+1. **El board**, en todas las columnas, incluidas *Hecho* y *Cancelado*: `feature_list.json`
+   (F0 las importa todas), por `name` y `description`. Quien tiene el MCP de `atlassian`
+   (`/afinar-feature`) lo confirma en vivo con
+   `project = <arnes.config.json > jira.project> AND issuetype != Epic AND text ~ "<término>"`.
+2. **Los specs** ya escritos: `grep -ril "<término>" specs/`.
+3. **El código**: el grafo (`search_graph`, `search_code`) con los nombres del dominio
+   (`docs/grafo-de-codigo.md`).
+
+Busca con dos o tres términos del dominio de la feature, no con su título literal.
+
+Si aparece algo, el humano decide una de tres:
+
+- **Es la misma feature** → la ficha nueva se mueve a *Cancelado* con un comentario que cite la
+  original. Nunca se borra (`docs/jira.md > Cuando el disco descubre que el board está
+  desactualizado`).
+- **Se solapa en parte** → se acota: lo que ya existe va a «Lo que NO entra», o una ficha absorbe
+  a la otra.
+- **Ya hay código que lo resuelve** → se sigue, reutilizándolo en vez de re-crearlo.
+
+La decisión queda como fila en `## Decisiones cerradas (no reabrir)` del `requirements.md`.
+
+| Quién | Cuándo |
+|---|---|
+| `/afinar-feature` | paso 1, antes de preguntar; y paso 5, antes de crear una ficha nueva |
+| `spec_author` | F1.2, antes de escribir (cubre las fichas que llegan sin afinar) |
+| `reviewer` | F2.2: comprueba la sección y que el diff no re-cree nada de ella |
+
+El resultado se escribe en `design.md > ## Lo que ya existe`: términos buscados, qué apareció
+(key, spec o símbolo) y qué se reutiliza. Si no apareció nada, se dice: «Buscado `<términos>`:
+nada». Sección ausente o vacía es BLOQUEANTE del reviewer.
+
+Aplica a los specs escritos desde el 2026-10-06: los anteriores no se auditan.
+
+**Lo que cuesta:** una búsqueda en el board y otra en el grafo por feature, y una pregunta más al
+humano cuando hay coincidencia.
+
+### Por qué
+
+Una ficha duplicada reparte el mismo trabajo entre dos personas que no se ven; código re-creado
+deja dos versiones que divergen. **No hay un caso verificado** en este repo: la regla es
+preventiva.
+
 ## Los tres archivos
 
 ### 1. requirements.md — el QUÉ, en EARS
@@ -34,6 +83,7 @@ después. No es opcional por comodidad.
 Decisiones antes de escribir código: modelo de datos (tablas, RLS, migraciones),
 endpoints/rutas Next, contratos de entrada/salida, integraciones externas si las hay,
 y **al menos una alternativa que descartaste y por qué**.
+Abre con `## Lo que ya existe` (`> Antes de especificar: lo que ya existe`).
 
 Si propone una librería nueva, lo dice aquí: la aprobación del spec la incluye (regla 7 de
 `CLAUDE.md`, `AGENTS.md > F1.4`).

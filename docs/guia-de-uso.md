@@ -79,7 +79,7 @@ en curso a la vez).
 | Soltar una feature | «suelta QC-123» | quítate de responsable, anota en `progress/features/QC-123.md` hasta dónde llegaste y haz push |
 | Anotar una deuda sin feature en curso | «anota la deuda …» | rama `chore/deudas-<fecha>` desde `dev`, bloque `### D<n>` en `progress/deudas.md`, PR |
 | El gate avisa que el perfil está vencido | `/arnes-init revisar` | relee el doc, corrígelo y actualiza `revisado=` en su primera línea |
-| Mejorar el arnés | `/afinar-regla <la mejora>` (aplica, prueba y la sube) | aplica el cambio · `./init.sh` · commit · `./scripts/arnes-sync.sh --subir -m "<qué mejora>"` → abre el PR en la plantilla |
+| Mejorar el arnés | `/afinar-regla <la mejora>` (aplica, prueba, la sube y abre los dos PRs) | aplica el cambio · `./init.sh` · commit · `./scripts/arnes-sync.sh --subir -m "<qué mejora>"` (abre el PR en la plantilla y actualiza `arnes.lock.json`) · commit del lock · PR al proyecto |
 | Ver si tengo mejoras sin subir | lo dice `./init.sh` (aviso amarillo) | `./scripts/arnes-sync.sh --estado` |
 | Traer la última versión del arnés | «sincroniza el arnés» | `./scripts/arnes-sync.sh` (ver) · `./scripts/arnes-sync.sh --aplicar` · `./init.sh` · commit |
 | El sync dice «conflicto» | «resuelve el conflicto del arnés» | integra a mano los dos cambios en el archivo · `./scripts/arnes-sync.sh --aplicar --resuelto <archivo>` · `--subir` |
@@ -96,7 +96,10 @@ proyecto A, B, C ◄──────────────(--aplicar)──�
 - **Bajar** (`--aplicar`) trae lo que cambió en la plantilla. **Nunca pisa** un archivo que
   cambiaste tú y no has subido.
 - **Subir** (`--subir -m "…"`) lleva tus cambios a archivos del arnés a un PR en la plantilla.
-  No sube nada del perfil del proyecto.
+  No sube nada del perfil del proyecto. También actualiza `arnes.lock.json`, que va en el **mismo**
+  PR del proyecto. Cuando se mergean los dos PRs (plantilla y proyecto), el proyecto queda al día
+  sin nada más. Si la plantilla rechaza o cambia la mejora, el siguiente `--aplicar` baja su
+  versión: la plantilla manda.
 - `arnes.lock.json` (versionado) recuerda qué versión de cada archivo trajo el último sync. Con él
   el script sabe, archivo por archivo, si cambió la plantilla (`↓`), si cambiaste tú (`↑`) o si
   cambiaron los dos (`!`, conflicto).
