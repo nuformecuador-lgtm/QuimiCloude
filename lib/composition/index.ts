@@ -404,6 +404,8 @@ import {
   createUnassignResponsible,
   createCancelAssignedOrder,
   createRecordStepMove,
+  createListExecutionTraces,
+  createGetExecutionTrace,
 } from '@/lib/modules/asignaciones';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
@@ -1748,6 +1750,16 @@ export const asignaciones = {
     orders: orderCatalog,
     log: executionLogRepository,
     now: () => new Date(),
+  }),
+  listExecutionTraces: createListExecutionTraces({
+    log: executionLogRepository,
+    orders: orderCatalog,
+    people: peopleDirectory,
+  }),
+  getExecutionTrace: createGetExecutionTrace({
+    log: executionLogRepository,
+    orders: orderCatalog,
+    people: peopleDirectory,
   }),
 } as const;
 

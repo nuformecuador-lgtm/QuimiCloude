@@ -222,3 +222,23 @@ export { createRecordStepMove, type RecordStepMoveDeps } from './domain/record-s
 export type { ExecutionAction, NewExecutionEntry } from './domain/execution-entry';
 export type { StartedOrderExecution } from './domain/assigned-order-execution-view';
 export { NotCancellableError } from './domain/errors';
+
+// ---------------------------------------------------------------------------------------
+// El recorrido de ejecucion: la lista de pedidos ejecutados y el recorrido de uno. Bloque NUEVO
+// al final: no reordena ni reformatea nada de lo de arriba.
+// ---------------------------------------------------------------------------------------
+export {
+  createListExecutionTraces,
+  type ExecutionTraceList,
+  type ExecutionTraceListInput,
+  type ExecutionTracePerson,
+  type ExecutionTraceRow,
+  type ListExecutionTracesDeps,
+} from './domain/list-execution-traces';
+export {
+  createGetExecutionTrace,
+  type ExecutionTraceDetail,
+  type ExecutionTraceDetailStep,
+  type GetExecutionTraceDeps,
+} from './domain/get-execution-trace';
+export type { ExecutionTrace, TraceDuration, TraceStep } from './domain/execution-trace';
