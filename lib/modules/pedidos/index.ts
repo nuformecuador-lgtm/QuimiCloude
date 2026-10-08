@@ -82,6 +82,7 @@ export {
   OrderDistributionExceedsQuantityError,
   OrderWithoutDistributionError,
   OrderPresentationLineNotEditableError,
+  CustomerNotFoundError,
 } from './domain/errors';
 
 /** La pagina y su esquema (R34, R36). El defecto de 10 y el tope de 25 NO viven aqui: los
@@ -231,3 +232,23 @@ export type { DistributionLineInput, PresentationLineInput } from './domain/reso
  *  la reserva, la ejecucion y la tabla de ingredientes del formulario. */
 export { resolveLineNeed } from './domain/order-line-need';
 export type { LineNeedUnits, OrderLineNeed } from './domain/order-line-need';
+
+/** El cliente del pedido: su forma, el filtro del listado y la comprobacion de que existe y
+ *  sigue vivo. Los tipos del catalogo de clientes no se reexportan: son de `clientes`. */
+export {
+  ORDER_CUSTOMER_FILTER_FIELD,
+  ORDER_CUSTOMER_PRESENCE_FILTER_FIELD,
+  ORDER_CUSTOMER_PRESENCE_NONE,
+  ORDER_CUSTOMER_PRESENCE_VALUES,
+  formatOrderCustomerName,
+  isCustomerIdShape,
+  requireAliveCustomer,
+  toOrderCustomer,
+} from './domain/order-customer';
+export type { OrderCustomer, OrderCustomerSearchPurpose } from './domain/order-customer';
+export { createSetOrderCustomer } from './domain/set-order-customer';
+export type { SetOrderCustomerDeps } from './domain/set-order-customer';
+export { createSearchOrderCustomers } from './domain/search-order-customer-options';
+export type { SearchOrderCustomersDeps } from './domain/search-order-customer-options';
+export { createGetOrderCustomerFilterOption } from './domain/get-order-customer-filter-option';
+export type { GetOrderCustomerFilterOptionDeps } from './domain/get-order-customer-filter-option';

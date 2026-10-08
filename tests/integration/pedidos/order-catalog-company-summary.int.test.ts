@@ -126,6 +126,7 @@ function baseOrder(e: Empresa, overrides: Partial<NewOrder> = {}): NewOrder {
     priority: 'MEDIA',
     status: 'PENDIENTE',
     unitId: e.unitId,
+    customerId: null,
     presentationLines: [],
     ...overrides,
   }

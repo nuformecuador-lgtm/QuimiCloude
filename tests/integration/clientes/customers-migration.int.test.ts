@@ -8,8 +8,8 @@
 // SAVEPOINTS — ninguna operacion de este archivo se espera que falle salvo el caso sintetico de
 // `down.sql` roto, que va aparte y sin transaccion contra la base porque muta el SQL EN MEMORIA,
 // no la base.
-import { readdirSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { Prisma } from '@prisma/client'
@@ -62,6 +62,7 @@ function locateCustomersMigrationDir(): string {
 }
 
 const migrationDir = locateCustomersMigrationDir()
+const migrationsDir = dirname(migrationDir)
 
 function statementsOf(sql: string): readonly string[] {
   return sql
@@ -79,6 +80,32 @@ const UP_SOURCE = readFileSync(join(migrationDir, 'migration.sql'), 'utf8')
 const DOWN_SOURCE = readFileSync(join(migrationDir, 'down.sql'), 'utf8')
 const UP_STATEMENTS = statementsOf(UP_SOURCE)
 const DOWN_STATEMENTS = statementsOf(DOWN_SOURCE)
+
+/**
+ * Las migraciones POSTERIORES con una FK hacia `customers`. Un rollback real las revierte antes
+ * que esta: sin su `down.sql` delante, el `DROP TABLE "customers"` choca con 2BP01. Se detectan
+ * por texto y se leen del disco; los DOWN van de la mas reciente a la mas antigua y los UP al
+ * reves.
+ */
+const timestampDe = (nombre: string): string => nombre.split('_')[0] as string
+const DEPENDIENTES_POSTERIORES = readdirSync(migrationsDir)
+  .filter((nombre) => timestampDe(nombre) > timestampDe(basename(migrationDir)))
+  .filter((nombre) => {
+    const sql = join(migrationsDir, nombre, 'migration.sql')
+    return existsSync(sql) && /REFERENCES\s+"customers"/.test(readFileSync(sql, 'utf8'))
+  })
+  .sort()
+expect(
+  DEPENDIENTES_POSTERIORES,
+  'se esperaba encontrar la migracion del cliente del pedido como dependiente',
+).toContain('20261006160000_orders_customer')
+
+const DOWN_DE_DEPENDIENTES = [...DEPENDIENTES_POSTERIORES]
+  .reverse()
+  .flatMap((nombre) => statementsOf(readFileSync(join(migrationsDir, nombre, 'down.sql'), 'utf8')))
+const UP_DE_DEPENDIENTES = DEPENDIENTES_POSTERIORES.flatMap((nombre) =>
+  statementsOf(readFileSync(join(migrationsDir, nombre, 'migration.sql'), 'utf8')),
+)
 
 async function applyStatements(tx: Prisma.TransactionClient, statements: readonly string[]): Promise<void> {
   for (const statement of statements) {
@@ -134,6 +161,7 @@ describe('migracion customers contra Postgres real', () => {
       const permissionsAntes = await permissionsSnapshot(tx)
       const rolePermissionsAntes = await rolePermissionsSnapshot(tx)
 
+      await applyStatements(tx, DOWN_DE_DEPENDIENTES)
       await applyStatements(tx, DOWN_STATEMENTS)
 
       expect(await customersTableExists(tx)).toBe(false)
@@ -164,6 +192,7 @@ describe('migracion customers contra Postgres real', () => {
         ['Administrador', 'Operador'].sort(),
       )
 
+      await applyStatements(tx, DOWN_DE_DEPENDIENTES)
       await applyStatements(tx, DOWN_STATEMENTS)
 
       expect(
@@ -177,8 +206,10 @@ describe('migracion customers contra Postgres real', () => {
       const permissionsAntes = await permissionsSnapshot(tx)
       const rolePermissionsAntes = await rolePermissionsSnapshot(tx)
 
+      await applyStatements(tx, DOWN_DE_DEPENDIENTES)
       await applyStatements(tx, DOWN_STATEMENTS)
       await applyStatements(tx, UP_STATEMENTS)
+      await applyStatements(tx, UP_DE_DEPENDIENTES)
 
       expect(await customersTableExists(tx)).toBe(true)
 
@@ -194,6 +225,7 @@ describe('migracion customers contra Postgres real', () => {
 
   it('R24: si el seed ya creo los dos permisos y su asignacion, el UP no falla, no duplica y no reescribe updated_at', async () => {
     await inRolledBackTransaction(async (tx) => {
+      await applyStatements(tx, DOWN_DE_DEPENDIENTES)
       await applyStatements(tx, DOWN_STATEMENTS)
 
       // Simula que el seed ya dejo los dos permisos y su asignacion al Administrador ANTES de
@@ -228,6 +260,7 @@ describe('migracion customers contra Postgres real', () => {
       // La tabla no existe todavia porque el DOWN se aplico; el UP tiene que crearla ademas de
       // reconciliar los permisos ya sembrados sin fallar.
       await applyStatements(tx, UP_STATEMENTS)
+      await applyStatements(tx, UP_DE_DEPENDIENTES)
 
       const permisosDespues = await tx.permission.findMany({
         where: { code: { in: CODIGOS_CLIENTES } },

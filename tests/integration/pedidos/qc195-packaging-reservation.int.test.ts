@@ -60,6 +60,11 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
+import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+
+const customerCatalog = {
+  findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
+};
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -90,8 +95,8 @@ const presentations: PresentationCatalog = { findRefs: findPresentationRefs, fin
 const units: UnitCatalog = { findRefs: findUnitRefs, listVisibleRefs: () => Promise.reject(new Error('no se usa')), findMassVolumeBridge: () => findMassVolumeBridge(), findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany };
 const packaging: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
-const createOrder = createCreateOrder({ recipes, products, units, presentations, packaging, unitOfWork, now: () => new Date() });
-const updateOrder = createUpdateOrder({ orders, recipes, products, units, presentations, packaging, unitOfWork, now: () => new Date() });
+const createOrder = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging, unitOfWork, now: () => new Date() });
+const updateOrder = createUpdateOrder({ customerCatalog, orders, recipes, products, units, presentations, packaging, unitOfWork, now: () => new Date() });
 const cancelOrder = createCancelOrder({ orders, unitOfWork, now: () => new Date() });
 const deleteOrder = createDeleteOrder({ orders, unitOfWork, now: () => new Date() });
 const transition = createTransitionOrder({ unitOfWork });

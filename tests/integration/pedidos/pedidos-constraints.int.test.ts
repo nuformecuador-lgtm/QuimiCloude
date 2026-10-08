@@ -484,7 +484,7 @@ describe('el pedido como fila completa', () => {
     })
   })
 
-  it('la tabla real no tiene ninguna columna de total, subtotal, impuesto ni cliente', async () => {
+  it('la tabla real no tiene columna de total, subtotal ni impuesto; el cliente es una sola referencia, customer_id (QC-156 R5)', async () => {
     // R10 (y de paso R3 y R11) leidos contra `information_schema`, no contra el texto del
     // esquema: es la unica forma de que la AUSENCIA se compruebe donde de verdad importa.
     // La lista se lee entera para que anadir una columna prohibida se vea aqui.
@@ -495,13 +495,16 @@ describe('el pedido como fila completa', () => {
     expect(names).toEqual([
       // `cancellation_reason` la anade QC-34 (su R48, decision cerrada 4): es la UNICA columna
       // que esa ficha puede anadir a `orders`. Aparece la PRIMERA porque el `sort()` es
-      // lexicografico y 'ca' < 'cr'. Sigue sin haber total, subtotal, impuesto ni cliente.
+      // lexicografico y 'ca' < 'cr'. Sigue sin haber total, subtotal ni impuesto.
       'cancellation_reason',
       // `company_id` la anade QC-60 (R1): la empresa del pedido. No es un total, un impuesto ni un
       // cliente. Va entre las dos por el mismo `sort()` lexicografico ('ca' < 'co' < 'cr').
       'company_id',
       'created_at',
       'created_by',
+      // `customer_id` la anade QC-156 (R5): la UNICA referencia a cliente del pedido, opcional.
+      // Entre `created_by` y `deleted_at` por el mismo `sort()` lexicografico ('cr' < 'cu' < 'd').
+      'customer_id',
       'deleted_at',
       // `finished_at` es el instante en que el pedido paso a ENTREGADO al finalizarlo en
       // planta: no es un total, un subtotal, un impuesto ni un cliente. Entre `deleted_at` e

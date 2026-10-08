@@ -11,6 +11,7 @@ import {
 import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
+import { orderCustomerLabel } from './order-customer-label';
 import {
   CREATED_AT_COLUMN_ID,
   PRIORITY_COLUMN_ID,
@@ -87,6 +88,7 @@ export const ORDER_NUMBER_COLUMN_ID = 'orderNumber';
 
 /** Ids de las columnas que no filtran ni ordenan, pero que los tests localizan por su celda. */
 export const RECIPE_NAME_COLUMN_ID = 'recipeName';
+export const ORDER_CUSTOMER_NAME_COLUMN_ID = 'customer';
 export const QUANTITY_COLUMN_ID = 'quantity';
 export const PRESENTATION_NAME_COLUMN_ID = 'presentationName';
 export const CANCELLATION_REASON_COLUMN_ID = 'cancellationReason';
@@ -153,6 +155,8 @@ export type OrderColumnsDeps = {
   readonly coverageByOrder?: Readonly<Record<string, OrderCoverage>>;
   /** Si el actor puede modificar pedidos; lo resuelve el servidor. */
   readonly canEditDistribution?: boolean;
+  /** Si el actor puede cambiar el cliente del pedido; lo resuelve el servidor. */
+  readonly canEditCustomer?: boolean;
 };
 
 /**
@@ -175,6 +179,7 @@ export function buildOrderColumns({
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
   coverageByOrder = {},
   canEditDistribution = false,
+  canEditCustomer = false,
 }: OrderColumnsDeps): readonly DataTableColumn<OrderSummary>[] {
   return [
     {
@@ -213,6 +218,18 @@ export function buildOrderColumns({
       hideText: false,
       cell: (order) =>
         order.recipeName ?? <MissingValue field={RECIPE_NAME_COLUMN_ID} />,
+    },
+    {
+      id: ORDER_CUSTOMER_NAME_COLUMN_ID,
+      label: 'Cliente',
+      align: 'start',
+      // Sin `sortable` ni `filter`: el filtro de cliente es un autocompletado de la barra.
+      cell: (order) =>
+        order.customer === null ? (
+          <MissingValue field={ORDER_CUSTOMER_NAME_COLUMN_ID} />
+        ) : (
+          orderCustomerLabel(order.customer)
+        ),
     },
     {
       id: QUANTITY_COLUMN_ID,
@@ -312,6 +329,7 @@ export function buildOrderColumns({
           // La hoja pinta la cobertura de ESTA fila, ya traida por el lote.
           coverage={coverageByOrder[order.id]}
           canEditDistribution={canEditDistribution}
+          canEditCustomer={canEditCustomer}
         />
       ),
     },

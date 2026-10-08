@@ -26,7 +26,7 @@ import {
  */
 
 /**
- * Cuantas celdas por fila pinta el esqueleto: ONCE, la misma cuenta que `ORDER_COLUMNS.length`.
+ * Cuantas celdas por fila pinta el esqueleto: DOCE, la misma cuenta que `ORDER_COLUMNS.length`.
  *
  * **QC-102 R22**: el esqueleto y la tabla declaran el MISMO numero de columnas, de modo que
  * resolverse la carga no cambie cuantas columnas hay y la pantalla no de un salto.
@@ -36,7 +36,7 @@ import {
  * Server Component. Para que el numero no se quede atras en silencio, T7 anade el test que ata
  * esta constante a `ORDER_COLUMNS.length`.
  */
-export const ORDER_SKELETON_COLUMN_COUNT = 11;
+export const ORDER_SKELETON_COLUMN_COUNT = 12;
 
 export function OrderListSkeleton({ rows }: { readonly rows: number }) {
   const columns = Array.from({ length: ORDER_SKELETON_COLUMN_COUNT }, (_, index) => index);

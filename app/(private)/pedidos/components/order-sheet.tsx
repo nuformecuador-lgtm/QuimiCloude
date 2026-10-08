@@ -16,6 +16,7 @@ import type { OrderCoverage } from '@/lib/modules/inventario';
 
 import { CancelOrderDialog } from './cancel-order-dialog';
 import { DeleteOrderDialog } from './delete-order-dialog';
+import { OrderCustomerDialog } from './order-customer-dialog';
 import { OrderDistributionDialog, type OrderDistributionDraft } from './order-distribution-dialog';
 import { OrderForm, type OrderSheetSection } from './order-form';
 import {
@@ -183,6 +184,8 @@ export type OrderRowSheetActionsProps = {
   readonly coverage?: OrderCoverage;
   /** Si el actor puede modificar pedidos; lo resuelve el servidor. */
   readonly canEditDistribution?: boolean;
+  /** Si el actor puede cambiar el cliente; lo resuelve el servidor. */
+  readonly canEditCustomer?: boolean;
 };
 
 /**
@@ -211,11 +214,13 @@ export function OrderRowSheetActions({
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
   coverage,
   canEditDistribution = false,
+  canEditCustomer = false,
 }: OrderRowSheetActionsProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [distributionOpen, setDistributionOpen] = useState(false);
+  const [customerOpen, setCustomerOpen] = useState(false);
   // Atado a la instancia de `order`: cuando llega el refresco trae otra y lo guardado se descarta.
   const [savedDistribution, setSavedDistribution] = useState<{
     readonly order: OrderSummary;
@@ -244,6 +249,8 @@ export function OrderRowSheetActions({
         onResponsibles={() => openSection('responsibles')}
         canEditDistribution={canEditDistribution}
         onDistribution={() => setDistributionOpen(true)}
+        canEditCustomer={canEditCustomer}
+        onCustomer={() => setCustomerOpen(true)}
       />
       <OrderSheet
         order={order}
@@ -272,6 +279,9 @@ export function OrderRowSheetActions({
           saved={pendingDistribution}
           onSaved={(draft) => setSavedDistribution({ order, draft })}
         />
+      ) : null}
+      {customerOpen ? (
+        <OrderCustomerDialog order={order} open onOpenChange={setCustomerOpen} />
       ) : null}
     </>
   );

@@ -64,6 +64,11 @@ import type { PackagingCatalog } from '@/lib/modules/inventario';
 
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
+import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma'
+
+const customerCatalog = {
+  findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
+}
 
 const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
@@ -286,7 +291,7 @@ describe('R3 — el alta copia el contenido de cada presentacion del reparto', (
   it('la presentacion del envase tiene contenido: la linea copia ese valor (QC-195 R14)', async () => {
     const recipeId = await crearReceta(A)
     const envase = await crearEnvase(A, '5.0000')
-    const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
+    const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
 
     const creado = await alta(
       {
@@ -311,7 +316,7 @@ describe('R3 — el alta copia el contenido de cada presentacion del reparto', (
   it('R35: la presentacion del envase NO tiene contenido, rechaza con presentation_without_content y no crea nada (QC-195 R13)', async () => {
     const recipeId = await crearReceta(A)
     const envase = await crearEnvase(A, null)
-    const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
+    const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
 
     try {
       await expect(
@@ -341,8 +346,8 @@ describe('R3 — la edicion reemplaza el reparto y copia el contenido vigente', 
     const envaseNuevo = await crearEnvase(A, '9.0000')
     const presentationVieja = envaseViejo.presentationId
     const presentationNueva = envaseNuevo.presentationId
-    const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
-    const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
+    const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
+    const edicion = createUpdateOrder({ customerCatalog, orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
 
     const creado = await alta(
       {
@@ -388,8 +393,8 @@ describe('R3 — la edicion reemplaza el reparto y copia el contenido vigente', 
     // El contenido VIGENTE de la presentacion cambia entre el alta y la edicion: la edicion
     // reemplaza el CONJUNTO de lineas y vuelve a copiar el contenido de HOY (R3), a diferencia
     // de la presentacion unica de QC-146, que solo recopiaba si el id cambiaba.
-    const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
-    const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
+    const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
+    const edicion = createUpdateOrder({ customerCatalog, orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
 
     const creado = await alta(
       {
@@ -436,7 +441,7 @@ describe('R3 — cambiar el contenido de la presentacion no toca la copia de un 
     const recipeId = await crearReceta(A)
     const envase = await crearEnvase(A, '1.0000')
     const presentationId = envase.presentationId
-    const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
+    const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork })
 
     const creado = await alta(
       {

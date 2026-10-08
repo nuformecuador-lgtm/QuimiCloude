@@ -26,7 +26,12 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { setupUser } from '../../helpers/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { OrderRowActions, isFinalOrderStatus } from '@/app/(private)/pedidos/components';
+import {
+  ORDER_ACTION_CUSTOMER_TESTID,
+  ORDER_ACTION_DISTRIBUTION_TESTID,
+  OrderRowActions,
+  isFinalOrderStatus,
+} from '@/app/(private)/pedidos/components';
 import {
   ORDER_STATUS_VALUES,
   formatOrderNumber,
@@ -79,6 +84,7 @@ function pedido(status: OrderStatus, overrides: Partial<OrderSummary> = {}): Ord
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    customer: null,
     ...overrides,
   };
 }
@@ -331,4 +337,55 @@ describe('QC-102 — la entrada propia «Responsables» (R24)', () => {
       expect(enganches.onDelete).not.toHaveBeenCalled();
     },
   );
+});
+
+describe('la accion «Cliente»', () => {
+  it.each(ORDER_STATUS_VALUES)('R32: con canEditCustomer aparece y esta habilitada en %s', async (status) => {
+    render(<OrderRowActions order={pedido(status)} canEditCustomer />);
+
+    abrirMenu();
+
+    const item = await screen.findByTestId(ORDER_ACTION_CUSTOMER_TESTID);
+    expect(item).not.toHaveAttribute('aria-disabled');
+  });
+
+  it('R32: cubre los siete estados del contrato', () => {
+    expect(ORDER_STATUS_VALUES).toHaveLength(7);
+  });
+
+  it.each(ORDER_STATUS_VALUES)('R32: sin canEditCustomer no aparece en %s', async (status) => {
+    render(<OrderRowActions order={pedido(status)} />);
+
+    abrirMenu();
+
+    await screen.findByTestId('order-action-edit');
+    expect(screen.queryByTestId(ORDER_ACTION_CUSTOMER_TESTID)).toBeNull();
+  });
+
+  it('R32: pulsarla emite su enganche con la fila, tambien con el pedido cerrado', async () => {
+    const onCustomer = vi.fn();
+    const elPedido = pedido('ENTREGADO');
+    render(<OrderRowActions order={elPedido} canEditCustomer onCustomer={onCustomer} />);
+
+    abrirMenu();
+    fireEvent.click(await screen.findByTestId(ORDER_ACTION_CUSTOMER_TESTID));
+
+    expect(onCustomer).toHaveBeenCalledWith(elPedido);
+  });
+
+  it('va detras de «Responsables» y delante de «Reparto y unidad»', async () => {
+    render(<OrderRowActions order={pedido('POR_EMPACAR')} canEditCustomer canEditDistribution />);
+
+    abrirMenu();
+    await screen.findByTestId(ORDER_ACTION_CUSTOMER_TESTID);
+
+    expect(screen.getAllByRole('menuitem').map((item) => item.getAttribute('data-testid'))).toEqual([
+      'order-action-edit',
+      'order-action-cancel',
+      'order-action-delete',
+      RESPONSABLES_TESTID,
+      ORDER_ACTION_CUSTOMER_TESTID,
+      ORDER_ACTION_DISTRIBUTION_TESTID,
+    ]);
+  });
 });

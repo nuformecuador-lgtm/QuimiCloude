@@ -662,9 +662,9 @@ enum OrderPriority {
 /// Sin fecha de solicitud: es `createdAt`. El correlativo es un indice unico total, no parcial: un
 /// pedido dado de baja conserva su numero, y se mide DENTRO de la empresa: `(empresa, ano,
 /// secuencia)`. `orderYear` es el ano de `createdAt` en UTC, y lo exige el CHECK
-/// `orders_order_year_matches_created_at`. `recipeId`, `createdBy`, `updatedBy` y `companyId` van
-/// sin `@relation` porque apuntan a otros modulos; sus FK y CHECK estan escritos a mano y son drift:
-/// hay que borrar a mano su `DROP CONSTRAINT` de toda migracion generada.
+/// `orders_order_year_matches_created_at`. `recipeId`, `createdBy`, `updatedBy`, `companyId` y
+/// `customerId` van sin `@relation` porque apuntan a otros modulos; sus FK y CHECK estan escritos a
+/// mano y son drift: hay que borrar a mano su `DROP CONSTRAINT` de toda migracion generada.
 /// `orders_id_company_id_key` es la clave candidata a la que apunta la FK COMPUESTA de
 /// `order_assignments`: quitarla la rompe.
 /// Los indices de listado son parciales y viven en la migracion `list_query_indexes`.
@@ -709,6 +709,9 @@ model Order {
   /// `@relation`: `Unit` es de `unidades`, es drift. NULL solo en pedidos anteriores sin
   /// presentacion; la aplicacion la exige en el alta y en la edicion.
   unitId              String?       @map("unit_id") @db.Uuid
+  /// Cliente del pedido, opcional. Sin `@relation`: `Customer` es de `clientes`, es drift. FK
+  /// COMPUESTA `(company_id, customer_id)` a `customers_company_id_id_key`, escrita a mano.
+  customerId          String?       @map("customer_id") @db.Uuid
 
   presentationLines OrderPresentationLine[]
 
@@ -719,6 +722,7 @@ model Order {
   @@index([updatedBy], map: "orders_updated_by_idx")
   @@index([packedBy], map: "orders_packed_by_idx")
   @@index([unitId], map: "orders_unit_id_idx")
+  @@index([companyId, customerId], map: "orders_company_id_customer_id_idx")
   @@map("orders")
 }
 

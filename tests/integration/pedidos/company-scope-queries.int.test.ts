@@ -171,6 +171,7 @@ function pedidoNuevo(overrides: Partial<NewOrder> = {}): NewOrder {
     priority: 'BAJA',
     status: 'PENDIENTE',
     unitId,
+    customerId: null,
     presentationLines: [],
     ...overrides,
   };

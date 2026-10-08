@@ -28,6 +28,8 @@ import {
   updateOrderDistributionSchema,
   type Actor,
   type OrderCostQuote,
+  type OrderCustomer,
+  type OrderCustomerSearchPurpose,
   type OrderPresentationAvailabilityNext,
   type OrderSummary,
   type OrderView,
@@ -216,6 +218,7 @@ function buildCreateCandidate(formData: FormData): unknown {
     // Solo la cadena exacta confirma: cualquier otro valor, o la ausencia, es no confirmar.
     confirmBlocked: formData.get('confirmBlocked') === 'true',
     recipeVersionId: readOptionalFormString(formData, 'recipeVersionId'),
+    customerId: readOptionalFormString(formData, 'customerId'),
   };
 }
 
@@ -480,6 +483,55 @@ export async function updateOrderDistributionAction(
       case 'unit_not_convertible':
         throw new OrderUnitNotConvertibleError();
     }
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// El cliente del pedido.
+// ---------------------------------------------------------------------------------------------
+
+export type OrderCustomerOptionsResult = { status: 'success'; data: Page<OrderCustomer> } | ErrorState;
+
+export type OrderCustomerFilterOptionResult = { status: 'success'; data: OrderCustomer | null } | ErrorState;
+
+/** Cambio de cliente. Argumentos tipados, sin `FormData`: el dialogo no es un `<form>` de varios
+ *  campos. `input` = `{ customerId: string | null }`. */
+export async function setOrderCustomerAction(id: string, input: unknown): Promise<OrderMutationFormState> {
+  const actor = await currentActor();
+
+  try {
+    await pedidos.setOrderCustomer(id, input, actor);
+    return { status: 'success' };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/** Opciones del selector. `purpose` decide el permiso y si entran los dados de baja.
+ *  `query` = `{ search: string; page: number; pageSize?: number }`. */
+export async function searchOrderCustomersAction(
+  query: unknown,
+  purpose: OrderCustomerSearchPurpose,
+): Promise<OrderCustomerOptionsResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await pedidos.searchOrderCustomers(query, purpose, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/** El cliente que trae la direccion del filtro. `null` = descartar el filtro. */
+export async function getOrderCustomerFilterOptionAction(id: string): Promise<OrderCustomerFilterOptionResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await pedidos.getOrderCustomerFilterOption(id, actor);
+    return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);
   }

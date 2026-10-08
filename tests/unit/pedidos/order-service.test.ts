@@ -32,6 +32,7 @@ import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/li
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
+import { fakeCustomerCatalog } from '../../helpers/customer-catalog-double';
 
 // QC-74: el actor lleva PERMISOS, no el nombre del rol (R18). Los dos codigos de `pedidos`,
 // porque este archivo ejercita lecturas y escrituras con el mismo fixture.
@@ -80,6 +81,7 @@ function fila(overrides: Partial<OrderRow> = {}): OrderRow {
     updatedBy: 'admin-0',
     presentationLines: [{ presentationId: PRESENTATION_ID, packages: 5, packagingProductId: null }],
     unitId: UNIT_ID,
+    customerId: null,
     ...overrides,
   }
 }
@@ -91,6 +93,7 @@ type Dobles = {
   readonly units: UnitCatalog
   readonly presentations: PresentationCatalog
   readonly packaging: PackagingCatalog
+  readonly customerCatalog: ReturnType<typeof fakeCustomerCatalog>
   readonly unitOfWork: ReturnType<typeof fakeUnitOfWork>['unitOfWork']
   readonly now: () => Date
 }
@@ -164,6 +167,7 @@ function dobles(opciones: {
     } as unknown as UnitCatalog,
     presentations: { findRefs: findPresentationRefs } as unknown as PresentationCatalog,
     packaging: fakePackagingCatalog(),
+    customerCatalog: fakeCustomerCatalog(),
     unitOfWork,
     now: () => AHORA,
     create,
@@ -210,6 +214,7 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
       status: 'PENDIENTE',
       unitId: UNIT_ID,
       presentationLines: [],
+      customerId: null,
     })
   })
 
@@ -248,6 +253,7 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
     const [data, , actorId] = d.create.mock.calls[0] as [Record<string, unknown>, number, string]
     expect(actorId).toBe(ADMIN.id)
     expect(Object.keys(data).sort()).toEqual([
+      'customerId',
       'presentationLines',
       'priority',
       'quantity',
@@ -334,6 +340,7 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       // [Q4]: la unidad y su etiqueta, resueltas por el contrato de `unidades`.
       unitId: UNIT_ID,
       unitLabel: 'L',
+      customer: null,
     })
   })
 
@@ -438,6 +445,7 @@ describe('lecturas — el importe se devuelve a quien tiene pedidos.consultar (R
     const log = { ignoredFields: vi.fn() }
 
     const pagina = await createListOrders({
+      customerCatalog: fakeCustomerCatalog(),
       orders,
       recipes: { findRefsIncludingDeleted, findIdsMatchingName } as unknown as RecipeCatalog,
       presentations: { findRefs: vi.fn(async () => []) } as unknown as PresentationCatalog,
@@ -478,6 +486,7 @@ describe('updateOrder — edicion (R6, R8, R9, R20, R21, R22, R24, R25, R33)', (
       priority: 'ALTA',
       unitId: UNIT_ID,
       presentationLines: [],
+      customerId: null,
     })
     expect(actorId).toBe(ADMIN.id)
     expect(instante).toBe(AHORA)
