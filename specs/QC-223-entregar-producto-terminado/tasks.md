@@ -174,7 +174,7 @@ Archivos:
 **Hecho cuando:** el archivo está en verde, `tests/guards/guard-ambito-empresa-pedidos.test.ts` y
 los `company-scope` de `pedidos` están en verde, y el gate de la tanda también.
 
-### [ ] B4 — Casos de uso reales
+### [x] B4 — Casos de uso reales
 Depende de: T0. La parte unitaria puede empezar en paralelo con B1–B3 porque trabaja con dobles;
 se cierra después de B3.
 
@@ -250,7 +250,7 @@ Archivos:
 
 Trabaja contra las actions mockeadas y `tests/fixtures/order-delivery.ts`. No toca `lib/`.
 
-### [ ] F1 [P] — Acción «Entregar» en la fila
+### [x] F1 [P] — Acción «Entregar» en la fila
 Depende de: T0. Va en paralelo con F2 y con el bloque B.
 
 Archivos:
@@ -266,7 +266,7 @@ Archivos:
 **Hecho cuando:** el archivo está en verde, los tests que ya existían de `order-row-actions`,
 `order-columns` y `order-row-wiring` siguen en verde, y el gate de la tanda también.
 
-### [ ] F2 [P] — Borrador
+### [x] F2 [P] — Borrador
 Depende de: T0. Va en paralelo con F1.
 
 Archivos:
@@ -282,7 +282,7 @@ Archivos:
 
 **Hecho cuando:** el archivo está en verde y el gate de la tanda también.
 
-### [ ] F3 — Sheet de entrega
+### [x] F3 — Sheet de entrega
 Depende de: F1 y F2.
 
 Archivos:
@@ -305,7 +305,7 @@ Archivos:
 **Hecho cuando:** el archivo está en verde, el sheet no declara ninguna aritmética de tope propia
 (usa `checkDelivery`) y el gate de la tanda también.
 
-### [ ] F4 [P] — Historial del lote
+### [x] F4 [P] — Historial del lote
 Depende de: T0. Va en paralelo con F1–F3.
 
 Archivos: `tests/unit/inventario/batch-history.test.tsx`. Caso R38: un asiento `delivery` se pinta

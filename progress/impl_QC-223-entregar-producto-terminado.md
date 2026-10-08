@@ -441,3 +441,16 @@ B4 opción b lista: la clave se comprueba antes del cliente, el bloqueo y el est
   - `tests/unit/recetas/scope.test.ts`, que señala `app/(private)/pedidos/page.tsx`, un archivo que esta rama no toca.
 
 F1-F4 hechos: la acción, el borrador, el sheet y el R38 están en verde, salvo los rojos ajenos (baseline y `recetas/scope`). Hay dos desviaciones menores anotadas arriba para el reviewer.
+
+## Cierre de la tanda 3 (implementer, 2026-10-08)
+
+- B4 (opción b, 7770a7bc), F1, F2, F4 (2ddc5c79) y F3 (a74a6db0) marcadas [x].
+- TC: los casos de uso importan `checkDelivery`/`remainingPackages` de `./order-delivery` y no del barrel
+  de `pedidos`, porque el barrel crearía un ciclo. El caso R16 de TC tiene que aceptar esa ruta.
+- Rojos vistos en esta tanda que no son nuestros: `navegacion/pantallas-exigen-permiso` y `recetas/scope`
+  (los dos en `tests/baseline-rojos.json`; `app/(private)/pedidos/page.tsx` es igual a `origin/dev`).
+- Abierto para el humano: R29 pide «el mismo estado del pedido que dejó la primera»; el código responde con
+  el estado actual del pedido de la entrega (solo difiere si una entrega parcial ya registrada queda
+  seguida de otra que completa el pedido). Ver la sección «B4 opción b».
+- Desviaciones de frontend para el reviewer: el sheet lo monta `order-sheet.tsx` (`OrderRowSheetActions`),
+  no `order-table.tsx`; el campo de envases no se recorta a dígitos, para que el aviso R13 pueda aparecer.
