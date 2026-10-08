@@ -113,6 +113,36 @@ misma rama daba **23 archivos y 32 tests en rojo** desde un shell limpio y **1 a
 con el `.env` cargado, y el rojo no decía «falta una variable» sino «Validation Error» de Prisma,
 que se lee como un fallo de código.
 
+## Datos de demostración en la base local: `pnpm db:seed:demo` (QC-230, 2026-10-08)
+
+- **Para qué:** ver pantallas con datos sin cargarlos a mano. Corre sobre la empresa del seed
+  base, así que antes va `pnpm db:seed`.
+- **Cómo:** las contraseñas de los usuarios de demo van en el entorno del comando, nunca en un
+  archivo versionado (nombres en `.env.example`):
+  `SEED_DEMO_OPERADOR_PASSWORD=... SEED_DEMO_EMPACADOR_PASSWORD=... SEED_DEMO_ACONDICIONAMIENTO_PASSWORD=... pnpm db:seed:demo`.
+  Si falta alguna, falla nombrándola. Deben cumplir la política de credenciales.
+- **Nunca en producción:** se niega con `VERCEL_ENV=production` y si `DATABASE_URL` no apunta a
+  `localhost` o `127.0.0.1`. Solo lo salta `--forzar` (o `SEED_DEMO_FORZAR=1`), y avisa.
+- **Idempotente:** cada cosa se busca por su nombre antes de crearla y un pedido a medias se
+  retoma desde su estado. Una segunda corrida no crea nada.
+- **Qué crea**, todo ficticio y con el prefijo `DEMO` (lotes `DEMO-`, usuarios `demo.`):
+  - 2 unidades propias y 5 presentaciones;
+  - 8 insumos, 3 envases y 2 instrumentos, con 15 lotes y ajustes de merma, rotura y conteo;
+  - 2 proveedores con 5 líneas de catálogo y 4 clientes;
+  - 4 recetas con líneas, pasos y pasos de envasado, una con 2 versiones;
+  - 5 usuarios activos (2 Operadores, 2 Empacadores, 1 de acondicionamiento) y 2 grupos de
+    trabajo;
+  - 10 pedidos con responsables, uno por estado y con las cuatro prioridades. Los que avanzan
+    lo hacen por los casos de uso reales, así que consumen material y dan de alta producto
+    terminado.
+- **Lo que no crea, y por qué:**
+  - ningún pedido `ENTREGADO`: hoy ningún caso de uso lleva un pedido a ese estado;
+  - ningún Administrador de demo: el alta de usuarios no concede ese rol, y actúa el del seed
+    base.
+- **Por dónde pasa:** toda escritura va por los casos de uso de `lib/composition`, con su
+  permiso y sus invariantes. Prisma solo lee, para saber qué existe ya. El código está en
+  `scripts/seed-demo/`.
+
 ## Los tests de integración corren sobre una base propia y efímera (QC-77, 2026-09-12)
 
 - El gate carga `DATABASE_URL` para saber **dónde está el Postgres**, no para escribir en ella.
