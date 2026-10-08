@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { wholePackagesIn } from '@/lib/modules/inventario'
+import { quantityForPackages } from '@/lib/modules/inventario/domain/finished-goods-dispatch'
 
 describe('wholePackagesIn (R20, R7)', () => {
   it.each([
@@ -26,5 +27,22 @@ describe('wholePackagesIn (R20, R7)', () => {
 
   it('R20: una cadena que no es decimal lanza', () => {
     expect(() => wholePackagesIn('abc', '1.0000')).toThrow(/no es un decimal valido/)
+  })
+})
+
+describe('quantityForPackages (R23)', () => {
+  it.each([
+    { caso: 'contenido entero', packages: 4, content: '5.0000', esperado: '20.0000' },
+    { caso: 'contenido decimal', packages: 3, content: '0.7500', esperado: '2.2500' },
+    { caso: 'un envase de la escala minima', packages: 1, content: '0.0001', esperado: '0.0001' },
+    { caso: 'sin decimales en la entrada', packages: 2, content: '3', esperado: '6.0000' },
+    { caso: 'cifras grandes sin perder precision', packages: 1000, content: '9999999.9999', esperado: '9999999999.9000' },
+  ])('R23: $caso', ({ packages, content, esperado }) => {
+    expect(quantityForPackages(packages, content)).toBe(esperado)
+  })
+
+  it('R23: envases que no son un entero no negativo lanzan', () => {
+    expect(() => quantityForPackages(1.5, '1.0000')).toThrow(/envases no validos/)
+    expect(() => quantityForPackages(-1, '1.0000')).toThrow(/envases no validos/)
   })
 })

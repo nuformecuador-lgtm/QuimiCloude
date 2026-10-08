@@ -11,6 +11,7 @@ import {
   ValidationError,
 } from '../../../domain/errors';
 import { planFinishedGoodsLine } from '../../../domain/finished-goods';
+import { quantityForPackages, wholePackagesIn } from '../../../domain/finished-goods-dispatch';
 import { isWholeQuantity } from '../../../domain/product-input';
 import { normalizeProductName } from '../../../domain/product-name';
 import { netReservedQuantity } from '../../../domain/reservation-ledger';
@@ -34,6 +35,7 @@ import {
 } from './list-query-sql';
 
 import type { FinishedGoodsOutcome } from '../../../domain/finished-goods';
+import type { FinishedGoodsDispatchOutcome } from '../../../domain/finished-goods-dispatch';
 import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
@@ -1286,6 +1288,121 @@ export async function receiveFinishedGoods(
   await recalculateProductStock(tx, product.id, scope);
 
   return { kind: 'received', productId: product.id, productName: product.name, packages: input.packages.toString() };
+}
+
+/**
+ * La salida de producto terminado hacia un cliente, para UNA combinacion receta-presentacion, sobre
+ * la MISMA transaccion de quien llama: bloquea el producto terminado vivo (`FOR NO KEY UPDATE`,
+ * como la entrada), lee los lotes pedidos -de ese producto, de la empresa y con contenido de
+ * envase-, y por cada asignacion hace el decremento CONDICIONAL (`stock >= cantidad` en el
+ * `where`, como `consumeBatchStock`) y su asiento `delivery` en negativo. Recalcula
+ * `products.stock` una sola vez, al final.
+ *
+ * No lanza por un lote ausente o corto: lo devuelve, y quien llama deshace la transaccion entera.
+ * Un lote de otra empresa, de otro producto o sin contenido sale igual que uno que no existe.
+ */
+export async function dispatchFinishedGoods(
+  tx: Prisma.TransactionClient,
+  input: {
+    readonly orderId: string;
+    readonly orderDeliveryId: string;
+    readonly recipeId: string;
+    readonly presentationId: string;
+    readonly allocations: readonly { readonly batchId: string; readonly packages: number }[];
+    readonly actorId: string;
+    readonly now: Date;
+  },
+  scope: InventoryScope,
+): Promise<FinishedGoodsDispatchOutcome> {
+  const { companyId } = companyScopeColumns(scope);
+  const firstAllocation = input.allocations[0];
+  if (firstAllocation === undefined) return { kind: 'dispatched', lines: [] };
+
+  const productRows = await tx.$queryRaw<ReadonlyArray<{ id: string }>>(Prisma.sql`
+    SELECT "id"
+      FROM "products"
+     WHERE "company_id" = ${companyId}::uuid
+       AND "recipe_id" = ${input.recipeId}::uuid
+       AND "presentation_id" = ${input.presentationId}::uuid
+       AND "type" = ${PRODUCT_TYPES.FINISHED_PRODUCT}::"ProductType"
+       AND "deleted_at" IS NULL
+       FOR NO KEY UPDATE
+  `);
+  const product = productRows[0];
+  if (product === undefined) return { kind: 'batch_not_found', batchId: firstAllocation.batchId };
+
+  const batchRows = await tx.productBatch.findMany({
+    where: {
+      AND: [
+        batchCompanyScope(scope),
+        {
+          id: { in: input.allocations.map((allocation) => allocation.batchId) },
+          productId: product.id,
+          packageContent: { not: null },
+        },
+      ],
+    },
+    select: { id: true, packageContent: true },
+  });
+  const contentByBatch = new Map<string, string>();
+  for (const row of batchRows) {
+    if (row.packageContent !== null) contentByBatch.set(row.id, row.packageContent.toFixed(4));
+  }
+  const missing = input.allocations.find((allocation) => !contentByBatch.has(allocation.batchId));
+  if (missing !== undefined) return { kind: 'batch_not_found', batchId: missing.batchId };
+
+  const lines: { batchId: string; packages: number; quantity: string }[] = [];
+  for (const allocation of input.allocations) {
+    const packageContent = contentByBatch.get(allocation.batchId);
+    if (packageContent === undefined) return { kind: 'batch_not_found', batchId: allocation.batchId };
+    const quantity = quantityForPackages(allocation.packages, packageContent);
+    const decimalQuantity = new Prisma.Decimal(quantity);
+
+    const { count } = await tx.productBatch.updateMany({
+      where: {
+        AND: [
+          batchCompanyScope(scope),
+          { id: allocation.batchId, productId: product.id, stock: { gte: decimalQuantity } },
+        ],
+      },
+      data: { stock: { decrement: decimalQuantity }, updatedBy: input.actorId, updatedAt: input.now },
+    });
+
+    if (count === 0) {
+      const current = await tx.productBatch.findFirst({
+        where: { AND: [batchCompanyScope(scope), { id: allocation.batchId }] },
+        select: { stock: true },
+      });
+      const stock = current === null ? ZERO_QUANTITY : current.stock.toFixed(4);
+      return {
+        kind: 'insufficient',
+        batchId: allocation.batchId,
+        availablePackages: wholePackagesIn(stock, packageContent),
+      };
+    }
+
+    await writeMovement(
+      tx,
+      {
+        batchId: allocation.batchId,
+        kind: 'delivery',
+        quantity: negateQuantity(quantity),
+        reason: null,
+        orderId: input.orderId,
+        orderPresentationLineId: null,
+        orderDeliveryId: input.orderDeliveryId,
+        createdBy: input.actorId,
+      },
+      input.now,
+      scope,
+    );
+
+    lines.push({ batchId: allocation.batchId, packages: allocation.packages, quantity });
+  }
+
+  await recalculateProductStock(tx, product.id, scope);
+
+  return { kind: 'dispatched', lines };
 }
 
 /** Lote de producto terminado que entra por importacion: asiento `opening`, no `production`,

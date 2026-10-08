@@ -23,6 +23,19 @@ export function wholePackagesIn(stock: string, packageContent: string): number {
   return Number(available / content);
 }
 
+/** `packages x packageContent`, exacto, como `'d.dddd'`. Es lo que sale del lote al entregar
+ *  esos envases. */
+export function quantityForPackages(packages: number, packageContent: string): string {
+  if (!Number.isSafeInteger(packages) || packages < 0) {
+    throw new Error(`finished-goods-dispatch: envases no validos: ${String(packages)}`);
+  }
+  const scaled = BigInt(packages) * toScaled(packageContent);
+  const negative = scaled < ZERO;
+  const digits = (negative ? -scaled : scaled).toString().padStart(SCALE + 1, '0');
+  const cut = digits.length - SCALE;
+  return `${negative ? '-' : ''}${digits.slice(0, cut)}.${digits.slice(cut)}`;
+}
+
 export type DeliverableBatch = {
   readonly batchId: string;
   readonly presentationId: string;

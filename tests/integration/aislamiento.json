@@ -37,6 +37,7 @@
     "inventario/company-scope.int.test.ts",
     "inventario/inventario-constraints.int.test.ts",
     "inventario/inventory-movements-constraints.int.test.ts",
+    "inventario/finished-goods-dispatch.int.test.ts",
     "inventario/presentation-uniqueness.int.test.ts",
     "inventario/product-batch-require-unit.int.test.ts",
     "inventario/product-batch-write.int.test.ts",
@@ -49,6 +50,7 @@
     "pedidos/order-conditioning-states-rollback.int.test.ts",
     "pedidos/order-crud.int.test.ts",
     "pedidos/order-delivery-constraints.int.test.ts",
+    "pedidos/order-delivery-repository.int.test.ts",
     "pedidos/order-packing-constraints.int.test.ts",
     "pedidos/order-packing-states-rollback.int.test.ts",
     "pedidos/order-status-blocked-rollback.int.test.ts",
@@ -540,6 +542,11 @@
       "archivo": "asignaciones/execution-atomicity.int.test.ts",
       "motivo": "Atomicidad de la ejecucion con la composicion real: 'withExecutionTransaction' (execution-transaction-prisma.ts) abre su PROPIA 'prisma.$transaction' sobre el cliente GLOBAL y 'pedidos' se une a ella; lo que se mide es que su ROLLBACK deshaga pedido, reservas, consumo, lotes y anotacion, y la carrera de dos arranques reales, asi que una transaccion del test no la envolveria. Cada caso fabrica su empresa efimera con randomUUID y la borra en un 'finally' por 'company_id' en orden de FK (anotaciones -> asientos -> reparto -> asignaciones -> pedidos -> lineas de receta -> producto terminado -> recetas -> lotes -> productos -> presentaciones -> unidad -> equipo -> usuarios -> roles -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-06"
+    },
+    {
+      "archivo": "inventario/deliverable-batches.int.test.ts",
+      "motivo": "Lotes que se pueden entregar: 'findDeliverableBatches' (deliverable-batches-prisma.ts) lee con el cliente Prisma GLOBAL, y los lotes se siembran con 'receiveFinishedGoods' y 'addImportedFinishedGoodsBatch' en 'prisma.$transaction' que CONFIRMAN: una transaccion del test con ROLLBACK no los envolveria. Cada caso fabrica dos empresas efimeras con randomUUID (usuario, rol, tipo de documento, unidad, recetas, presentaciones, pedido, linea, productos terminados y lotes) y las limpia en un 'finally' por 'company_id' en orden de FK (asientos -> lotes -> productos -> lineas -> pedidos -> recetas -> presentaciones -> unidad; usuario, rol, tipo de documento y empresa en 'afterAll'). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-08"
     },
     {
       "archivo": "pedidos/order-customer.int.test.ts",

@@ -149,8 +149,9 @@ empresa; operación que mueve existencias idempotente y auditable).
   - una referencia a entrega en un asiento que no es de entrega;
   - dos asientos de entrega del mismo lote en la misma entrega;
   - una línea de entrega con envases o cantidad menores o iguales a cero;
-  - una entrega, una línea o un asiento cuya empresa no coincida con la del pedido, la del cliente
-    o la del lote al que apuntan;
+  - una entrega, una línea o un asiento cuya empresa no coincida con la del pedido, la del cliente,
+    la del lote o la del usuario que la registra (este último caso, decisión del humano
+    2026-10-08);
   - dos entregas con la misma clave en la misma empresa.
 - **R32** [D7] El sistema NO DEBE ofrecer ningún camino de aplicación que modifique o borre una
   entrega, una línea de entrega o su asiento: ningún caso de uso, Server Action ni control de UI.

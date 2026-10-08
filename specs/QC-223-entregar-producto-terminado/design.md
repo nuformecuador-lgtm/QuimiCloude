@@ -414,7 +414,9 @@ ALTER TABLE "order_deliveries" ADD CONSTRAINT "order_deliveries_customer_id_fkey
 ALTER TABLE "order_deliveries" ADD CONSTRAINT "order_deliveries_company_id_fkey"
   FOREIGN KEY ("company_id") REFERENCES "companies"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "order_deliveries" ADD CONSTRAINT "order_deliveries_created_by_fkey"
-  FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  FOREIGN KEY ("created_by", "company_id") REFERENCES "users"("id", "company_id") ON DELETE RESTRICT ON UPDATE CASCADE;
+-- Nota (decisión del humano 2026-10-08): la FK de "created_by" es compuesta con "company_id",
+-- como las otras cinco FK a "users" de pedidos y grupos. Un usuario de otra empresa se rechaza.
 CREATE INDEX "order_deliveries_order_id_idx" ON "order_deliveries"("order_id");
 CREATE INDEX "order_deliveries_customer_id_idx" ON "order_deliveries"("company_id", "customer_id");
 CREATE INDEX "order_deliveries_created_by_idx" ON "order_deliveries"("created_by");
@@ -457,7 +459,11 @@ ALTER TABLE "inventory_movements" ADD CONSTRAINT "inventory_movements_order_deli
 ALTER TABLE "inventory_movements" ADD CONSTRAINT "inventory_movements_delivery_quantity_negative"
   CHECK ("kind"::text <> 'delivery' OR "quantity" < 0);
 CREATE UNIQUE INDEX "inventory_movements_one_delivery_per_batch"
-  ON "inventory_movements" ("order_delivery_id", "batch_id") WHERE "kind"::text = 'delivery';
+  ON "inventory_movements" ("order_delivery_id", "batch_id") WHERE "order_delivery_id" IS NOT NULL;
+-- Nota (QC-223 2026-10-08, validado por el humano): el predicado original era
+-- `WHERE "kind"::text = 'delivery'`, y Postgres lo rechaza (42P17: el cast de enum a texto no es
+-- IMMUTABLE). `"order_delivery_id" IS NOT NULL` selecciona las mismas filas porque el CHECK
+-- `inventory_movements_order_delivery_id_matches_kind` ata los dos campos.
 
 ALTER TABLE "inventory_movements" DROP CONSTRAINT "inventory_movements_order_id_matches_kind";
 ALTER TABLE "inventory_movements" ADD CONSTRAINT "inventory_movements_order_id_matches_kind"

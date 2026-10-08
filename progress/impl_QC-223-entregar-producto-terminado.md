@@ -104,3 +104,73 @@ T0 listo salvo `batch-history.tsx` (frontend_dev) y los tres `.int` de identity,
 
 ### Veredicto
 B1 listo: tres migraciones con down probado, esquema y cliente regenerados, censos enmendados y tests nuevos en verde contra Postgres; una desviación del design (predicado del índice parcial) para validar.
+
+## B3 — Persistencia de la entrega en `pedidos` (backend_dev, 2026-10-08)
+
+### Archivos creados
+- `lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma.ts`: `createOrderDeliveryRepository(tx = prisma)` con `create` (P2002 → `duplicate_key`), `addLines` (`createMany`) y `sumDeliveredPackages` (`groupBy` sobre `order_delivery_lines` con `delivery: { companyId, orderId }`). Toda función declara `scope: OrderScope` y lo lleva a `companyScopeColumns`; ninguna declara `update`, `delete` ni `upsert`.
+- `tests/integration/pedidos/order-delivery-repository.int.test.ts` (9 casos, modo `transaccion`).
+
+### Archivos modificados (censos, nota «QC-223 2026-10-08»)
+- `tests/unit/pedidos/module-contract.test.ts`: `DUENOS_DE_PRISMA` y `DUENOS_DEL_CLIENTE` + `order-delivery-prisma.ts` (importa `@prisma/client` por `Prisma.Decimal` y el P2002, y el cliente compartido como defecto de la fábrica). Las listas siguen cerradas.
+- `tests/integration/aislamiento.json`: + `pedidos/order-delivery-repository.int.test.ts` en `transaccion` (Edit mínimo).
+- `tests/guards/guard-ambito-empresa-pedidos.test.ts`: sin cambio; su barrido por archivo recoge el nuevo y queda verde (el cliente se llama `tx` para que `TOCA_LA_BASE` lo vea).
+
+### R → test (B3)
+| R | Test (`order-delivery-repository.int.test.ts`) |
+|---|---|
+| R25 | «R25: create guarda la entrega con su empresa, pedido, cliente, clave, autor e instante», «R25: addLines guarda linea del reparto, lote, envases y cantidad con la empresa del ambito» |
+| R29 | «R29: la misma clave en la misma empresa da duplicate_key y no deja una segunda fila», «R29: la clave es unica por empresa: otra empresa puede usar la misma» |
+| R31 | «R31: create con el ambito de otra empresa no puede apuntar al pedido de A», «R31: addLines rechaza por FK el lote de otra empresa y no escribe ninguna linea», «R31: addLines con el ambito de B no puede colgar lineas de una entrega de A» |
+| R6 | «R6: sumDeliveredPackages suma los envases por linea entre varias entregas, y una linea sin entregas no aparece» |
+| R5 (ámbito) | «R5: sumDeliveredPackages no ve las entregas de la empresa B, ni con el ambito de B sobre el pedido de A» |
+
+## B4 — Casos de uso reales (backend_dev, 2026-10-08)
+
+### Archivos modificados
+- `lib/modules/pedidos/domain/deliver-order.ts`: cuerpo real. Permiso → zod (`strictObject`, uuids, envases enteros ≥ 1, 1..`DELIVERY_MAX_ALLOCATIONS`, `refine` sin pares línea/lote repetidos) → `requireAliveCustomer` → `assertTransition('TERMINADO','ENTREGADO')` → `unitOfWork.run`. Dentro: `lockAliveById` (null → `order_not_found`; ≠ `TERMINADO` → `action_not_allowed`) → `findPresentationLinesForFinish` (línea ajena → `invalid_input`) → `deliveries.create` (`duplicate_key` → señal privada `DeliveryAlreadyRegisteredSignal`) → `sumDeliveredPackages` → `checkDelivery(lines, null, …)` (≠ ok → `delivery_exceeds_remaining`) → `dispatchForDelivery` por línea (`batch_not_found` / `insufficient` → su error) → `addLines` con la `quantity` de inventario → `setStatus(TERMINADO→ENTREGADO)` solo si `completesOrder` (≠ ok lanza). Fuera: la señal relee `orders.findAliveById` y devuelve `already_registered` con el estado.
+- `lib/modules/pedidos/domain/get-order-delivery.ts`: cuerpo real. Permiso → uuid (si no, `order_not_found`) → `findAliveById` (null → `order_not_found`; ≠ `TERMINADO` → `action_not_allowed`) → líneas y entregados en paralelo → `remainingPackages` → `findRefs`, `findDeliverableBatches` (solo presentaciones con envases pendientes; sin pendientes no consulta) y cliente vivo (`findAliveRefById`; sin cliente o `null` → `customer: null`). Línea completa → `batches: []`.
+- `tests/unit/pedidos/module-contract.test.ts`: consumidores de `assertTransition` + `deliver-order.ts` (nota «QC-223 2026-10-08»), aserciones previas intactas.
+- `tests/unit/pedidos/search-order-customer-options.test.ts`: sin cambio; T0 ya dejó «R10: para entregar pide solo los vivos…» (`includeDeleted: false`) y dos casos R2 con `purpose: 'deliver'`.
+
+### Archivos creados
+- `tests/unit/pedidos/deliver-order.test.ts` (45 casos) y `tests/unit/pedidos/get-order-delivery.test.ts` (20 casos).
+
+### Desviaciones del design (a validar por el leader)
+1. **Orden de `create` frente al tope (R29).** `design.md > 4` pone `sumDeliveredPackages` + `checkDelivery` (pasos 3–4) ANTES de `deliveries.create` (paso 5). Con ese orden, el reintento con la misma clave de una entrega parcial ya aplicada responde `delivery_exceeds_remaining` en vez de `already_registered` si lo pedido supera ahora lo que falta, contra R29. Aquí la entrega se crea tras validar las líneas y ANTES de sumar y comprobar el tope: la entrega recién creada aún no tiene líneas, así que la suma no cambia, y cualquier fallo posterior lo deshace todo (R30). Lo fija «R29: el reintento de una entrega parcial ya aplicada responde already_registered aunque hoy excederia lo que falta». Volver al orden del design es mover un bloque.
+2. **`already_registered` con el pedido releído fuera de `TERMINADO`/`ENTREGADO` o ya no vivo.** El design no lo dice; se lanza `action_not_allowed` / `order_not_found` en vez de devolver un `orderStatus` fuera del tipo.
+3. `deliver-order.ts` y `get-order-delivery.ts` importan `checkDelivery`/`remainingPackages` de `./order-delivery`, no del barrel: ningún archivo de `pedidos/domain` importa su propio barrel (sería un ciclo). El caso R16 de TC («importan del barrel de `pedidos`») tendrá que aceptar la ruta propia para el caso de uso.
+4. El fixture `deliveryView().numberText` es `'2026-0007'`, que no es la forma real de `formatOrderNumber` (`'2026-0000007'`). Cosmético, de frontend; no se tocó.
+
+### R → test (B4)
+| R | Test |
+|---|---|
+| R2 | `deliver-order.test.ts` «R2: sin entregas.modificar responde unauthorized antes de validar, y ningun puerto se llama»; `get-order-delivery.test.ts` «R2: sin entregas.modificar responde unauthorized y ningun puerto se llama»; `search-order-customer-options.test.ts` (T0) dos casos R2 con `deliver` |
+| R3 | `deliver-order.test.ts` «R3: un actor con entregas.modificar y otro rol es aceptado», «R3: un Administrador sin entregas.modificar en su conjunto es rechazado» |
+| R5 | `get-order-delivery.test.ts` «R5: un id sin forma de uuid…», «R5: inexistente, borrado o de otra empresa…», «R5: un pedido <estado> es action_not_allowed…» (×9) |
+| R6 | `get-order-delivery.test.ts` «R6: por cada presentacion devuelve nombre, pedidos, entregados y faltan…», «R6: no devuelve ningun listado de entregas anteriores» |
+| R7 | `get-order-delivery.test.ts` «R7: cada linea pendiente lleva los lotes de su presentacion…» (el filtro real es del `.int` de B2) |
+| R8 | `get-order-delivery.test.ts` «R8: una linea completa lleva batches vacio…», «R8: si no falta nada en ninguna linea no consulta lotes» |
+| R9 | `get-order-delivery.test.ts` «R9: el cliente vivo…», «R9: un pedido sin cliente…», «R9: un cliente dado de baja…» |
+| R10 | `search-order-customer-options.test.ts` (T0) «R10: para entregar pide solo los vivos de la empresa del actor» |
+| R17 | `deliver-order.test.ts` «R17: un pedido que no vuelve del bloqueo…», «R17: un pedido <estado> es action_not_allowed y no escribe nada» (×9) |
+| R18 | `deliver-order.test.ts` «R18: mas envases que los que faltan en una linea…», «R18: cualquier envase a una linea que ya esta completa…» |
+| R19 | `deliver-order.test.ts` «R19: batch_not_found de inventario es batch_not_found…» |
+| R20 | `deliver-order.test.ts` «R20: insufficient de inventario es delivery_batch_insufficient…» |
+| R21 | `deliver-order.test.ts` «R21: un cliente que no vuelve del catalogo…», «R21: un cliente sin forma de uuid…» |
+| R22 | `deliver-order.test.ts` «R22: <caso> es invalid_input y no lee ni escribe nada» (×17), «R22: una linea del reparto que no es del pedido…», «R22: un pedido sin lineas del reparto…» |
+| R24 (caso de uso) | `deliver-order.test.ts` «R24: despacha una vez por linea con la receta del pedido…», «R24: con dos lineas pendientes despacha cada una con su presentacion» |
+| R26 | `deliver-order.test.ts` «R26: si a alguna linea le siguen faltando envases el pedido sigue TERMINADO…» |
+| R27 | `deliver-order.test.ts` «R27: si no le falta nada a ninguna linea pasa a ENTREGADO…», «R27: si setStatus no mueve el pedido la entrega entera falla» |
+| R29 | `deliver-order.test.ts` «R29: duplicate_key es already_registered con el estado leido…», «R29: el reintento de una entrega parcial ya aplicada…» |
+
+### Verificación B3 + B4 (salida real)
+- `pnpm run typecheck`: `tsc --noEmit` sin errores.
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)` (ajenos: `confirm-catalog-import.test.ts`, `order-service.test.ts`).
+- `pnpm exec vitest run guard`: `Test Files 55 passed (55)`, `Tests 747 passed | 11 skipped (758)`.
+- `deliver-order.test.ts`: `Tests 45 passed (45)`; `get-order-delivery.test.ts`: `Tests 20 passed (20)`.
+- `order-delivery-repository.int.test.ts` contra Postgres (copia `qct_qc223_…` de la plantilla): `Test Files 1 passed (1)`, `Tests 9 passed (9)`.
+- `pnpm exec vitest related --run <tocados>`: PENDIENTE_RELATED
+
+### Veredicto
+PENDIENTE_VEREDICTO
