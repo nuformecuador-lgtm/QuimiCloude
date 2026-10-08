@@ -12,7 +12,7 @@ existe. Es **bloqueante**: si aparece algo, para y pregunta al humano.
 
 Se busca siempre en los tres sitios:
 
-1. **El board**, en todas las columnas, incluidas *Hecho* y *Cancelado*: `feature_list.json`
+1. **El board**, en todos sus estados, incluidos los de `done` y `cancelled` (según `arnes.config.json > jira.estados`): `feature_list.json`
    (F0 las importa todas), por `name` y `description`. Quien tiene el MCP de `atlassian`
    (`/afinar-feature`) lo confirma en vivo con
    `project = <arnes.config.json > jira.project> AND issuetype != Epic AND text ~ "<término>"`.
@@ -24,7 +24,7 @@ Busca con dos o tres términos del dominio de la feature, no con su título lite
 
 Si aparece algo, el humano decide una de tres:
 
-- **Es la misma feature** → la ficha nueva se mueve a *Cancelado* con un comentario que cite la
+- **Es la misma feature** → la ficha nueva se mueve al estado de `cancelled` con un comentario que cite la
   original. Nunca se borra (`docs/jira.md > Cuando el disco descubre que el board está
   desactualizado`).
 - **Se solapa en parte** → se acota: lo que ya existe va a «Lo que NO entra», o una ficha absorbe
@@ -101,10 +101,10 @@ entre personas`).
 ## La puerta de aprobación humana (`spec_ready`)
 
 Cuando los tres archivos están listos, el leader pasa la feature a `spec_ready`, mueve la
-tarjeta a *Spec en revisión*, comenta la ruta del spec en el issue y hace `git push`
+tarjeta al estado de `spec_ready` (según `jira.estados`), comenta la ruta del spec en el issue y hace `git push`
 (`AGENTS.md > F1.3`). El proceso **se detiene**. El humano lee los tres archivos y responde:
 
-- **aprobado** → la forma canónica es mover la tarjeta de *Spec en revisión* a *En curso*
+- **aprobado** → la forma canónica es mover la tarjeta del estado de `spec_ready` al de `in_progress`
   (queda autor y fecha); un "aprobado" escrito también vale. Se procede a implementar.
 - **cambios** → el `spec_author` corrige y se vuelve a pedir aprobación.
 

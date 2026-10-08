@@ -43,7 +43,7 @@ tu resumen operativo, y si discrepan, manda `AGENTS.md`.
 2. **F1.2:** ofrece `/afinar-feature` si hay preguntas abiertas y no hay semilla. Lanza
    `spec_author`.
 3. **F1.3–F1.4:** pasa a `spec_ready`, mueve la tarjeta, comenta la ruta del spec, `git push`.
-   **DETENTE** hasta la aprobación (tarjeta movida a *En curso*, o un "aprobado").
+   **DETENTE** hasta la aprobación (tarjeta movida del estado de `spec_ready` al de `in_progress` según `jira.estados`, o un "aprobado").
 4. **F2.0:** pasa a `in_progress` y repite `archivos-en-vuelo.mjs --candidata <key>`.
 5. **F2.1:** lanza `implementer`. Al cerrar cada tanda:
    - corre `./init.sh` en el worktree;
@@ -61,7 +61,7 @@ tu resumen operativo, y si discrepan, manda `AGENTS.md`.
      - Si sale rojo, vuelve al implementer.
      - Si sale verde, reporta la URL al humano.
 9. **F2.5–F2.6:** con el PR mergeado:
-   - pasa a `done`, mueve la tarjeta a *Hecho* y comenta la URL del PR en el issue;
+   - pasa a `done`, mueve la tarjeta al estado de `done` y comenta la URL del PR en el issue;
    - `./scripts/wt.sh done <key>-<slug>` (`--assume-merged` si fue squash);
    - `delete_project` en el grafo;
    - completa `progress/features/<key>.md > Cierre`;
