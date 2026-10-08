@@ -229,3 +229,12 @@ B2 listo: salida física, lectura de lotes entregables y las tres guardias enmen
 - Los 4 archivos de `lib/` y los 7 de `tests/` de `tasks.md > B2` existen. Las enmiendas llevan nota «QC-223 2026-10-08»: `guard-libro-de-inventario` (`CAMINOS_ESPERADOS` y título), `qc121-alcance` (censo, fuente fabricada, octavo camino), `qc91-alcance` (dos funciones permitidas y el caso sintético «R30: updateMany en consumeBatchStock y dispatchFinishedGoods no es hallazgo; uno en una tercera funcion si»), `ledger-cuadre` (caso «QC-223 R23, R24: cuadra con un lote ... entrega»). `aislamiento.json`: `finished-goods-dispatch` en `transaccion`, `deliverable-batches` en `commit` con motivo y `desde`. Sin huecos.
 - Unit + guardia (`finished-goods-dispatch-prisma`, `finished-goods-dispatch`, `batch-movement-prisma`, `qc121-alcance`, `qc91-alcance`, `guard-libro-de-inventario`): `Test Files 6 passed (6)`, `Tests 125 passed (125)`.
 - `.int` (`finished-goods-dispatch`, `deliverable-batches`, `ledger-cuadre`): `Test Files 3 passed (3)`, `Tests 12 passed (12)` (plantilla `qct_tpl_7dede18c795f`).
+
+## Decisiones del humano sobre las desviaciones de B4 (backend_dev, tanda 2, 2026-10-08)
+
+- **Desviación 1 (ACEPTADA).** `design.md > 4` reordenado: `deliveries.create` es el paso 3, antes de `sumDeliveredPackages` (4) y `checkDelivery` (5), con nota «decisión del humano 2026-10-08». Las referencias de §4.1 al «paso 5» pasan a «paso 3». El código ya tenía ese orden; sin cambio en `deliver-order.ts`.
+- **Desviación 2 (NO APLICADA, bloqueo para el humano).** `DeliverOrderResult.orderStatus` es `'TERMINADO' | 'ENTREGADO'` y no puede representar otros estados. `alreadyRegistered` relee `input.orderId`, que no tiene por qué ser el pedido de la entrega existente (la clave es única por empresa, no por pedido): ese pedido puede estar en cualquier estado o no existir. Además, `lockAliveById` + estado (paso 1) va antes de `create`, así que un reintento sobre un pedido ya `ENTREGADO` sigue saliendo por `action_not_allowed` antes de ver la clave (lo dice `design.md > 4.1`, segundo párrafo). Por instrucción, se para y se reporta en vez de inventar el valor. `deliver-order.ts` sin cambio.
+- **Fixture.** `tests/fixtures/order-delivery.ts`: `numberText` `'2026-0007'` → `'2026-0000007'`. Ningún test lo afirmaba (las coincidencias de `'2026-0007'` en `finished-stock-table.test.tsx` son su propio fixture).
+
+### Salida real
+- `deliver-order.test.ts` + `get-order-delivery.test.ts`: `Test Files 2 passed (2)`, `Tests 65 passed (65)`.

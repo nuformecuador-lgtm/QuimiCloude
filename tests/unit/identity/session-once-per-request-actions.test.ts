@@ -275,6 +275,32 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         await import('@/lib/modules/pedidos/adapters/driving/order-actions')
       ).getOrderCustomerFilterOptionAction('7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31'),
   },
+  // QC-223 2026-10-08: las dos acciones de la entrega resuelven el actor con `currentActor()`.
+  {
+    archivo: 'lib/modules/pedidos/adapters/driving/order-actions.ts',
+    nombre: 'getOrderDeliveryAction',
+    invocar: async () =>
+      (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).getOrderDeliveryAction(
+        '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+      ),
+  },
+  {
+    archivo: 'lib/modules/pedidos/adapters/driving/order-actions.ts',
+    nombre: 'deliverOrderAction',
+    invocar: async () =>
+      (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).deliverOrderAction({
+        orderId: '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+        deliveryKey: '8b3e2c51-4d6e-4f7a-8b29-1e5c7a3f9d42',
+        customerId: '9c4f3d62-5e7f-4a8b-9c3a-2f6d8b4a0e53',
+        allocations: [
+          {
+            presentationLineId: 'ad5a4e73-6f8a-4b9c-8d4b-3a7e9c5b1f64',
+            batchId: 'be6b5f84-7a9b-4cad-9e5c-4b8fad6c2a75',
+            packages: 1,
+          },
+        ],
+      }),
+  },
   {
     // Anadido el 2026-09-17 por QC-63, que estrena la pantalla de ejecucion: su archivo de
     // `driving/` resuelve las dos caras de la sesion, asi que el censo tiene que cubrirlo o R15

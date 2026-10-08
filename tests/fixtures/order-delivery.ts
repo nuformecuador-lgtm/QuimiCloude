@@ -18,7 +18,7 @@ const PENDING_PRESENTATION_ID = 'f0000000-0000-4000-8000-000000000002';
 export function deliveryView(overrides: Partial<OrderDeliveryView> = {}): OrderDeliveryView {
   return {
     orderId: DELIVERY_ORDER_ID,
-    numberText: '2026-0007',
+    numberText: '2026-0000007',
     customer: { id: DELIVERY_CUSTOMER_ID, name: 'Ana Perez', isDeleted: false },
     lines: [
       {

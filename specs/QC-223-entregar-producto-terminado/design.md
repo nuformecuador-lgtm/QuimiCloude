@@ -548,13 +548,19 @@ luego lote). No aparece ningún ciclo nuevo.
 2. `orders.findPresentationLinesForFinish(orderId, scope)`. Cada `presentationLineId` de la entrada
    tiene que estar en ellas; si no, `ValidationError` (R22). Un pedido sin líneas rechaza siempre
    por aquí.
-3. `deliveries.sumDeliveredPackages(orderId, scope)` con el pedido ya bloqueado. Dos entregas del
-   mismo pedido se serializan en el paso 1 (R28).
-4. `checkDelivery(lines, null, allocations)`: `exceeds_remaining` lanza
+3. `deliveries.create(...)`. Si devuelve `duplicate_key`, se lanza `DeliveryAlreadyRegisteredSignal`
+   (§4.1).
+4. `deliveries.sumDeliveredPackages(orderId, scope)` con el pedido ya bloqueado. Dos entregas del
+   mismo pedido se serializan en el paso 1 (R28). La entrega recién creada aún no tiene líneas, así
+   que no cambia la suma.
+5. `checkDelivery(lines, null, allocations)`: `exceeds_remaining` lanza
    `DeliveryExceedsRemainingError` (R18). `empty` no llega aquí, porque zod exige al menos una
    asignación.
-5. `deliveries.create(...)`. Si devuelve `duplicate_key`, se lanza `DeliveryAlreadyRegisteredSignal`
-   (§4.1).
+
+   *Nota (decisión del humano 2026-10-08):* la clave de entrega se comprueba (paso 3) **antes** de
+   los topes (pasos 4–5). Con el orden original, el reintento de una entrega parcial ya aplicada
+   respondía `delivery_exceeds_remaining` si lo pedido superaba lo que falta tras la primera, en
+   contra de R29. Cualquier fallo posterior a `create` lo deshace todo (R30).
 6. Por cada línea del reparto con asignaciones, `finishedGoods.dispatchForDelivery(...)`:
    - `batch_not_found` lanza `DeliveryBatchNotFoundError` (R19);
    - `insufficient` lanza `DeliveryBatchInsufficientError` (R20).
@@ -572,12 +578,12 @@ luego lote). No aparece ningún ciclo nuevo.
 La pantalla genera la clave de entrega (`crypto.randomUUID()`) al crear el borrador y la guarda con
 él (R35). Si la misma clave llega dos veces (doble clic, reintento tras perder la respuesta, recarga
 con el borrador intacto), el `INSERT` choca con `order_deliveries_company_key_unique`.
-`create` devuelve `duplicate_key` (P2002 capturado en el adaptador) y el paso 5 lanza una señal
+`create` devuelve `duplicate_key` (P2002 capturado en el adaptador) y el paso 3 lanza una señal
 interna. La señal deshace la transacción, y fuera el caso de uso lee el estado del pedido con
 `orders.findAliveById` y devuelve `{ status: 'already_registered', orderStatus }`.
 
 Si dos peticiones con la misma clave llegan a la vez, la segunda espera el bloqueo del pedido
-(paso 1), y al llegar al paso 5 la primera ya confirmó. Si la primera dejó el pedido `ENTREGADO`, la
+(paso 1), y al llegar al paso 3 la primera ya confirmó. Si la primera dejó el pedido `ENTREGADO`, la
 segunda sale antes, por el paso 1, con `action_not_allowed`. El sheet trata ese código, cuando viene
 tras un envío con la misma clave, igual que un rechazo normal: vuelve a leer y muestra el pedido ya
 entregado. Esa carrera exacta no tiene requisito propio; queda cubierta por R28 y R30.
