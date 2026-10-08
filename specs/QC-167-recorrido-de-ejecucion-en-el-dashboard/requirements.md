@@ -27,35 +27,41 @@
 
 > **Cómo se citan las decisiones.** `[D<n>]` es la fila **n-ésima** de `## Decisiones cerradas (no
 > reabrir)`, contando desde arriba y sin reordenar: `D1` «¿Qué se muestra?» … `D10` «¿Costura del
-> dashboard?». `[P<n>]` es una pregunta de `## Preguntas abiertas`.
+> dashboard?», y las cuatro que el humano cerró al revisar el spec el 2026-10-07: `D11` «¿Cómo se
+> cuenta la duración?», `D12` «¿Pedidos dados de baja?», `D13` «¿Orden de la lista?» y `D14`
+> «¿Búsqueda por número?». `[P<n>]` es una pregunta de `## Preguntas abiertas`. Donde D11 y D2
+> difieren («el empaque aparte»), manda D11, que es posterior.
 >
 > **Vocabulario.** «El registro» es `order_execution_entries` (QC-82). «Anotación» es una fila suya.
-> «Pedido ejecutado» es un pedido de la empresa con **al menos una** anotación. «Recorrido» son las
-> anotaciones de un pedido en orden. «Tramo» es el tiempo entre una anotación y la siguiente.
-> «Anotaciones de ejecución» son arrancar, retomar, avanzar, retroceder, cancelar y finalizar;
-> «anotaciones de empaque», comenzar y terminar empaque. «Número visible» es el que produce
-> `formatOrderNumber` del contrato de `pedidos` (`2026-0000001`). «La lista» es la del área de
-> contenido de `/dashboard`; «el detalle», la página del recorrido de un pedido.
->
-> **Lo marcado con ⚑** está escrito con la propuesta de `design.md > 9` y espera el visto bueno del
-> humano en F1.3. Si la cambia, se reescribe ese requisito y nada más.
+> «Pedido ejecutado» es un pedido de la empresa con **al menos una** anotación, esté vivo o dado de
+> baja. «Recorrido» son las anotaciones de un pedido en orden. «Tramo» es el tiempo entre una
+> anotación y la siguiente. «Anotación de cierre» es **cancelar** o **terminar empaque**: las dos que
+> dejan el pedido en un estado final. «Estado final» es `ENTREGADO` o `CANCELADO`, los dos que no
+> tienen ninguna transición de salida (`lib/modules/pedidos/domain/order-transitions.ts:44-45`).
+> «Pedido activo» es un pedido **no dado de baja** cuyo estado actual **no es final**; por las
+> transiciones del código, un pedido con anotaciones activo está en la práctica en `EN_CURSO`,
+> `POR_EMPACAR` o `EN_EMPAQUE`. «Dado de baja» es un pedido con borrado lógico. «Número visible» es
+> el que produce `formatOrderNumber` del contrato de `pedidos` (`2026-0000001`). «La lista» es la
+> del área de contenido de `/dashboard`; «el detalle», la página del recorrido de un pedido.
 
 ### La lista
 
 **R1.** CUANDO quien tiene `dashboard.consultar` abre el dashboard, el sistema DEBE mostrar en el
 área de contenido una lista de los pedidos ejecutados de su empresa, **incluidos los que siguen en
-curso**. Un pedido sin ninguna anotación **NO DEBE** aparecer. `[D1] [D6]`
+curso y los dados de baja**. Un pedido sin ninguna anotación **NO DEBE** aparecer. `[D1] [D6] [D12]`
 
 **R2.** Cada fila DEBE mostrar: el número visible del pedido, su estado actual, las personas que
-tienen alguna anotación en él, el instante de la primera y de la última anotación, la duración de la
-ejecución, la duración del empaque, el número de vueltas atrás y un enlace a su recorrido. `[D1] [D2]`
+tienen alguna anotación en él, el instante de la primera y de la última anotación, **la duración**
+(una sola cifra, R15), el número de vueltas atrás y un enlace a su recorrido. SI el pedido está dado
+de baja, ENTONCES su fila DEBE llevar además la marca **«Dado de baja»**. `[D1] [D2] [D11] [D12]`
 
-**R3.** MIENTRAS el pedido está `EN_CURSO`, su fila DEBE marcarlo **«En curso»** y la duración de la
-ejecución DEBE mostrarse **abierta**: contada hasta el instante de la consulta y señalada como
-abierta. MIENTRAS está `EN_EMPAQUE`, lo mismo vale para la duración del empaque. `[D2] [D6]`
+**R3.** MIENTRAS el pedido está activo, su fila DEBE marcarlo **«En curso»** y su duración DEBE
+mostrarse **abierta**: contada desde la primera anotación hasta el instante de la consulta y
+señalada como abierta. CUANDO el pedido deja de estar activo —llega a un estado final o se da de
+baja—, la duración **NO DEBE** seguir abierta. `[D6] [D11]`
 
-**R4.** ⚑ La lista DEBE ordenarse por número de pedido **descendente** (año y, dentro del año,
-secuencia), con un orden total y estable entre páginas. `[D1]`
+**R4.** La lista DEBE ordenarse por número de pedido **descendente** (año y, dentro del año,
+secuencia), con un orden total y estable entre páginas. `[D1] [D13]`
 
 **R5.** La lista DEBE paginarse **en el servidor**, con la tabla compartida, a **10 o 25** filas por
 página y 10 por defecto. SI la URL trae un tamaño distinto de esos dos o una página que no es un
@@ -63,11 +69,22 @@ entero mayor o igual que 1, ENTONCES el sistema DEBE usar el valor por defecto *
 
 ### Los filtros
 
-**R6.** CUANDO se filtra por pedido con un número visible, la lista DEBE mostrar **solo** ese pedido,
-si es un pedido ejecutado de la empresa. La comparación DEBE admitir la secuencia con o sin ceros a
-la izquierda (`2026-42` y `2026-0000042` son el mismo pedido) y DEBE ignorar los espacios de los
-extremos. SI el texto no tiene la forma de un número visible, ENTONCES la lista DEBE quedar **vacía**:
-el filtro **NO DEBE** ignorarse. `[D3] [P2]`
+**R6.** CUANDO se filtra por pedido con un texto, la lista DEBE mostrar **solo** los pedidos
+ejecutados de la empresa cuyo **número visible contiene ese texto como subcadena**, tras quitar los
+espacios de los extremos del texto. La comparación es carácter a carácter contra el número tal como
+se ve (`AAAA-NNNNNNN`, con los ceros de relleno), sin normalizar nada más:
+- `42` DEBE encontrar `2026-0000042`, `2026-0000142` y `2026-0004200`, y **NO DEBE** encontrar
+  `2026-0000043`;
+- `0000042` DEBE encontrar `2026-0000042` y `2025-0000042`, y **NO DEBE** encontrar `2026-0000142`;
+- `2026-0000042` DEBE encontrar exactamente ese pedido; `2026-` DEBE encontrar todos los de 2026;
+- `2026-42` **NO DEBE** encontrar `2026-0000042`, porque no es una subcadena de lo que se ve (sí
+  encontraría `2026-4200000`);
+- `2026` DEBE encontrar los pedidos de 2026 **y** los de cualquier año cuya secuencia visible
+  contenga `2026` (p. ej. `2025-0002026`).
+
+SI el texto, ya sin espacios en los extremos, contiene algún carácter que no sea dígito ni guion
+(`abc`, `42a`, `2026 42`), ENTONCES la lista DEBE quedar **vacía, sin error**: el filtro **NO DEBE**
+ignorarse. SI el texto queda vacío, ENTONCES el filtro DEBE tratarse como ausente. `[D3] [D14] [P2]`
 
 **R7.** CUANDO se filtra por persona, la lista DEBE mostrar solo los pedidos con al menos una
 anotación **de esa persona**. Las opciones del filtro DEBEN ser las personas de la empresa que
@@ -95,25 +112,27 @@ detalle DEBEN conservarlos. CUANDO cambia cualquier filtro, la lista DEBE volver
 una **página propia bajo `/dashboard`** cuya URL identifica el pedido y se puede compartir: abrirla en
 otra sesión con el mismo permiso y la misma empresa DEBE mostrar el mismo recorrido. `[D7]`
 
-**R13.** El detalle DEBE mostrar el número visible y el estado actual del pedido y **todas** sus
-anotaciones en orden cronológico —desempatando dos del mismo instante de forma estable—, cada una con
-su acción en español, su instante, la persona que la hizo, la posición del paso cuando la tiene y el
-motivo cuando es cancelar. `[D1]`
+**R13.** El detalle DEBE mostrar el número visible y el estado actual del pedido —con la marca
+**«Dado de baja»** SI lo está— y **todas** sus anotaciones en orden cronológico —desempatando dos
+del mismo instante de forma estable—, cada una con su acción en español, su instante, la persona que
+la hizo, la posición del paso cuando la tiene y el motivo cuando es cancelar. `[D1] [D12]`
 
 **R14.** Cada anotación salvo la última DEBE mostrar el **tramo** hasta la siguiente. `[D2]`
 
-**R15.** ⚑ El detalle DEBE mostrar la **duración de la ejecución** y la **duración del empaque por
-separado**, y la fila de la lista DEBE mostrar las mismas dos cifras:
-- la ejecución va de la primera anotación de ejecución a la de finalizar o cancelar; el empaque, de
-  comenzar empaque a terminar empaque; cada una se mide de **reloj**, de su primera a su última
-  anotación, pausas incluidas `[P1]`;
-- el tiempo entre finalizar y comenzar empaque **NO DEBE** sumarse a ninguna de las dos;
-- SI falta la anotación de cierre y el pedido sigue `EN_CURSO` (o `EN_EMPAQUE`, para el empaque),
-  ENTONCES esa duración DEBE ser abierta (R3);
-- SI falta la anotación de cierre y el pedido ya no está en ese estado, ENTONCES esa duración DEBE
-  cerrarse en la última anotación de esa parte y mostrarse marcada **«sin cierre anotado»**;
-- SI no hay ninguna anotación de empaque, ENTONCES la duración del empaque DEBE mostrarse como
-  **«sin empaque»**, no como cero. `[D2] [D6]`
+**R15.** El detalle y la fila de la lista DEBEN mostrar **una sola duración** por pedido, **la
+misma cifra** en los dos sitios, medida de **reloj** desde la **primera** anotación del recorrido
+hasta la **última**, sean de ejecución o de empaque. Las pausas, los `retomar` y el hueco entre
+finalizar y comenzar empaque **DEBEN** quedar dentro; **NO DEBE** haber una cifra de ejecución y
+otra de empaque. Además:
+- MIENTRAS el pedido está activo, ENTONCES la duración DEBE ser **abierta** y contarse hasta el
+  instante de la consulta, no hasta la última anotación (R3);
+- SI el pedido no está activo y su última anotación es una anotación de cierre, ENTONCES la
+  duración DEBE mostrarse **cerrada**;
+- SI el pedido no está activo y su última anotación **no** es una anotación de cierre (p. ej. se
+  canceló desde la pantalla de pedidos, o se dio de baja a mitad de la ejecución), ENTONCES la
+  duración DEBE cerrarse en la última anotación y mostrarse marcada **«sin cierre anotado»**.
+- Un pedido con una sola anotación que no está activo DEBE mostrar duración cero, con la marca que
+  le toque por las dos reglas anteriores. `[D2] [D6] [D11]`
 
 **R16.** Cada anotación de **retroceder** DEBE quedar marcada visualmente en el recorrido, y su
 número DEBE mostrarse en el detalle y en la fila con **la misma cifra**. `[D2]`
@@ -123,9 +142,10 @@ filtros, página y tamaño** con los que se abrió el detalle. SI el detalle se 
 ejemplo, con un enlace compartido sin parámetros), ENTONCES DEBE volver a la lista por defecto. `[D3]
 [D7]`
 
-**R18.** SI el pedido pedido en el detalle no existe, es de otra empresa, ⚑ está dado de baja `[P3]` o
-no tiene ninguna anotación, ENTONCES el sistema DEBE responder **404**, con la misma respuesta en
-los cuatro casos. `[D7] [D8]`
+**R18.** SI el pedido pedido en el detalle no existe, es de otra empresa o no tiene ninguna
+anotación, ENTONCES el sistema DEBE responder **404**, con la misma respuesta en los tres casos.
+Un pedido **dado de baja** con anotaciones de la empresa **NO DEBE** responder 404: su recorrido DEBE
+abrirse, con la marca de R13. `[D7] [D8] [D12]`
 
 ### Autorización
 
@@ -153,9 +173,9 @@ actor, y la empresa **NUNCA** DEBE salir de la entrada. Un pedido o una persona 
 una persona de otra empresa, ENTONCES la lista DEBE quedar vacía; y su recorrido DEBE responder 404
 (R18). `[D8]`
 
-**R24.** El registro DEBE consultarlo **solo** el módulo `asignaciones`; el número y el estado del
-pedido DEBEN obtenerse por el **contrato público de `pedidos`**, y el nombre de las personas por el de
-`identity`. `[D8]`
+**R24.** El registro DEBE consultarlo **solo** el módulo `asignaciones`; el número, el estado y la
+marca de baja del pedido, y el filtro por número de R6, DEBEN obtenerse por el **contrato público de
+`pedidos`**, y el nombre de las personas por el de `identity`. `[D8] [D12] [D14]`
 
 ### La costura del dashboard
 
@@ -191,7 +211,7 @@ en `/dashboard` y en la URL del recorrido de un pedido de su propia empresa. `[D
 | Decisión | Requisitos |
 |---|---|
 | D1 — lista de pedidos ejecutados y, al abrir uno, su recorrido | R1, R2, R4, R12, R13, R22 |
-| D2 — tramos, duración total (empaque aparte), vueltas atrás | R2, R3, R14, R15, R16 |
+| D2 — tramos, duración total, vueltas atrás (lo del empaque aparte lo sustituye D11) | R2, R14, R15, R16 |
 | D3 — filtros en la URL, sobreviven a paginar y volver | R6, R7, R8, R9, R10, R11, R17, R28 |
 | D4 — paginación en servidor, 10/25, tabla compartida | R5 |
 | D5 — `dashboard.consultar`, sin permiso nuevo, en el service y con test | R19, R20, R21, R29 |
@@ -200,16 +220,20 @@ en `/dashboard` y en la URL del recorrido de un pedido de su propia empresa. `[D
 | D8 — todas las consultas por la empresa de la sesión | R18, R23, R24 |
 | D9 — E2E: el Administrador filtra y abre; otro rol 404 | R20, R28, R29 |
 | D10 — la costura se rellena y su test negativo se enmienda | R25 |
+| D11 — una sola duración de reloj, de la primera a la última anotación | R2, R3, R15 |
+| D12 — los dados de baja salen marcados y abren su recorrido | R1, R2, R13, R18, R24 |
+| D13 — orden por número de pedido descendente | R4 |
+| D14 — búsqueda por parte del número visible | R6, R24 |
 
 ## Preguntas abiertas
 
 - Cómo se cuenta la duración total si un pedido se retomó tras una pausa larga: tiempo de reloj
   de la primera a la última anotación, o la suma de los tramos. Lo propone el spec_author en el
   design y lo aprueba el humano en F1.3.
-  - **P1 — PROPUESTA, pendiente de aprobación (F1.3).** Tiempo de **reloj** de la primera a la
-    última anotación de cada parte (ejecución y empaque por separado), pausas incluidas. Las tres
-    opciones, y por qué la suma de tramos no distingue una pausa de una recarga, en `design.md > 5`.
-    Requisito afectado: R15.
+  - **P1 — CERRADA por el humano el 2026-10-07 (D11).** «Reloj, todo junto»: **una** duración por
+    pedido, de la primera a la última anotación, ejecución y empaque juntos, pausas y hueco entre
+    finalizar y comenzar empaque incluidos. Abierta mientras el pedido está activo; «sin cierre
+    anotado» si no está activo y su última anotación no es de cierre. Requisitos: R2, R3, R15.
 - Con qué se busca un pedido en el filtro: el identificador visible que usa hoy la pantalla de
   pedidos. Lo comprueba el spec_author en el código, sin inventarlo.
   - **P2 — RESPONDIDA en el código.** El identificador visible es el **número de pedido**
@@ -217,16 +241,15 @@ en `/dashboard` y en la URL del recorrido de un pedido de su propia empresa. `[D
     y pinta la columna «Nº de pedido» de la pantalla de pedidos
     (`app/(private)/pedidos/components/order-columns.tsx:182-190`). **Ojo:** la búsqueda `q` de esa
     pantalla **no** busca por número, busca por nombre de receta (`list-orders.ts:156-159`); el
-    filtro de esta ficha busca por número, que es lo que dice la pregunta. Coincidencia **exacta**
-    del número, con la secuencia con o sin ceros (R6). Si el humano quiere coincidencia parcial
-    (`2026-00` → todos los de 2026), es un cambio de R6; ver `design.md > 9`.
-- **P3 — Abierta, la abre el spec el 2026-10-07.** ¿Un pedido **dado de baja** con anotaciones sale
-  en la lista y abre su recorrido? Puede pasar: un pedido `EN_CURSO` se puede borrar
+    filtro de esta ficha busca por número, que es lo que dice la pregunta. El humano eligió el
+    2026-10-07 la coincidencia **por parte del número** (D14): subcadena sobre el número visible,
+    con los ejemplos de R6.
+- **P3 — CERRADA por el humano el 2026-10-07 (D12).** ¿Un pedido **dado de baja** con anotaciones
+  sale en la lista y abre su recorrido? Puede pasar: un pedido `EN_CURSO` se puede borrar
   (`lib/modules/pedidos/domain/delete-order.ts:24` solo impide borrar `ENTREGADO`, `CANCELADO`,
-  `POR_EMPACAR` y `EN_EMPAQUE`) y su registro se queda. **Propuesta: no sale y su detalle es 404**
-  (R18), igual que la pantalla de pedidos no enseña los borrados y porque el contrato de `pedidos`
-  que se reutiliza solo lee pedidos vivos. Si el humano quiere verlos, es un método de `pedidos`
-  que incluya borrados y una marca «dado de baja» en la fila.
+  `POR_EMPACAR` y `EN_EMPAQUE`) y su registro se queda. **Decisión: «Aparece marcado».** Sale en la
+  lista con la marca «Dado de baja» y su recorrido se abre; el 404 queda para inexistente, de otra
+  empresa o sin anotaciones. Requisitos: R1, R2, R13, R18, R24.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -242,3 +265,7 @@ en `/dashboard` y en la URL del recorrido de un pedido de su propia empresa. `[D
 | 2026-10-07 | ¿Aislamiento? | Todas las consultas filtran por la empresa de la sesión (heredado de QC-82 y QC-102) |
 | 2026-10-07 | ¿E2E? | Sí: el Administrador filtra y abre un recorrido; otro rol recibe 404 |
 | 2026-10-07 | ¿Costura del dashboard? | La costura vacía de `dashboard-content.tsx` (QC-75) se rellena aquí, y su test negativo se enmienda |
+| 2026-10-07 | ¿Cómo se cuenta la duración? | «Reloj, todo junto»: UNA duración por pedido, de la primera a la última anotación (ejecución y empaque juntos, pausas y hueco entre finalizar y comenzar empaque incluidos). Abierta mientras el pedido no ha llegado a un estado final; «sin cierre anotado» si quedó sin anotación final y ya no está activo. Sustituye «el empaque aparte» de «¿Qué cálculos?» |
+| 2026-10-07 | ¿Pedidos dados de baja? | «Aparece marcado»: un pedido dado de baja con anotaciones sale en la lista con la marca «dado de baja» y su recorrido se puede abrir. El 404 queda para inexistente, de otra empresa o sin anotaciones. «Solo cancelados» sigue mirando el estado `CANCELADO` |
+| 2026-10-07 | ¿Orden de la lista? | Número de pedido descendente |
+| 2026-10-07 | ¿Búsqueda por número? | «Parte del número»: con «42» salen 2026-0000042, 2026-0000142…; texto sin dígitos ni guion, lista vacía sin error |

@@ -20,8 +20,9 @@ que se completó con Grep/Read).
 | Tipos de acción del dominio | `domain/execution-entry.ts:1-12` | **Se reutiliza** `ExecutionAction`; se añade el tipo de lectura |
 | `requirePermission`, `Actor`, `currentActor()` con `runInRequestScope` | `domain/actor.ts:58`, `adapters/driving/order-assignment-actions.ts:83-95` | **Se reutilizan** tal cual |
 | Errores `UnauthorizedError`, `ValidationError`, `OrderNotFoundError` | `domain/errors.ts:51,61,76` | **Se reutilizan**; ningún error nuevo |
-| Contrato de pedidos para otros módulos (`OrderCatalog`) con resumen paginado por ids (número, estado) | `lib/modules/pedidos/domain/order-catalog.ts:61-67`, adaptador `order-catalog-prisma.ts:158-185` | **Se reutiliza y se amplía** con dos opciones (§ 3.3) |
-| Formato del número visible | `pedidos/domain/order-number.ts:18` | **Se reutiliza**; nace su inversa al lado (§ 3.3) |
+| Contrato de pedidos para otros módulos (`OrderCatalog`) con resumen paginado por ids (número, estado), **solo pedidos vivos** | `lib/modules/pedidos/domain/order-catalog.ts:61-67`, adaptador `order-catalog-prisma.ts:158-185` | **Se copia el patrón** en un método nuevo que incluye dados de baja (§ 3.3); el existente no se toca |
+| Formato del número visible | `pedidos/domain/order-number.ts:18` | **Se reutiliza**; nace al lado la coincidencia por subcadena (§ 3.3) |
+| Estados finales (lista de transiciones vacía) | `pedidos/domain/order-transitions.ts:44-45` | **Se reutiliza** el criterio: final = `ENTREGADO`, `CANCELADO` (§ 3.4) |
 | Directorio de personas, con dadas de baja | `identity/domain/people-directory.ts:93` | **Se reutiliza** (nombres, R7) |
 | Tabla compartida con filtros y paginación | `components/shared/data-table` | **Se reutiliza** sin tocarla |
 | Parser/serializador de lista en URL | `app/(private)/pedidos/components/order-list-params.ts` | **Se copia el patrón**, no el archivo: es de otra ruta |
@@ -109,33 +110,108 @@ lo olvide no compila (R23). `ExecutionEntryRecord` va en `domain/execution-entry
 
 ### 3.3 Lo que gana `pedidos` (contrato público)
 
-Dos piezas, las dos **aditivas**: ningún llamante actual cambia.
+Tres piezas, todas **aditivas**: ningún método existente cambia de firma ni de comportamiento, y
+`listAliveSummariesByIds` y `OrderSummaryOrdering` quedan **intactos**.
 
-1. **`parseOrderNumber(text: string): OrderNumber | null`** en `domain/order-number.ts`, al lado de
-   `formatOrderNumber` y exportada por el barril. Acepta `^\s*(\d{4})-(\d{1,7})\s*$` con secuencia
-   ≥ 1; cualquier otra cosa es `null`. Vive en `pedidos` porque es la **inversa** de un formato que es
-   suyo: una segunda definición fuera divergiría (R6). Test: `parse(format(n))` devuelve `n`.
-2. **`listAliveSummariesByIds` gana un sexto parámetro opcional**
-   `options?: { readonly number?: OrderNumber; readonly ordering?: OrderSummaryOrdering }`, mismo
-   patrón que el `filter?` de `listAliveSummariesInCompany` (`order-catalog.ts:84`). `number` añade
-   `orderYear = y AND orderSequence = s` al `where`; `ordering` elige el `ORDER BY`. Y
-   `OrderSummaryOrdering` gana un tercer valor, **`'number_recent_first'`**: `orderYear desc,
-   orderSequence desc, id asc` (R4). Sin `options`, el comportamiento es el de hoy (`work_queue`).
-   `listAliveSummariesInCompany` acepta también el valor nuevo, porque el tipo es compartido; no hay
-   llamante que lo use.
+**1. `orderNumberContains(number: OrderNumber, text: string): boolean`** en `domain/order-number.ts`,
+al lado de `formatOrderNumber` y exportada por el barril (R6, D14):
 
-Cambia el puerto `ports/order-summary-reader.ts`, la factoría `domain/list-order-summaries.ts:42-49`
-(pasa `options`) y el adaptador `order-catalog-prisma.ts:158-185`. El ámbito de empresa
-(`orderCompanyScope`) y `deletedAt: null` siguen siendo el **primer término del `AND`**.
+```ts
+export function orderNumberContains(number: OrderNumber, text: string): boolean {
+  return formatOrderNumber(number).includes(text.trim());
+}
+```
+
+- **Se decide el número visible, no la secuencia.** Quien busca copia o lee lo que ve en pantalla
+  (`2026-0000042`); buscar sobre la secuencia sin relleno haría que `0000042` o `2026-0000042` no
+  encontraran nada, y obligaría a explicar dos formatos. Sobre lo que se ve, pegar el número entero
+  lo encuentra, `2026-` acota el año y `42` encuentra todo lo que contiene «42».
+- **Ceros a la izquierda:** cuentan como caracteres, porque se ven. `0000042` encuentra `…-0000042`
+  de cualquier año y no `…-0000142`. `2026-42` **no** encuentra `2026-0000042` (no es subcadena);
+  sí encuentra `2026-4200000`. Es el precio de no normalizar: una segunda regla («ignora los ceros
+  tras el guion») haría que `2026-0` y `2026-` dieran cosas distintas a lo que se ve.
+- **Escribir el año:** `2026` encuentra todos los de 2026 **y** cualquier secuencia que contenga
+  `2026` (`2025-0002026`). Se acepta: es exactamente «contiene».
+- **Caracteres fuera de `[0-9-]`:** el número visible solo tiene dígitos y un guion, así que un texto
+  con cualquier otro carácter no es subcadena de ningún número y la lista queda vacía **sin regla
+  aparte**: lo da la propia definición. Un texto que tras `trim` queda vacío lo descarta antes el
+  parser de la URL y la zod del caso de uso (filtro ausente), así que aquí no llega.
+- Usa `formatOrderNumber` en vez de recomponer el formato: si mañana cambia el relleno, la búsqueda
+  cambia con él (la propia `order-number.ts:13-17` avisa contra un segundo sitio con el formato).
+
+**2. Un tipo y un método nuevos en `OrderCatalog`, que incluyen los dados de baja** (R1, R18, D12):
+
+```ts
+/** Lo que el recorrido necesita de un pedido, vivo o dado de baja. Nada más (mismo criterio que
+ *  `OrderAssignmentTarget`): ni receta, ni cantidades, ni reparto. */
+export type OrderHistorySummary = {
+  readonly id: string;
+  readonly number: OrderNumber;
+  readonly status: OrderStatus;
+  readonly deleted: boolean;
+};
+
+listSummariesByIdsIncludingDeleted(
+  companyId: string,
+  ids: readonly string[],
+  statuses: readonly OrderStatus[],
+  page: number,
+  pageSize?: number,
+  filter?: { readonly numberContains?: string },
+): Promise<Page<OrderHistorySummary>>;
+```
+
+- El nombre lleva `IncludingDeleted`, como `PeopleDirectory.findRefsIncludingDeletedInCompany`
+  (`identity`): un método sin «Alive» que **sí** devuelve borrados no puede confundirse con los demás
+  del catálogo, que los excluyen todos.
+- **Orden fijo**: `orderYear desc, orderSequence desc, id asc` (R4, D13). No es parámetro: el único
+  llamante quiere ese, y una opción sin segundo uso es superficie de más. Por eso
+  `OrderSummaryOrdering` no gana valor.
+- Tipo propio y no `AssignedOrderSummary` + campo: aquel lleva receta, cantidades y reparto (con
+  una consulta a `inventario` por página) que el recorrido no usa; y añadirle `deleted` lo haría
+  aparecer en los listados de vivos, donde siempre valdría `false`.
+- `companyId` es **el primer parámetro**, como el resto del catálogo: la guardia
+  `guard-ambito-empresa-pedidos.test.ts` (`PUERTOS`, `:466-473`) lo exige al literal `companyId: string`.
+
+**3. El puerto `OrderSummaryReader` gana dos lecturas y la factoría las compone**
+(`domain/list-order-summaries.ts`, nueva `createListSummariesByIdsIncludingDeleted({ summaries })`):
+
+```ts
+listNumbersByIdsIncludingDeleted(companyId, ids, statuses): Promise<readonly { id: string; number: OrderNumber }[]>;
+listHistoryByIdsIncludingDeleted(companyId, ids, statuses, page, pageSize?): Promise<Page<OrderHistorySummary>>;
+```
+
+- Sin `numberContains`: una llamada a `listHistoryByIdsIncludingDeleted` con los `ids` tal cual.
+- Con `numberContains`: `listNumbersByIdsIncludingDeleted` → `filter(orderNumberContains)` en el
+  **dominio** → `listHistoryByIdsIncludingDeleted` con los ids que casan. Si no casa ninguno, se
+  pasa la lista vacía y el adaptador devuelve la página vacía con su forma (`id: { in: [] }` no
+  devuelve filas): el dominio no arma `Page` a mano, porque `lib/shared/pagination` no se importa
+  desde `domain/` (`order-catalog.ts:57-59`).
+- **Pagina `pedidos`** y el `total` es el de los pedidos que cumplen estado, número y empresa.
+
+Adaptador (`order-catalog-prisma.ts`, dos funciones nuevas). `where: { AND: [orderCompanyScope({
+companyId }), { id: { in }, status: { in } }] }` — el ámbito de empresa sigue siendo el **primer
+término del `AND`**, y lo único que falta respecto de las lecturas vivas es `deletedAt: null`, a
+propósito. `select` mínimo: `id, orderYear, orderSequence, status, deletedAt`; `deleted =
+deletedAt !== null` y `deletedAt` no sale del adaptador. Se cablea en `lib/composition/index.ts`
+junto a `listAliveSummariesByIds` (`:1456-1463`) y la guardia de ámbito de `pedidos` gana su fila en
+`METODOS_DELEGADOS_EN_DOMINIO` (`:487`), igual que `listAliveSummariesByIds` (`:517-518`).
+
+**Efecto en tests existentes.** Un método nuevo **obligatorio** en `OrderCatalog` rompe el tipado de
+los dobles que declaran el catálogo entero (`const orders: OrderCatalog = {…}`):
+`tests/integration/asignaciones/use-case-fixture.ts:73`, `finished-orders.int.test.ts:86`,
+`company-orders.int.test.ts:50` y `responsible-eligibility.int.test.ts:120`. Cada uno gana la entrada
+cableada como en la composición (o un `throw` si su caso no la usa); los que usan `as unknown as
+OrderCatalog` o `Pick<…>` no cambian. Hacerlo opcional en la interfaz para ahorrarse esto se
+descarta: un método opcional obliga a todo llamante a comprobar que existe.
 
 ### 3.4 Cálculo del recorrido (`domain/execution-trace.ts`, puro)
 
 ```ts
 export type TraceDuration =
-  | { readonly kind: 'closed'; readonly ms: number }
-  | { readonly kind: 'open'; readonly ms: number }          // hasta `now` (R3)
-  | { readonly kind: 'unclosed'; readonly ms: number }      // «sin cierre anotado» (R15)
-  | { readonly kind: 'none' };                              // «sin empaque» (R15)
+  | { readonly kind: 'closed'; readonly ms: number }        // última anotación = de cierre (R15)
+  | { readonly kind: 'open'; readonly ms: number }          // pedido activo: hasta `now` (R3)
+  | { readonly kind: 'unclosed'; readonly ms: number };     // «sin cierre anotado» (R15)
 
 export type TraceStep = ExecutionEntryRecord & {
   readonly gapToNextMs: number | null;                      // null en la última (R14)
@@ -143,29 +219,35 @@ export type TraceStep = ExecutionEntryRecord & {
 };
 
 export function buildExecutionTrace(
-  entries: readonly ExecutionEntryRecord[],                 // de UN pedido, ya ordenadas
-  status: OrderStatus,
+  entries: readonly ExecutionEntryRecord[],                 // de UN pedido, ya ordenadas, ≥ 1
+  order: { readonly status: OrderStatus; readonly deleted: boolean },
   now: Date,
 ): {
   readonly steps: readonly TraceStep[];
   readonly firstAt: Date; readonly lastAt: Date;
-  readonly execution: TraceDuration; readonly packing: TraceDuration;
+  readonly duration: TraceDuration;                         // UNA sola (R15, D11)
   readonly goBackCount: number;
   readonly userIds: readonly string[];                      // distintos, en orden de aparición
 };
 ```
 
-Reglas (R15), con la propuesta de P1 (§ 5):
+Reglas (R3, R15, D11), en este orden:
 
-- **Ejecución**: anotaciones `start | resume | advance | go_back | cancel | finish`. Desde la
-  primera hasta la primera `finish` o `cancel` → `closed`. Sin cierre: `status === 'EN_CURSO'` →
-  `open` hasta `now`; otro estado → `unclosed` hasta la última anotación de ejecución. Sin ninguna
-  anotación de ejecución → `none`.
-- **Empaque**: `pack_start` → `pack_finish`. Sin `pack_finish`: `EN_EMPAQUE` → `open`; otro estado
-  → `unclosed` hasta `pack_start`. Sin `pack_start` → `none`.
-- El hueco entre la última de ejecución y `pack_start` no entra en ninguna de las dos.
+- **Activo** = `!order.deleted && !FINAL_STATUSES.includes(order.status)`, con
+  `FINAL_STATUSES = ['ENTREGADO', 'CANCELADO']`: los dos estados cuya lista de transiciones es vacía
+  (`pedidos/domain/order-transitions.ts:44-45`). Se declara en `execution-trace.ts` tipado como
+  `readonly OrderStatus[]`. La tabla de transiciones no es pública, así que no se importa: el test
+  unitario fija los dos valores y el comentario del código dice de dónde salen. (Por las transiciones, un pedido con anotaciones activo es `EN_CURSO`,
+  `POR_EMPACAR` o `EN_EMPAQUE`; `PENDIENTE` y `BLOQUEADO` no se alcanzan desde `EN_CURSO`, y si
+  aparecieran contarían como activos, que es lo que dice D11: «no ha llegado a un estado final».)
+- Activo → `open`, `ms = now − firstAt`.
+- No activo y la **última** anotación es `cancel` o `pack_finish` → `closed`, `ms = lastAt − firstAt`.
+- No activo y la última no es de cierre → `unclosed`, `ms = lastAt − firstAt` («sin cierre
+  anotado»): cancelado desde la pantalla de pedidos sin anotación, entregado con la anotación de
+  terminar perdida, o dado de baja a medias.
+- Pausas, `resume` y el hueco `finish → pack_start` quedan **dentro**: es reloj, no suma de tramos.
 - `goBackCount` = número de `go_back`. Es **una** función: la fila y el detalle la llaman igual, así
-  que no pueden dar cifras distintas (R16).
+  que no pueden dar cifras distintas (R15, R16).
 - `now` entra por parámetro: el dominio no tiene reloj (mismo criterio que `PeopleDirectory`).
 
 `OrderStatus` llega del contrato de `pedidos`: el dominio de `asignaciones` ya lo importa del barril.
@@ -183,37 +265,42 @@ createListExecutionTraces(deps: { log, orders: OrderCatalog, people: PeopleDirec
 Orden de ejecución, y es el requisito:
 
 1. `requirePermission(actor, 'dashboard.consultar')` — **primera línea** (R19).
-2. zod `strictObject`: `page ≥ 1`, `pageSize ∈ {10, 25}`, `orderNumber?: string (≤ 20)`,
-   `userId?: uuid`, `from?/to?: YYYY-MM-DD`, `cancelledOnly: boolean`. Inválido → `ValidationError`.
-   (La URL ya llega acotada por el parser de la pantalla; esto es la frontera, no la cortesía.)
+2. zod `strictObject`: `page ≥ 1`, `pageSize ∈ {10, 25}`, `orderNumber?: string` (`trim`, ≤ 20; vacío
+   tras `trim` = ausente), `userId?: uuid`, `from?/to?: YYYY-MM-DD`, `cancelledOnly: boolean`.
+   Inválido → `ValidationError`. (La URL ya llega acotada por el parser de la pantalla; esto es la
+   frontera, no la cortesía.) Un `orderNumber` con letras **no** es inválido: es un texto que no casa
+   con nada y deja la lista vacía (R6).
 3. `personOptions`: `log.listUserIdsWithEntries(companyId)` + `people.findRefsIncludingDeletedInCompany`
    (R7). Se pide siempre, porque el filtro tiene que poder pintarse aunque la lista quede vacía.
-4. Si hay `orderNumber`: `parseOrderNumber`; `null` → página vacía **sin preguntar a `pedidos`** (R6).
-5. `log.listExecutedOrderIds(companyId, { userId, occurredFrom, occurredBefore })` (R7, R8). El rango
+4. `log.listExecutedOrderIds(companyId, { userId, occurredFrom, occurredBefore })` (R7, R8). El rango
    pasa de días a instantes aquí: `from` 00:00Z inclusivo, `to` + 1 día 00:00Z exclusivo, igual que
-   `list-query-sql.ts:81-93`. Ids vacíos → página vacía.
-6. `orders.listAliveSummariesByIds(companyId, ids, cancelledOnly ? ['CANCELADO'] : ORDER_STATUS_VALUES,
-   page, pageSize, { number, ordering: 'number_recent_first' })` (R4, R5, R6, R9, R10). **Pagina
-   `pedidos`**: el `total` es el de los pedidos que cumplen todos los filtros.
-7. `log.listEntriesForOrders(companyId, idsDeLaPágina)` → agrupar → `buildExecutionTrace` por pedido.
-8. `people.findRefsIncludingDeletedInCompany(companyId, userIdsDeLaPágina, now)` — **una** consulta
+   `list-query-sql.ts:81-93`. Ids vacíos → página vacía sin llamar a `orders`.
+5. `orders.listSummariesByIdsIncludingDeleted(companyId, ids, cancelledOnly ? ['CANCELADO'] :
+   ORDER_STATUS_VALUES, page, pageSize, { numberContains: orderNumber })` (R1, R4, R5, R6, R9, R10,
+   D12). **Pagina `pedidos`**: el `total` es el de los pedidos que cumplen todos los filtros. Qué es
+   «contiene» lo decide `pedidos` (§ 3.3): `asignaciones` no conoce el formato del número.
+6. `log.listEntriesForOrders(companyId, idsDeLaPágina)` → agrupar → `buildExecutionTrace(entries,
+   { status, deleted }, now)` por pedido.
+7. `people.findRefsIncludingDeletedInCompany(companyId, userIdsDeLaPágina, now)` — **una** consulta
    para toda la página.
 
-Fila (`ExecutionTraceRow`): `orderId`, `numberText` (`formatOrderNumber`), `status`, `people`,
-`firstAt`, `lastAt`, `execution`, `packing`, `goBackCount`. Consultas por render: **5** como mucho,
-constantes, sin una por fila.
+Fila (`ExecutionTraceRow`): `orderId`, `numberText` (`formatOrderNumber`), `status`, `deleted`,
+`people`, `firstAt`, `lastAt`, `duration`, `goBackCount`. Consultas por render: **6** como mucho
+(con número: una más en `pedidos`), constantes, sin una por fila.
 
 ### 3.6 Caso de uso del detalle (`domain/get-execution-trace.ts`)
 
 1. `requirePermission(actor, 'dashboard.consultar')` (R19).
 2. zod: `orderId` uuid; inválido → `OrderNotFoundError` (un id mal formado en la URL es un 404, no un
    500: mismo comportamiento que un id que no existe, R18).
-3. `orders.listAliveSummariesByIds(companyId, [orderId], ORDER_STATUS_VALUES, 1, 1)` → vacío =
-   `OrderNotFoundError` (no existe, otra empresa o dado de baja, P3).
+3. `orders.listSummariesByIdsIncludingDeleted(companyId, [orderId], ORDER_STATUS_VALUES, 1, 1)` →
+   vacío = `OrderNotFoundError` (no existe u otra empresa). Un dado de baja **sí** vuelve, con
+   `deleted: true` (R18, D12).
 4. `log.listEntriesForOrders(companyId, [orderId])` → vacío = `OrderNotFoundError` (sin anotaciones).
-5. Nombres con el directorio y `buildExecutionTrace`.
+5. Nombres con el directorio y `buildExecutionTrace(entries, { status, deleted }, now)`.
 
-Los cuatro casos de R18 lanzan **el mismo error**: la página no puede distinguirlos.
+Los tres casos de 404 de R18 lanzan **el mismo error**: la página no puede distinguirlos. La salida
+(`ExecutionTrace`) lleva `deleted` para la marca de R13.
 
 ### 3.7 Adaptador driving (`adapters/driving/execution-trace-actions.ts`, nuevo)
 
@@ -236,7 +323,8 @@ resto del módulo. **Ningún permiso se comprueba aquí.** No se reexporta por e
   `executionLogRepository`, `orderCatalog` y `peopleDirectory` que ya existen (`:1460`, `:1495`,
   `:1514`). Ningún adaptador nuevo.
 - `lib/modules/asignaciones/index.ts`: bloque nuevo al final con las dos factorías y los tipos de
-  salida (`ExecutionTraceRow`, `ExecutionTrace`, `TraceDuration`, `TraceStep`). Sin `'use server'`
+  salida (`ExecutionTraceRow`, `ExecutionTrace`, `TraceDuration`, `TraceStep`).
+- `lib/modules/pedidos/index.ts`: exporta `orderNumberContains` y el tipo `OrderHistorySummary`. Sin `'use server'`
   ni `@prisma/client` en su cierre.
 
 ## 4. La pantalla
@@ -279,13 +367,15 @@ parámetros solo afectan al «volver».
 | `execution-trace-list-section.tsx` | servidor; llama a `listExecutionTracesAction`; error → aviso dentro del área, no tumba la pantalla |
 | `execution-trace-table.tsx` | `'use client'`; `DataTable` controlada por la URL (`router.push`), `searchable` con `q`, interruptor «solo cancelados» en `toolbarActions` (`components/ui/checkbox.tsx`, con `label` y 44×44) |
 | `execution-trace-columns.tsx` | `'use client'`; columnas como datos. «Personas» con `ResponsibleAvatars` y filtro `select` (opciones del servidor); «Última anotación» con filtro `dateRange`; «Nº de pedido» fijada a la izquierda; **ninguna ordenable** (R4) |
-| `execution-trace-format.ts` | puro: `formatTraceDuration`, `formatTraceInstant` (UTC, `YYYY-MM-DD HH:mm:ss`), etiquetas de acción y de estado |
+| `execution-trace-format.ts` | puro: `formatTraceDuration`, `formatTraceInstant` (UTC, `YYYY-MM-DD HH:mm:ss`), etiquetas de acción y de estado, y el texto de la marca «Dado de baja» |
 | `index.ts` | barril; sin `'use client'` |
 
 Y `app/(private)/dashboard/recorrido/[id]/page.tsx` + `components/{execution-trace-detail.tsx,
 index.ts}`. El detalle es un **Server Component sin estado**: una lista ordenada (`<ol>`) de
 anotaciones, cada vuelta atrás con marca visible **de texto** («Vuelta atrás») además del estilo, y un
-resumen arriba (número, estado, duraciones, vueltas). Importa los formateadores del barril del
+resumen arriba (número, estado, marca «Dado de baja» si lo está, la duración y las vueltas). En la
+lista, la marca «Dado de baja» va **como texto** en la celda del número, junto a él, no solo como
+color ni como `title` (R26: nada que dependa de `:hover`). Importa los formateadores del barril del
 dashboard (`@/app/(private)/dashboard/components`): la ruta hija comparte presentación con la madre y
 no se copia. **No hay precedente de una ruta que importe el barril de otra**; si el reviewer lo
 rechaza, se sube `execution-trace-format.ts` a `lib/shared/ui/`, que es hoja y puro.
@@ -297,9 +387,10 @@ y ninguna ruta importa de otra. Se declara uno propio, **exhaustivo por tipo**
 `components/shared/` tocaría dos rutas de otras fichas en vuelo: queda anotado como deuda, no se hace
 aquí.
 
-**Formato de duración.** `formatTraceDuration(d)`: `«1 h 05 min»`, `«12 min 30 s»`, `«45 s»`; `open`
-añade «(en curso)»; `unclosed`, «(sin cierre anotado)»; `none`, «Sin empaque». Aritmética entera sobre
-milisegundos, unas diez líneas. **No se usa librería** (§ 8).
+**Formato de duración.** `formatTraceDuration(d)`: `«1 h 05 min»`, `«12 min 30 s»`, `«45 s»`, `«0 s»`;
+`open` añade «(en curso)»; `unclosed`, «(sin cierre anotado)»; `closed`, nada. Una pausa de una noche
+sale en horas (`«15 h 20 min»`): no hay unidad de días, para que la cifra se compare de un vistazo.
+Aritmética entera sobre milisegundos, unas diez líneas. **No se usa librería** (§ 8).
 
 ### 4.4 Multiplataforma (R26)
 
@@ -309,30 +400,35 @@ los avatares de personas ya tienen su lista accesible (`responsible-avatars.tsx`
 completo de cada persona está además en el detalle. Nada de `100vh`. **No se declara ninguna
 excepción de escritorio.** La lista del detalle es una columna: en móvil no hay tabla ancha.
 
-## 5. P1 — La duración con pausas (para aprobación humana en F1.3)
+## 5. P1 — La duración con pausas (cerrada: D11, 2026-10-07)
+
+**Decisión del humano: «Reloj, todo junto».** Es la opción A de la tabla, y además **sin separar**
+ejecución y empaque: una sola cifra de la primera a la última anotación del recorrido (§ 3.4). Lo
+que sigue es el análisis con el que se decidió; se conserva como justificación.
 
 El registro **no tiene pausa**: tiene `retomar`, y QC-82 R13 lo anota tanto al volver de una pausa
 como **al recargar la pantalla**. Y avanzar/retroceder pueden perderse sin aviso (QC-82 D11/R19).
 
 | | Opción | Qué da | Problema |
 |---|---|---|---|
-| **A** | **Reloj**: de la primera a la última anotación de cada parte | lo que tardó el pedido de verdad, de principio a fin | una pausa de una noche infla la cifra |
+| **A** | **Reloj**: de la primera a la última anotación (propuesta: por parte; decidido: todo junto) | lo que tardó el pedido de verdad, de principio a fin | una pausa de una noche infla la cifra |
 | B | Suma de tramos, **quitando el tramo anterior a cada `retomar`** | «tiempo trabajado» aparente | un `retomar` por **recarga** a mitad de un paso quita trabajo real; una anotación perdida hace el tramo más largo y se lo come igual. Da una cifra que parece precisa y no lo es |
 | C | Suma de tramos, quitando los **mayores de X minutos** | se aproxima a B sin depender de `retomar` | X no está en ningún doc ni decisión: habría que inventarlo |
 
 **Recomendación: A.** Es la única que no afirma nada que el registro no sabe. La pausa larga **no se
 esconde**: el detalle enseña cada tramo (R14), y el tramo anterior a un `retomar` es justo el que se
-verá largo. Si el humano prefiere B o C, cambian `buildExecutionTrace` y R15, nada más; para C hace
-falta además que diga el valor de X.
+verá largo. Juntar ejecución y empaque además deja dentro el hueco `finish → pack_start` (el pedido
+esperando en `POR_EMPACAR`), que también se ve como un tramo largo en el detalle.
 
-## 6. P2 — Con qué se busca un pedido
+## 6. P2 — Con qué se busca un pedido (cerrada: D14, 2026-10-07)
 
 Comprobado en el código: el identificador visible es el número `AAAA-NNNNNNN`
 (`order-number.ts:18`), el de la columna «Nº de pedido» (`order-columns.tsx:182-190`). La búsqueda
 `q` de la pantalla de pedidos **busca por nombre de receta**, no por número (`list-orders.ts:153-159`):
-aquí no hay nada que copiar de ella. Por eso nace `parseOrderNumber` en `pedidos` (§ 3.3) y la
-coincidencia es **exacta** (R6). Un texto que no tiene forma de número deja la lista vacía en vez de
-ignorarse: quien filtra y ve la lista entera creería que su pedido no está.
+aquí no hay nada que copiar de ella. El spec proponía coincidencia exacta; el humano eligió **«Parte
+del número»**. Nace `orderNumberContains` en `pedidos` (§ 3.3): subcadena sobre el número **visible**,
+con los ejemplos de R6. Un texto con caracteres que no salen en ningún número deja la lista vacía en
+vez de ignorarse: quien filtra y ve la lista entera creería que su pedido no está.
 
 ## 7. La costura del dashboard (QC-75 / QC-12) y los tests que se enmiendan
 
@@ -364,14 +460,17 @@ checks y la aprobación por un caso trivial (`docs/architecture.md > Dependencia
 `Intl.DurationFormat` tampoco: su soporte en Safari/WebKit y Chrome Android no está verificado aquí, y
 sin verificar es un desconocido (regla 6).
 
-## 9. Lo que se propone y espera visto bueno (⚑)
+## 9. Lo que se propuso y decidió el humano (2026-10-07)
 
-| | Propuesta | Requisitos | Si el humano elige otra cosa |
-|---|---|---|---|
-| **P1** | Duración de reloj por parte (§ 5) | R15 | cambia `buildExecutionTrace` |
-| **P3** | Los pedidos dados de baja no salen y su detalle es 404 | R18 | método de `pedidos` con borrados y marca en la fila |
-| ⚑ | Orden por número descendente | R4 | cambia `ordering` |
-| ⚑ | Coincidencia exacta del número (P2) | R6 | parcial exige otro filtro en `pedidos` |
+No queda ningún ⚑ abierto. Las cuatro respuestas están en `requirements.md > Decisiones cerradas`
+como D11–D14.
+
+| | Propuesta del spec | Decisión del humano | Requisitos | Qué cambió en el diseño |
+|---|---|---|---|---|
+| **P1** | Duración de reloj por parte | **D11** «Reloj, todo junto»: una sola duración | R2, R3, R15 | `buildExecutionTrace` devuelve una `duration`; desaparece `kind: 'none'` («sin empaque») (§ 3.4) |
+| **P3** | Dados de baja fuera y 404 | **D12** «Aparece marcado» | R1, R2, R13, R18, R24 | método nuevo `listSummariesByIdsIncludingDeleted` y tipo `OrderHistorySummary` con `deleted` (§ 3.3) |
+| Orden | Número descendente | **D13** aprobado tal cual | R4 | orden fijo del método nuevo; `OrderSummaryOrdering` no cambia |
+| Búsqueda | Coincidencia exacta | **D14** «Parte del número» | R6, R24 | `orderNumberContains` en lugar de `parseOrderNumber` (§ 3.3) |
 
 ## 10. Alternativas descartadas
 
@@ -402,10 +501,26 @@ la decisión pide página propia con URL compartible.
 volver y se saldría de la aplicación; R17 pide la lista con los filtros, y eso solo lo garantiza
 llevarlos en la URL.
 
+**A7 — Búsqueda por subcadena en SQL** (`strpos(order_year::text || '-' || lpad(order_sequence::text,
+7, '0'), $1) > 0` con `$queryRaw`). Una sola sentencia y sin leer los números de los candidatos.
+**Descartada**: escribe el formato visible por **segunda vez**, en SQL, que es justo lo que
+`order-number.ts:13-17` prohíbe; y `lpad` **trunca** una secuencia de más de siete dígitos
+(`lpad('12345678', 7, '0')` = `'1234567'`), mientras `formatOrderNumber` la deja crecer: las dos
+definiciones ya divergirían el día que alguien pase de 9.999.999 pedidos al año. Con
+`orderNumberContains` en el dominio, el formato vive en un solo sitio. Una columna generada con el
+número visible lo resolvería en la base, pero es una migración (R27).
+
+**A8 — Añadir `includeDeleted` a `listAliveSummariesByIds`.** Un parámetro en vez de un método.
+**Descartada**: un método llamado «Alive» que devuelve borrados según un booleano miente por su
+nombre, y el tipo de salida (`AssignedOrderSummary`) tendría que ganar `deleted` para todos sus
+llamantes, que nunca lo verían a `true`.
+
 ## 11. Riesgos
 
-1. **La lista de ids pasa entera a `pedidos`** (§ 3.5, paso 6): un `IN` con todos los pedidos
-   ejecutados de la empresa que cumplen los filtros de persona y fecha. Crece hasta que QC-124 purgue.
+1. **La lista de ids pasa entera a `pedidos`** (§ 3.5, paso 5): un `IN` con todos los pedidos
+   ejecutados de la empresa que cumplen los filtros de persona y fecha. Con filtro de número,
+   además, `pedidos` lee id, año y secuencia de **todos** esos candidatos para filtrarlos en memoria
+   (§ 3.3, A7): tres columnas por fila, mismo tamaño que el `IN`. Crece hasta que QC-124 purgue.
    Prisma tiene un tope de parámetros por sentencia; con un registro de decenas de miles de pedidos
    habría que trocear o cambiar de estrategia. Hoy no se acerca: la tabla nació con QC-82, que **aún
    no está en `dev`**.
@@ -417,3 +532,6 @@ llevarlos en la URL.
 4. **Pedidos ejecutados antes de QC-82** no tienen anotaciones y no salen (R1). Uno que empezó antes y
    terminó después sale con el recorrido a medias; su duración se mide desde la primera anotación que
    haya.
+5. **Un dado de baja `EN_CURSO` queda con estado `EN_CURSO` para siempre** (el borrado lógico no
+   cambia el estado). Por eso «activo» mira `deleted` además del estado (§ 3.4): sin eso, su duración
+   seguiría abierta indefinidamente.
