@@ -22,6 +22,7 @@ sdd: false (sin spec). Alcance: ficha Jira QC-230, según el encargo del leader.
 | Comportamiento pedido | Test |
 |---|---|
 | Rechaza `VERCEL_ENV=production` | seed-demo-guard › rechaza VERCEL_ENV=production aunque la base sea local |
+| Rechaza cualquier `VERCEL_ENV` no vacio distinto de `development`, con o sin `--forzar` (H6) | seed-demo-guard › --forzar no anula VERCEL_ENV=preview…; --forzar no anula un VERCEL_ENV arbitrario distinto de development; VERCEL_ENV=development sigue la regla normal…; VERCEL_ENV vacio cuenta como no definido |
 | Rechaza un host que no es local | seed-demo-guard › rechaza una DATABASE_URL que no apunta a una base local…; no confunde un host que solo empieza por localhost…; rechaza cuando falta DATABASE_URL… |
 | La bandera lo permite (solo base no local) | seed-demo-guard › la bandera --forzar permite una base remota…; --forzar no anula VERCEL_ENV=production; rechaza dentro de CI, con o sin --forzar…; CI vacia, 0 o false no cuenta como CI; una variable de entorno no fuerza nada… |
 | Host efectivo `?host=` (H1) | seed-demo-guard › toma como host efectivo el parametro ?host= y rechaza uno remoto; admite ?host=localhost; admite un socket Unix local en ?host=; rechaza un parametro host repetido…; rechaza un parametro host vacio; databaseHost devuelve el host efectivo… |
@@ -66,3 +67,16 @@ Veredicto: hecho. Seed idempotente por los casos de uso, con guardas y tests en 
 - `pnpm exec vitest run tests/unit/scripts`: 3 archivos, 48 tests, todos verdes.
 - `pnpm run typecheck`: sin errores. `pnpm run lint`: 0 errores, 7 warnings previos en archivos no tocados.
 - Veredicto: H1 y H2 corregidos y cubiertos por test.
+
+## Correccion tras review, vuelta 2 (H6)
+- H6: la guarda rechaza siempre, tambien con `--forzar`, cualquier `VERCEL_ENV` no vacio (con trim)
+  distinto de `development`: `production`, `preview` (usa la base de produccion, `scripts/build.mjs`)
+  y cualquier otro valor. El mensaje nombra el valor y dice que `--forzar` no lo anula. Con
+  `VERCEL_ENV=development` o sin definir, sigue la regla de base local o `--forzar`.
+- Archivos: `scripts/seed-demo/guard.ts`, `scripts/seed-demo.ts` (comentario), `docs/verification.md`,
+  `tests/unit/scripts/seed-demo-guard.test.ts`.
+- El test muerde: con la condicion revertida a `=== 'production'`, fallan los tests de `preview` y
+  `staging` (2 failed | 22 passed); restaurada, verdes.
+- `pnpm exec vitest run tests/unit/scripts`: 3 archivos, 52 tests, todos verdes.
+- `pnpm run typecheck`: sin errores. `pnpm run lint`: 0 errores, 7 warnings previos en archivos no tocados.
+- Veredicto: H6 corregido y cubierto por test.

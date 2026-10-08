@@ -4,8 +4,9 @@
  *
  * - `evaluateDemoSeedGuard` decide si el seed puede escribir en la base que apunta
  *   `DATABASE_URL`. Solo una base local (localhost / 127.0.0.1 o un socket Unix). La bandera
- *   `--forzar` de la linea de comandos salta SOLO la regla de base local; con
- *   `VERCEL_ENV=production` o dentro de CI se niega siempre, con o sin bandera.
+ *   `--forzar` de la linea de comandos salta SOLO la regla de base local; con un
+ *   `VERCEL_ENV` no vacio distinto de `development` (production y preview, que comparte la
+ *   base de produccion: `scripts/build.mjs`) o dentro de CI se niega siempre, con o sin bandera.
  * - `readDemoCredentials` lee las contrasenas de los usuarios de demo. Sin valor por
  *   defecto: si falta alguna, falla nombrandolas todas, sin imprimir ningun valor.
  */
@@ -63,8 +64,9 @@ function isCi(env: DemoSeedEnvironment['env']): boolean {
 
 /** Rechazos que ninguna bandera anula. */
 function hardRefusal(input: DemoSeedEnvironment): string | null {
-  if (input.env.VERCEL_ENV === 'production') {
-    return `VERCEL_ENV=production: el seed de demostracion no corre en produccion (${DEMO_SEED_FORCE_FLAG} no lo anula)`
+  const vercelEnv = (input.env.VERCEL_ENV ?? '').trim()
+  if (vercelEnv !== '' && vercelEnv !== 'development') {
+    return `VERCEL_ENV=${vercelEnv}: el seed de demostracion solo corre fuera de Vercel o con VERCEL_ENV=development; preview usa la base de produccion (${DEMO_SEED_FORCE_FLAG} no lo anula)`
   }
   if (isCi(input.env)) {
     return `variable CI presente: el seed de demostracion no corre en integracion continua (${DEMO_SEED_FORCE_FLAG} no lo anula)`

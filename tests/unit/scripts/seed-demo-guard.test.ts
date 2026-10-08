@@ -60,6 +60,39 @@ describe('seed de demo — guardas de entorno', () => {
     if (!verdict.allowed) expect(verdict.reason).toContain('VERCEL_ENV=production')
   })
 
+  it('--forzar no anula VERCEL_ENV=preview (comparte la base de produccion)', () => {
+    for (const DATABASE_URL of [LOCAL_URL, REMOTE_URL]) {
+      const verdict = evaluateDemoSeedGuard({ argv: [DEMO_SEED_FORCE_FLAG], env: { DATABASE_URL, VERCEL_ENV: 'preview' } })
+      expect(verdict.allowed).toBe(false)
+      if (!verdict.allowed) {
+        expect(verdict.reason).toContain('VERCEL_ENV=preview')
+        expect(verdict.reason).toContain(`${DEMO_SEED_FORCE_FLAG} no lo anula`)
+      }
+    }
+  })
+
+  it('--forzar no anula un VERCEL_ENV arbitrario distinto de development', () => {
+    const verdict = evaluateDemoSeedGuard({ argv: [DEMO_SEED_FORCE_FLAG], env: { DATABASE_URL: LOCAL_URL, VERCEL_ENV: 'staging' } })
+    expect(verdict.allowed).toBe(false)
+    if (!verdict.allowed) expect(verdict.reason).toContain('VERCEL_ENV=staging')
+  })
+
+  it('VERCEL_ENV=development sigue la regla normal de base local y --forzar', () => {
+    const VERCEL_ENV = 'development'
+    expect(evaluateDemoSeedGuard({ argv: [], env: { DATABASE_URL: LOCAL_URL, VERCEL_ENV } })).toEqual({ allowed: true, forced: false })
+    const remoto = evaluateDemoSeedGuard({ argv: [], env: { DATABASE_URL: REMOTE_URL, VERCEL_ENV } })
+    expect(remoto.allowed).toBe(false)
+    if (!remoto.allowed) expect(remoto.reason).toContain('db.abcdefgh.supabase.co')
+    expect(evaluateDemoSeedGuard({ argv: [DEMO_SEED_FORCE_FLAG], env: { DATABASE_URL: REMOTE_URL, VERCEL_ENV } })).toEqual({
+      allowed: true,
+      forced: true,
+    })
+  })
+
+  it('VERCEL_ENV vacio cuenta como no definido', () => {
+    expect(evaluateDemoSeedGuard({ argv: [], env: { DATABASE_URL: LOCAL_URL, VERCEL_ENV: '' } })).toEqual({ allowed: true, forced: false })
+  })
+
   it('rechaza dentro de CI, con o sin --forzar y aunque la base sea local', () => {
     for (const argv of [[], [DEMO_SEED_FORCE_FLAG]]) {
       const verdict = evaluateDemoSeedGuard({ argv, env: { DATABASE_URL: LOCAL_URL, CI: 'true' } })
