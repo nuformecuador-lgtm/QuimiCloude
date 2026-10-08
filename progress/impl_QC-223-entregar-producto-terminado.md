@@ -454,3 +454,56 @@ F1-F4 hechos: la acción, el borrador, el sheet y el R38 están en verde, salvo 
   seguida de otra que completa el pedido). Ver la sección «B4 opción b».
 - Desviaciones de frontend para el reviewer: el sheet lo monta `order-sheet.tsx` (`OrderRowSheetActions`),
   no `order-table.tsx`; el campo de envases no se recorta a dígitos, para que el aviso R13 pueda aparecer.
+
+## TI — E2E (frontend_dev, 2026-10-08)
+
+### Archivos
+- `e2e/entregar-producto-terminado.spec.ts` (nuevo). Siembra por Prisma con prefijo `qc223_e2e_` + `RUN_ID` del worker:
+  - empresa propia con Administrador y Operador;
+  - dos clientes;
+  - receta, dos presentaciones (contenido 1 y 2) y un producto terminado por presentación;
+  - pedido `TERMINADO` con dos líneas (5 y 3 envases);
+  - tres lotes: 1a (4 envases) y 1b (10) de la presentación 1, y 2 (5) de la presentación 2.
+- Censos enmendados, con nota fechada:
+  - `tests/guards/guard-identificador-de-request.test.ts`: `E2E_ESPERADOS` + el spec.
+  - `tests/unit/shared/data-table-alcance.test.ts`: el spec localiza `data-table-row-<id>`; la lista cerrada pasa de 31 a 32.
+  - `tests/unit/clientes/scope.test.ts`: `E2E_PERMITIDOS` + el spec, que importa `normalizeCustomerText` del barrel de `clientes`.
+  - `tests/unit/inventario/scope.test.ts`: el nombre casa con `/product/`; + `entregar-producto-terminado.spec.ts` en orden alfabético.
+  - `tests/unit/pedidos/scope.test.ts`: no hace falta (el nombre no casa con `pedidos|orders`).
+
+### Pasos → asserts
+1. El Administrador abre «Entregar» desde el menú de fila (`order-action-deliver`). El cliente parte del cliente del pedido.
+2. Cambia el cliente al segundo y escribe 3 envases en el lote 1a y 1 en el lote 2.
+3. Recarga y reabre: el cliente, los dos envases y el lote 1b vacío se restauran (R35).
+4. Confirma. En Postgres:
+   - una fila `order_deliveries` con el cliente elegido, y sus líneas (1a×3, 2×1);
+   - dos asientos `delivery` con `orderId`: −3.0000 y −2.0000;
+   - los lotes siguen existiendo: 1a = 1.0000, 1b = 10.0000, 2 = 8.0000;
+   - el pedido sigue `TERMINADO` con su cliente original.
+5. Segunda entrega (1b×2, 2×2) con el cliente del pedido: queda `ENTREGADO`, con dos entregas (los dos clientes), y la fila pinta `order-status[data-status=ENTREGADO]`.
+6. El Operador: `/pedidos` pinta `private-not-found`, sin la fila del pedido ni `order-action-deliver` (R4).
+7. `afterAll` borra por la empresa de este worker, en orden de FK, y después usuarios y empresa.
+
+### Mapa R → test
+- R39, R35 → «entrega parcial a otro cliente con el borrador tras recargar, y entrega que completa el pedido (R35, R39)».
+- R4 (lado E2E) → «el Operador, sin permiso de entregas, no ve la accion «Entregar» (R4)».
+
+### Verificación (salida real)
+- `pnpm exec playwright test e2e/entregar-producto-terminado.spec.ts` (proyectos `chromium` y `webkit`):
+  ```
+  ✓  3 [webkit] › e2e\entregar-producto-terminado.spec.ts:612:7 › entregar el producto terminado de un pedido › el Operador, sin permiso de entregas, no ve la accion «Entregar» (R4) (45.4s)
+  ✓  4 [chromium] › e2e\entregar-producto-terminado.spec.ts:612:7 › entregar el producto terminado de un pedido › el Operador, sin permiso de entregas, no ve la accion «Entregar» (R4) (47.9s)
+  ✓  1 [chromium] › e2e\entregar-producto-terminado.spec.ts:501:7 › entregar el producto terminado de un pedido › entrega parcial a otro cliente con el borrador tras recargar, y entrega que completa el pedido (R35, R39) (1.2m)
+  ✓  2 [webkit] › e2e\entregar-producto-terminado.spec.ts:501:7 › entregar el producto terminado de un pedido › entrega parcial a otro cliente con el borrador tras recargar, y entrega que completa el pedido (R35, R39) (1.2m)
+  4 passed (2.0m)
+  ```
+  El servidor también escribió `[WebServer] ⨯ Error: The destination stream closed early.` al cerrar; no afecta a ningún caso.
+- Filas que quedan con el prefijo (script tsx contra la base del `.env`):
+  `{"companies":0,"users":0,"recipes":0,"presentations":0,"products":0,"batches":0}`.
+- `pnpm run typecheck`: `tsc --noEmit`, sin errores.
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)` (los mismos avisos previos).
+- `pnpm exec vitest run guard`: `Test Files  55 passed (55)`, `Tests  747 passed | 11 skipped (758)`.
+- `pnpm exec vitest run` de los censos de alcance (`clientes`, `inventario`, `shared/data-table-alcance`, `recetas`, `proveedores` y `pedidos` scope): `Test Files  1 failed | 5 passed (6)`.
+  - El rojo es `tests/unit/recetas/scope.test.ts` (`app/(private)/pedidos/page.tsx`), el mismo de baseline que ya estaba.
+
+Veredicto: TI en verde en Chromium y WebKit, sin filas sobrantes; los censos están enmendados.

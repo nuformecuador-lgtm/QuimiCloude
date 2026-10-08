@@ -298,6 +298,11 @@ export const E2E_ESPERADOS = [
   // y cancelar con motivo desde la ejecucion. No lee ni afirma nada sobre el identificador de
   // peticion.
   'registro-ejecucion.spec.ts',
+  // Alta el 2026-10-08 (QC-223) por el mismo motivo que las demas. Recorre la entrega de un pedido
+  // terminado desde el menu de fila: borrador que sobrevive a la recarga, entrega parcial a otro
+  // cliente, entrega que completa y usuario sin permiso. No lee ni afirma nada sobre el
+  // identificador de peticion ni sobre `reference`.
+  'entregar-producto-terminado.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
