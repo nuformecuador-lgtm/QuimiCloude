@@ -442,3 +442,9 @@ Rechazada con 3 bloqueantes y 6 menores; se corrigen todos en esta vuelta.
 - Migraciones: entra `20261006234105_conditioning_role`, posterior a la de QC-82 (`20261006180000`); sin choque de orden. Aplicada con `prisma migrate deploy` a `QuimiCloude_QC82`; una segunda corrida dice "No pending migrations to apply".
 - `pnpm typecheck`: exit 0. `pnpm lint`: exit 0 (0 errores, 8 warnings ya existentes).
 - `pnpm exec vitest related --run` sobre el guard en conflicto, `qc145-estado-solo-planta.test.ts` y `company-scope.int.test.ts`: `Test Files 3 passed (3)`, `Tests 53 passed (53)` (la integración corre sobre la copia efímera de la plantilla `qct_tpl_9d7128117c80`, que se reconstruyó con las 73 migraciones).
+
+## Rojo post-merge: orden de migraciones (2026-10-07)
+- Fallaba `order-execution-entries-migration.test.ts > db/migrations — orden > ... es la ultima`: QC-216 trajo `20261006234105_conditioning_role`, posterior e independiente.
+- Sin renombrar la migracion. "Es la ultima" se sustituye por: la carpeta `MIGRATION_NAME` existe, su timestamp es unico y va despues de las migraciones que crean `users_id_company_id_key` (`20260908210000_work_groups_and_members`) y `orders_id_company_id_key` (`20260915120000_orders_company_scope`). Las dependencias se localizan leyendo el SQL. El control negativo se adapta con `orderIsValid` (dependencia posterior, timestamp duplicado o carpeta ausente dan false; una migracion posterior independiente da true).
+- Grep en tests/ y scripts/: ninguna otra guardia exige "ultima migracion" para QC-82.
+- `vitest related --run`: 1 archivo, 21/21 en verde; con la guardia del identificador de request, 44/44. `pnpm typecheck` limpio; `pnpm lint`: 0 errores y 8 avisos ajenos.

@@ -4,7 +4,7 @@
 // la RLS y la reversion exacta del `down.sql`. Cada afirmacion es un PREDICADO que se aplica al SQL
 // real y a una version MUTADA EN MEMORIA, que tiene que reprobarlo.
 
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -390,14 +390,92 @@ describe('down.sql — reversion exacta (R34)', () => {
   })
 })
 
-describe('db/migrations — orden', () => {
-  it('la carpeta de esta migracion es la ultima por orden de nombre', () => {
-    const folders = readdirSync(migrationsRoot)
-      .filter((entry) => statSync(join(migrationsRoot, entry)).isDirectory())
-      .sort()
-    expect(folders.at(-1)).toBe(MIGRATION_NAME)
+// 2026-10-07: antes se exigia que esta migracion fuera la ultima por orden de nombre. El merge
+// con QC-216 trajo `20261006234105_conditioning_role`, posterior e independiente, y la asercion
+// se puso roja sin que nada estuviera mal: "es la ultima" era fragil y no respondia a ningun
+// R<n>. Lo que importa de verdad es que la carpeta exista, que su timestamp no colisione con
+// otra y que corra DESPUES de las migraciones que crean las claves unicas que usan sus FK
+// (R6, R7). Esas migraciones se localizan por contenido, no por nombre.
 
-    const conPosterior = [...folders, '20991231000000_later'].sort()
-    expect(conPosterior.at(-1)).not.toBe(MIGRATION_NAME)
+/** Claves unicas compuestas a las que apuntan las dos FK de esta migracion. */
+const REFERENCED_KEYS = ['orders_id_company_id_key', 'users_id_company_id_key'] as const
+
+function listMigrationFolders(): string[] {
+  return readdirSync(migrationsRoot)
+    .filter((entry) => statSync(join(migrationsRoot, entry)).isDirectory())
+    .sort()
+}
+
+function timestampOf(folder: string): string {
+  return folder.split('_')[0] ?? folder
+}
+
+/** La sentencia que DEFINE la clave (indice unico o constraint UNIQUE), sin contar comentarios. */
+function definesKey(sql: string, key: string): boolean {
+  const code = stripSqlComments(sql)
+  return (
+    new RegExp(`CREATE\\s+UNIQUE\\s+INDEX\\s+"${key}"`, 'i').test(code) ||
+    new RegExp(`CONSTRAINT\\s+"${key}"\\s+UNIQUE`, 'i').test(code)
+  )
+}
+
+function folderDefiningKey(folders: readonly string[], key: string): string[] {
+  return folders.filter((folder) => {
+    const file = join(migrationsRoot, folder, 'migration.sql')
+    return existsSync(file) && definesKey(readFileSync(file, 'utf8'), key)
+  })
+}
+
+/** El orden es valido si la migracion existe, su timestamp es unico y va tras sus dependencias. */
+function orderIsValid(folders: readonly string[], name: string, deps: readonly string[]): boolean {
+  if (!folders.includes(name)) return false
+  const sameTimestamp = folders.filter((folder) => timestampOf(folder) === timestampOf(name))
+  if (sameTimestamp.length !== 1) return false
+  return deps.every((dep) => folders.includes(dep) && dep < name)
+}
+
+describe('db/migrations — orden', () => {
+  const folders = listMigrationFolders()
+  const definers = REFERENCED_KEYS.map((key) => ({ key, found: folderDefiningKey(folders, key) }))
+  const deps = definers.flatMap(({ found }) => found)
+
+  it('cada clave unica que usan sus FK la define exactamente una migracion', () => {
+    for (const { key, found } of definers) {
+      expect(found, `migraciones que definen ${key}`).toHaveLength(1)
+    }
+  })
+
+  it('la carpeta de esta migracion existe en db/migrations', () => {
+    expect(folders).toContain(MIGRATION_NAME)
+  })
+
+  it('su prefijo timestamp es unico entre las carpetas de migraciones', () => {
+    const timestamps = folders.map(timestampOf)
+    expect(timestamps.filter((ts) => ts === timestampOf(MIGRATION_NAME))).toHaveLength(1)
+  })
+
+  it('R6, R7: va despues de las migraciones que crean las claves unicas de sus FK', () => {
+    for (const dep of deps) {
+      expect(dep < MIGRATION_NAME, `${MIGRATION_NAME} debe ir despues de ${dep}`).toBe(true)
+    }
+    expect(orderIsValid(folders, MIGRATION_NAME, deps)).toBe(true)
+  })
+
+  it('control negativo: el criterio rechaza un orden roto', () => {
+    // Una dependencia que sortea despues de esta migracion.
+    expect(orderIsValid([...folders, '20991231000000_later'], MIGRATION_NAME, [
+      ...deps,
+      '20991231000000_later',
+    ])).toBe(false)
+    // Un timestamp duplicado.
+    expect(
+      orderIsValid([...folders, `${timestampOf(MIGRATION_NAME)}_dup`].sort(), MIGRATION_NAME, deps),
+    ).toBe(false)
+    // La carpeta no existe.
+    expect(orderIsValid(folders.filter((f) => f !== MIGRATION_NAME), MIGRATION_NAME, deps)).toBe(
+      false,
+    )
+    // Una migracion posterior e independiente NO rompe el orden (el caso de QC-216).
+    expect(orderIsValid([...folders, '20991231000000_later'], MIGRATION_NAME, deps)).toBe(true)
   })
 })
