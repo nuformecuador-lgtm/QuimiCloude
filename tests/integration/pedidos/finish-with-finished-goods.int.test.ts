@@ -70,6 +70,7 @@ import type { PackagingCatalog } from '@/lib/modules/inventario';
 
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
+import { executionOnClient } from '../../helpers/execution-transaction-on-client';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
 
 const customerCatalog = {
@@ -172,6 +173,8 @@ function finishAssignedOrderPara(orderId: string) {
     orders: orderCatalog,
     people: assignmentDirectoryPrisma,
     groups: assignmentDirectoryPrisma,
+    // Este archivo confirma de verdad: la anotacion del Finalizar se escribe y `borrarFixture` la borra.
+    ...executionOnClient(prisma, orderCatalog),
     now: () => new Date(),
   });
 }
@@ -283,6 +286,7 @@ async function borrarFixture(fixture: Fixture, productIds: readonly string[]): P
   await prisma.reservationMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.orderPresentationLine.deleteMany({ where: { companyId: fixture.companyId } });
+  await prisma.orderExecutionEntry.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId: fixture.companyId } } });
   // El producto terminado que Terminar da de alta referencia la receta con
@@ -771,7 +775,7 @@ describe('R26 — el Finalizar de asignaciones exige el permiso primero, sin dar
       const creado = await createOrder(nuevoPedido(recipeId, fixture, '10.0000', 10), actorDe(fixture));
       await orderCatalog.transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
-      const resultado = await finishAssignedOrderPara(creado.id)(asignacionesActorDe(fixture), { orderId: creado.id });
+      const resultado = await finishAssignedOrderPara(creado.id)(asignacionesActorDe(fixture), { orderId: creado.id, stepPosition: null });
 
       expect(resultado.numberText).toMatch(/^\d{4}-\d+$/);
       expect(await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId)).toBeNull();

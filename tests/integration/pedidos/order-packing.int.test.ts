@@ -28,6 +28,7 @@ import {
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishPacking, createStartPacking } from '@/lib/modules/pedidos';
 import {
+  createOrderPackingRepository,
   createOrderWriteRepository,
   startPackingAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
@@ -511,6 +512,48 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
       });
       expect(fila.status).toBe('ENTREGADO');
       expect(fila.finishedAt).toEqual(ahora);
+    } finally {
+      await borrarFixture(fixture, [pedido]);
+    }
+  });
+});
+
+describe('createOrderPackingRepository — Comenzar dentro de una transaccion ajena (R24, R42)', () => {
+  it('R24, R42: sobre un tx abierto por quien llama mueve la fila a EN_EMPAQUE, y el ROLLBACK de ese tx la devuelve a POR_EMPACAR', async () => {
+    const fixture = await crearFixture();
+    const pedido = await createOrder(fixture, { status: 'POR_EMPACAR' });
+    await crearLinea(fixture, pedido);
+    const antes = await readOrder(pedido);
+    const deshacer = new Error('rollback pedido por el test');
+    let dentro: { resultado: string; status: string; packedBy: string | null } | null = null;
+    try {
+      const fallo = await prisma
+        .$transaction(async (tx) => {
+          const resultado = await createOrderPackingRepository(tx).startPackingAlive(
+            pedido,
+            fixture.packerId,
+            new Date(),
+            { companyId: fixture.companyId },
+          );
+          const fila = await tx.order.findUniqueOrThrow({
+            where: { id: pedido },
+            select: { status: true, packedBy: true },
+          });
+          dentro = { resultado, status: fila.status, packedBy: fila.packedBy };
+          throw deshacer;
+        })
+        .then(
+          () => null,
+          (error: unknown) => error,
+        );
+
+      expect(fallo).toBe(deshacer);
+      expect(dentro).toEqual({ resultado: 'ok', status: 'EN_EMPAQUE', packedBy: fixture.packerId });
+
+      const despues = await readOrder(pedido);
+      expect(despues).toEqual(antes);
+      expect(despues.status).toBe('POR_EMPACAR');
+      expect(despues.packedBy).toBeNull();
     } finally {
       await borrarFixture(fixture, [pedido]);
     }

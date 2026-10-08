@@ -29,6 +29,7 @@ import type {
   LockedOrderRow,
   OrderWriteRepository,
 } from '../../../ports/order-write-repository';
+import type { OrderPackingRepository } from '../../../ports/order-packing-repository';
 
 /** Cliente global o el transaccional que abra quien llama: los metodos de mas abajo no
  *  distinguen, mismo patron que `createOrderAssignmentRepository`. */
@@ -980,44 +981,66 @@ export async function startPackingAliveOrder(
   now: Date,
   scope: OrderScope,
 ): Promise<'ok' | 'already_mine' | 'taken' | 'not_packable' | 'not_found' | 'without_distribution'> {
+  return prisma.$transaction((tx) => lockAndStartPackingAlive(id, packerId, now, scope, tx));
+}
+
+/** Las tres sentencias de Comenzar sobre el cliente recibido, sin abrir transaccion: el
+ *  `FOR UPDATE` solo retiene la fila si `tx` ya es transaccional. */
+async function lockAndStartPackingAlive(
+  id: string,
+  packerId: string,
+  now: Date,
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<'ok' | 'already_mine' | 'taken' | 'not_packable' | 'not_found' | 'without_distribution'> {
   const { companyId } = companyScopeColumns(scope);
 
-  return prisma.$transaction(async (tx) => {
-    const rows = await tx.$queryRaw<ReadonlyArray<LockedPackingStatusRow>>(Prisma.sql`
-      SELECT "status", "packed_by"
-        FROM "orders"
-       WHERE "id" = ${id}::uuid
-         AND "company_id" = ${companyId}::uuid
-         AND "deleted_at" IS NULL
-         FOR UPDATE
-    `);
-    const locked = rows[0];
-    if (locked === undefined) return 'not_found';
+  const rows = await tx.$queryRaw<ReadonlyArray<LockedPackingStatusRow>>(Prisma.sql`
+    SELECT "status", "packed_by"
+      FROM "orders"
+     WHERE "id" = ${id}::uuid
+       AND "company_id" = ${companyId}::uuid
+       AND "deleted_at" IS NULL
+       FOR UPDATE
+  `);
+  const locked = rows[0];
+  if (locked === undefined) return 'not_found';
 
-    if (locked.status !== 'POR_EMPACAR') {
-      if (locked.status === 'EN_EMPAQUE') {
-        return locked.packed_by === packerId ? 'already_mine' : 'taken';
-      }
-      return 'not_packable';
+  if (locked.status !== 'POR_EMPACAR') {
+    if (locked.status === 'EN_EMPAQUE') {
+      return locked.packed_by === packerId ? 'already_mine' : 'taken';
     }
+    return 'not_packable';
+  }
 
-    // Sentencia NUEVA, tras el bloqueo: cuenta las lineas vigentes del reparto.
-    const [conteo] = await tx.$queryRaw<ReadonlyArray<{ total: bigint }>>(Prisma.sql`
-      SELECT count(*)::bigint AS total
-        FROM "order_presentation_lines"
-       WHERE "order_id" = ${id}::uuid
-         AND "company_id" = ${companyId}::uuid
-    `);
-    if (conteo === undefined || conteo.total === BigInt(0)) return 'without_distribution';
+  // Sentencia NUEVA, tras el bloqueo: cuenta las lineas vigentes del reparto.
+  const [conteo] = await tx.$queryRaw<ReadonlyArray<{ total: bigint }>>(Prisma.sql`
+    SELECT count(*)::bigint AS total
+      FROM "order_presentation_lines"
+     WHERE "order_id" = ${id}::uuid
+       AND "company_id" = ${companyId}::uuid
+  `);
+  if (conteo === undefined || conteo.total === BigInt(0)) return 'without_distribution';
 
-    const { count } = await tx.order.updateMany({
-      where: { AND: [orderCompanyScope(scope), { id, deletedAt: null, status: 'POR_EMPACAR' }] },
-      data: { status: 'EN_EMPAQUE', packedBy: packerId, updatedAt: now, updatedBy: packerId },
-    });
-    // La fila sigue bloqueada desde el `SELECT ... FOR UPDATE` de arriba, en la MISMA
-    // transaccion: ninguna otra conexion pudo moverla entre la lectura y esta escritura.
-    return count === 1 ? 'ok' : 'not_packable';
+  const { count } = await tx.order.updateMany({
+    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null, status: 'POR_EMPACAR' }] },
+    data: { status: 'EN_EMPAQUE', packedBy: packerId, updatedAt: now, updatedBy: packerId },
   });
+  // La fila sigue bloqueada desde el `SELECT ... FOR UPDATE` de arriba, en la MISMA
+  // transaccion: ninguna otra conexion pudo moverla entre la lectura y esta escritura.
+  return count === 1 ? 'ok' : 'not_packable';
+}
+
+/**
+ * Fabrica de `OrderPackingRepository` sobre el cliente que le pasen. Con un `tx`, Comenzar se
+ * escribe dentro de la transaccion de quien llama y se deshace con ella; sin argumento usa el
+ * cliente global y no abre transaccion, asi que quien no tenga una debe usar
+ * `startPackingAliveOrder`.
+ */
+export function createOrderPackingRepository(db: PrismaLike = prisma): OrderPackingRepository {
+  return {
+    startPackingAlive: (id, packerId, now, scope) => lockAndStartPackingAlive(id, packerId, now, scope, db),
+  };
 }
 
 /**

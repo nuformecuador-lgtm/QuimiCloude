@@ -253,6 +253,7 @@ import type { SupplierCatalogRepository } from '@/lib/modules/proveedores/ports/
 import type { SupplierRepository } from '@/lib/modules/proveedores/ports/supplier-repository';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 import {
+  createCancelAliveOrder,
   createCancelOrder,
   createCreateOrder,
   createDeleteOrder,
@@ -282,6 +283,7 @@ import {
   findExpirableOrders,
   listAliveOrders,
   startPackingAliveOrder,
+  createOrderPackingRepository,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
 import {
@@ -399,9 +401,15 @@ import {
   createStartAssignedOrder,
   createStartPacking as createStartPackingOrder,
   createUnassignResponsible,
+  createCancelAssignedOrder,
+  createRecordStepMove,
 } from '@/lib/modules/asignaciones';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
+import { createExecutionLogRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/execution-log-prisma';
+import { withExecutionTransaction } from '@/lib/modules/asignaciones/adapters/driven/persistence/execution-transaction-prisma';
+import type { ExecutionLogRepository } from '@/lib/modules/asignaciones/ports/execution-log-repository';
+import type { ExecutionTransaction } from '@/lib/modules/asignaciones/ports/execution-transaction';
 import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
@@ -1268,26 +1276,33 @@ const orderRepository: OrderRepository = {
   findBlockedIds: findBlockedOrderIds,
 };
 
+type OrderTransactionClient = Parameters<Parameters<typeof withOrderTransaction>[0]>[0];
+
 /**
- * `OrderUnitOfWork.run` sobre `withOrderTransaction`: abre la transaccion y construye cada
- * pieza del scope con el MISMO `tx`, para que todas vean la misma instantanea sin abrir una
+ * Cada pieza del scope sobre el MISMO `tx`, para que todas vean la misma instantanea sin abrir una
  * segunda conexion mientras esta retiene la suya. `createMaterialReservations` no convierte
  * nada: la necesidad le llega ya en la unidad del producto.
  */
+function orderTransactionScopeOn(tx: OrderTransactionClient): OrderTransactionScope {
+  return {
+    orders: createOrderWriteRepository(tx),
+    reservations: createMaterialReservations(tx),
+    recipes: createRecipeExecutionReader(tx),
+    finishedGoods: createFinishedGoodsIntake(tx),
+    products: { findRefs: (ids, companyId) => findProductRefs(ids, companyId, tx) },
+    units: createUnitCatalogReader(tx),
+  };
+}
+
+/** `OrderUnitOfWork.run` sobre `withOrderTransaction`: abre la transaccion y construye el scope. */
 const orderUnitOfWork: OrderUnitOfWork = {
-  run: (work) =>
-    withOrderTransaction((tx) => {
-      const scope: OrderTransactionScope = {
-        orders: createOrderWriteRepository(tx),
-        reservations: createMaterialReservations(tx),
-        recipes: createRecipeExecutionReader(tx),
-        finishedGoods: createFinishedGoodsIntake(tx),
-        products: { findRefs: (ids, companyId) => findProductRefs(ids, companyId, tx) },
-        units: createUnitCatalogReader(tx),
-      };
-      return work(scope);
-    }),
+  run: (work) => withOrderTransaction((tx) => work(orderTransactionScopeOn(tx))),
 };
+
+/** Se une a una transaccion ya abierta: no confirma ni deshace, eso lo decide quien la abrio. */
+function joinOrderUnitOfWork(tx: OrderTransactionClient): OrderUnitOfWork {
+  return { run: (work) => work(orderTransactionScopeOn(tx)) };
+}
 
 /** Lectura de la cobertura de un pedido, FUERA de transaccion, sobre el cliente global:
  *  `findCoverage` la usa una vez por pagina. */
@@ -1526,6 +1541,41 @@ const workGroupDirectory: WorkGroupDirectory = assignmentDirectoryPrisma;
  */
 const orderAssignmentRepository: OrderAssignmentRepository = createOrderAssignmentRepository();
 
+/** El registro fuera de transaccion: anotar un paso o el retomar es una sola sentencia. */
+const executionLogRepository: ExecutionLogRepository = createExecutionLogRepository();
+
+/**
+ * La transaccion de ejecucion la abre `asignaciones`, y `pedidos` se une a ella sin abrir otra:
+ * la escritura del pedido, lo que `pedidos` escriba en `inventario` y la anotacion se confirman
+ * juntas o no se confirma ninguna. Comenzar empaque no va por la unidad de trabajo, asi que su
+ * repositorio se construye tambien sobre `tx`. Las lecturas de catalogo de Terminar siguen siendo
+ * las globales, como en `orderCatalog`.
+ */
+const executionTransaction: ExecutionTransaction = {
+  run: (work) =>
+    withExecutionTransaction((tx) =>
+      work({
+        orders: {
+          transitionAliveById: createTransitionOrder({ unitOfWork: joinOrderUnitOfWork(tx) }),
+          cancelAliveById: createCancelAliveOrder({ unitOfWork: joinOrderUnitOfWork(tx) }),
+        },
+        packing: {
+          startPackingAliveById: createStartPacking({ packing: createOrderPackingRepository(tx) }),
+          finishPackingAliveById: createFinishPacking({
+            packing: createOrderPackingRepository(tx),
+            unitOfWork: joinOrderUnitOfWork(tx),
+            recipes: recipeCatalog,
+            products: productCatalog,
+            units: unitCatalog,
+            presentations: presentationCatalog,
+            packaging: packagingCatalog,
+          }),
+        },
+        log: createExecutionLogRepository(tx),
+      }),
+    ),
+};
+
 /**
  * Fachada del modulo `asignaciones` ya cableada (T11, `design.md > 2.3`). Es lo que consumen las
  * tres Server Actions y la consulta de T12.
@@ -1605,6 +1655,8 @@ export const asignaciones = {
     units: unitCatalog,
     products: productCatalog,
     presentations: presentationCatalog,
+    log: executionLogRepository,
+    transaction: executionTransaction,
     now: () => new Date(),
   }),
   finishAssignedOrder: createFinishAssignedOrder({
@@ -1612,6 +1664,8 @@ export const asignaciones = {
     orders: orderCatalog,
     people: peopleDirectory,
     groups: workGroupDirectory,
+    log: executionLogRepository,
+    transaction: executionTransaction,
     now: () => new Date(),
   }),
   // Claves NUEVAS al final: ninguna de las de arriba se toca. MISMOS `orderCatalog`,
@@ -1667,10 +1721,26 @@ export const asignaciones = {
   }),
   startPacking: createStartPackingOrder({
     orders: orderCatalog,
+    log: executionLogRepository,
+    transaction: executionTransaction,
     now: () => new Date(),
   }),
   finishPacking: createFinishPackingOrder({
     orders: orderCatalog,
+    log: executionLogRepository,
+    transaction: executionTransaction,
+    now: () => new Date(),
+  }),
+  cancelAssignedOrder: createCancelAssignedOrder({
+    assignments: orderAssignmentRepository,
+    orders: orderCatalog,
+    transaction: executionTransaction,
+    now: () => new Date(),
+  }),
+  recordStepMove: createRecordStepMove({
+    assignments: orderAssignmentRepository,
+    orders: orderCatalog,
+    log: executionLogRepository,
     now: () => new Date(),
   }),
 } as const;

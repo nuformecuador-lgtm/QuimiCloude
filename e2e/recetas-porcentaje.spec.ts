@@ -229,6 +229,7 @@ test.beforeAll(async () => {
     await prisma.orderPresentationLine.deleteMany({
       where: { companyId: { in: orphanCompanyIds } },
     });
+    await prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.recipe.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
@@ -373,6 +374,7 @@ test.afterAll(async () => {
     () => prisma.inventoryMovement.deleteMany({ where: { companyId } }),
     () => prisma.orderAssignment.deleteMany({ where: { companyId } }),
     () => prisma.orderPresentationLine.deleteMany({ where: { companyId } }),
+    () => prisma.orderExecutionEntry.deleteMany({ where: { companyId } }),
     () => prisma.order.deleteMany({ where: { companyId } }),
     () => prisma.recipe.deleteMany({ where: { companyId } }), // cascada sobre `recipe_lines`.
     () => prisma.productBatch.deleteMany({ where: { companyId } }),

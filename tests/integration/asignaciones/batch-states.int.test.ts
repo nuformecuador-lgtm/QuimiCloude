@@ -47,6 +47,7 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import { NOW, actorOf, codeOf, createOrder, createPerson, inRolledBackTransaction, type Fixture } from './use-case-fixture';
 import { realOrderSummaries } from '../../helpers/order-summaries';
+import { executionOnClient } from '../../helpers/execution-transaction-on-client';
 
 const summaryReaders = realOrderSummaries();
 
@@ -166,6 +167,7 @@ function casosDelOperador(fixture: Fixture) {
       presentations,
       units: { findRefs: noUsado('units.findRefs'), findRefsSharingBaseInCompany: noUsado('units.sisters') } as unknown as UnitCatalog,
       products: { findRefs: noUsado('products.findRefs') } as unknown as ProductCatalog,
+      ...executionOnClient(fixture.tx, orders),
       now: () => NOW,
     }),
   };

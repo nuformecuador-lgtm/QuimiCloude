@@ -1,7 +1,7 @@
 import { requirePermission, type Actor } from './actor';
 import { NotCancellableError, OrderNotFoundError, ValidationError } from './errors';
+import { cancelInsideTransaction, isCancellableStatus } from './order-cancellation';
 import { cancelOrderSchema } from './order-input';
-import type { OrderStatus } from './order-classification';
 import type { OrderScope } from './order-scope';
 
 import type { OrderUnitOfWork } from '../ports/order-unit-of-work';
@@ -15,22 +15,6 @@ export type CancelOrderDeps = {
   /** Ver el comentario identico de `create-order.ts` sobre el origen de este reloj. */
   readonly now?: () => Date;
 };
-
-/**
- * Los TRES estados desde los que se cancela. Desde `ENTREGADO` no se cancela -eso seria una
- * devolucion, que no existe- y desde `CANCELADO` tampoco, porque es final. `POR_EMPACAR` y
- * `EN_EMPAQUE` tampoco: el material ya se consumio al dejar el pedido `POR_EMPACAR`, asi que
- * cancelar dejaria un consumo sin pedido que lo explique; un problema en esos dos estados se
- * corrige con un ajuste de inventario, no con esta lista. Escrita como lista para que anadir un
- * estado nuevo obligue a decidir explicitamente si es cancelable.
- *
- * `BLOQUEADO` SI se cancela, con las mismas reglas que un `PENDIENTE` y su motivo: la
- * cancelacion es la unica salida manual de un pedido sin material, porque en lo demas no cabe
- * cancelar -no se fabrico nada- y esperar lotes no es una cancelacion. Cancelar uno bloqueado no
- * libera nada, porque no tiene nada apartado; la llamada a `releaseForOrder` no encuentra filas
- * y no falla por eso.
- */
-const CANCELABLES: readonly OrderStatus[] = ['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'];
 
 /**
  * Cancelacion. CASO DE USO PROPIO y UNICO camino capaz de escribir el estado `CANCELADO` y
@@ -71,32 +55,23 @@ export function createCancelOrder(
     const row = await deps.orders.findAliveById(id, scope);
     if (row === null) throw new OrderNotFoundError();
 
-    // R28, con `code` PROPIO: `not_cancellable` no es `invalid_transition` ni `not_deletable`,
-    // porque QC-35 tiene que poder decir tres frases distintas sin leer el mensaje (R56).
-    if (!CANCELABLES.includes(row.status)) throw new NotCancellableError();
+    // `not_cancellable` lleva `code` propio para que quien lo muestre lo distinga sin leer el
+    // mensaje.
+    if (!isCancellableStatus(row.status)) throw new NotCancellableError();
 
     const instant = now();
 
-    const result = await deps.unitOfWork.run(async (transaction) => {
-      const locked = await transaction.orders.lockAliveById(id, scope);
-      if (locked === null) return 'not_found' as const;
-      if (!CANCELABLES.includes(locked.status)) throw new NotCancellableError();
-
-      // El actor queda como autor de la ultima modificacion, sin tocar el de creacion.
-      const cancelled = await transaction.orders.cancelAlive(id, reason, actor.id, instant, scope);
-      if (cancelled === 'not_found') return 'not_found' as const;
-
-      await transaction.reservations.releaseForOrder({
-        orderId: id,
-        companyId: actor.companyId,
-        reason: 'release',
+    const result = await deps.unitOfWork.run((transaction) =>
+      cancelInsideTransaction(transaction, {
+        id,
+        reason,
         actorId: actor.id,
         now: instant,
-      });
-      await transaction.orders.setReservedAt(id, null, scope);
-      return 'ok' as const;
-    });
+        companyId: actor.companyId,
+      }),
+    );
 
     if (result === 'not_found') throw new OrderNotFoundError();
+    if (result === 'not_cancellable') throw new NotCancellableError();
   };
 }

@@ -440,6 +440,12 @@ const CASOS_DE_USO_QC63 = [
   `${ASIGNACIONES}/domain/get-assigned-order-execution.ts`,
   `${ASIGNACIONES}/domain/start-assigned-order.ts`,
   `${ASIGNACIONES}/domain/finish-assigned-order.ts`,
+  // 2026-10-06 (QC-82, P3 contestada con la propuesta): cancelar desde la pantalla y anotar un
+  // paso exigen el mismo `asignaciones.ejecutar` que arrancar y finalizar. La lista crece con los
+  // dos archivos exactos; los dos de empaque NO entran: exigen `empaque.modificar` y ningun codigo
+  // de `asignaciones`.
+  `${ASIGNACIONES}/domain/cancel-assigned-order.ts`,
+  `${ASIGNACIONES}/domain/record-step-move.ts`,
 ]
 
 const CONSUMO_LEGITIMO: ReadonlyArray<ConsumoLegitimo> = [
@@ -1044,13 +1050,45 @@ ${linea}` } : file,
       )
     }
 
-    it('R15: asignaciones.ejecutar se nombra solo en los tres casos de uso, actor.ts y la pantalla de ejecucion', () => {
+    // 2026-10-06 (QC-82): la lista exacta crece con cancel-assigned-order.ts y record-step-move.ts.
+    it('R15: asignaciones.ejecutar se nombra solo en los cinco casos de uso, actor.ts y la pantalla de ejecucion', () => {
       const nombran = appSources
         .filter((file) => isScopedForPermissionCodes(file.relPath))
         .filter((file) => stripComments(file.content).includes('asignaciones.ejecutar'))
         .map((file) => file.relPath)
         .sort()
       expect(nombran).toEqual([PAGINA_EJECUCION, PREDICADO_DE_EJECUCION, ...CASOS_DE_USO_QC63].sort())
+    })
+
+    it('R26: los dos casos de uso de QC-82 entran en la lista de asignaciones.ejecutar', () => {
+      expect(CASOS_DE_USO_QC63).toEqual(
+        expect.arrayContaining([
+          `${ASIGNACIONES}/domain/cancel-assigned-order.ts`,
+          `${ASIGNACIONES}/domain/record-step-move.ts`,
+        ]),
+      )
+    })
+
+    const CASOS_DE_USO_DE_EMPAQUE = [
+      `${ASIGNACIONES}/domain/start-packing.ts`,
+      `${ASIGNACIONES}/domain/finish-packing.ts`,
+    ]
+
+    it('R42: los casos de uso de empaque no nombran ningun permiso de asignaciones y no estan en ninguna lista', () => {
+      for (const objetivo of CASOS_DE_USO_DE_EMPAQUE) {
+        expect(CASOS_DE_USO_QC63).not.toContain(objetivo)
+        expect(CONSUMO_LEGITIMO.some((p) => p.tipo === 'archivo' && p.archivo === objetivo)).toBe(false)
+      }
+      expect(findPermissionUsageFindings(appSources)).toEqual([])
+    })
+
+    it.each(
+      CASOS_DE_USO_DE_EMPAQUE.flatMap((objetivo) =>
+        ['asignaciones.consultar', 'asignaciones.ejecutar'].map((codigo) => [objetivo, codigo] as const),
+      ),
+    )('R42 mutacion: nombrar en %s el codigo %s pone la regla en rojo', (objetivo, codigo) => {
+      const mutados = conLinea(objetivo, `const p = '${codigo}';`)
+      expect(findPermissionUsageFindings(mutados)).toEqual([`${objetivo} nombra '${codigo}' (R29)`])
     })
 
     it.each([

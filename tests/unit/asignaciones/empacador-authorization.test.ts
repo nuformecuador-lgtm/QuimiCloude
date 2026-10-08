@@ -155,6 +155,8 @@ describe('el Empacador no ejecuta pedidos asignados', () => {
       units: { findRefs: explode(), findRefsSharingBaseInCompany: explode() },
       products: { findRefs: explode(), findCostingBatches: explode() },
       presentations: { findRefs: explode() },
+      log: { append: explode(), findLastStepPosition: explode() },
+      transaction: { run: explode() },
       now: () => new Date('2026-09-22T10:00:00.000Z'),
     } as unknown as StartAssignedOrderDeps;
 
@@ -170,6 +172,8 @@ describe('el Empacador no ejecuta pedidos asignados', () => {
       orders: { findAliveById: explode(), listAliveSummariesByIds: explode(), transitionAliveById: explode() },
       people: { findAliveRefsInCompany: explode(), findRefsIncludingDeletedInCompany: explode() },
       groups: { findSnapshotAliveInCompany: explode() },
+      log: { append: explode(), findLastStepPosition: explode() },
+      transaction: { run: explode() },
       now: () => new Date('2026-09-22T10:00:00.000Z'),
     } as unknown as FinishAssignedOrderDeps;
 

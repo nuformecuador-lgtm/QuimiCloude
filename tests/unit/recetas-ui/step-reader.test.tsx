@@ -7,6 +7,7 @@ import { setupUser } from '../../helpers/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { StepReader } from '@/components/shared/step-reader';
+import { clampStepPosition } from '@/components/shared/step-reader/step-reader';
 import type { RecipeStepDocument } from '@/lib/modules/recetas';
 import {
   NARROW_VIEWPORT,
@@ -994,5 +995,101 @@ describe('StepReader: texto y bloqueo del boton final (QC-211)', () => {
   it('R21: finishBusy no afecta a Siguiente en los pasos intermedios', () => {
     render(<StepReader steps={[PASO_SIN_ITEMS, PASO_SIN_ITEMS]} onFinish={vi.fn()} finishBusy />);
     expect(screen.getByTestId('step-reader-next')).toBeEnabled();
+  });
+});
+
+describe.each(['lectura', 'ejecucion'] as const)(
+  'StepReader: paso de entrada y aviso de cambio de paso (QC-82), mode=%s',
+  (mode) => {
+    const SIN_BLOQUEO: readonly RecipeStepDocument[] = [PASO_SIN_ITEMS, PASO_SIN_ITEMS, PASO_SIN_ITEMS];
+
+    it('R13: con initialStepPosition=3 empieza en el paso 3', () => {
+      render(<StepReader steps={TRES_PASOS} onFinish={vi.fn()} mode={mode} initialStepPosition={3} />);
+      expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 3 de 3');
+      expect(screen.getByText(PASO_3_TEXTO)).toBeInTheDocument();
+    });
+
+    it('R14: una posicion fuera de rango se recorta (9 al ultimo, 0 al primero)', () => {
+      const { unmount } = render(
+        <StepReader steps={TRES_PASOS} onFinish={vi.fn()} mode={mode} initialStepPosition={9} />,
+      );
+      expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 3 de 3');
+      unmount();
+
+      render(<StepReader steps={TRES_PASOS} onFinish={vi.fn()} mode={mode} initialStepPosition={0} />);
+      expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 3');
+    });
+
+    it('R17, R18: Siguiente avisa {advance, 2} y Anterior avisa {go_back, 1}', () => {
+      const onStepChange = vi.fn();
+      render(
+        <StepReader steps={SIN_BLOQUEO} onFinish={vi.fn()} mode={mode} onStepChange={onStepChange} />,
+      );
+
+      fireEvent.click(screen.getByTestId('step-reader-next'));
+      expect(onStepChange).toHaveBeenCalledTimes(1);
+      expect(onStepChange).toHaveBeenLastCalledWith({ direction: 'advance', position: 2 });
+      expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 2 de 3');
+
+      fireEvent.click(screen.getByTestId('step-reader-previous'));
+      expect(onStepChange).toHaveBeenCalledTimes(2);
+      expect(onStepChange).toHaveBeenLastCalledWith({ direction: 'go_back', position: 1 });
+    });
+
+    it('R18: Anterior en el paso 1 no avisa', () => {
+      const onStepChange = vi.fn();
+      render(
+        <StepReader steps={SIN_BLOQUEO} onFinish={vi.fn()} mode={mode} onStepChange={onStepChange} />,
+      );
+
+      fireEvent.click(screen.getByTestId('step-reader-previous'));
+      expect(onStepChange).not.toHaveBeenCalled();
+      expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 3');
+    });
+
+    it('R13: empezar en el paso 3 no mueve el foco', () => {
+      const antes = document.activeElement;
+      render(<StepReader steps={TRES_PASOS} onFinish={vi.fn()} mode={mode} initialStepPosition={3} />);
+      expect(document.activeElement).toBe(antes);
+      if (mode === 'ejecucion') {
+        expect(document.activeElement).not.toBe(screen.getByTestId('step-reader-heading'));
+      }
+    });
+
+    it('R37: empezando en el ultimo paso, finishLabel sigue en el boton final', () => {
+      render(
+        <StepReader
+          steps={SIN_BLOQUEO}
+          onFinish={vi.fn()}
+          mode={mode}
+          finishLabel="Terminar"
+          initialStepPosition={3}
+        />,
+      );
+      expect(screen.getByTestId('step-reader-finish')).toHaveTextContent('Terminar');
+    });
+  },
+);
+
+describe('StepReader — R37: recorte de la posicion de entrada', () => {
+  it('R37: clampStepPosition deja la posicion dentro, sube a 1, baja al maximo y sin pasos da null', () => {
+    expect(clampStepPosition(2, 3)).toBe(2);
+    expect(clampStepPosition(0, 3)).toBe(1);
+    expect(clampStepPosition(-4, 3)).toBe(1);
+    expect(clampStepPosition(null, 3)).toBe(1);
+    expect(clampStepPosition(9, 3)).toBe(3);
+    expect(clampStepPosition(2, 0)).toBeNull();
+  });
+});
+
+describe('StepReader — R37: la pantalla de empaque no recibe las props nuevas', () => {
+  const PACKING_SCREEN = join(
+    HERE,
+    '../../../app/(private)/asignacion/empaque/[id]/components/packing-order-screen.tsx',
+  );
+
+  it('R37: packing-order-screen.tsx no pasa onStepChange ni initialStepPosition', () => {
+    const fuente = sinComentarios(readFileSync(PACKING_SCREEN, 'utf8'));
+    expect(fuente).not.toMatch(/\b(onStepChange|initialStepPosition)\b/);
   });
 });
