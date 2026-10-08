@@ -641,6 +641,7 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     expect(
       pedidosSources.filter((file) => CONSUME_LA_GUARDIA.test(read(file))).map(etiqueta),
     ).toEqual([
+      'lib/modules/pedidos/domain/order-conditioning.ts',
       'lib/modules/pedidos/domain/order-packing.ts',
       DUENO,
       'lib/modules/pedidos/domain/transition-order.ts',

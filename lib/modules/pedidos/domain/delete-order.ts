@@ -15,13 +15,21 @@ export type DeleteOrderDeps = {
 };
 
 /**
- * Los estados que NO se borran: se cancela o se entrega para dejar constancia, asi que borrar
- * despues los borraria de las consultas. `POR_EMPACAR` y `EN_EMPAQUE` se suman porque el
- * material ya se consumio al llegar a `POR_EMPACAR` -borrarlos ocultaria ese consumo y el lote
- * de producto terminado ya dado de alta-. Esta lista es la mitad de APLICACION; la otra mitad
- * es el `CHECK orders_delivered_not_deleted`, que nombra los mismos cuatro estados.
+ * Los estados que NO se borran: se cancela, se termina o se entrega para dejar constancia, asi
+ * que borrar despues los borraria de las consultas. Desde `POR_EMPACAR` el material ya se
+ * consumio -borrarlos ocultaria ese consumo y el producto terminado ya dado de alta-. Esta lista
+ * es la mitad de APLICACION; la otra mitad es el `CHECK orders_delivered_not_deleted`, que
+ * nombra los mismos estados.
  */
-const NO_BORRABLES: readonly OrderStatus[] = ['ENTREGADO', 'CANCELADO', 'POR_EMPACAR', 'EN_EMPAQUE'];
+const NO_BORRABLES: readonly OrderStatus[] = [
+  'ENTREGADO',
+  'CANCELADO',
+  'POR_EMPACAR',
+  'EN_EMPAQUE',
+  'POR_ACONDICIONAR',
+  'EN_ACONDICIONAMIENTO',
+  'TERMINADO',
+];
 
 /**
  * Borrado de pedido. Borrado LOGICO y sin restaurar: `softDeleteAlive`, jamas un borrado

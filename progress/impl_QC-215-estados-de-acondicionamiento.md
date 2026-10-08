@@ -60,6 +60,9 @@ gate se pone rojo, con el cambio mínimo y anotado en «Excepciones».
 - A1 · `tests/unit/pedidos-ui/order-row-actions.test.tsx`: los 3 estados en la lista literal de
   finales (R22). Mismo motivo. El nombre del caso aún dice «exactamente ENTREGADO, CANCELADO,
   POR_EMPACAR y EN_EMPAQUE»: se corrige en C3.
+- A2 · `tests/unit/pedidos/module-contract.test.ts`: alta de `order-conditioning.ts` en la lista
+  literal de consumidores de `assertTransition` (1 línea). Motivo: el design exige que el dominio
+  nuevo llame a `assertTransition` y el caso queda rojo sin el alta.
 
 ## Tandas
 
@@ -87,3 +90,38 @@ gate se pone rojo, con el cambio mínimo y anotado en «Excepciones».
   `test:rapido` tras el commit (18 archivos del diff): 334 archivos verdes, 5 rojos y los 5 están en
   `tests/baseline-rojos.json` (unidades-viewport, usuarios-viewport, product-page,
   pantallas-exigen-permiso, recipe-page): `vitest related` no aplica los `--exclude`. Nada propio.
+
+### A2 + A3 — Dominio y UI sin colisión (2026-10-07/08, una sola tanda tras el corte de sesión)
+
+- Producción nueva: `pedidos/ports/order-conditioning-repository.ts` (puerto, `scope` último),
+  `pedidos/domain/order-conditioning.ts` (`createStartConditioning`/`createFinishConditioning`,
+  tipos `StartConditioningAliveById`/`FinishConditioningAliveById` con la firma que tendrá
+  `OrderCatalog`).
+- Producción modificada: `pedidos/domain/transition-order.ts` (destinos reservados + los 3, R4);
+  `pedidos/domain/delete-order.ts` (`NO_BORRABLES` + los 3, igual que el CHECK de M1);
+  `asignaciones/domain/list-company-orders.ts` (`resolveOrdering`: exactamente `TERMINADO` también);
+  `asignacion/components/assignment-view-params.ts` (orden de R2; `isExactlyDelivered` = exactamente
+  `ENTREGADO` o exactamente `TERMINADO`); `company-orders-skeleton.tsx` (solo docstring: recibe
+  `showFinishedAt` de `page.tsx`); `packed-order-notice.tsx` («Pedido <n> empacado»).
+- Tests nuevos: `tests/unit/pedidos/order-conditioning.test.ts`.
+- Tests ampliados (sin colisión): `asignaciones/list-company-orders.test.ts`,
+  `list-packing-orders.test.ts`, `get-packing-order.test.ts`, `pedidos/expire-stale-orders.test.ts`,
+  `asignaciones-ui/assignment-view-params.test.ts`, `company-orders-columns.test.tsx`,
+  `packed-order-notice.test.tsx`, `asignacion-page.test.tsx`.
+- Arreglo de A1: `tests/integration/pedidos/pedidos-constraints.int.test.ts` (lista literal de
+  columnas de `orders` + `conditioned_by`; no está en la lista de colisión).
+- **Movido a C2:** los dos códigos de error (`error-codes.ts`, `error-catalog.ts`,
+  `catalogo.test.ts`). Se escribieron en A2, pero `guard-catalogo-de-errores` exige que una clase
+  declare cada código, y las clases van en `asignaciones/domain/errors.ts` (colisión QC-82). Se
+  revirtieron y el diff se guardó en `.git/worktrees/QC-215-estados-de-acondicionamiento/qc215-c2-catalogo-errores.patch`
+  para aplicarlo en C2.
+- Diferido a C1: los dos métodos de `OrderCatalog` (el literal de `lib/composition/index.ts`
+  dejaría de compilar) y el export del puerto en `pedidos/index.ts`.
+- Diferido a C3: test de etiquetas/variantes del badge de `/pedidos` (R29, R32): su único test es
+  `tests/unit/pedidos-ui/order-columns.test.tsx` (colisión QC-156).
+- R → test: R4 → `transition-order.test.ts` sigue verde (casos nuevos en C2); R8, R9, R10, R12, R13
+  (dominio) → `order-conditioning.test.ts`; R19, R30 (borrar) → `delete-order.test.ts` sigue verde
+  (casos en C2); R23 → `list-packing-orders`, `get-packing-order`, `expire-stale-orders`;
+  R28 → `company-orders-columns.test.tsx`, `assignment-view-params.test.ts`, `list-company-orders`;
+  R32 (Todos) → `list-company-orders`, `assignment-view-params`, `asignacion-page.test.tsx`;
+  R7 → `packed-order-notice.test.tsx`.

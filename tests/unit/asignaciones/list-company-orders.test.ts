@@ -257,6 +257,55 @@ describe('QC-145 — listCompanyOrders: R24/D16 el orden depende del filtro', ()
     );
   });
 
+  it('R32: exactamente `TERMINADO` ordena como «Terminados»', async () => {
+    const { deps, listAliveSummariesInCompany } = montar();
+    const listCompanyOrders = createListCompanyOrders(deps);
+
+    await listCompanyOrders(ACTOR, { page: 1, statuses: ['TERMINADO', 'TERMINADO'] });
+
+    expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
+      EMPRESA,
+      ['TERMINADO'],
+      'finished_recent_first',
+      1,
+      undefined,
+    );
+  });
+
+  it('R32: TERMINADO junto a ENTREGADO, o junto a otro estado, usa el orden de la lista de trabajo', async () => {
+    const { deps, listAliveSummariesInCompany } = montar();
+    const listCompanyOrders = createListCompanyOrders(deps);
+
+    await listCompanyOrders(ACTOR, { page: 1, statuses: ['TERMINADO', 'ENTREGADO'] });
+    await listCompanyOrders(ACTOR, { page: 1, statuses: ['TERMINADO', 'EN_ACONDICIONAMIENTO'] });
+
+    expect(listAliveSummariesInCompany).toHaveBeenNthCalledWith(
+      1,
+      EMPRESA,
+      ['TERMINADO', 'ENTREGADO'],
+      'work_queue',
+      1,
+      undefined,
+    );
+    expect(listAliveSummariesInCompany).toHaveBeenNthCalledWith(
+      2,
+      EMPRESA,
+      ['TERMINADO', 'EN_ACONDICIONAMIENTO'],
+      'work_queue',
+      1,
+      undefined,
+    );
+  });
+
+  it('R32: exactamente un estado de acondicionamiento abierto usa el orden de la lista de trabajo', async () => {
+    const { deps, listAliveSummariesInCompany } = montar();
+    const listCompanyOrders = createListCompanyOrders(deps);
+
+    await listCompanyOrders(ACTOR, { page: 1, statuses: ['POR_ACONDICIONAR'] });
+
+    expect(listAliveSummariesInCompany).toHaveBeenCalledWith(EMPRESA, ['POR_ACONDICIONAR'], 'work_queue', 1, undefined);
+  });
+
   it('un solo estado que no es ENTREGADO usa el orden de la lista de trabajo', async () => {
     const { deps, listAliveSummariesInCompany } = montar();
     const listCompanyOrders = createListCompanyOrders(deps);
