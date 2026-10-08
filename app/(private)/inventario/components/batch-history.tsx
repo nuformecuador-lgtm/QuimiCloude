@@ -36,6 +36,7 @@ const KIND_LABELS: Record<BatchHistoryEntry['kind'], string> = {
   release: 'Liberación',
   expire: 'Caducidad',
   consume: 'Consumo',
+  delivery: 'Entrega a cliente',
 };
 
 /**

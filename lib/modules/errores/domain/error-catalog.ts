@@ -79,6 +79,8 @@ export const ERROR_MESSAGE_KEY = {
   order_unit_not_convertible: 'errors.order_unit_not_convertible',
   batch_stock_changed: 'errors.batch_stock_changed',
   adjustment_reason_not_allowed: 'errors.adjustment_reason_not_allowed',
+  delivery_exceeds_remaining: 'errors.delivery_exceeds_remaining',
+  delivery_batch_insufficient: 'errors.delivery_batch_insufficient',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -201,4 +203,8 @@ export const ERROR_MESSAGES_ES = {
     'La existencia del lote cambio mientras ajustabas: revisa la diferencia y confirma de nuevo.',
   'errors.adjustment_reason_not_allowed':
     'Un aumento de existencia solo admite los motivos conteo fisico o error de carga.',
+  'errors.delivery_exceeds_remaining':
+    'La entrega supera los envases que faltan por entregar en alguna presentacion.',
+  'errors.delivery_batch_insufficient':
+    'Algun lote ya no tiene los envases elegidos: revisa los lotes y confirma de nuevo.',
 } as const satisfies Record<ErrorMessageKey, string>;

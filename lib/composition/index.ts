@@ -142,6 +142,7 @@ import type { OrderNumberFormatter } from '@/lib/modules/inventario/ports/order-
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 import type {
+  FinishedBatchCatalog,
   OrderNumberDirectory,
   PackagingCatalog,
   PresentationCatalog,
@@ -257,12 +258,14 @@ import {
   createCancelOrder,
   createCreateOrder,
   createDeleteOrder,
+  createDeliverOrder,
   createExpireStaleOrders,
   createFindCoverage,
   createFinishConditioning,
   createFinishPacking,
   createGetOrder,
   createGetOrderCustomerFilterOption,
+  createGetOrderDelivery,
   createListAliveSummariesByIds,
   createListAliveSummariesInCompany,
   createListSummariesByIdsIncludingDeleted,
@@ -300,6 +303,8 @@ import type { OrderConditioningRepository } from '@/lib/modules/pedidos/ports/or
 import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-packing-repository';
 import type { OrderSummaryReader } from '@/lib/modules/pedidos/ports/order-summary-reader';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
+import type { OrderDeliveryRepository } from '@/lib/modules/pedidos/ports/order-delivery-repository';
+import type { OrderDeliveryUnitOfWork } from '@/lib/modules/pedidos/ports/order-delivery-unit-of-work';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import {
   createRecipeExecutionReader,
@@ -1366,6 +1371,18 @@ const reviewBlockedOrders = createReviewBlockedOrders({
  */
 const customerCatalog = buildCustomerCatalog();
 
+// Dobles provisionales de la entrega hasta que existan sus adaptadores: no entregan nada y la
+// lectura no encuentra entregas ni lotes.
+const orderDeliveryReads: Pick<OrderDeliveryRepository, 'sumDeliveredPackages'> = {
+  sumDeliveredPackages: async () => new Map(),
+};
+const finishedBatchCatalog: FinishedBatchCatalog = { findDeliverableBatches: async () => [] };
+const orderDeliveryUnitOfWork: OrderDeliveryUnitOfWork = {
+  run: async () => {
+    throw new Error('orderDeliveryUnitOfWork: la entrega todavia no tiene adaptador');
+  },
+};
+
 export const pedidos = {
   createOrder: createCreateOrder({
     recipes: recipeCatalog,
@@ -1444,6 +1461,19 @@ export const pedidos = {
   }),
   searchOrderCustomers: createSearchOrderCustomers({ customerCatalog }),
   getOrderCustomerFilterOption: createGetOrderCustomerFilterOption({ customerCatalog }),
+  getOrderDelivery: createGetOrderDelivery({
+    orders: orderRepository,
+    deliveries: orderDeliveryReads,
+    lines: createOrderWriteRepository(),
+    presentations: presentationCatalog,
+    finishedBatches: finishedBatchCatalog,
+    customerCatalog,
+  }),
+  deliverOrder: createDeliverOrder({
+    customerCatalog,
+    unitOfWork: orderDeliveryUnitOfWork,
+    orders: orderRepository,
+  }),
 } as const;
 
 // ---------------------------------------------------------------------------------------

@@ -7,9 +7,9 @@ import type { CustomerCatalog, CustomerRef } from '@/lib/modules/clientes';
 /** El cliente de un pedido tal como lo ven la ficha y el listado. */
 export type OrderCustomer = { readonly id: string; readonly name: string; readonly isDeleted: boolean };
 
-/** `'assign'` busca para asignar (solo vivos); `'filter'`, para filtrar el listado (tambien los
- *  dados de baja). */
-export type OrderCustomerSearchPurpose = 'assign' | 'filter';
+/** `'assign'` busca para asignar y `'deliver'` para entregar (los dos, solo vivos); `'filter'`,
+ *  para filtrar el listado (tambien los dados de baja). */
+export type OrderCustomerSearchPurpose = 'assign' | 'filter' | 'deliver';
 
 export const ORDER_CUSTOMER_FILTER_FIELD = 'customerId';
 

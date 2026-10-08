@@ -124,6 +124,42 @@ describe('searchOrderCustomers — includeDeleted segun purpose (R27, R28)', () 
   })
 })
 
+describe('searchOrderCustomers para entregar (QC-223)', () => {
+  const ENTREGADOR: Actor = { id: 'u-2', companyId: EMPRESA, permissions: ['entregas.modificar'] }
+
+  it('R10: para entregar pide solo los vivos de la empresa del actor', async () => {
+    const c = catalogo()
+
+    const pagina = await createSearchOrderCustomers({ customerCatalog: c })({ search: 'a', page: 1 }, 'deliver', ENTREGADOR)
+
+    expect(c.searchRefs).toHaveBeenCalledWith({ search: 'a', includeDeleted: false, page: 1, pageSize: undefined }, EMPRESA)
+    expect(pagina.items).toEqual([{ id: VIVO.id, name: 'Ana Perez', isDeleted: false }])
+  })
+
+  it('R2: para entregar exige entregas.modificar, no le basta pedidos.modificar, y no consulta', async () => {
+    const c = catalogo()
+
+    expect(await codigoDelFallo(() => createSearchOrderCustomers({ customerCatalog: c })({}, 'deliver', AMBOS))).toBe(
+      'unauthorized',
+    )
+    expect(await codigoDelFallo(() => createSearchOrderCustomers({ customerCatalog: c })({ page: 0 }, 'deliver', null))).toBe(
+      'unauthorized',
+    )
+    expect(c.searchRefs).not.toHaveBeenCalled()
+  })
+
+  it('R2: entregas.modificar no abre asignar ni filtrar', async () => {
+    const c = catalogo()
+
+    for (const purpose of ['assign', 'filter'] as const) {
+      expect(await codigoDelFallo(() => createSearchOrderCustomers({ customerCatalog: c })({}, purpose, ENTREGADOR))).toBe(
+        'unauthorized',
+      )
+    }
+    expect(c.searchRefs).not.toHaveBeenCalled()
+  })
+})
+
 describe('getOrderCustomerFilterOption — el cliente que trae la direccion (R29)', () => {
   it('R29: devuelve el cliente de la empresa, tambien dado de baja, con una sola llamada', async () => {
     const c = catalogo()

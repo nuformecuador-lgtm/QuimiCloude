@@ -46,12 +46,19 @@ const CODIGOS_DEL_REQUISITO = [
   'empresas.consultar',
   'empresas.modificar',
   'acondicionamiento.modificar',
+  // QC-223 2026-10-08: entra `entregas.modificar`, al final.
+  'entregas.modificar',
 ] as const
 
 /** Los dos codigos de la plataforma: solo los recibe el Maestro. */
 const CODIGOS_DE_EMPRESAS = ['empresas.consultar', 'empresas.modificar'] as const
 
 const ACONDICIONAMIENTO = 'acondicionamiento.modificar'
+
+// QC-223 2026-10-08: `entregas.modificar` entra al final del catalogo y del Administrador. Los
+// casos de fichas previas que fijan «el catalogo previo» lo comparan sin el.
+const ENTREGAS = 'entregas.modificar'
+const sinEntregas = (codigo: string): boolean => codigo !== ENTREGAS
 
 const esDeEmpresas = (codigo: string): boolean => codigo.startsWith('empresas.')
 
@@ -193,6 +200,8 @@ const MODULOS = [
   'empaque',
   'empresas',
   'acondicionamiento',
+  // QC-223 2026-10-08
+  'entregas',
 ]
 
 /** Modulos con casos de uso de escritura (R3) y sin ellos (R4). */
@@ -211,7 +220,8 @@ const MODULOS_CON_ESCRITURA = [
 const MODULOS_SIN_ESCRITURA = ['dashboard', 'terminados']
 /** Modulos que solo escriben, sin consulta propia (R34): quien tiene el permiso ya ve el pedido
  *  por otra via. */
-const MODULOS_SOLO_ESCRITURA = ['empaque', 'acondicionamiento']
+// QC-223 2026-10-08: `entregas` tambien solo escribe.
+const MODULOS_SOLO_ESCRITURA = ['empaque', 'acondicionamiento', 'entregas']
 
 const codigos = PERMISSIONS.map((permiso) => permiso.code)
 
@@ -274,10 +284,11 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
         codigo !== 'documentos.modificar' &&
         codigo !== 'empaque.modificar' &&
         codigo !== ACONDICIONAMIENTO &&
+        sinEntregas(codigo) &&
         !esDeEmpresas(codigo),
     )
 
-    expect(codigos).toEqual([
+    expect(codigos.filter(sinEntregas)).toEqual([
       ...catalogoPrevio,
       'documentos.consultar',
       'documentos.modificar',
@@ -367,10 +378,11 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
         codigo !== 'documentos.modificar' &&
         codigo !== 'empaque.modificar' &&
         codigo !== ACONDICIONAMIENTO &&
+        sinEntregas(codigo) &&
         !esDeEmpresas(codigo),
     )
 
-    expect(codigos).toEqual([
+    expect(codigos.filter(sinEntregas)).toEqual([
       ...catalogoPrevio,
       'clientes.consultar',
       'clientes.modificar',
@@ -402,10 +414,13 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
   it('R35: el catalogo es el previo mas empaque.modificar en su posicion, con solo los empresas.* detras, ningun otro codigo cambia', () => {
     const catalogoPrevio = CODIGOS_DEL_REQUISITO.filter(
       (codigo) =>
-        codigo !== 'empaque.modificar' && codigo !== ACONDICIONAMIENTO && !esDeEmpresas(codigo),
+        codigo !== 'empaque.modificar' &&
+        codigo !== ACONDICIONAMIENTO &&
+        sinEntregas(codigo) &&
+        !esDeEmpresas(codigo),
     )
 
-    expect(codigos).toEqual([
+    expect(codigos.filter(sinEntregas)).toEqual([
       ...catalogoPrevio,
       'empaque.modificar',
       ...CODIGOS_DE_EMPRESAS,
@@ -823,11 +838,13 @@ describe('QC-201 — el permiso asignaciones.ejecutar (R1, R2, R3, R4, R14)', ()
   })
 
   it('R1: el catalogo es el previo mas asignaciones.ejecutar justo detras de asignaciones.modificar', () => {
-    const sinEjecutar = codigos.filter((codigo) => codigo !== 'asignaciones.ejecutar')
+    const sinEjecutar = codigos.filter(
+      (codigo) => codigo !== 'asignaciones.ejecutar' && sinEntregas(codigo),
+    )
     const indice = sinEjecutar.indexOf('asignaciones.modificar')
 
     expect(sinEjecutar).toEqual([...PERMISOS_PREVIOS, ...PERMISOS_POSTERIORES].map((p) => p.code))
-    expect(codigos).toEqual([
+    expect(codigos.filter(sinEntregas)).toEqual([
       ...sinEjecutar.slice(0, indice + 1),
       'asignaciones.ejecutar',
       ...sinEjecutar.slice(indice + 1),
@@ -835,7 +852,9 @@ describe('QC-201 — el permiso asignaciones.ejecutar (R1, R2, R3, R4, R14)', ()
   })
 
   it('R1: todas las entradas previas conservan su modulo, accion y descripcion exactos', () => {
-    const previas = PERMISSIONS.filter((permiso) => permiso.code !== 'asignaciones.ejecutar')
+    const previas = PERMISSIONS.filter(
+      (permiso) => permiso.code !== 'asignaciones.ejecutar' && sinEntregas(permiso.code),
+    )
 
     expect(previas).toEqual([...PERMISOS_PREVIOS, ...PERMISOS_POSTERIORES])
   })
@@ -875,7 +894,9 @@ describe('QC-201 — el permiso asignaciones.ejecutar (R1, R2, R3, R4, R14)', ()
 
   it('R3: el Administrador recibe asignaciones.ejecutar justo tras asignaciones.modificar y el resto no cambia', () => {
     const admin = SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []
-    const sinEjecutar = admin.filter((codigo) => codigo !== 'asignaciones.ejecutar')
+    const sinEjecutar = admin.filter(
+      (codigo) => codigo !== 'asignaciones.ejecutar' && sinEntregas(codigo),
+    )
 
     expect(admin).toEqual([...CODIGOS_DEL_ADMINISTRADOR])
     expect(admin.indexOf('asignaciones.ejecutar')).toBe(admin.indexOf('asignaciones.modificar') + 1)
@@ -1014,10 +1035,11 @@ describe('QC-216 — el permiso acondicionamiento.modificar y el Administrador d
       ...PERMISOS_POSTERIORES.filter((p) => p.code !== ACONDICIONAMIENTO),
     ]
 
-    expect(PERMISSIONS.slice(0, -1)).toEqual(catalogoPrevio)
-    expect(PERMISSIONS.at(-1)).toEqual(ENTRADA_DE_ACONDICIONAMIENTO)
-    expect(codigos).toEqual([
-      ...CODIGOS_DEL_REQUISITO.filter((codigo) => codigo !== ACONDICIONAMIENTO),
+    const previosAEntregas = PERMISSIONS.filter((permiso) => sinEntregas(permiso.code))
+    expect(previosAEntregas.slice(0, -1)).toEqual(catalogoPrevio)
+    expect(previosAEntregas.at(-1)).toEqual(ENTRADA_DE_ACONDICIONAMIENTO)
+    expect(codigos.filter(sinEntregas)).toEqual([
+      ...CODIGOS_DEL_REQUISITO.filter((codigo) => codigo !== ACONDICIONAMIENTO && sinEntregas(codigo)),
       ACONDICIONAMIENTO,
     ])
   })
@@ -1069,7 +1091,9 @@ describe('QC-216 — el permiso acondicionamiento.modificar y el Administrador d
   it('R9: el Administrador no recibe acondicionamiento.modificar, que figura entre sus excluidos, y conserva exactamente su conjunto', () => {
     expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).not.toContain(ACONDICIONAMIENTO)
     expect(ADMIN_EXCLUDED_PERMISSIONS).toContain(ACONDICIONAMIENTO)
-    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual([...PERMISOS_DEL_ADMINISTRADOR_PREVIOS])
+    expect((SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []).filter(sinEntregas)).toEqual([
+      ...PERMISOS_DEL_ADMINISTRADOR_PREVIOS,
+    ])
     expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual(
       CODIGOS_DEL_REQUISITO.filter((codigo) => !ADMIN_EXCLUDED_PERMISSIONS.includes(codigo)),
     )
@@ -1090,5 +1114,60 @@ describe('QC-216 — el permiso acondicionamiento.modificar y el Administrador d
     for (const rol of [ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO]) {
       expect(SEED_ROLE_PERMISSIONS[rol], rol).not.toContain(ACONDICIONAMIENTO)
     }
+  })
+})
+
+describe('QC-223 — el permiso entregas.modificar', () => {
+  const citaFichaORequisito = /QC-\d+|\bR\d+\b|\bD\d+\b|design\.md|decisi[oó]n cerrada/i
+
+  const ENTRADA_DE_ENTREGAS = {
+    code: 'entregas.modificar',
+    module: 'entregas',
+    action: 'modificar',
+    description: 'Entregar al cliente el producto terminado de los pedidos de la empresa.',
+  } as const
+
+  function parrafoDeEntregas(): string | undefined {
+    const raiz = join(__dirname, '..', '..', '..')
+    const fuente = readFileSync(
+      join(raiz, 'lib', 'modules', 'identity', 'domain', 'permissions.ts'),
+      'utf8',
+    ).replace(/\r\n/g, '\n')
+    const jsdoc = fuente.match(/\/\*\*([\s\S]*?)\*\/\s*export const PERMISSIONS/)?.[1] ?? ''
+    return jsdoc
+      .split(/\n\s*\*\s*\n/)
+      .map((bloque) => bloque.trim())
+      .find((bloque) => bloque.includes(ENTREGAS))
+  }
+
+  it('R1: el catalogo contiene entregas.modificar con su modulo, accion y descripcion exactos, al final y una sola vez', () => {
+    expect(PERMISSIONS.at(-1)).toEqual(ENTRADA_DE_ENTREGAS)
+    expect(codigos.filter((codigo) => codigo.startsWith('entregas.'))).toEqual([ENTREGAS])
+  })
+
+  it('R1: el catalogo es el previo, en el mismo orden, mas entregas.modificar', () => {
+    expect(codigos).toEqual([...codigos.filter(sinEntregas), ENTREGAS])
+    expect(codigos.filter(sinEntregas)).toEqual(CODIGOS_DEL_REQUISITO.filter(sinEntregas))
+  })
+
+  it('R1: el Administrador recibe entregas.modificar al final, una vez, y no figura entre sus excluidos', () => {
+    const admin = SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []
+    expect(admin.at(-1)).toBe(ENTREGAS)
+    expect(admin.filter((codigo) => codigo === ENTREGAS)).toHaveLength(1)
+    expect(ADMIN_EXCLUDED_PERMISSIONS).not.toContain(ENTREGAS)
+  })
+
+  it('R1: ningun otro rol recibe entregas.modificar', () => {
+    for (const rol of [ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO, ROLE_ACONDICIONAMIENTO]) {
+      expect(SEED_ROLE_PERMISSIONS[rol], rol).not.toContain(ENTREGAS)
+    }
+  })
+
+  it('R1: el JSDoc del catalogo tiene el parrafo de entregas, corto y sin citas', () => {
+    const parrafo = parrafoDeEntregas()
+    expect(parrafo).toBeDefined()
+    expect(parrafo!.split('\n').length).toBeLessThanOrEqual(5)
+    expect(parrafo).toContain('lib/modules/')
+    expect(parrafo).not.toMatch(citaFichaORequisito)
   })
 })
