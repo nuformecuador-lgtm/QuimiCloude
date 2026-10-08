@@ -18,6 +18,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
+import { exactProductNameCellText } from './helpers/product-name-cell';
 
 const FIXTURE_PREFIX = 'qc199_e2e_';
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -89,7 +90,7 @@ async function guardarAlta(page: Page): Promise<void> {
 function filaDelProducto(page: Page): Locator {
   return page
     .getByTestId('data-table-cell-name')
-    .filter({ hasText: productName })
+    .filter({ hasText: exactProductNameCellText(productName) })
     .locator('xpath=ancestor::tr[1]');
 }
 

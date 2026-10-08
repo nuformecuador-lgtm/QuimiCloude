@@ -198,6 +198,7 @@ const PEDIDO: OrderSummary = {
   presentationLines: [],
   unitId: null,
   unitLabel: null,
+  customer: null,
 };
 
 beforeEach(() => {

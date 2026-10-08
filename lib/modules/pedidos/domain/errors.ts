@@ -81,6 +81,16 @@ export class RecipeNotFoundError extends PedidosError {
   }
 }
 
+/** El cliente del pedido no tiene forma de id, no existe, esta dado de baja o es de otra
+ *  empresa. Reusa el codigo compartido con `clientes`. */
+export class CustomerNotFoundError extends PedidosError {
+  readonly code = 'customer_not_found';
+
+  constructor(diagnostic?: string) {
+    super('customer_not_found', diagnostic);
+  }
+}
+
 /** La unidad del pedido no existe en el catalogo de la empresa de quien escribe, o es de otra
  *  empresa. Reusa el codigo compartido con `unidades`. */
 export class UnitNotFoundError extends PedidosError {

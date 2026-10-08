@@ -50,6 +50,15 @@ function rescale(value: Scaled, scale: number): bigint {
   return value.unscaled * BigInt(10) ** BigInt(scale - value.scale);
 }
 
+/** Igualdad numerica de dos decimales en texto, sin importar los ceros de la parte decimal:
+ *  `"10"` y `"10.0000"` son iguales. */
+export function sameDecimal(a: string, b: string): boolean {
+  const left = parseDecimal(a);
+  const right = parseDecimal(b);
+  const scale = Math.max(left.scale, right.scale);
+  return rescale(left, scale) === rescale(right, scale);
+}
+
 function addDecimals(a: Scaled, b: Scaled): Scaled {
   const scale = Math.max(a.scale, b.scale);
   return { unscaled: rescale(a, scale) + rescale(b, scale), scale };

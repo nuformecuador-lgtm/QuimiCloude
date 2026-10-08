@@ -50,6 +50,8 @@ type AsyncAutocompleteProps<T> = {
   readonly id?: string;
   /** Nombre del campo oculto que viaja en el formulario con la etiqueta elegida. */
   readonly name?: string;
+  /** Texto con el que arranca el campo, para precargar una opcion ya elegida. */
+  readonly defaultInputValue?: string;
   readonly className?: string;
   readonly 'aria-label'?: string;
   readonly 'aria-invalid'?: boolean;
@@ -88,12 +90,13 @@ export function AsyncAutocomplete<T>({
   disabled = false,
   id,
   name,
+  defaultInputValue,
   className,
   ...aria
 }: AsyncAutocompleteProps<T>) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(defaultInputValue ?? '');
   const [open, setOpen] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
 

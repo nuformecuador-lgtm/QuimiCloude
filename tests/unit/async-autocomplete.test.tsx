@@ -302,3 +302,45 @@ describe('AsyncAutocomplete — consulta paginada de 10 en 10', () => {
     expect(screen.queryByText('Cargando...')).not.toBeInTheDocument();
   });
 });
+
+describe('AsyncAutocomplete — valor inicial del campo', () => {
+  it('R31: con defaultInputValue el campo arranca con ese texto y no consulta hasta abrirse', async () => {
+    const user = userEvent.setup();
+    const { peticiones, fetchPage } = crearServidor();
+
+    render(
+      <AsyncAutocomplete<Option>
+        fetchPage={fetchPage}
+        getOptionLabel={(option) => option.nombre}
+        getOptionKey={(option) => option.id}
+        defaultInputValue="Opcion 3"
+        name="opcion"
+        debounceMs={0}
+      />,
+    );
+
+    const campo = screen.getByRole('combobox');
+    expect(campo).toHaveValue('Opcion 3');
+    expect(document.querySelector('input[type="hidden"][name="opcion"]')).toHaveValue('Opcion 3');
+    expect(peticiones).toHaveLength(0);
+
+    await user.click(campo);
+
+    await waitFor(() => expect(peticiones).toHaveLength(1));
+    expect(peticiones[0]).toMatchObject({ query: 'Opcion 3', page: 1 });
+  });
+
+  it('R31: sin defaultInputValue el campo arranca vacio', () => {
+    const { fetchPage } = crearServidor();
+
+    render(
+      <AsyncAutocomplete<Option>
+        fetchPage={fetchPage}
+        getOptionLabel={(option) => option.nombre}
+        getOptionKey={(option) => option.id}
+      />,
+    );
+
+    expect(screen.getByRole('combobox')).toHaveValue('');
+  });
+});

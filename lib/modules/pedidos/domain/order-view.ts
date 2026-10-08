@@ -1,5 +1,6 @@
 import type { OrderPriority, OrderStatus } from './order-classification';
 import type { EditableOrderStatus } from './order-input';
+import type { OrderCustomer } from './order-customer';
 import type { OrderNumber } from './order-number';
 
 /**
@@ -75,6 +76,8 @@ export type NewOrder = {
   readonly unitId: string;
   /** El reparto, ya resuelto y validado contra el total (puede ser `[]`). */
   readonly presentationLines: readonly OrderPresentationLineWrite[];
+  /** `null` = pedido sin cliente. */
+  readonly customerId: string | null;
 };
 
 /**
@@ -114,6 +117,8 @@ export type OrderRow = {
   /** La unidad en que se expresa `quantity`.
    *  `null` solo en los pedidos anteriores sin presentacion. */
   readonly unitId: string | null;
+  /** Solo el id: el nombre lo resuelve el caso de uso con el catalogo de clientes. */
+  readonly customerId: string | null;
 };
 
 /**
@@ -166,6 +171,8 @@ export type OrderView = {
    *  es `null`, nunca cuando el id no vuelve del catalogo -la FK con `RESTRICT` hace ese caso
    *  imposible por construccion-. */
   readonly unitLabel: string | null;
+  /** `null` = pedido sin cliente. Un cliente dado de baja vuelve con `isDeleted: true`. */
+  readonly customer: OrderCustomer | null;
 };
 
 /**

@@ -56,6 +56,11 @@ import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedid
 import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
+import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma'
+
+const customerCatalog = {
+  findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
+}
 
 const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
@@ -314,6 +319,7 @@ describe('R1: la cotizacion coincide con el importe que guarda el alta', () => {
       expect(cotizacion.ingredientsCost).toBe('30.0000')
 
       const alta = createCreateOrder({
+        customerCatalog,
         unitOfWork,
         recipes,
         products,
@@ -346,6 +352,7 @@ describe('R1: la cotizacion coincide con el importe que guarda el alta', () => {
       expect(cotizacion.ingredientsCost).toBeNull()
 
       const alta = createCreateOrder({
+        customerCatalog,
         unitOfWork,
         recipes,
         products,
@@ -425,8 +432,8 @@ describe('R65: un pedido que ya existe cuenta lo que EL MISMO tiene apartado com
 
     try {
       const now = () => new Date('2026-05-12T12:00:00.000Z')
-      const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now })
-      const edicion = createUpdateOrder({ orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now })
+      const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now })
+      const edicion = createUpdateOrder({ customerCatalog, orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now })
 
       // necesaria = 6 * 100 % = 6: aparta el UNICO lote entero. Sin excluir la reserva propia del
       // pedido, el lote quedaria con disponible cero para el calculo de la propia edicion y el
@@ -435,7 +442,7 @@ describe('R65: un pedido que ya existe cuenta lo que EL MISMO tiene apartado com
       orderId = creado.id
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
 
-      const sinCambios: NewOrder = { recipeId, quantity: '6.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [] }
+      const sinCambios: Omit<NewOrder, 'customerId'> = { recipeId, quantity: '6.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [] }
       await edicion(orderId, sinCambios, actorDe(A))
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
 
@@ -466,7 +473,7 @@ describe('aislamiento: `orderId` de OTRA empresa no cambia nada (R65, ambito)', 
 
     try {
       const now = () => new Date('2026-05-13T12:00:00.000Z')
-      const alta = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now })
+      const alta = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now })
 
       // El unico pedido que existe aparta el material de Q, no el de A: el lote de A sigue
       // entero disponible para la cotizacion de abajo.

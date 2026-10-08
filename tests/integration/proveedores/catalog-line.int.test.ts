@@ -37,7 +37,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { Prisma } from '@prisma/client';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import {
   createCatalogLine,
@@ -46,6 +46,7 @@ import {
   softDeleteAliveCatalogLine,
 } from '@/lib/modules/proveedores/adapters/driven/persistence/supplier-catalog-line-prisma';
 import { softDeleteAliveSupplier } from '@/lib/modules/proveedores/adapters/driven/persistence/supplier-prisma';
+import { ValidationError } from '@/lib/modules/proveedores/domain/errors';
 import { normalizeSupplierName } from '@/lib/modules/proveedores/domain/supplier-name';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
@@ -723,58 +724,90 @@ describe('R10, R13: alta de la linea del catalogo por el adaptador', () => {
     }
   });
 
-  it('R32: la base rechaza la presentacion y la unidad inexistentes, y el adaptador NO traduce a ciegas', async () => {
+  it('R32: la base rechaza la presentacion y la unidad inexistentes, y el adaptador traduce solo esas dos, nunca a ciegas', async () => {
     // R10 (la mitad que solo Postgres puede demostrar), R32, `design.md > 6.2`.
     //
-    // HALLAZGO QUE ESTE CASO DOCUMENTA, y que hay que leer antes de tocar el adaptador. El
-    // diseno pedia traducir el `P2003` de `presentation_id`/`unit_id` a `invalid_input` y
-    // relanzar crudo el de `created_by`/`updated_by`, decidiendo por `meta.field_name`. Con
-    // Prisma 6.19.3 esa distincion NO ES POSIBLE: se comprobo contra esta misma base que
-    // TODO `P2003` -de una FK declarada con `@relation` o de un escalar, en esta tabla y en
-    // `products`- llega con `meta = { modelName, constraint: null }`. El conector no dice
-    // cual. El precedente de `inventario` al que apunta `design.md > 6.2` esta hoy en la
-    // misma situacion.
+    // ACTUALIZADO EL 2026-10-07 (D33). La version anterior afirmaba que el adaptador
+    // relanzaba CRUDO los cuatro `P2003` porque el conector -con un Postgres que hablaba
+    // espanol- entregaba `meta = { modelName, constraint: null }`. Contra un Postgres en
+    // ingles (`lc_messages = en_US.utf8`: el de Docker local y el `postgres:17` de CI) el
+    // conector SI nombra la restriccion -`supplier_catalog_lines_presentation_id_fkey`-, y el
+    // adaptador hace por fin lo que `design.md > 6.2` pedia desde el principio: `invalid_input`
+    // para la presentacion y la unidad, error crudo para el autor. Nadie valida antes: el
+    // adaptador no lleva `zod`, y el `ValidationError` solo puede salir de traducir el `P2003`.
     //
-    // Asi que el adaptador RELANZA CRUDO los cuatro casos, y este test afirma lo que de
-    // verdad ocurre en vez de lo que nos gustaria. Lo que NO se hace es traducir a ciegas
-    // -asumir que todo `P2003` de esta tabla es la presentacion-: le diria `invalid_input`
-    // al usuario cuando el fallo fuera del autor, que es exactamente la mentira que
-    // `design.md > 6.2` prohibe en el otro sentido.
-    //
-    // Lo que SI queda cerrado aqui, y es la mitad de R10 que importa: la BASE rechaza. La
-    // logica de clasificacion, que es correcta y empezara a traducir en cuanto el conector
-    // diga el nombre, se prueba en `tests/unit/proveedores/catalog-line-fk.test.ts`.
+    // Para que el caso no se quede verde por una validacion previa, se espia el `create` del
+    // delegado sin cambiar su comportamiento: tiene que haberse llamado, la BASE tiene que
+    // haberlo rechazado con `P2003` y la restriccion tiene que ser la de la columna que el
+    // caso rompe. Sin las FK no hay rechazo; con una traduccion a ciegas el autor saldria
+    // `invalid_input`; sin traduccion la presentacion saldria cruda. Los tres rompen el caso.
     const supplierId = await createTestSupplier(prisma);
     const presentationId = await createTestPresentation(prisma);
+    const delegado = prisma.supplierCatalogLine;
+    const original = delegado.create.bind(delegado);
+    const rechazosDeLaBase: unknown[] = [];
+    const spy = vi.spyOn(delegado, 'create').mockImplementation(((
+      args: Parameters<typeof original>[0],
+    ) =>
+      original(args).catch((error: unknown) => {
+        rechazosDeLaBase.push(error);
+        throw error;
+      })) as unknown as typeof original);
+    const restriccionDe = (error: unknown): unknown =>
+      error instanceof Prisma.PrismaClientKnownRequestError ? error.meta?.constraint : undefined;
     try {
-      for (const [etiqueta, campos] of [
-        ['presentacion inexistente', fields('Presentacion fantasma', randomUUID())],
-        ['unidad inexistente', fields('Unidad fantasma', presentationId, { unitId: randomUUID() })],
+      for (const [etiqueta, campos, restriccion] of [
+        [
+          'presentacion inexistente',
+          fields('Presentacion fantasma', randomUUID()),
+          // Dos FK la vigilan: la simple y la compuesta con la empresa (QC-59). Vale cualquiera.
+          /^supplier_catalog_lines_(company_id_)?presentation_id_fkey$/u,
+        ],
+        [
+          'unidad inexistente',
+          fields('Unidad fantasma', presentationId, { unitId: randomUUID() }),
+          /^supplier_catalog_lines_unit_id_fkey$/u,
+        ],
       ] as const) {
+        rechazosDeLaBase.length = 0;
+        spy.mockClear();
         const fallo = await createCatalogLine(
           { supplierId, ...campos },
           sharedActorId,
           new Date('2026-01-01T00:00:00Z'),
-        scope,
+          scope,
         ).catch((error: unknown) => error);
-        expect(fallo, etiqueta).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
-        expect((fallo as Prisma.PrismaClientKnownRequestError).code, etiqueta).toBe('P2003');
+        // La base llego a rechazar, y por la columna que el caso rompe...
+        expect(spy, etiqueta).toHaveBeenCalledTimes(1);
+        expect(rechazosDeLaBase, etiqueta).toHaveLength(1);
+        expect((rechazosDeLaBase[0] as { code?: unknown }).code, etiqueta).toBe('P2003');
+        expect(restriccionDe(rechazosDeLaBase[0]), etiqueta).toMatch(restriccion);
+        // ...y el adaptador lo tradujo a la entrada invalida existente, sin codigo nuevo.
+        expect(fallo, etiqueta).toBeInstanceOf(ValidationError);
+        expect((fallo as ValidationError).code, etiqueta).toBe('invalid_input');
       }
 
-      // El autor inventado tampoco se traduce, y ese SI es el trato que el diseno pedia: el
-      // actor sale de una sesion real, asi que un autor inexistente es un fallo del sistema.
+      // El autor inventado NO se traduce: el actor sale de una sesion real, asi que un autor
+      // inexistente es un fallo del sistema y decirle `invalid_input` al usuario seria mentir.
+      rechazosDeLaBase.length = 0;
+      spy.mockClear();
       const porAutor = await createCatalogLine(
         { supplierId, ...fields('Autor fantasma', presentationId) },
         randomUUID(),
         new Date('2026-01-01T00:00:00Z'),
         scope,
       ).catch((error: unknown) => error);
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(rechazosDeLaBase).toHaveLength(1);
+      expect(porAutor).toBe(rechazosDeLaBase[0]);
       expect(porAutor).toBeInstanceOf(Prisma.PrismaClientKnownRequestError);
       expect((porAutor as Prisma.PrismaClientKnownRequestError).code).toBe('P2003');
+      expect(restriccionDe(porAutor)).toMatch(/^supplier_catalog_lines_(created|updated)_by_fkey$/u);
 
       // Y ninguno de los tres intentos dejo fila.
       expect(await prisma.supplierCatalogLine.count({ where: { supplierId } })).toBe(0);
     } finally {
+      spy.mockRestore();
       await prisma.supplierCatalogLine.deleteMany({ where: { supplierId } });
       await prisma.supplier.delete({ where: { id: supplierId } });
       await prisma.presentation.delete({ where: { id: presentationId } });

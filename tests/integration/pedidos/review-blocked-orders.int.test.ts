@@ -56,6 +56,11 @@ import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/in
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { countFromDelta } from '../../helpers/adjust-by-delta';
+import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+
+const customerCatalog = {
+  findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
+};
 
 const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
@@ -127,7 +132,7 @@ const units: UnitCatalog = {
   findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany,
 };
 
-const createOrder = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
+const createOrder = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
 const cancelOrder = createCancelOrder({ orders, unitOfWork, now: () => new Date() });
 const reviewBlockedOrders = createReviewBlockedOrders({ orders, recipes, products, units, packaging: packagingCatalog, unitOfWork });
 

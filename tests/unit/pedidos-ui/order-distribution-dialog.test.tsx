@@ -130,6 +130,7 @@ function pedido(status: OrderStatus = 'POR_EMPACAR', overrides: Partial<OrderSum
     ],
     unitId: UNIDAD_ID,
     unitLabel: 'L',
+    customer: null,
     ...overrides,
   };
 }

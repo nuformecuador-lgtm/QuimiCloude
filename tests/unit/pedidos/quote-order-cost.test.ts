@@ -15,6 +15,7 @@ import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventar
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades'
 import { fakePackagingCatalog, packagingRef } from '../../helpers/packaging-catalog-double';
+import { fakeCustomerCatalog } from '../../helpers/customer-catalog-double';
 
 const RECIPE_ID = '22222222-2222-4222-8222-222222222222'
 const PRESENTATION_ID = '66666666-6666-4666-8666-666666666666'
@@ -91,6 +92,7 @@ function filaExistente(): OrderRow {
     updatedBy: 'admin-0',
     presentationLines: [],
     unitId: null,
+    customerId: null,
   }
 }
 
@@ -110,6 +112,7 @@ describe('R1: el mismo resultado que recibirian orders.create y orders.updateAli
     const { unitOfWork: unitOfWorkDeAlta } = fakeUnitOfWork({ orders: { create, setReservedAt: vi.fn(async () => undefined) } })
 
     const alta = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: unitOfWorkDeAlta,
       recipes: recipesConVigencia,
       products: d.products,
@@ -137,6 +140,7 @@ describe('R1: el mismo resultado que recibirian orders.create y orders.updateAli
     })
 
     const edicion = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders,
       unitOfWork: unitOfWorkDeEdicion,
       recipes: recipesConVigencia,
@@ -412,6 +416,7 @@ describe('QC-195 — la cotizacion suma los envases del reparto', () => {
     const create = vi.fn(async () => filaExistente())
     const { unitOfWork } = fakeUnitOfWork({ orders: { create, setReservedAt: vi.fn(async () => undefined) } })
     await createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork,
       recipes: {
         ...d.recipes,

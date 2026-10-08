@@ -14,14 +14,24 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  CUSTOMER_COLUMN_ID,
+  CUSTOMER_PARAM,
+  CUSTOMER_PRESENCE_COLUMN_ID,
+  ORDER_ACTION_CUSTOMER_TESTID,
+  ORDER_CUSTOMER_FILTER_TESTID,
+  ORDER_CUSTOMER_NONE_LABEL,
   ORDER_LIST_CLEAR_SEARCH_TESTID,
   ORDER_LIST_NO_MATCHES_TESTID,
   OrderListSection,
   OrderListSkeleton,
+  orderListHref,
 } from '@/app/(private)/pedidos/components';
 import type { DataTableParams } from '@/components/shared/data-table';
-import type { OrderSummary } from '@/lib/modules/pedidos';
-import type { OrderListResult } from '@/lib/modules/pedidos/adapters/driving/order-actions';
+import type { OrderCustomer, OrderSummary } from '@/lib/modules/pedidos';
+import type {
+  OrderCustomerFilterOptionResult,
+  OrderListResult,
+} from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import type { UnitView } from '@/lib/modules/unidades';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
@@ -49,7 +59,9 @@ const {
   listResponsibleCandidatesActionMock,
   getSessionUserMock,
   listWorkGroupsActionMock,
+  getCustomerFilterOptionMock,
 } = vi.hoisted(() => ({
+  getCustomerFilterOptionMock: vi.fn<(id: string) => Promise<OrderCustomerFilterOptionResult>>(),
   // QC-102 T11: la SEGUNDA llamada de la seccion, el lote de responsables de la pagina. Es el
   // borde del modulo `asignaciones` (QC-87 + T6, ya en disco) y se sustituye igual que la lista:
   // sin doble, leeria la cookie de sesion real.
@@ -116,7 +128,25 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   listOrdersAction: listOrdersActionMock,
   getOrderAction: getOrderActionMock,
   listOrderCoverageAction: listOrderCoverageActionMock,
+  getOrderCustomerFilterOptionAction: getCustomerFilterOptionMock,
+  searchOrderCustomersAction: vi.fn(() => {
+    throw new Error('searchOrderCustomersAction no debe invocarse sin abrir el filtro');
+  }),
 }));
+
+// Espia sin sustituir: la tabla se sigue pintando y se pueden leer los parametros que recibe.
+const { orderTableSpy } = vi.hoisted(() => ({ orderTableSpy: vi.fn() }));
+
+vi.mock('@/app/(private)/pedidos/components/order-table', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/app/(private)/pedidos/components/order-table')>();
+  return {
+    ...original,
+    OrderTable: (props: Parameters<typeof original.OrderTable>[0]) => {
+      orderTableSpy(props);
+      return original.OrderTable(props);
+    },
+  };
+});
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   listRecipeVersionsAction: vi.fn(async () => ({ status: 'success' as const, data: [] })),
@@ -236,6 +266,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    customer: null,
     ...overrides,
   };
 }
@@ -843,5 +874,111 @@ describe('la accion «Reparto y unidad» la decide el permiso de la sesion', () 
     expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('order-row-actions'));
     expect(screen.queryByTestId(ACCION)).toBeNull();
+  });
+});
+
+describe('el filtro «Cliente» de la barra', () => {
+  const CLIENTE: OrderCustomer = { id: '6f1c2a3b-4d5e-4f60-8a71-b2c3d4e5f601', name: 'Ana Garcia', isDeleted: false };
+  const conCliente = () =>
+    parametros({ filters: { [CUSTOMER_COLUMN_ID]: { kind: 'select', values: [CLIENTE.id] } } });
+  const sinCliente = () =>
+    parametros({ filters: { [CUSTOMER_PRESENCE_COLUMN_ID]: { kind: 'select', values: ['none'] } } });
+
+  function campoFiltro(): HTMLElement {
+    return within(screen.getByTestId(ORDER_CUSTOMER_FILTER_TESTID)).getByRole('combobox');
+  }
+
+  it('R29: con customer=<uuid> resuelve la opcion ANTES de listar y la muestra en el control', async () => {
+    let resolverOpcion: (value: OrderCustomerFilterOptionResult) => void = () => undefined;
+    getCustomerFilterOptionMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolverOpcion = resolve;
+      }),
+    );
+    listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
+
+    const seccion = OrderListSection({ params: conCliente(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null });
+    await Promise.resolve();
+
+    // Mientras la opcion no responde, el listado no sale: depende de ella.
+    expect(getCustomerFilterOptionMock).toHaveBeenCalledWith(CLIENTE.id);
+    expect(listOrdersActionMock).not.toHaveBeenCalled();
+
+    resolverOpcion({ status: 'success', data: CLIENTE });
+    render(await seccion);
+
+    expect(listOrdersActionMock).toHaveBeenCalledTimes(1);
+    expect(listOrdersActionMock).toHaveBeenCalledWith(conCliente());
+    expect(getCustomerFilterOptionMock.mock.invocationCallOrder[0]).toBeLessThan(
+      listOrdersActionMock.mock.invocationCallOrder[0],
+    );
+    expect(campoFiltro()).toHaveValue('Ana Garcia');
+  });
+
+  it('R29: si la opcion es null, descarta el filtro y lista sin el', async () => {
+    getCustomerFilterOptionMock.mockResolvedValue({ status: 'success', data: null });
+    listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
+
+    render(await OrderListSection({ params: conCliente(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
+
+    expect(listOrdersActionMock).toHaveBeenCalledTimes(1);
+    expect(listOrdersActionMock).toHaveBeenCalledWith(parametros());
+    expect(campoFiltro()).toHaveValue('');
+  });
+
+  it('R29: con un uuid que no se resuelve lista UNA sola vez, sin customerId, y la tabla no recibe customer', async () => {
+    getCustomerFilterOptionMock.mockResolvedValue(errorInesperado());
+    listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
+
+    render(await OrderListSection({ params: conCliente(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
+
+    expect(listOrdersActionMock).toHaveBeenCalledTimes(1);
+    const filtros = (listOrdersActionMock.mock.calls[0][0] as DataTableParams).filters;
+    expect(filtros).not.toHaveProperty(CUSTOMER_COLUMN_ID);
+    expect(filtros).not.toHaveProperty('customerId');
+    const tabla = orderTableSpy.mock.lastCall?.[0] as { params: DataTableParams };
+    expect(tabla.params.filters).not.toHaveProperty(CUSTOMER_COLUMN_ID);
+    expect(orderListHref(tabla.params)).not.toContain(`${CUSTOMER_PARAM}=`);
+  });
+
+  it('R29: con customer=none NO llama a la action de opcion y lista con customerPresence', async () => {
+    listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
+
+    render(await OrderListSection({ params: sinCliente(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
+
+    expect(getCustomerFilterOptionMock).not.toHaveBeenCalled();
+    expect(listOrdersActionMock).toHaveBeenCalledTimes(1);
+    expect(listOrdersActionMock).toHaveBeenCalledWith(sinCliente());
+    expect(campoFiltro()).toHaveValue(ORDER_CUSTOMER_NONE_LABEL);
+  });
+
+  it('sin filtro de cliente no llama a la action de opcion y el control arranca vacio', async () => {
+    listOrdersActionMock.mockResolvedValue(pagina([pedido()]));
+
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
+
+    expect(getCustomerFilterOptionMock).not.toHaveBeenCalled();
+    expect(campoFiltro()).toHaveValue('');
+  });
+
+  it('R32: canEditCustomer sale de la comprobacion de pedidos.modificar', async () => {
+    for (const [permisos, visible] of [
+      [['pedidos.consultar', 'pedidos.modificar'], true],
+      [['pedidos.consultar'], false],
+    ] as const) {
+      cleanup();
+      vi.clearAllMocks();
+      getSessionUserMock.mockResolvedValue({ id: '55555555-5555-4555-8555-555555555555', permissions: [...permisos] });
+      listOrdersActionMock.mockResolvedValue(pagina([pedido({ status: 'POR_EMPACAR' })]));
+
+      render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
+
+      fireEvent.click(screen.getByTestId('order-row-actions'));
+      await screen.findByTestId('order-action-edit');
+      expect(screen.queryByTestId(ORDER_ACTION_CUSTOMER_TESTID) !== null).toBe(visible);
+      expect(screen.queryByTestId('order-action-distribution') !== null).toBe(visible);
+      // Una lectura para responsables y otra para la edicion acotada; el cliente no anade ninguna.
+      expect(getSessionUserMock).toHaveBeenCalledTimes(2);
+    }
   });
 });

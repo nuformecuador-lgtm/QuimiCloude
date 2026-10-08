@@ -9,6 +9,11 @@ import {
   type OrderPriority,
   type OrderStatus,
 } from '../../../domain/order-classification';
+import {
+  ORDER_CUSTOMER_FILTER_FIELD,
+  ORDER_CUSTOMER_PRESENCE_FILTER_FIELD,
+  ORDER_CUSTOMER_PRESENCE_NONE,
+} from '../../../domain/order-customer';
 
 import { companyScopeColumns, orderCompanyScope } from './company-scope';
 import { dateRangeCondition, numberRangeCondition, selectCondition } from './list-query-sql';
@@ -75,6 +80,7 @@ const ORDER_SELECT = {
   createdBy: true,
   updatedBy: true,
   unitId: true,
+  customerId: true,
   presentationLines: {
     select: { presentationId: true, packages: true, packagingProductId: true },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
@@ -123,6 +129,7 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
     createdBy: row.createdBy,
     updatedBy: row.updatedBy,
     unitId: row.unitId,
+    customerId: row.customerId,
     presentationLines: row.presentationLines.map((line) => ({
       presentationId: line.presentationId,
       packages: line.packages,
@@ -348,6 +355,26 @@ function orderFilterWhere(field: string, value: ListFilterValue): Prisma.OrderWh
 }
 
 /**
+ * Los dos filtros de cliente -un id o «sin cliente»- en UN solo termino del `AND`. Con los dos a
+ * la vez es la union, y el `OR` queda dentro de este termino: suelto al nivel del ambito
+ * ampliaria lo visible. `null` = ninguno de los dos acota.
+ */
+export function orderCustomerFilterWhere(
+  customerIdFilter: ListFilterValue | undefined,
+  customerPresenceFilter: ListFilterValue | undefined,
+): Prisma.OrderWhereInput | null {
+  const ids = customerIdFilter?.kind === 'select' ? selectCondition(customerIdFilter.values) : null;
+  const none =
+    customerPresenceFilter?.kind === 'select' &&
+    customerPresenceFilter.values.includes(ORDER_CUSTOMER_PRESENCE_NONE);
+
+  if (ids !== null && none) return { OR: [{ customerId: ids }, { customerId: null }] };
+  if (ids !== null) return { customerId: ids };
+  if (none) return { customerId: null };
+  return null;
+}
+
+/**
  * `where` UNICO del listado de pedidos: el mismo objeto para el `findMany` y para el `count`.
  * Tres capas, y ninguna sobra:
  *
@@ -366,7 +393,13 @@ export function buildOrderWhere(
   recipeIds: readonly string[] | null,
   scope: OrderScope,
 ): Prisma.OrderWhereInput {
-  const filters = Object.entries(query.filters)
+  const {
+    [ORDER_CUSTOMER_FILTER_FIELD]: customerIdFilter,
+    [ORDER_CUSTOMER_PRESENCE_FILTER_FIELD]: customerPresenceFilter,
+    ...otherFilters
+  } = query.filters;
+  const customerFilter = orderCustomerFilterWhere(customerIdFilter, customerPresenceFilter);
+  const filters = Object.entries(otherFilters)
     .map(([field, value]) => orderFilterWhere(field, value))
     .filter((condition): condition is Prisma.OrderWhereInput => condition !== null);
 
@@ -380,6 +413,7 @@ export function buildOrderWhere(
       { deletedAt: null },
       ...(recipeIds === null ? [] : [{ recipeId: { in: [...recipeIds] } }]),
       ...filters,
+      ...(customerFilter === null ? [] : [customerFilter]),
     ],
   };
 }
@@ -512,6 +546,7 @@ export async function updateAliveOrder(
       updatedAt: now,
       updatedBy: actorId,
       unitId: data.unitId,
+      customerId: data.customerId,
     },
   });
   if (count !== 1) return 'not_found';
@@ -675,7 +710,7 @@ async function insertAliveOrder(
     INSERT INTO "orders" (
       "company_id", "order_year", "order_sequence", "recipe_id", "quantity",
       "priority", "status", "ingredients_cost", "packaging_cost", "created_by", "updated_by",
-      "created_at", "updated_at", "unit_id"
+      "created_at", "updated_at", "unit_id", "customer_id"
     ) VALUES (
       ${companyId}::uuid,
       ${year}::integer,
@@ -693,7 +728,8 @@ async function insertAliveOrder(
       ${actorId}::uuid,
       ${now}::timestamptz,
       ${now}::timestamptz,
-      ${data.unitId}::uuid
+      ${data.unitId}::uuid,
+      ${data.customerId}::uuid
     )
     RETURNING "id", "order_year", "order_sequence"
   `);
@@ -723,6 +759,7 @@ async function insertAliveOrder(
     createdBy: actorId,
     updatedBy: actorId,
     unitId: data.unitId,
+    customerId: data.customerId,
     presentationLines: data.presentationLines.map((line) => ({
       presentationId: line.presentationId,
       packages: line.packages,
@@ -805,6 +842,23 @@ async function setOrderReservedAt(
   `);
 }
 
+/** `setCustomerAlive` de `OrderWriteRepository`: `data` no lleva ninguna otra columna, para que
+ *  cambiar el cliente no toque el estado, el importe ni lo apartado. */
+async function setAliveOrderCustomer(
+  id: string,
+  customerId: string | null,
+  actorId: string,
+  now: Date,
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<'ok' | 'not_found'> {
+  const { count } = await tx.order.updateMany({
+    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
+    data: { customerId, updatedBy: actorId, updatedAt: now },
+  });
+  return count === 1 ? 'ok' : 'not_found';
+}
+
 /** `findBlockedIds`: el filtro y el orden coinciden con el indice parcial
  *  `orders_blocked_company_created_idx`. */
 export async function findBlockedOrderIds(scope: OrderScope): Promise<readonly string[]> {
@@ -882,6 +936,8 @@ export function createOrderWriteRepository(tx: PrismaLike = prisma): OrderWriteR
     setStatus: (id, from, to, actorId, now, scope) => setAliveOrderStatus(id, from, to, actorId, now, scope, tx),
     setIngredientsCost: (id, cost, actorId, now, scope) => setAliveOrderIngredientsCost(id, cost, actorId, now, scope, tx),
     setReservedAt: (id, reservedAt, scope) => setOrderReservedAt(id, reservedAt, scope, tx),
+    setCustomerAlive: (id, customerId, actorId, now, scope) =>
+      setAliveOrderCustomer(id, customerId, actorId, now, scope, tx),
     updatePresentationLinesAlive: (id, unitId, lines, actorId, now, scope) =>
       updatePresentationLinesAliveOrder(id, unitId, lines, actorId, now, scope, tx),
     finishPackingAlive: (id, packerId, now, scope) => finishPackingAliveOrder(id, packerId, now, scope, tx),

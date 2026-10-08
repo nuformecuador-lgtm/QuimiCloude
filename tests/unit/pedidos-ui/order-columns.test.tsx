@@ -22,6 +22,7 @@ import {
   CREATED_AT_COLUMN_ID,
   MISSING_VALUE_MARK,
   ORDER_COVERAGE_LABELS,
+  ORDER_CUSTOMER_NAME_COLUMN_ID,
   ORDER_NUMBER_COLUMN_ID,
   ORDER_PRIORITY_LABELS,
   ORDER_SKELETON_COLUMN_COUNT,
@@ -89,6 +90,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    customer: null,
     ...overrides,
   };
 }
@@ -106,15 +108,16 @@ afterEach(() => {
 
 // QC-35bis (2026-09-07): eran DIEZ. La unidad y el precio unitario salieron del pedido -de la
 // tabla `orders` hacia arriba-, asi que sus dos columnas ya no tienen dato que pintar y la lista
-// acordada baja a ocho. Luego sube a diez con RESPONSABLES y a ONCE con COBERTURA.
-// Sigue siendo cerrada y en un orden acordado.
-describe('las columnas declaradas son exactamente las once acordadas (R8, R20, R35)', () => {
-  it('en positivo: los once ids, en el orden acordado', () => {
+// acordada baja a ocho. Luego sube a diez con RESPONSABLES, a ONCE con COBERTURA y a DOCE con
+// CLIENTE. Sigue siendo cerrada y en un orden acordado.
+describe('las columnas declaradas son exactamente las doce acordadas (R8, R20, R35)', () => {
+  it('en positivo: los doce ids, en el orden acordado', () => {
     expect(ORDER_COLUMNS.map((column) => column.id)).toEqual([
       ORDER_NUMBER_COLUMN_ID,
       STATUS_COLUMN_ID,
       PRIORITY_COLUMN_ID,
       RECIPE_NAME_COLUMN_ID,
+      ORDER_CUSTOMER_NAME_COLUMN_ID,
       QUANTITY_COLUMN_ID,
       PRESENTATION_NAME_COLUMN_ID,
       CREATED_AT_COLUMN_ID,
@@ -123,7 +126,7 @@ describe('las columnas declaradas son exactamente las once acordadas (R8, R20, R
       RESPONSIBLES_COLUMN_ID,
       ACTIONS_COLUMN_ID,
     ]);
-    expect(ORDER_COLUMNS).toHaveLength(11);
+    expect(ORDER_COLUMNS).toHaveLength(12);
   });
 
   it('en negativo: ninguna columna es `total`, `createdBy`, `updatedBy`, unidad ni precio', () => {
@@ -164,6 +167,7 @@ describe('solo cuatro columnas ordenan, y son las de la lista blanca menos la no
 
     expect(noOrdenables).toEqual([
       RECIPE_NAME_COLUMN_ID,
+      ORDER_CUSTOMER_NAME_COLUMN_ID,
       QUANTITY_COLUMN_ID,
       PRESENTATION_NAME_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
@@ -487,7 +491,7 @@ describe('la tabla de pedidos no pinta el importe (R18)', () => {
     const ids = ORDER_COLUMNS.map((column) => column.id);
     expect(ids).not.toContain('ingredientsCost');
     expect(ids).not.toContain('importe');
-    expect(ids).toHaveLength(11);
+    expect(ids).toHaveLength(12);
 
     const VALOR_DELATOR = '999999.9999';
     const order = pedido({ ingredientsCost: VALOR_DELATOR });
@@ -496,6 +500,7 @@ describe('la tabla de pedidos no pinta el importe (R18)', () => {
       STATUS_COLUMN_ID,
       PRIORITY_COLUMN_ID,
       RECIPE_NAME_COLUMN_ID,
+      ORDER_CUSTOMER_NAME_COLUMN_ID,
       QUANTITY_COLUMN_ID,
       PRESENTATION_NAME_COLUMN_ID,
       CREATED_AT_COLUMN_ID,
@@ -609,5 +614,49 @@ describe('QC-141 T14 — la columna propia de cobertura del material (R35)', () 
       MISSING_VALUE_MARK,
     );
     expect(screen.queryByTestId('order-coverage')).toBeNull();
+  });
+});
+
+describe('la columna «Cliente»', () => {
+  const CLIENTE_ID = '6f1c2a3b-4d5e-4f60-8a71-b2c3d4e5f601';
+
+  it('R30: pinta el nombre del cliente del pedido', () => {
+    pintarCelda(
+      ORDER_CUSTOMER_NAME_COLUMN_ID,
+      pedido({ customer: { id: CLIENTE_ID, name: 'Ana Garcia', isDeleted: false } }),
+    );
+
+    expect(screen.getByText('Ana Garcia')).toBeInTheDocument();
+    expect(screen.queryByText(CLIENTE_ID)).toBeNull();
+  });
+
+  it('R20: un cliente dado de baja lleva el sufijo «(eliminado)»', () => {
+    pintarCelda(
+      ORDER_CUSTOMER_NAME_COLUMN_ID,
+      pedido({ customer: { id: CLIENTE_ID, name: 'Bruno Lopez', isDeleted: true } }),
+    );
+
+    expect(screen.getByText('Bruno Lopez (eliminado)')).toBeInTheDocument();
+  });
+
+  it('R30: sin cliente pinta el marcador de ausencia', () => {
+    pintarCelda(ORDER_CUSTOMER_NAME_COLUMN_ID, pedido({ customer: null }));
+
+    expect(screen.getByTestId(`order-missing-${ORDER_CUSTOMER_NAME_COLUMN_ID}`)).toHaveTextContent(
+      MISSING_VALUE_MARK,
+    );
+  });
+
+  it('R26/R30: no ordena ni filtra desde su cabecera', () => {
+    const columna = ORDER_COLUMNS.find((column) => column.id === ORDER_CUSTOMER_NAME_COLUMN_ID);
+
+    expect(columna?.sortable).toBeUndefined();
+    expect(columna?.filter).toBeUndefined();
+  });
+
+  it('R30: va justo detras de «Receta»', () => {
+    const ids = ORDER_COLUMNS.map((column) => column.id);
+
+    expect(ids.indexOf(ORDER_CUSTOMER_NAME_COLUMN_ID)).toBe(ids.indexOf(RECIPE_NAME_COLUMN_ID) + 1);
   });
 });

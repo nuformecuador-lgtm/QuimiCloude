@@ -9,6 +9,7 @@
  */
 
 import type { ListQueryable } from './list-query';
+import { ORDER_CUSTOMER_FILTER_FIELD, ORDER_CUSTOMER_PRESENCE_FILTER_FIELD } from './order-customer';
 
 export const ORDER_QUERYABLE: ListQueryable = {
   /**
@@ -28,10 +29,17 @@ export const ORDER_QUERYABLE: ListQueryable = {
    * desconocido. El indice parcial `orders_unit_price_idx` cayo en la misma migracion.
    */
   sortable: ['orderNumber', 'priority', 'status', 'createdAt', 'quantity'],
+  /**
+   * El cliente filtra pero no ordena: su nombre vive en otro modulo y la columna solo guarda el
+   * id, igual que la receta. `customerId` admite solo uuids; «sin cliente» va en un campo aparte,
+   * `customerPresence`, con un conjunto cerrado de un unico valor. Los dos juntos son la union.
+   */
   filterable: {
     status: 'select',
     priority: 'select',
     createdAt: 'dateRange',
+    [ORDER_CUSTOMER_FILTER_FIELD]: 'select',
+    [ORDER_CUSTOMER_PRESENCE_FILTER_FIELD]: 'select',
   },
   searchable: true,
 };

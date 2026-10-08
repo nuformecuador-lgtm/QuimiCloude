@@ -102,7 +102,6 @@ export function buildRecipeColumns({ rowActions }: RecipeColumnsDeps): readonly 
       label: ACTIONS_COLUMN_LABEL,
       align: 'end',
       pinnable: false,
-      defaultPinned: 'right',
       cell: (recipe) => <div className="flex justify-end gap-1">{rowActions(recipe)}</div>,
     },
   ];

@@ -35,18 +35,9 @@ board de este repo, abre `arnes.config.json`: este documento es del arnés y no 
    que es lo que habilita el token de API.
 2. Proyecto **Kanban** gestionado por el equipo. Su clave es la que se declara en
    `arnes.config.json > jira.project`.
-3. Cinco columnas, que mapean 1:1 a los estados del arnés:
-
-   | Columna | `status` |
-   |---|---|
-   | Backlog | `pending` |
-   | **Spec en revisión** | `spec_ready` |
-   | En curso | `in_progress` |
-   | Hecho | `done` |
-   | Cancelado | `cancelled` |
-
-   *Spec en revisión* es la puerta de aprobación humana **F1.4**: aprobar es mover la tarjeta,
-   con autor y fecha.
+3. Un estado del board por cada estado del arnés (`pending`, `spec_ready`, `in_progress`,
+   `done`, `cancelled`), con el nombre que el proyecto ya use. La traducción se declara en
+   `arnes.config.json > jira.estados` (`## Los estados del board`).
 
 4. Habilitar el token: **Atlassian Administration → Rovo → Rovo MCP server →
    Authentication**, activando el acceso vía API token (viene apagado).
@@ -98,6 +89,51 @@ Las dos trampas del paso 5 están verificadas en este repo. Se probaron `/v1/mcp
 `/v1/mcp/authv2` con la misma credencial y devuelven el mismo conjunto de herramientas. Una
 versión previa de este documento afirmaba que `authv2` era solo para OAuth; era falso.
 
+## Los estados del board
+
+Los nombres de los estados son **de cada proyecto**: Jira los traduce, cada plantilla de
+proyecto trae los suyos y cualquiera los renombra. Por eso el arnés no los da por supuestos: se
+declaran en `arnes.config.json > jira.estados`, que es perfil y se versiona. Es una tabla
+**nombre del estado en Jira → estado del arnés**:
+
+```json
+"jira": {
+  "project": "XX",
+  "estados": {
+    "<nombre en Jira>": "pending",
+    "<nombre en Jira>": "spec_ready",
+    "<nombre en Jira>": "in_progress",
+    "<nombre en Jira>": "done",
+    "<nombre en Jira>": "cancelled"
+  }
+}
+```
+
+- **F0 traduce por el nombre del estado**, con esta tabla y con nada más. Ni por la posición de
+  la columna ni por la categoría de Jira (*To Do* / *In Progress* / *Done*), que no distingue
+  `spec_ready` de `in_progress` ni `done` de `cancelled`.
+- **Un estado que no esté en la tabla detiene F0**, con un mensaje que nombre el estado y el
+  issue. Nunca se adivina: se añade la fila a `jira.estados` (con el humano) y se repite F0.
+- **Varios nombres pueden ir al mismo estado del arnés** (un *Bloqueado* que cuente como
+  `in_progress`, por ejemplo). Lo que no vale es un valor fuera de los cinco.
+- **La puerta de aprobación humana F1.4 es la transición** del estado de `spec_ready` al de
+  `in_progress`: aprobar es mover la tarjeta, con autor y fecha.
+- En el resto de los docs del arnés los estados se nombran **por su papel**: «el estado de
+  `spec_ready`» es el nombre que `jira.estados` le asigne en este proyecto.
+
+`scripts/validate-features.mjs` lo hace cumplir sin red: falla si un valor de `jira.estados`
+no es uno de los cinco, o si una ficha de `feature_list.json` trae un `status` fuera de ellos;
+avisa si a alguno de los cinco no le corresponde ningún nombre.
+
+### Por qué
+
+- **2026-10-08, F0 de QC.** Este documento decía que el board tenía cinco columnas —*Backlog*,
+  *Spec en revisión*, *En curso*, *Hecho*, *Cancelado*— que mapeaban 1:1 a los estados del
+  arnés. El board real, verificado por API, tenía *Por hacer*, *En revisión*, *En curso*,
+  *Finalizado* y *Cancelado*: F0 encontró tres estados sin traducción y no tenía regla para
+  ellos. Un nombre fijo en un doc del arnés es un supuesto sobre el proyecto, y los supuestos
+  sobre el proyecto viven en el perfil.
+
 ## Montar un colaborador nuevo
 
 La sección anterior está escrita desde quien creó el sitio. Esta es la otra mitad: **qué
@@ -133,8 +169,8 @@ y los empujones hacia Jira, incluida la aprobación por tarjeta de F1.4, que vue
 
 El token hereda los permisos de su dueño en Jira. Uno compartido haría que todos los empujones
 del ciclo —assignee y labels en F1.0, comentarios en F1.3 y F2.5, transiciones— aparecieran
-firmados por la misma cuenta, que es justo la autoría que la columna *Spec en revisión* existe
-para registrar, y el assignee dejaría de distinguir quién tiene cada feature. Si alguien entra
+firmados por la misma cuenta, que es justo la autoría que la transición del estado de `spec_ready`
+al de `in_progress` existe para registrar, y el assignee dejaría de distinguir quién tiene cada feature. Si alguien entra
 como lectora, el arnés no falla al importar en F0 sino más tarde, al asignar, escribir labels o
 mover la tarjeta.
 
@@ -177,7 +213,7 @@ están en `arnes.config.json > jira` (`## El board al que pertenece el disco`).
 | `epic` | key de la épica padre (campo `parent` del issue). Agrupa por módulo; **no** es dependencia. |
 | `epic_name` | summary de esa épica (`QC-17` → «Identidad y acceso»). **Se almacena, no se deriva**: el gate corre sin red y no puede resolver un key contra Jira. |
 | `description` | campo Description del issue. Lo **decide** siempre el humano; lo **escribe** él en el board, o `/afinar-feature` en su nombre tras un sí explícito (`## Cuando el disco descubre que el board está desactualizado`). |
-| `status` | la columna del board |
+| `status` | el nombre del estado del issue, traducido con `arnes.config.json > jira.estados` (`## Los estados del board`). Un nombre que no esté en la tabla detiene F0. |
 | `assignee` | campo Assignee del issue: `{ "accountId": "…", "displayName": "…" }`, o `null` si no tiene. Es el candado visible del equipo (`## El assignee: el candado visible del equipo`). |
 | `depends_on` | issue links **"is blocked by"**, escritos como keys (`["QC-9", "QC-12"]`) |
 | `zone` | label `zone:backend` \| `zone:frontend` \| `zone:fullstack` |
@@ -251,11 +287,11 @@ segunda copia de las credenciales.
 |---|---|
 | **F0** — arranque de sesión | Lee el board y regenera la lista `features` de `feature_list.json` entera (altas, `description`, `status`, `assignee`, `depends_on` desde los links). Después `./init.sh`. **Es el único paso que regenera el archivo entero.** |
 | **F1.0** — tomar | Relee el issue, escribe el **assignee** y las labels `zone:` y `complexity:` de la evaluación. Sin las labels, la siguiente importación borraría la evaluación. |
-| **F1.3** | Mueve a *Spec en revisión* y comenta la ruta de `specs/<key>-<slug>/`. |
-| **F1.4** | La aprobación humana **es** mover la tarjeta a *En curso*. |
-| **F2.0** | Asegura la tarjeta en *En curso*. |
-| **F2.5** | Mueve a *Hecho* y comenta la URL del PR. El assignee no se toca. |
-| **Al soltar** | Quita el assignee y devuelve la tarjeta a su columna (`docs/equipo.md > Soltar una feature`). |
+| **F1.3** | Mueve al estado de `spec_ready` y comenta la ruta de `specs/<key>-<slug>/`. |
+| **F1.4** | La aprobación humana **es** mover la tarjeta del estado de `spec_ready` al de `in_progress`. |
+| **F2.0** | Asegura la tarjeta en el estado de `in_progress`. |
+| **F2.5** | Mueve al estado de `done` y comenta la URL del PR. El assignee no se toca. |
+| **Al soltar** | Quita el assignee y devuelve la tarjeta a su estado anterior (`docs/equipo.md > Soltar una feature`). |
 
 **Del ciclo, F1.0 es el único paso que escribe campos del issue**; los demás mueven tarjetas o
 comentan.
@@ -265,7 +301,7 @@ sembrar el spec y todos con un sí explícito del humano:
 1. escribir en el issue los campos que la conversación invalidó (`description`, `complexity`,
    `zone`, `depends_on`);
 2. **crear** la ficha que el alcance descubre que falta;
-3. mover a *Cancelado* la que quedó huérfana.
+3. mover al estado de `cancelled` la que quedó huérfana.
 
 Son los únicos empujones que nacen de una conversación y no de una transición de estado.
 Después, el comando refleja esas mismas fichas —y solo esas— en `feature_list.json`. Ver
@@ -275,7 +311,7 @@ Después, el comando refleja esas mismas fichas —y solo esas— en `feature_li
 
 **Manda Jira**, con dos excepciones que son las que el board no puede saber:
 
-1. **Una feature `in_progress` no se degrada** aunque su tarjeta esté en otra columna. Hay
+1. **Una feature `in_progress` no se degrada** aunque su tarjeta esté en otro estado. Hay
    un worktree y una rama con trabajo real; primero se cierra o se cancela a mano.
 2. **`zone` y `complexity` no se borran** si el issue perdió sus labels. Se re-escriben en
    Jira desde la copia local y se anota en `progress/deudas.md`.
@@ -332,8 +368,8 @@ Y dos formas más, que no son campos de una ficha sino fichas enteras:
 
 | Caso | Cómo se resuelve |
 |---|---|
-| el «Lo que NO entra» manda trabajo a una ficha que no existe | se **crea** el issue: tipo `Tarea`, `parent` a la épica del módulo, link «is blocked by», y los labels `sdd` / `slug:` / `zone:` / `complexity:`. Nace `pending` en Backlog, sin assignee, y **no se siembra**: se acota cuando le toque |
-| lo acordado absorbe una ficha existente o la deja sin alcance | se mueve a **Cancelado**, con un comentario que diga qué ficha la absorbe. Nunca se borra |
+| el «Lo que NO entra» manda trabajo a una ficha que no existe | se **crea** el issue: tipo `Tarea`, `parent` a la épica del módulo, link «is blocked by», y los labels `sdd` / `slug:` / `zone:` / `complexity:`. Nace en el estado de `pending`, sin assignee, y **no se siembra**: se acota cuando le toque |
+| lo acordado absorbe una ficha existente o la deja sin alcance | se mueve al estado de **`cancelled`**, con un comentario que diga qué ficha la absorbe. Nunca se borra |
 
 **La regla: no se siembra hasta que el board esté al día.**
 - El comando redacta el valor nuevo de cada campo afectado, lo muestra, y **con el sí explícito

@@ -178,6 +178,7 @@ function newOrder(fixture: Fixture, quantity = '1.0000'): NewOrder {
     priority: 'BAJA',
     status: 'PENDIENTE',
     unitId: fixture.unitId,
+    customerId: null,
     presentationLines: [],
   };
 }

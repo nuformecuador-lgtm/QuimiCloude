@@ -1,9 +1,11 @@
 import { requirePermission, type Actor } from './actor';
 import { OrderNotFoundError } from './errors';
+import { toOrderCustomer, type OrderCustomer } from './order-customer';
 import { formatOrderNumber } from './order-number';
 import type { OrderScope } from './order-scope';
 import type { OrderRow, OrderView } from './order-view';
 
+import type { CustomerCatalog } from '@/lib/modules/clientes';
 import type { PackagingCatalog, PresentationCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
@@ -24,6 +26,8 @@ export type GetOrderDeps = {
   readonly packaging: PackagingCatalog;
   /** Contrato PUBLICO de `unidades`: resuelve la etiqueta de `unitId`. */
   readonly units: UnitCatalog;
+  /** Contrato PUBLICO de `clientes`: el nombre del cliente, aunque este dado de baja. */
+  readonly customerCatalog: Pick<CustomerCatalog, 'findRefsIncludingDeleted'>;
 };
 
 /** El simbolo de la unidad, o su nombre si no lo tiene. Se exporta porque
@@ -47,6 +51,19 @@ export function orderPackagingIds(rows: readonly Pick<OrderRow, 'presentationLin
       ),
     ),
   ];
+}
+
+/** Los clientes de las filas en una sola llamada, con los ids sin repetir; sin ninguno, no
+ *  consulta. Los dados de baja vuelven marcados: el pedido conserva la referencia. */
+export async function findOrderCustomers(
+  customerCatalog: Pick<CustomerCatalog, 'findRefsIncludingDeleted'>,
+  rows: readonly Pick<OrderRow, 'customerId'>[],
+  companyId: string,
+): Promise<ReadonlyMap<string, OrderCustomer>> {
+  const ids = [...new Set(rows.flatMap((row) => (row.customerId === null ? [] : [row.customerId])))];
+  if (ids.length === 0) return new Map();
+  const refs = await customerCatalog.findRefsIncludingDeleted(ids, companyId);
+  return new Map(refs.map((ref) => [ref.id, toOrderCustomer(ref)]));
 }
 
 /** Los nombres de los envases; uno dado de baja o sin presentacion fija no vuelve. */
@@ -82,6 +99,7 @@ export function toOrderView(
   presentationNames: ReadonlyMap<string, string> = new Map(),
   unitLabels: ReadonlyMap<string, string> = new Map(),
   packagingNames: ReadonlyMap<string, string> = new Map(),
+  orderCustomers: ReadonlyMap<string, OrderCustomer> = new Map(),
 ): OrderView {
   const recipe = recipes.get(row.recipeId);
   return {
@@ -116,6 +134,8 @@ export function toOrderView(
     // `null` si el pedido esta sin unidad; la FK con RESTRICT hace imposible el caso
     // «tiene id pero no vuelve del catalogo».
     unitLabel: row.unitId === null ? null : unitLabels.get(row.unitId) ?? null,
+    // Un id que no vuelve del catalogo se pinta sin cliente y la fila sigue saliendo.
+    customer: row.customerId === null ? null : orderCustomers.get(row.customerId) ?? null,
   };
 }
 
@@ -149,6 +169,7 @@ export function createGetOrder(
 
     const units = row.unitId === null ? [] : await deps.units.findRefs([row.unitId], actor.companyId);
     const packagingNames = await findPackagingNames(deps.packaging, orderPackagingIds([row]), actor.companyId);
+    const orderCustomers = await findOrderCustomers(deps.customerCatalog, [row], actor.companyId);
 
     return toOrderView(
       row,
@@ -156,6 +177,7 @@ export function createGetOrder(
       new Map(presentations.map((presentation) => [presentation.id, presentation.name])),
       new Map(units.map((unit) => [unit.id, unitLabelOf(unit)])),
       packagingNames,
+      orderCustomers,
     );
   };
 }

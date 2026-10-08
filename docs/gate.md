@@ -49,6 +49,17 @@ integración, no contra el último commit:
 pnpm exec vitest related --run $(git diff --name-only origin/dev...HEAD)   # tres puntos
 ```
 
+### En CI la suite va en shards
+
+- El CI parte la suite de vitest en N shards (`GATE_SHARD=i/N`); el N lo fija el perfil en `gate.yml`.
+- **Ningún shard da veredicto.** Un shard puede no traer ni un archivo de `integration`: la
+  garantía «los tres proyectos corrieron» solo vale sobre el informe unido.
+- El job final `gate-completo` une los informes (`./init.sh --unir <dir> <N>`) y aplica baseline y
+  garantías una sola vez. **Un shard sin informe es rojo**, no «un shard menos».
+- typecheck y lint van en su propio job (`GATE_PARTE=estatico`); `gate-completo` exige que también
+  salga verde.
+- En local nada cambia: `./init.sh --completo` corre todo sin shard.
+
 ### Por qué
 
 **Dos niveles.** Una suite madura son miles de tests y varios minutos. Correrla al cerrar
@@ -76,6 +87,12 @@ proyecto con este arnés: se mergeó mirando el estado del PR —que era un buil
 tests**— y entró un guard rojo en la rama de integración.
 
 **Merge-base.** Contra el último commit, una tanda de tres commits solo mira el tercero.
+
+- **Shards en CI.** El 2026-10-07 el run 37568468781 tardó 22 min, y 14,5 de ellos fueron del
+  proyecto `ui` (jsdom: importar módulos y montar el entorno, no los tests). `isolate: false` daba
+  3–5× pero se descartó por fugas entre archivos (`progress/fix-ci-velocidad-ui.md`, PR #161).
+  **Coste aceptado:** con 3 shards se facturan ~30 min por corrida frente a ~23 de un solo job, en
+  el plan Free (2000 min/mes); a cambio, el reloj del PR baja.
 
 ## Rojos heredados: la pregunta es «¿rompí algo YO?»
 

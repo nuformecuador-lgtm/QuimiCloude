@@ -40,6 +40,7 @@ function filaBloqueada(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow 
     updatedBy: 'admin-0',
     presentationLines: [],
     unitId: null,
+    customerId: null,
     reservedAt: null,
     packagingCost: null,
     ...overrides,

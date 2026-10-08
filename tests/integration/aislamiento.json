@@ -48,6 +48,7 @@
     "pedidos/order-packing-constraints.int.test.ts",
     "pedidos/order-packing-states-rollback.int.test.ts",
     "pedidos/order-status-blocked-rollback.int.test.ts",
+    "pedidos/orders-customer-constraints.int.test.ts",
     "pedidos/pedidos-constraints.int.test.ts",
     "pedidos/qc170-backfill.int.test.ts",
     "proveedores/catalog-line.int.test.ts",
@@ -452,6 +453,11 @@
       "desde": "2026-09-24"
     },
     {
+      "archivo": "clientes/customer-catalog.int.test.ts",
+      "motivo": "B2 (QC-156): ejercita las tres funciones de customer-catalog-prisma.ts, que llaman al cliente Prisma GLOBAL (mismo criterio que list-query-customers.int.test.ts), asi que una transaccion del test con ROLLBACK no las envolveria. Dos empresas efimeras (randomUUID) nacen en beforeAll; sus clientes llevan un marcador irrepetible y afterAll los borra por company_id, cuenta que no quedo ninguno y despues borra las empresas. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-06"
+    },
+    {
       "archivo": "proveedores/catalog-image-url.int.test.ts",
       "motivo": "T4 (QC-171): ejercita `listCatalogLines` y `listSupplierShowcase` ya cableados por `lib/composition`, cuyos adaptadores driven llaman al cliente Prisma GLOBAL (mismo criterio que supplier-showcase.int.test.ts), asi que una transaccion del test con ROLLBACK no los envolveria -correrian en otra conexion del pool y verian una base vacia-. Siembra una empresa efimera con randomUUID (proveedor, presentacion y dos lineas de catalogo) y COMMITEA; el afterAll borra lineas, proveedor, presentacion y empresa por su id exacto, en el orden que exigen las FK. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-25"
@@ -524,6 +530,11 @@
     {
       "archivo": "asignaciones/execution-atomicity.int.test.ts",
       "motivo": "Atomicidad de la ejecucion con la composicion real: 'withExecutionTransaction' (execution-transaction-prisma.ts) abre su PROPIA 'prisma.$transaction' sobre el cliente GLOBAL y 'pedidos' se une a ella; lo que se mide es que su ROLLBACK deshaga pedido, reservas, consumo, lotes y anotacion, y la carrera de dos arranques reales, asi que una transaccion del test no la envolveria. Cada caso fabrica su empresa efimera con randomUUID y la borra en un 'finally' por 'company_id' en orden de FK (anotaciones -> asientos -> reparto -> asignaciones -> pedidos -> lineas de receta -> producto terminado -> recetas -> lotes -> productos -> presentaciones -> unidad -> equipo -> usuarios -> roles -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-06"
+    },
+    {
+      "archivo": "pedidos/order-customer.int.test.ts",
+      "motivo": "B6 (QC-156): ejercita el cambio de cliente, la edicion que solo cambia el cliente y los filtros de cliente del listado con los adaptadores reales; 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' sobre el cliente GLOBAL y el listado y el catalogo de clientes leen con ese mismo cliente, asi que una transaccion del test con ROLLBACK no los envolveria. Cada caso fabrica sus empresas efimeras con randomUUID (dos usuarios, rol, tipo de documento, unidad, presentacion, recetas, materias primas, clientes) y las limpia en un 'finally' en orden de FK (los tres libros -> pedidos -> clientes -> recetas -> lotes y productos -> presentacion -> unidad -> usuarios -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-06"
     }
   ]
