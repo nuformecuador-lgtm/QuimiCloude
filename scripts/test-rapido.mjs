@@ -14,11 +14,20 @@
  * fallo; un fallo es un test rojo.
  *
  * Node y no bash a proposito: este repo se trabaja tambien desde Windows.
+ *
+ * Rojos heredados (`tests/baseline-rojos.json`): un rojo de un archivo listado NO pone el
+ * gate en rojo; un rojo de cualquier otro archivo, si. Se decide leyendo el informe JSON de la
+ * corrida, como el modo completo, y no con `--exclude`: `vitest related` (4.1.10) ignora
+ * `--exclude` y corre igual los archivos excluidos. Se midio el 2026-10-08 en QC-226, donde
+ * `pantallas-exigen-permiso.test.tsx`, que estaba en el baseline, puso rojo el gate local de
+ * una feature que no lo tocaba.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 // Se invoca el CLI de vitest con `node <bin>` y SIN shell a proposito: con `shell: true`,
 // cmd.exe parte las rutas con parentesis (`app/(public)/layout.tsx`) y el comando revienta.
@@ -61,47 +70,101 @@ function changedFiles() {
     .filter((file) => existsSync(file));
 }
 
-function runVitest(args, label) {
-  console.log(`\n[test:rapido] ${label}`);
-  console.log(`[test:rapido] -> vitest ${args.join(' ')}`);
-  const result = spawnSync(process.execPath, [VITEST_BIN, ...args], { stdio: 'inherit' });
-  return result.status ?? 1;
+/** Rutas comparables entre Windows y Linux: relativas al repo y siempre con `/`. */
+const normalizar = (p) => path.relative(process.cwd(), path.resolve(p)).split('\\').join('/');
+
+/**
+ * Veredicto de una corrida de vitest con rojos heredados. Es una funcion pura para que la guardia
+ * `tests/guards/guard-test-rapido-rojos-heredados.test.ts` la pruebe sin lanzar vitest.
+ *
+ * - `estado === 0`: verde, sin mirar nada mas.
+ * - Rojo con informe valido en el que TODOS los archivos rojos son heredados: verde, y se dice cuales.
+ * - Rojo sin informe, con informe ilegible o sin ningun archivo rojo en el: ROJO. El codigo
+ *   distinto de 0 tiene otra causa (vitest no arranco, un error fuera de los tests), y un gate
+ *   que da por bueno lo que no llego a mirar es peor que ninguno (`comparar-baseline-rojos.mjs`).
+ * - Rojo con algun archivo rojo fuera del baseline: ROJO, y se nombran los nuevos.
+ *
+ * @param {{ estado: number, reporte: unknown, heredados: string[] }} entrada
+ * @returns {{ estado: number, heredadosEnRojo: string[], nuevos: string[] }}
+ */
+export function veredictoConHeredados({ estado, reporte, heredados }) {
+  if (estado === 0) return { estado: 0, heredadosEnRojo: [], nuevos: [] };
+  const suites = reporte && Array.isArray(reporte.testResults) ? reporte.testResults : null;
+  if (!suites) return { estado, heredadosEnRojo: [], nuevos: [] };
+  const conocidos = new Set(heredados.map(normalizar));
+  const rojos = [...new Set(suites.filter((t) => t.status === 'failed').map((t) => normalizar(t.name)))];
+  if (rojos.length === 0) return { estado, heredadosEnRojo: [], nuevos: [] };
+  const nuevos = rojos.filter((r) => !conocidos.has(r));
+  const heredadosEnRojo = rojos.filter((r) => conocidos.has(r));
+  return { estado: nuevos.length === 0 ? 0 : estado, heredadosEnRojo, nuevos };
 }
 
-// Rojos heredados (`tests/baseline-rojos.json`): deuda AJENA ya registrada. El modo rapido no compara
-// contra el baseline como el completo, asi que sin esto bastaba con tocar un archivo de la lista
-// (un comentario, una cita) para que el gate local saliera rojo por algo que no es tuyo. Se
-// excluyen de la seleccion y se dice cuales; el CI los sigue corriendo y comparando.
+/** Corre vitest con el informe JSON al lado del de consola y aplica `veredictoConHeredados`. */
+function runVitest(args, label, heredados) {
+  console.log(`\n[test:rapido] ${label}`);
+  console.log(`[test:rapido] -> vitest ${args.join(' ')}`);
+  const informe = path.join(os.tmpdir(), `test-rapido-${process.pid}-${Date.now()}.json`);
+  rmSync(informe, { force: true });
+  const result = spawnSync(
+    process.execPath,
+    [VITEST_BIN, ...args, '--reporter=default', '--reporter=json', `--outputFile.json=${informe}`],
+    { stdio: 'inherit' },
+  );
+  let reporte = null;
+  try {
+    reporte = JSON.parse(readFileSync(informe, 'utf8'));
+  } catch {
+    reporte = null;
+  }
+  rmSync(informe, { force: true });
+  const v = veredictoConHeredados({ estado: result.status ?? 1, reporte, heredados });
+  if (v.heredadosEnRojo.length > 0 && v.estado === 0) {
+    console.log(`[test:rapido] en rojo, pero solo rojos heredados del baseline: ${v.heredadosEnRojo.join(', ')}`);
+  }
+  if (v.nuevos.length > 0) console.log(`[test:rapido] rojos NUEVOS (fuera del baseline): ${v.nuevos.join(', ')}`);
+  return v.estado;
+}
+
+// Rojos heredados (`tests/baseline-rojos.json`): deuda AJENA ya registrada. Sin esto bastaba con
+// tocar un archivo relacionado con uno de la lista para que el gate local saliera rojo por algo
+// que no es tuyo. El CI los sigue corriendo y comparando.
 function rojosHeredados() {
   try {
-    return Object.keys(JSON.parse(readFileSync('tests/baseline-rojos.json', 'utf8')).archivos ?? {});
+    return Object.keys(JSON.parse(readFileSync('tests/baseline-rojos.json', 'utf8')).archivos ?? {}).filter(
+      (f) => !f.startsWith('_'),
+    );
   } catch {
     return [];
   }
 }
-const HEREDADOS = rojosHeredados();
-const EXCLUIR = HEREDADOS.flatMap((f) => ['--exclude', f]);
 
-// Un test heredado que esta en el diff entraria por nombre aunque se excluya por glob: fuera tambien.
-const files = changedFiles().filter((f) => !HEREDADOS.includes(f));
+function main() {
+  const heredados = rojosHeredados();
+  // `--exclude` se mantiene porque `vitest run` (las guardias) si lo respeta. En `related` no
+  // basta, y lo cubre el veredicto sobre el informe.
+  const excluir = heredados.flatMap((f) => ['--exclude', f]);
+  // Un test heredado que esta en el diff entraria por nombre: fuera de la lista de archivos.
+  const files = changedFiles().filter((f) => !heredados.includes(f));
 
-let status = 0;
-
-if (files.length === 0) {
-  console.log(`[test:rapido] el diff vs ${BASE_REF} no toca codigo con tests: nada que relacionar.`);
-} else {
-  status = runVitest(
-    ['related', '--run', '--passWithNoTests', ...EXCLUIR, ...files],
-    `tests relacionados con ${files.length} archivo(s) del diff vs ${BASE_REF}`,
-  );
+  let status = 0;
+  if (files.length === 0) {
+    console.log(`[test:rapido] el diff vs ${BASE_REF} no toca codigo con tests: nada que relacionar.`);
+  } else {
+    status = runVitest(
+      ['related', '--run', '--passWithNoTests', ...excluir, ...files],
+      `tests relacionados con ${files.length} archivo(s) del diff vs ${BASE_REF}`,
+      heredados,
+    );
+  }
+  if (status === 0) {
+    status = runVitest(['run', 'guard', '--passWithNoTests', ...excluir], 'todas las guardias', heredados);
+  }
+  if (heredados.length > 0) {
+    console.log(`
+[test:rapido] ${heredados.length} rojo(s) heredado(s) del baseline no cuentan en esta seleccion; el CI los compara.`);
+  }
+  process.exit(status);
 }
 
-if (status === 0) {
-  status = runVitest(['run', 'guard', '--passWithNoTests', ...EXCLUIR], 'todas las guardias');
-}
-
-if (HEREDADOS.length > 0) {
-  console.log(`
-[test:rapido] ${HEREDADOS.length} rojo(s) heredado(s) del baseline excluidos de esta seleccion; el CI los compara.`);
-}
-process.exit(status);
+// Solo corre como script: la guardia lo importa para probar `veredictoConHeredados`.
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) main();
