@@ -705,7 +705,7 @@ test.describe('producto terminado', () => {
       where: { id: order.id },
       select: { status: true, packedBy: true },
     });
-    expect(deliveredOrder.status).toBe('ENTREGADO');
+    expect(deliveredOrder.status).toBe('POR_ACONDICIONAR');
     expect(deliveredOrder.packedBy).toBe(empacadorUserId);
 
     const finishedProductName = `${RECIPE_NAME} · ${PRESENTATION_NAME}`;

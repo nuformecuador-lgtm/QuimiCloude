@@ -632,7 +632,7 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
       (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(PACKED_ORDER_PARAM),
       { timeout: 60_000 },
     );
-    expect(await orderStatus(orderId)).toBe('ENTREGADO');
+    expect(await orderStatus(orderId)).toBe('POR_ACONDICIONAR');
     await expect(page.getByTestId(PACKED_ORDER_NOTICE_TESTID)).toContainText(orderNumber, {
       timeout: 60_000,
     });

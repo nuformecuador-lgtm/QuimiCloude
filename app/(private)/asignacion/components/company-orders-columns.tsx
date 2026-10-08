@@ -15,7 +15,7 @@ import { ROUTE_ORDER_STATUS_VALUES } from './assignment-view-params';
  * **Sin columna «Entrar» ni acciones**, tampoco para los pedidos asignados al propio actor.
  *
  * La columna de **fecha de terminado** solo aparece cuando el filtro vigente es EXACTAMENTE
- * `['ENTREGADO']`: `showFinishedAt` la decide quien construye las columnas a partir de
+ * `['ENTREGADO']` o `['TERMINADO']`: `showFinishedAt` la decide quien construye las columnas a partir de
  * los parametros ya parseados en el servidor, nunca esta declaracion por su cuenta.
  */
 

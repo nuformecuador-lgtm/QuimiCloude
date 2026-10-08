@@ -686,7 +686,7 @@ test.describe('envases del pedido como productos', () => {
       where: { id: first.id },
       select: { status: true },
     });
-    expect(delivered.status).toBe('ENTREGADO');
+    expect(delivered.status).toBe('POR_ACONDICIONAR');
 
     // R25: Terminar consume los envases apartados y no deja nada apartado.
     expect(await batchStock(bottle.batchId)).toBe(Number(BOTTLE_STOCK) - Number(BOTTLES));

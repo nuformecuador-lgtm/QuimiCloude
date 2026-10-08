@@ -98,15 +98,15 @@
 
 ## Bloque 4 — Etiquetas y «Todos»
 
-- [ ] **T12.** `[P]` `company-orders-columns.tsx` y `assignment-view-params.ts` (R28). Tests:
+- [x] **T12.** `[P]` `company-orders-columns.tsx` y `assignment-view-params.ts` (R28). Tests:
   `tests/unit/asignaciones-ui/company-orders-columns.test.tsx`,
   `tests/unit/asignaciones-ui/assignment-view-params.test.ts` y
   `tests/unit/asignaciones/list-company-orders.test.ts` (sin filtro incluye los nuevos; con
   filtro, orden de trabajo). Depende de: T4.
-- [ ] **T13.** `[P]` `order-status-badge.tsx` y `order-row-actions.tsx` (R22, R29). Tests:
+- [x] **T13.** `[P]` `order-status-badge.tsx` y `order-row-actions.tsx` (R22, R29). Tests:
   `tests/unit/pedidos-ui/order-columns.test.tsx`, `tests/unit/pedidos-ui/order-row-actions.test.tsx`
   y `tests/guards/guard-pantalla-pedidos-se-amplia.test.ts` si lo exige. Depende de: T4.
-- [ ] **T14.** `[P]` `packed-order-notice.tsx` (R7). Test:
+- [x] **T14.** `[P]` `packed-order-notice.tsx` (R7). Test:
   `tests/unit/asignaciones-ui/packed-order-notice.test.tsx`. Depende de: —.
 
 ## Bloque 5 — `TERMINADO`
@@ -114,7 +114,7 @@
 - [x] **T15.** `TERMINADO` en el enum de T1 y las filas [P1] de `design.md > 1.3` en M1; M2
   con el índice `orders_company_terminated_idx` y su `down.sql`, dado de alta en la guardia de
   migraciones. Tests: amplían T2 y T3 (R30, base). Depende de: T1.
-- [ ] **T16.** «Terminados» = `TERMINADO` (`list-finished-orders.ts`); «Todos» exactamente
+- [x] **T16.** «Terminados» = `TERMINADO` (`list-finished-orders.ts`); «Todos» exactamente
   `TERMINADO` (`list-company-orders.ts`, `assignment-view-params.ts`,
   `company-orders-skeleton.tsx`); etiqueta «Terminado». Tests:
   - `tests/unit/asignaciones/list-finished-orders.test.ts`;

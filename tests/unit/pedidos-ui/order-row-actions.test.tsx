@@ -30,6 +30,7 @@ import {
   ORDER_ACTION_CUSTOMER_TESTID,
   ORDER_ACTION_DISTRIBUTION_TESTID,
   OrderRowActions,
+  acceptsDistributionEdit,
   isFinalOrderStatus,
 } from '@/app/(private)/pedidos/components';
 import {
@@ -264,7 +265,7 @@ describe('con el pedido en estado final las tres acciones estan deshabilitadas (
 });
 
 describe('el predicado de estado final es UNO solo y sale del contrato (R24, R42)', () => {
-  it('exactamente `ENTREGADO`, `CANCELADO`, `POR_EMPACAR` y `EN_EMPAQUE` de los valores que publica `pedidos`', () => {
+  it('R22: exactamente `ENTREGADO`, `CANCELADO`, `POR_EMPACAR`, `EN_EMPAQUE`, `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO` y `TERMINADO` de los valores que publica `pedidos`', () => {
     const finales = ORDER_STATUS_VALUES.filter((status) => isFinalOrderStatus(status));
 
     expect(finales).toEqual([
@@ -277,6 +278,52 @@ describe('el predicado de estado final es UNO solo y sale del contrato (R24, R42
       'TERMINADO',
     ]);
   });
+});
+
+describe('los estados de acondicionamiento son finales y no admiten la edicion de reparto', () => {
+  const ESTADOS_DE_ACONDICIONAMIENTO = ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const;
+
+  it.each(ESTADOS_DE_ACONDICIONAMIENTO)('R22: %s es final y no acepta la edicion acotada de reparto', (status) => {
+    expect(isFinalOrderStatus(status)).toBe(true);
+    expect(acceptsDistributionEdit(status)).toBe(false);
+  });
+
+  it.each(ESTADOS_DE_ACONDICIONAMIENTO)(
+    'R22: con un pedido %s, editar, cancelar y eliminar deshabilitados, sin «Reparto y unidad» y con «Responsables» activa',
+    async (status) => {
+      const enganches = enganchesQueFallan();
+      const onResponsibles = vi.fn();
+      render(
+        <OrderRowActions
+          order={pedido(status)}
+          {...enganches}
+          onResponsibles={onResponsibles}
+          canEditDistribution
+          onDistribution={vi.fn(() => {
+            throw new Error('no se debe abrir el reparto de un pedido en acondicionamiento');
+          })}
+        />,
+      );
+
+      abrirMenu();
+      for (const testId of CONTROLES) {
+        expect(await screen.findByTestId(testId)).toHaveAttribute('aria-disabled', 'true');
+      }
+      expect(screen.queryByTestId(ORDER_ACTION_DISTRIBUTION_TESTID)).toBeNull();
+
+      for (const testId of CONTROLES) {
+        fireEvent.click(screen.getByTestId(testId));
+      }
+      expect(enganches.onEdit).not.toHaveBeenCalled();
+      expect(enganches.onCancel).not.toHaveBeenCalled();
+      expect(enganches.onDelete).not.toHaveBeenCalled();
+
+      const responsables = screen.getByTestId(RESPONSABLES_TESTID);
+      expect(responsables).not.toHaveAttribute('aria-disabled');
+      fireEvent.click(responsables);
+      expect(onResponsibles).toHaveBeenCalledExactlyOnceWith(pedido(status));
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------------------------

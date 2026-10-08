@@ -210,7 +210,64 @@ gate se pone rojo, con el cambio mínimo y anotado en «Excepciones».
   R32, sin diff contra origin/dev, no está en baseline).
 - Veredicto: C2 hecha.
 
+### C3 — Badge y menú de `/pedidos`, cierre de T12/T14/T16 (2026-10-08)
+
+- Tests: `tests/unit/pedidos-ui/order-columns.test.tsx` (+3 casos parametrizados: el filtro de estado
+  ofrece los 3 nuevos en orden de flujo entre «En empaque» y «Entregado»; `parseOrderListParams`
+  acepta cada uno en `status`; la celda pinta «Por acondicionar»/«En acondicionamiento»/«Terminado»
+  con `data-status` = valor y la clase de `Badge` `secondary`/`default`/`secondary`).
+  `tests/unit/pedidos-ui/order-row-actions.test.tsx`: nombre del caso corregido a los 7 estados
+  finales (R22); bloque nuevo R22: los 3 son finales y no aceptan reparto; con cada uno, editar/
+  cancelar/eliminar `aria-disabled` y sin invocar, sin «Reparto y unidad» aun con
+  `canEditDistribution`, y «Responsables» activa y emitiendo.
+- Producción (solo comentarios): JSDoc de `order-row-actions.tsx` (lista de estados finales) y de
+  `company-orders-columns.tsx` (fecha con `['ENTREGADO']` o `['TERMINADO']`). Ningún cambio de lógica.
+- Revisión T12/T16 frente a A3: nada más que hacer en UI (columnas/etiquetas de «Todos», params,
+  skeleton, `isExactlyDelivered`, aviso «empacado» ya cubiertos y verdes). QC-156 en `/pedidos`
+  (cliente, cancelación): compila y sus tests de `pedidos-ui` pasan con los 10 estados.
+- R → test: R22 → `order-row-actions.test.tsx` («R22: …» ×7); R29 → `order-columns.test.tsx` («R29, R32: …»,
+  «R29: el filtro de estado acepta … en la URL»); R32 (badge y filtro de `/pedidos`) → mismos casos;
+  R28/R32 «Todos» → `company-orders-columns.test.tsx`, `assignment-view-params.test.ts`,
+  `list-company-orders.test.ts`, `asignacion-page.test.tsx`; R7 → `packed-order-notice.test.tsx`;
+  R31 → `list-finished-orders.test.ts` (+ `finished-orders.int`, C2).
+- Verificación: `pnpm run typecheck` verde; `pnpm run lint` 0 errores (7 warnings ajenos);
+  `vitest run` `order-columns` + `order-row-actions` + `guard-pantalla-pedidos-se-amplia`: 3 archivos,
+  112 verdes, 2 skipped; `order-columns` + `order-row-actions` solos: 104/104; `tests/unit/pedidos-ui`
+  completo: 42 archivos, 691 verdes, 3 skipped; asignaciones-ui (`company-orders-columns`,
+  `assignment-view-params`, `packed-order-notice`, `asignacion-page`) + `list-company-orders` +
+  `list-finished-orders`: 6 archivos, 106/106.
+- Veredicto: C3 hecha; T12, T13, T14 y T16 marcadas.
+
+### C4 — E2E existentes (T18) (2026-10-08)
+
+- Aserciones ajustadas (R34), ningún spec nuevo:
+  - `e2e/empaque.spec.ts`: tras Terminar, estado `POR_ACONDICIONAR`; en «Terminados» la fila NO
+    aparece (`toHaveCount(0)`). Título del caso y cabecera ajustados a lo que afirman.
+  - `e2e/pasos-de-envasado.spec.ts`, `e2e/envases-del-pedido.spec.ts`,
+    `e2e/pedido-en-varias-presentaciones.spec.ts`, `e2e/producto-terminado.spec.ts`: `ENTREGADO` →
+    `POR_ACONDICIONAR` tras Terminar el empaque (una línea cada uno).
+  - `e2e/pedidos-terminados.spec.ts`: el pedido «con fecha» se siembra `TERMINADO` con `finishedAt`,
+    `packedBy` (Empacador) y `conditionedBy` (Administrador); el «sin fecha» sigue `ENTREGADO`
+    (`TERMINADO` no admite `finished_at` nulo). Empacador: ve el `TERMINADO` y NO el `ENTREGADO` en
+    «Terminados» (R31). Administrador: «Todos» sin filtro con {PENDIENTE, EN_CURSO, TERMINADO,
+    ENTREGADO, CANCELADO}; filtro exacto Entregado → solo el `ENTREGADO`, 1 celda de fecha «Sin fecha»
+    (R32 «como hoy»). Se pierde la aserción E2E de orden con-fecha/sin-fecha (con un solo `ENTREGADO`
+    no hay orden que afirmar); el orden de terminados sigue en `list-company-orders.test.ts`.
+  - `e2e/pedidos-asignados.spec.ts` (bloque del Empacador): `deliveredOwn`/`deliveredOther` sembrados
+    `TERMINADO` + `conditionedBy` (Operador de la empresa); `deliveredNoPacker` sigue `ENTREGADO` sin
+    empacador (no puede ser `TERMINADO`) y su aserción (no aparece) no cambia.
+- Verificación: `pnpm run typecheck` verde (incluye `e2e/**`); `pnpm run lint` 0 errores (7 warnings
+  ajenos).
+- **Playwright NO corrido.** `playwright.config.ts` levanta `next dev` en el 3117 contra el
+  `DATABASE_URL` del `.env` (`localhost:5432/QuimiCloude`, base compartida). Esa base NO tiene las
+  migraciones de esta rama: `enum_range(null::"OrderStatus")` =
+  `{PENDIENTE,EN_CURSO,ENTREGADO,CANCELADO,POR_EMPACAR,EN_EMPAQUE,BLOQUEADO}` y `orders.conditioned_by`
+  no existe (0 columnas). Correrlo exige `db:migrate` sobre la base compartida (afecta a otros
+  worktrees; su rollback aborta si quedan filas en estados nuevos): decisión del humano.
+- Veredicto: aserciones editadas y compilando; T18 SIN marcar hasta que los 7 specs corran en verde.
+
 ## Pendiente
 
 - Cerrar el gate de A2+A3 (`./init.sh`).
-- C3 (T16 frontend, T13 tests), C4 + T19.
+- T18: correr los 7 E2E (de uno en uno) con una base migrada con M1/M2.
+- T19.
