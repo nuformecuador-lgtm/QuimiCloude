@@ -15,7 +15,7 @@ import { ROUTE_ORDER_STATUS_VALUES } from './assignment-view-params';
  * **Sin columna «Entrar» ni acciones**, tampoco para los pedidos asignados al propio actor.
  *
  * La columna de **fecha de terminado** solo aparece cuando el filtro vigente es EXACTAMENTE
- * `['ENTREGADO']`: `showFinishedAt` la decide quien construye las columnas a partir de
+ * `['ENTREGADO']` o `['TERMINADO']`: `showFinishedAt` la decide quien construye las columnas a partir de
  * los parametros ya parseados en el servidor, nunca esta declaracion por su cuenta.
  */
 
@@ -47,6 +47,9 @@ export const COMPANY_ORDER_STATUS_LABELS: Readonly<Record<OrderStatus, string>> 
   ENTREGADO: 'Entregado',
   CANCELADO: 'Cancelado',
   BLOQUEADO: 'Bloqueado',
+  POR_ACONDICIONAR: 'Por acondicionar',
+  EN_ACONDICIONAMIENTO: 'En acondicionamiento',
+  TERMINADO: 'Terminado',
 };
 
 export const COMPANY_ORDER_PRIORITY_LABELS: Readonly<Record<OrderPriority, string>> = {

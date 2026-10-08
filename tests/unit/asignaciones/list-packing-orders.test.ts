@@ -233,3 +233,18 @@ describe('listPackingOrders — R25: ningun puerto de escritura de inventario', 
     expect(Object.keys(deps.products)).toEqual(['findFinishedGoodsReceipts']);
   });
 });
+
+describe('listPackingOrders — los estados de acondicionamiento no aparecen en «Por empacar»', () => {
+  it('R23: el filtro que viaja al catalogo no incluye POR_ACONDICIONAR, EN_ACONDICIONAMIENTO ni TERMINADO', async () => {
+    const { deps, listAliveSummariesInCompany } = montar();
+    const listPackingOrders = createListPackingOrders(deps);
+
+    await listPackingOrders(ACTOR, { page: 1 });
+
+    const [, statuses] = listAliveSummariesInCompany.mock.calls[0] as unknown as [string, readonly string[]];
+    expect(statuses).toEqual(['POR_EMPACAR', 'EN_EMPAQUE']);
+    for (const status of ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO']) {
+      expect(statuses).not.toContain(status);
+    }
+  });
+});

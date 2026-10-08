@@ -22,6 +22,8 @@ import {
 } from '@/lib/modules/asignaciones/domain/assign-responsibles';
 import { AsignacionesError } from '@/lib/modules/asignaciones/domain/errors';
 import { assertOrderAcceptsWrites } from '@/lib/modules/asignaciones/domain/order-state';
+import { createRemoveWorkGroupFromOrder } from '@/lib/modules/asignaciones/domain/remove-work-group-from-order';
+import { createUnassignResponsible } from '@/lib/modules/asignaciones/domain/unassign-responsible';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
@@ -109,6 +111,9 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
     ['EN_EMPAQUE', 'order_produced_frozen'],
     ['ENTREGADO', 'order_delivered_frozen'],
     ['CANCELADO', 'order_cancelled_not_assignable'],
+    ['POR_ACONDICIONAR', 'order_produced_frozen'],
+    ['EN_ACONDICIONAMIENTO', 'order_produced_frozen'],
+    ['TERMINADO', 'order_produced_frozen'],
     ['no existe', 'order_not_found'],
   ];
 
@@ -149,6 +154,9 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
       { id: PEDIDO, status: 'EN_EMPAQUE' },
       { id: PEDIDO, status: 'ENTREGADO' },
       { id: PEDIDO, status: 'CANCELADO' },
+      { id: PEDIDO, status: 'POR_ACONDICIONAR' },
+      { id: PEDIDO, status: 'EN_ACONDICIONAMIENTO' },
+      { id: PEDIDO, status: 'TERMINADO' },
       null,
     ];
 
@@ -214,10 +222,10 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
     /**
      * El mapa de `order-state.ts` es TOTAL sobre `OrderStatus` (`satisfies Record<...>`), asi que
      * un estado nuevo en QC-34 rompe el TYPECHECK en vez de colarse como «admitida». Aqui se
-     * comprueba lo unico que un test en tiempo de ejecucion puede comprobar: que los SIETE
+     * comprueba lo unico que un test en tiempo de ejecucion puede comprobar: que los DIEZ
      * estados que hoy existen estan clasificados, ninguno de ellos por defecto.
      */
-    it('R35: los siete estados de hoy estan clasificados, ninguno por descuido (R33)', () => {
+    it('R35: los diez estados de hoy estan clasificados, ninguno por descuido (R33, QC-215 R20, R30)', () => {
       const clasificado = (status: OrderStatus): 'admite' | string => {
         try {
           assertOrderAcceptsWrites({ id: PEDIDO, status });
@@ -235,6 +243,9 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
         EN_EMPAQUE: clasificado('EN_EMPAQUE'),
         ENTREGADO: clasificado('ENTREGADO'),
         CANCELADO: clasificado('CANCELADO'),
+        POR_ACONDICIONAR: clasificado('POR_ACONDICIONAR'),
+        EN_ACONDICIONAMIENTO: clasificado('EN_ACONDICIONAMIENTO'),
+        TERMINADO: clasificado('TERMINADO'),
       }).toEqual({
         PENDIENTE: 'admite',
         EN_CURSO: 'admite',
@@ -243,7 +254,34 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
         EN_EMPAQUE: 'order_produced_frozen',
         ENTREGADO: 'order_delivered_frozen',
         CANCELADO: 'order_cancelled_not_assignable',
+        POR_ACONDICIONAR: 'order_produced_frozen',
+        EN_ACONDICIONAMIENTO: 'order_produced_frozen',
+        TERMINADO: 'order_produced_frozen',
       });
     });
   });
+});
+
+describe('QC-215 — los estados de acondicionamiento y TERMINADO congelan los responsables', () => {
+  const ESTADOS_CERRADOS = ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const;
+
+  for (const status of ESTADOS_CERRADOS) {
+    it(`R20, R30: asignar, quitar un grupo y desasignar sobre un ${status} rechazan con order_produced_frozen sin escribir`, async () => {
+      const { deps, assignments } = montar({ id: PEDIDO, status });
+
+      await expect(createAssignResponsibles(deps)(ACTOR, ENTRADA, AHORA)).rejects.toMatchObject({
+        code: 'order_produced_frozen',
+      });
+      await expect(
+        createRemoveWorkGroupFromOrder(deps)(ACTOR, { orderId: PEDIDO, workGroupId: uuid('b') }),
+      ).rejects.toMatchObject({ code: 'order_produced_frozen' });
+      await expect(
+        createUnassignResponsible(deps)(ACTOR, { orderId: PEDIDO, userId: PERSONA }),
+      ).rejects.toMatchObject({ code: 'order_produced_frozen' });
+
+      expect(assignments.insertMissing).not.toHaveBeenCalled();
+      expect(assignments.deleteOne).not.toHaveBeenCalled();
+      expect(assignments.deleteByWorkGroup).not.toHaveBeenCalled();
+    });
+  }
 });

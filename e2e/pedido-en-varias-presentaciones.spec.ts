@@ -711,7 +711,7 @@ test.describe('pedido en varias presentaciones', () => {
       where: { id: orderId },
       select: { status: true, ingredientsCost: true },
     });
-    expect(delivered.status).toBe('ENTREGADO');
+    expect(delivered.status).toBe('POR_ACONDICIONAR');
     expect(delivered.ingredientsCost, 'el pedido guardo el coste de sus ingredientes').not.toBeNull();
     expect(await batchStock(packagingABatchId!), 'Terminar consume los envases de A').toBe(
       Number(PACKAGING_STOCK) - Number(PACKAGES_A),

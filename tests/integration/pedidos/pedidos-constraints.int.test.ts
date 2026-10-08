@@ -500,6 +500,9 @@ describe('el pedido como fila completa', () => {
       // `company_id` la anade QC-60 (R1): la empresa del pedido. No es un total, un impuesto ni un
       // cliente. Va entre las dos por el mismo `sort()` lexicografico ('ca' < 'co' < 'cr').
       'company_id',
+      // `conditioned_by` es quien acondiciona el pedido: no es un total, un impuesto ni un
+      // cliente. Entre `company_id` y `created_at` por el mismo `sort()` ('com' < 'con' < 'cr').
+      'conditioned_by',
       'created_at',
       'created_by',
       // `customer_id` la anade QC-156 (R5): la UNICA referencia a cliente del pedido, opcional.

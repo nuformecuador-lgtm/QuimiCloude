@@ -236,6 +236,19 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
     }
   })
 
+  it('R18, R30 (QC-215): no cancela un POR_ACONDICIONAR, un EN_ACONDICIONAMIENTO ni un TERMINADO, sin escribir ni liberar', async () => {
+    for (const status of ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const) {
+      const d = dobles({ fila: fila(status) })
+
+      expect(
+        await codigoDelFallo(() => createCancelOrder(d)(ORDER_ID, { reason: 'sin stock' }, ADMIN)),
+        status,
+      ).toBe('not_cancellable')
+      expect(d.cancelAlive, status).not.toHaveBeenCalled()
+      expect(d.releaseForOrder, status).not.toHaveBeenCalled()
+    }
+  })
+
   it('no cancela un pedido ya CANCELADO, y su motivo queda intacto (R28, R29)', async () => {
     const d = dobles({ fila: fila('CANCELADO', 'motivo original') })
 

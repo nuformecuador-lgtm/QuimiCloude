@@ -317,7 +317,30 @@ async function librosDe(companyId: string): Promise<string> {
 }
 
 const ESCRITAS_DEL_CLIENTE = ['customer_id', 'updated_by', 'updated_at'] as const;
-const INTACTAS = ['reserved_at', 'ingredients_cost', 'packaging_cost', 'status', 'packed_by', 'finished_at'] as const;
+const INTACTAS = [
+  'reserved_at',
+  'ingredients_cost',
+  'packaging_cost',
+  'status',
+  'packed_by',
+  'conditioned_by',
+  'finished_at',
+] as const;
+
+/** QC-215 (R37): los estados de acondicionamiento y `TERMINADO`, sembrados a mano con lo que sus
+ *  `CHECK` exigen. En `EN_ACONDICIONAMIENTO`, `finished_at` es nulo por la base. */
+const ABIERTOS_DE_ACONDICIONAMIENTO = [
+  {
+    status: 'EN_ACONDICIONAMIENTO' as const,
+    finishedAt: null,
+    conNulo: ['finished_at'] as readonly string[],
+  },
+  {
+    status: 'TERMINADO' as const,
+    finishedAt: new Date('2026-09-02T10:00:00.000Z'),
+    conNulo: [] as readonly string[],
+  },
+];
 
 async function listar(fixture: Fixture, filters: Record<string, unknown>, search = ''): Promise<{ ids: string[]; total: number }> {
   const page = await listOrders({ page: 1, pageSize: 25, sort: null, filters, search }, actorDe(fixture));
@@ -331,49 +354,99 @@ afterAll(async () => {
 // ---------------------------------------------------------------------------
 
 describe('setCustomerAlive escribe solo el cliente y el sello de modificacion', () => {
-  it('R14, R15: en un pedido entregado y empacado, solo cambian customer_id, updated_by y updated_at; los libros no cambian', async () => {
-    const fixture = await crearFixture();
-    try {
-      const recipeId = await crearReceta(fixture, `Receta ${token()}`);
-      const orderId = await crearPedido(fixture, recipeId, null);
-      const clienteId = await crearCliente(fixture, `Uno ${token()}`);
-      // Estado final con quien empaco y fecha de terminado: las columnas que no se pueden tocar
-      // llevan valor, para que un cambio se note.
-      await prisma.order.update({
-        where: { id: orderId },
-        data: {
-          status: 'ENTREGADO',
-          packedBy: fixture.actorId,
-          finishedAt: new Date('2026-09-02T10:00:00.000Z'),
-          updatedAt: new Date('2026-09-02T10:00:00.000Z'),
-        },
-      });
-      await prisma.orderAssignment.create({ data: { orderId, userId: fixture.actorId, companyId: fixture.companyId } });
+  it.each(ABIERTOS_DE_ACONDICIONAMIENTO)(
+    'R14, R15, QC-215 R37: en $status, solo cambian customer_id, updated_by y updated_at; estado, finished_at, packed_by, conditioned_by y los libros no cambian',
+    async ({ status, finishedAt, conNulo }) => {
+      const fixture = await crearFixture();
+      try {
+        const recipeId = await crearReceta(fixture, `Receta ${token()}`);
+        const orderId = await crearPedido(fixture, recipeId, null);
+        const clienteId = await crearCliente(fixture, `Uno ${token()}`);
+        // Quien empaco, quien acondiciona y (en TERMINADO) la fecha de terminado llevan valor, para
+        // que un cambio se note.
+        await prisma.order.update({
+          where: { id: orderId },
+          data: {
+            status,
+            packedBy: fixture.actorId,
+            conditionedBy: fixture.otherActorId,
+            finishedAt,
+            updatedAt: new Date('2026-09-02T10:00:00.000Z'),
+          },
+        });
+        await prisma.orderAssignment.create({ data: { orderId, userId: fixture.actorId, companyId: fixture.companyId } });
 
-      const antes = await filaDe(orderId);
-      const librosAntes = await librosDe(fixture.companyId);
-      for (const columna of INTACTAS) expect(antes[columna], columna).not.toBe('null');
+        const antes = await filaDe(orderId);
+        const librosAntes = await librosDe(fixture.companyId);
+        for (const columna of INTACTAS) {
+          if (conNulo.includes(columna)) expect(antes[columna], columna).toBe('null');
+          else expect(antes[columna], columna).not.toBe('null');
+        }
+        expect(antes['status']).toBe(status);
 
-      await setOrderCustomer(orderId, { customerId: clienteId }, actorDe(fixture, fixture.otherActorId));
+        await setOrderCustomer(orderId, { customerId: clienteId }, actorDe(fixture, fixture.otherActorId));
 
-      const despues = await filaDe(orderId);
-      expect(sinColumnas(despues, ESCRITAS_DEL_CLIENTE)).toEqual(sinColumnas(antes, ESCRITAS_DEL_CLIENTE));
-      for (const columna of INTACTAS) expect(despues[columna], columna).toBe(antes[columna]);
-      expect(despues['customer_id']).toBe(clienteId);
-      expect(despues['updated_by']).toBe(fixture.otherActorId);
-      expect(despues['updated_at']).not.toBe(antes['updated_at']);
-      expect(await librosDe(fixture.companyId)).toBe(librosAntes);
+        const despues = await filaDe(orderId);
+        expect(sinColumnas(despues, ESCRITAS_DEL_CLIENTE)).toEqual(sinColumnas(antes, ESCRITAS_DEL_CLIENTE));
+        for (const columna of INTACTAS) expect(despues[columna], columna).toBe(antes[columna]);
+        expect(despues['customer_id']).toBe(clienteId);
+        expect(despues['updated_by']).toBe(fixture.otherActorId);
+        expect(despues['updated_at']).not.toBe(antes['updated_at']);
+        expect(await librosDe(fixture.companyId)).toBe(librosAntes);
 
-      // Quitarlo tampoco toca nada mas.
-      await setOrderCustomer(orderId, { customerId: null }, actorDe(fixture));
-      const sinCliente = await filaDe(orderId);
-      expect(sinCliente['customer_id']).toBe('null');
-      expect(sinColumnas(sinCliente, ESCRITAS_DEL_CLIENTE)).toEqual(sinColumnas(antes, ESCRITAS_DEL_CLIENTE));
-      expect(await librosDe(fixture.companyId)).toBe(librosAntes);
-    } finally {
-      await borrarFixture(fixture);
-    }
-  });
+        // Quitarlo tampoco toca nada mas.
+        await setOrderCustomer(orderId, { customerId: null }, actorDe(fixture));
+        const sinCliente = await filaDe(orderId);
+        expect(sinCliente['customer_id']).toBe('null');
+        expect(sinColumnas(sinCliente, ESCRITAS_DEL_CLIENTE)).toEqual(sinColumnas(antes, ESCRITAS_DEL_CLIENTE));
+        expect(await librosDe(fixture.companyId)).toBe(librosAntes);
+      } finally {
+        await borrarFixture(fixture);
+      }
+    },
+  );
+
+  it.each([
+    { status: 'ENTREGADO' as const, cancellationReason: null },
+    { status: 'CANCELADO' as const, cancellationReason: 'el cliente anulo el pedido' },
+  ])(
+    'QC-215 R36: en $status, mismo cliente, quitar y cliente nuevo dan action_not_allowed sin tocar ninguna fila',
+    async ({ status, cancellationReason }) => {
+      const fixture = await crearFixture();
+      try {
+        const recipeId = await crearReceta(fixture, `Receta ${token()}`);
+        const actual = await crearCliente(fixture, `Actual ${token()}`);
+        const nuevo = await crearCliente(fixture, `Nuevo ${token()}`);
+        const orderId = await crearPedido(fixture, recipeId, actual);
+        await prisma.order.update({
+          where: { id: orderId },
+          data: {
+            status,
+            cancellationReason,
+            packedBy: status === 'ENTREGADO' ? fixture.actorId : null,
+            finishedAt: status === 'ENTREGADO' ? new Date('2026-09-02T10:00:00.000Z') : null,
+            updatedAt: new Date('2026-09-02T10:00:00.000Z'),
+          },
+        });
+
+        const antes = await filaDe(orderId);
+        const librosAntes = await librosDe(fixture.companyId);
+
+        for (const customerId of [actual, null, nuevo]) {
+          const error = await setOrderCustomer(orderId, { customerId }, actorDe(fixture, fixture.otherActorId)).then(
+            () => null,
+            (e: unknown) => e,
+          );
+          expect((error as { code?: string } | null)?.code, String(customerId)).toBe('action_not_allowed');
+        }
+
+        expect(await filaDe(orderId)).toEqual(antes);
+        expect(await librosDe(fixture.companyId)).toBe(librosAntes);
+      } finally {
+        await borrarFixture(fixture);
+      }
+    },
+  );
 
   it('R15: con el ambito de otra empresa no escribe nada y responde not_found', async () => {
     const A = await crearFixture();

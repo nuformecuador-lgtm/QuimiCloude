@@ -23,11 +23,13 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145 y QC-168) — la fachada de 
   // UNA y comparadas por igualdad exacta: una operacion futura que nadie declare aqui pone el caso
   // en rojo, que es justo lo que este censo promete.
   // 2026-10-06 (QC-82): crece con `cancelAssignedOrder` y `recordStepMove`.
-  it('expone las doce anteriores, las CUATRO de QC-168 y las DOS de QC-82, y ninguna mas', () => {
+  // 2026-10-08 (QC-215): crece con `startConditioning` y `finishConditioning`.
+  it('expone las doce anteriores, las CUATRO de QC-168, las DOS de QC-82 y las DOS de QC-215, y ninguna mas', () => {
     expect(Object.keys(asignaciones).sort()).toEqual([
       'assignResponsibles',
       'cancelAssignedOrder',
       'finishAssignedOrder',
+      'finishConditioning',
       'finishPacking',
       'getAssignedOrderExecution',
       'getPackingOrder',
@@ -41,6 +43,7 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145 y QC-168) — la fachada de 
       'recordStepMove',
       'removeWorkGroupFromOrder',
       'startAssignedOrder',
+      'startConditioning',
       'startPacking',
       'unassignResponsible',
     ]);
@@ -176,6 +179,23 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145 y QC-168) — la fachada de 
   it('R26: `recordStepMove` rechaza sin `asignaciones.ejecutar` sin llegar a la base', async () => {
     const error = await asignaciones
       .recordStepMove({ id: 'u', companyId: 'c', permissions: ['asignaciones.consultar'] }, { orderId: 'o' })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  // QC-215: mismo criterio, con un actor que tiene los permisos del empaque pero no el suyo.
+  it('R15: `startConditioning` rechaza sin `acondicionamiento.modificar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .startConditioning({ id: 'u', companyId: 'c', permissions: ['empaque.modificar'] }, { orderId: 'o' })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('R15: `finishConditioning` rechaza sin `acondicionamiento.modificar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .finishConditioning({ id: 'u', companyId: 'c', permissions: ['empaque.modificar'] }, { orderId: 'o' })
       .catch((caught: unknown) => caught);
 
     expect((error as { code?: string }).code).toBe('unauthorized');

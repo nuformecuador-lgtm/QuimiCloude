@@ -1,11 +1,11 @@
 // lib/modules/asignaciones/domain/finish-packing.ts
 /**
- * Terminar: `EN_EMPAQUE -> ENTREGADO`, con `finished_at` en la misma escritura que el cambio de
- * estado, solo si el actor es quien tiene el pedido en empaque. Sin comprobacion de asignacion:
+ * Terminar: `EN_EMPAQUE -> POR_ACONDICIONAR`, sin `finished_at`, solo si el actor es quien tiene
+ * el pedido en empaque. Sin comprobacion de asignacion:
  * cualquier actor con `empaque.modificar` puede terminar cualquier pedido vivo de su empresa, y
  * sin ningun puerto de inventario: los envases los consume `pedidos` dentro de Terminar.
  *
- * Devuelve el numero visible del pedido, leido ANTES de la transicion: una vez `ENTREGADO`, el
+ * Devuelve el numero visible del pedido, leido ANTES de la transicion: una vez `POR_ACONDICIONAR`, el
  * filtro de estado con el que se leyo ya no lo encontraria (mismo motivo que
  * `finish-assigned-order.ts`).
  */

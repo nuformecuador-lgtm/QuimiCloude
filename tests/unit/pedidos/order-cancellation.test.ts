@@ -79,11 +79,14 @@ describe('isCancellableStatus — una sola definicion de «cancelable» (R29, R4
     BLOQUEADO: true,
     POR_EMPACAR: false,
     EN_EMPAQUE: false,
+    POR_ACONDICIONAR: false,
+    EN_ACONDICIONAMIENTO: false,
+    TERMINADO: false,
     ENTREGADO: false,
     CANCELADO: false,
   }
 
-  it('R29: clasifica los siete estados de OrderStatus, ni uno mas ni uno menos', () => {
+  it('R29: clasifica los diez estados de OrderStatus, ni uno mas ni uno menos', () => {
     expect([...ORDER_STATUS_VALUES].sort()).toEqual(Object.keys(ESPERADO).sort())
   })
 
@@ -173,6 +176,25 @@ describe('createCancelAliveOrder — cancelar por encargo, por el camino unico (
 
   for (const estado of ['POR_EMPACAR', 'EN_EMPAQUE', 'ENTREGADO', 'CANCELADO'] as const) {
     it(`R29, R43: un pedido ${estado} es not_cancellable (no not_found), sin cancelar ni liberar`, async () => {
+      const d = dobles({ estado })
+
+      const resultado = await createCancelAliveOrder({ unitOfWork: d.unitOfWork })(
+        ORDER_ID,
+        COMPANY_ID,
+        MOTIVO,
+        ACTOR_ID,
+        AHORA,
+      )
+
+      expect(resultado).toBe('not_cancellable')
+      expect(d.cancelAlive).not.toHaveBeenCalled()
+      expect(d.releaseForOrder).not.toHaveBeenCalled()
+      expect(d.setReservedAt).not.toHaveBeenCalled()
+    })
+  }
+
+  for (const estado of ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const) {
+    it(`R18: un pedido ${estado} es not_cancellable, sin cancelar ni liberar`, async () => {
       const d = dobles({ estado })
 
       const resultado = await createCancelAliveOrder({ unitOfWork: d.unitOfWork })(

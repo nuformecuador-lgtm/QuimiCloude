@@ -1,7 +1,8 @@
 /**
  * E2E del recorrido de empaque (R48): el Operario finaliza y el pedido queda «Por empacar», el
  * propio Operario no ve la pestaña ni puede pedirla por la dirección, «Por empacar» no se puede
- * cancelar desde Pedidos, y un Empacador lo comienza, lo termina y lo ve en «Terminados».
+ * cancelar desde Pedidos, y un Empacador lo comienza y lo termina: queda «Por acondicionar» y
+ * todavía no aparece en «Terminados».
  *
  * UN SOLO `test()`: cada paso es la precondición del siguiente sobre el MISMO pedido -partirlo
  * obligaría a resembrar el estado que ya dejó el paso anterior-, mismo criterio que
@@ -570,7 +571,7 @@ test.afterAll(async () => {
 test.setTimeout(180_000);
 
 test.describe('el recorrido de empaque (R48)', () => {
-  test('el Operario finaliza y queda Por empacar, no ve la pestaña, Pedidos no lo deja cancelar, y el Empacador lo comienza, lo termina y lo ve en Terminados', async ({
+  test('el Operario finaliza y queda Por empacar, no ve la pestaña, Pedidos no lo deja cancelar, y el Empacador lo comienza, lo termina y queda Por acondicionar, fuera de Terminados', async ({
     page,
   }) => {
     expect(orderId, 'el fixture no existe: falló el beforeAll').not.toBeNull();
@@ -677,7 +678,7 @@ test.describe('el recorrido de empaque (R48)', () => {
       { timeout: 60_000 },
     );
 
-    expect(await orderStatus(orderId)).toBe('ENTREGADO');
+    expect(await orderStatus(orderId)).toBe('POR_ACONDICIONAR');
     // Terminar consumio los envases de la linea.
     expect(await batchStock(packagingBatchId!)).toBe(
       Number(PACKAGING_STOCK) - Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
@@ -687,9 +688,9 @@ test.describe('el recorrido de empaque (R48)', () => {
     await expect(packedNotice).toBeVisible({ timeout: 60_000 });
     await expect(packedNotice).toContainText(orderNumber);
 
-    // --- 5. El pedido aparece en «Terminados» (R27).
+    // --- 5. Queda por acondicionar: todavia NO aparece en «Terminados».
     await page.getByTestId(ASSIGNMENT_VIEW_TAB_TERMINADOS_TESTID).click();
     await expect(page.getByTestId(FINISHED_ORDERS_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
-    await expect(rowByNumber(page, orderNumber)).toHaveCount(1, { timeout: 60_000 });
+    await expect(rowByNumber(page, orderNumber)).toHaveCount(0);
   });
 });

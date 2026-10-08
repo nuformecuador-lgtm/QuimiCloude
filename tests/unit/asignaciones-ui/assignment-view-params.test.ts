@@ -104,12 +104,15 @@ describe('parseStatusFilter descarta lo que no es un estado conocido (R24)', () 
     expect(parseStatusFilter({ [STATUS_PARAM]: 'ENTREGADO,PENDIENTE' })).not.toEqual(['ENTREGADO']);
   });
 
-  it('R41 - las siete palabras validas son exactamente las de `/pedidos`, en orden de flujo', () => {
+  it('R41, R2, R28 - las palabras validas son exactamente las de `/pedidos`, en orden de flujo', () => {
     expect([...ROUTE_ORDER_STATUS_VALUES]).toEqual([
       'PENDIENTE',
       'EN_CURSO',
       'POR_EMPACAR',
       'EN_EMPAQUE',
+      'POR_ACONDICIONAR',
+      'EN_ACONDICIONAMIENTO',
+      'TERMINADO',
       'ENTREGADO',
       'CANCELADO',
       'BLOQUEADO',
@@ -130,11 +133,40 @@ describe('assignmentViewHref deriva SIEMPRE de ASSIGNED_ORDERS_ROUTE y lleva sol
 });
 
 describe('isExactlyDelivered (R31)', () => {
-  it('solo ["ENTREGADO"] cuenta como exacto', () => {
+  it('R32 - ["ENTREGADO"] sigue contando como exacto', () => {
     expect(isExactlyDelivered(['ENTREGADO'])).toBe(true);
     expect(isExactlyDelivered([])).toBe(false);
     expect(isExactlyDelivered(['ENTREGADO', 'CANCELADO'])).toBe(false);
     expect(isExactlyDelivered(['PENDIENTE'])).toBe(false);
+  });
+
+  it('R32 - ["TERMINADO"] tambien cuenta como exacto', () => {
+    expect(isExactlyDelivered(['TERMINADO'])).toBe(true);
+    expect(isExactlyDelivered(parseStatusFilter({ [STATUS_PARAM]: 'TERMINADO' }))).toBe(true);
+  });
+
+  it('R32 - TERMINADO mezclado con otro, incluido ENTREGADO, no es exacto', () => {
+    expect(isExactlyDelivered(['TERMINADO', 'ENTREGADO'])).toBe(false);
+    expect(isExactlyDelivered(['ENTREGADO', 'TERMINADO'])).toBe(false);
+    expect(isExactlyDelivered(['TERMINADO', 'PENDIENTE'])).toBe(false);
+  });
+
+  it('R32 - los estados de acondicionamiento no activan la columna de terminados', () => {
+    expect(isExactlyDelivered(['POR_ACONDICIONAR'])).toBe(false);
+    expect(isExactlyDelivered(['EN_ACONDICIONAMIENTO'])).toBe(false);
+  });
+});
+
+describe('R28, R32 - el filtro de estado de «Todos» acepta los estados nuevos en la URL', () => {
+  it('POR_ACONDICIONAR, EN_ACONDICIONAMIENTO y TERMINADO se conservan, solos o combinados', () => {
+    expect(parseStatusFilter({ [STATUS_PARAM]: 'POR_ACONDICIONAR' })).toEqual(['POR_ACONDICIONAR']);
+    expect(parseStatusFilter({ [STATUS_PARAM]: 'EN_ACONDICIONAMIENTO' })).toEqual([
+      'EN_ACONDICIONAMIENTO',
+    ]);
+    expect(parseStatusFilter({ [STATUS_PARAM]: 'TERMINADO' })).toEqual(['TERMINADO']);
+    expect(
+      parseStatusFilter({ [STATUS_PARAM]: 'POR_ACONDICIONAR,EN_ACONDICIONAMIENTO,TERMINADO' }),
+    ).toEqual(['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO']);
   });
 });
 

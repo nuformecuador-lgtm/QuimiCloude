@@ -192,6 +192,21 @@ describe('finishPacking — R23: estado que no admite Terminar', () => {
   });
 });
 
+describe('finishPacking — QC-215: los estados de acondicionamiento y TERMINADO no admiten Terminar', () => {
+  for (const status of ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const) {
+    it(`R23, R30: un pedido ${status} que el catalogo clasifica not_packable -> order_not_packable, sin fila en el registro`, async () => {
+      const { deps, filas, estado } = montar({ target: { id: PEDIDO, status }, resultado: 'not_packable' });
+
+      const error = await createFinishPacking(deps)(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(OrderNotPackableError);
+      expect((error as OrderNotPackableError).code).toBe('order_not_packable');
+      expect(filas).toEqual([]);
+      expect(estado.confirmada).toBe(false);
+    });
+  }
+});
+
 describe('finishPacking — R17-R21: da de alta el lote por linea del reparto', () => {
   it('`recipe_not_found` rechaza con `RecipeNotFoundError`', async () => {
     const { deps } = montar({ resultado: 'recipe_not_found' });

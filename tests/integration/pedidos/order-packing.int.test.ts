@@ -242,13 +242,23 @@ async function borrarOtraEmpresa(otra: {
   await prisma.company.deleteMany({ where: { id: otra.companyId } });
 }
 
-type OrderStatusValue = 'PENDIENTE' | 'EN_CURSO' | 'POR_EMPACAR' | 'EN_EMPAQUE' | 'ENTREGADO' | 'CANCELADO';
+type OrderStatusValue =
+  | 'PENDIENTE'
+  | 'EN_CURSO'
+  | 'POR_EMPACAR'
+  | 'EN_EMPAQUE'
+  | 'ENTREGADO'
+  | 'CANCELADO'
+  | 'POR_ACONDICIONAR'
+  | 'EN_ACONDICIONAMIENTO'
+  | 'TERMINADO';
 
 async function createOrder(
   fixture: Fixture,
   overrides: {
     readonly status: OrderStatusValue;
     readonly packedBy?: string | null;
+    readonly conditionedBy?: string | null;
     readonly finishedAt?: Date | null;
     readonly deletedAt?: Date | null;
     readonly companyId?: string;
@@ -263,6 +273,7 @@ async function createOrder(
       quantity: new Prisma.Decimal('10'),
       status: overrides.status,
       packedBy: overrides.packedBy ?? null,
+      conditionedBy: overrides.conditionedBy ?? null,
       finishedAt: overrides.finishedAt ?? null,
       deletedAt: overrides.deletedAt ?? null,
       ...(overrides.status === 'CANCELADO' ? { cancellationReason: 'motivo de prueba' } : {}),
@@ -270,6 +281,26 @@ async function createOrder(
     select: { id: true },
   });
   return order.id;
+}
+
+/** Un pedido en cada estado de acondicionamiento y en TERMINADO, con las columnas que exigen
+ *  las restricciones de la base. */
+async function crearPedidosDeAcondicionamiento(fixture: Fixture): Promise<Record<string, string>> {
+  const quien = fixture.packerId;
+  return {
+    POR_ACONDICIONAR: await createOrder(fixture, { status: 'POR_ACONDICIONAR', packedBy: quien }),
+    EN_ACONDICIONAMIENTO: await createOrder(fixture, {
+      status: 'EN_ACONDICIONAMIENTO',
+      packedBy: quien,
+      conditionedBy: quien,
+    }),
+    TERMINADO: await createOrder(fixture, {
+      status: 'TERMINADO',
+      packedBy: quien,
+      conditionedBy: quien,
+      finishedAt: new Date(),
+    }),
+  };
 }
 
 async function readOrder(
@@ -397,6 +428,21 @@ describe('startPackingAliveById — R10, R18, R19, R20, R23, R24, R25', () => {
     }
   });
 
+  it('R23, R30 (QC-215): Comenzar sobre POR_ACONDICIONAR, EN_ACONDICIONAMIENTO o TERMINADO es not_packable, sin escribir', async () => {
+    const fixture = await crearFixture();
+    const pedidos = await crearPedidosDeAcondicionamiento(fixture);
+    try {
+      for (const [estado, pedido] of Object.entries(pedidos)) {
+        const antes = await readOrder(pedido);
+        const resultado = await startPackingAliveById(pedido, fixture.companyId, fixture.otherPackerId, new Date());
+        expect(resultado, estado).toBe('not_packable');
+        expect(await readOrder(pedido), estado).toEqual(antes);
+      }
+    } finally {
+      await borrarFixture(fixture, Object.values(pedidos));
+    }
+  });
+
   it('R24: Comenzar sobre un pedido inexistente, dado de baja o de otra empresa es not_found', async () => {
     const fixture = await crearFixture();
     const otra = await crearOtraEmpresa();
@@ -423,7 +469,7 @@ describe('startPackingAliveById — R10, R18, R19, R20, R23, R24, R25', () => {
 });
 
 describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
-  it('R21: Terminar sobre su EN_EMPAQUE deja ENTREGADO con finished_at, en una sola escritura', async () => {
+  it('R21, R5 (QC-215): Terminar sobre su EN_EMPAQUE deja POR_ACONDICIONAR sin finished_at y conserva packed_by, en una sola escritura', async () => {
     const fixture = await crearFixture();
     const pedido = await createOrder(fixture, { status: 'EN_EMPAQUE', packedBy: fixture.packerId });
     try {
@@ -435,8 +481,12 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
       expect(resultado).toEqual({ kind: 'ok', finishedGoods: [] });
 
       const fila = await readOrder(pedido);
-      expect(fila.status).toBe('ENTREGADO');
-      expect(fila.finishedAt).toEqual(ahora);
+      expect(fila.status).toBe('POR_ACONDICIONAR');
+      expect(fila.finishedAt).toBeNull();
+      expect(fila.packedBy).toBe(fixture.packerId);
+      expect(fila.updatedAt).toEqual(ahora);
+      const conditionedBy = await prisma.order.findUniqueOrThrow({ where: { id: pedido }, select: { conditionedBy: true } });
+      expect(conditionedBy.conditionedBy).toBeNull();
       expect(await movementCountDe(fixture.companyId)).toBe(antes);
     } finally {
       await borrarFixture(fixture, [pedido]);
@@ -477,6 +527,24 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
     }
   });
 
+  it('R23, R30 (QC-215): Terminar el empaque sobre POR_ACONDICIONAR, EN_ACONDICIONAMIENTO o TERMINADO es not_packable, sin escribir ni mover inventario', async () => {
+    const fixture = await crearFixture();
+    const pedidos = await crearPedidosDeAcondicionamiento(fixture);
+    try {
+      const movimientos = await movementCountDe(fixture.companyId);
+      for (const [estado, pedido] of Object.entries(pedidos)) {
+        const antes = await readOrder(pedido);
+        // El propio empacador: aun siendo quien empaco, el estado ya no admite Terminar.
+        const resultado = await finishPackingAliveById(pedido, fixture.companyId, fixture.packerId, new Date());
+        expect(resultado, estado).toBe('not_packable');
+        expect(await readOrder(pedido), estado).toEqual(antes);
+      }
+      expect(await movementCountDe(fixture.companyId)).toBe(movimientos);
+    } finally {
+      await borrarFixture(fixture, Object.values(pedidos));
+    }
+  });
+
   it('R24: Terminar sobre un pedido inexistente, dado de baja o de otra empresa es not_found', async () => {
     const fixture = await crearFixture();
     const otra = await crearOtraEmpresa();
@@ -499,7 +567,7 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
     }
   });
 
-  it('R27: un pedido terminado por Terminar aparece con su finished_at, sin ninguna otra accion', async () => {
+  it('R5, R33 (QC-215): un pedido empacado por Terminar NO recibe finished_at: queda POR_ACONDICIONAR', async () => {
     const fixture = await crearFixture();
     const pedido = await createOrder(fixture, { status: 'EN_EMPAQUE', packedBy: fixture.packerId });
     try {
@@ -510,8 +578,8 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
         where: { id: pedido },
         select: { status: true, finishedAt: true },
       });
-      expect(fila.status).toBe('ENTREGADO');
-      expect(fila.finishedAt).toEqual(ahora);
+      expect(fila.status).toBe('POR_ACONDICIONAR');
+      expect(fila.finishedAt).toBeNull();
     } finally {
       await borrarFixture(fixture, [pedido]);
     }

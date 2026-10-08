@@ -521,6 +521,18 @@ const METODOS_DELEGADOS_EN_DOMINIO: ReadonlyMap<string, RegExp> = new Map([
     'listAliveSummariesInCompany',
     /^createListAliveSummariesInCompany\s*\(\s*\{\s*summaries\s*:\s*orderSummaryReader\s*,\s*packaging\s*:\s*packagingCatalog\s*,?\s*\}\s*\)$/,
   ],
+  // QC-215 (R8, R12): Comenzar y Terminar el acondicionamiento cablean un caso de uso de
+  // `pedidos/domain` sobre `OrderConditioningRepository`. Quien toca la base son
+  // `startConditioningAliveOrder` y `finishConditioningAliveOrder` (`order-prisma.ts`), con
+  // `scope: OrderScope`, y el barrido sin lista de excepciones de mas abajo las sigue exigiendo.
+  [
+    'startConditioningAliveById',
+    /^createStartConditioning\s*\(\s*\{\s*conditioning\s*:\s*orderConditioningRepository\s*,?\s*\}\s*\)$/,
+  ],
+  [
+    'finishConditioningAliveById',
+    /^createFinishConditioning\s*\(\s*\{\s*conditioning\s*:\s*orderConditioningRepository\s*,?\s*\}\s*\)$/,
+  ],
 ])
 
 describe('QC-60 R18 — el punto unico es de verdad UNA definicion', () => {

@@ -176,6 +176,21 @@ describe('startPacking — R23: estado que no admite Comenzar', () => {
   });
 });
 
+describe('startPacking — QC-215: los estados de acondicionamiento y TERMINADO no admiten Comenzar', () => {
+  for (const estado of ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const) {
+    it(`R23, R30: el catalogo clasifica ${estado} como not_packable -> order_not_packable, sin fila en el registro`, async () => {
+      const { deps, filas, estado: run } = montar('not_packable');
+
+      const error = await createStartPacking(deps)(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(OrderNotPackableError);
+      expect((error as OrderNotPackableError).code).toBe('order_not_packable');
+      expect(filas).toEqual([]);
+      expect(run.confirmada).toBe(false);
+    });
+  }
+});
+
 describe('startPacking — R10: POR_EMPACAR sin ninguna linea de reparto', () => {
   it('`without_distribution` rechaza con `order_without_distribution`', async () => {
     const { deps } = montar('without_distribution');

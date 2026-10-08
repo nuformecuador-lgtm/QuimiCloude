@@ -333,6 +333,21 @@ describe('finishAssignedOrder — R10: solo EN_CURSO admite un Finalizar', () =>
     expect(transitionAliveById).not.toHaveBeenCalled();
   });
 
+  for (const estado of ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const) {
+    it(`R21, R30 (QC-215): ${estado} rechaza con el mismo error que EN_EMPAQUE, sin escribir ni anotar`, async () => {
+      const empaque = montar({ ordenDeEstados: ['EN_EMPAQUE'] });
+      const errorEmpaque = await createFinishAssignedOrder(empaque.deps)(ACTOR, ENTRADA).catch((e: unknown) => e);
+      const { deps, transitionAliveById, append } = montar({ ordenDeEstados: [estado] });
+
+      const error = await createFinishAssignedOrder(deps)(ACTOR, ENTRADA).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(OrderProducedFrozenError);
+      expect((error as OrderProducedFrozenError).code).toBe((errorEmpaque as OrderProducedFrozenError).code);
+      expect(transitionAliveById).not.toHaveBeenCalled();
+      expect(append).not.toHaveBeenCalled();
+    });
+  }
+
   it('PENDIENTE rechaza con `invalid_transition` sin escribir (A-1)', async () => {
     const { deps, transitionAliveById } = montar({ ordenDeEstados: ['PENDIENTE'] });
     const finishAssignedOrder = createFinishAssignedOrder(deps);

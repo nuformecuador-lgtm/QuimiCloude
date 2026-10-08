@@ -2,7 +2,8 @@
 /**
  * «Todos»: los pedidos de la empresa en cualquier estado, sin filtro por usuario asignado. Sin
  * filtro de estado o con una mezcla, el orden es el de la lista de trabajo; filtrado por
- * exactamente `ENTREGADO`, el orden es el de terminados y la fecha de terminado se pinta.
+ * exactamente `ENTREGADO` o exactamente `TERMINADO`, el orden es el de terminados y la fecha de
+ * terminado se pinta.
  */
 import { z } from 'zod';
 
@@ -32,10 +33,15 @@ export type ListCompanyOrdersDeps = ComposeOrderRowsDeps & {
   readonly orders: OrderCatalog;
 };
 
-/** Solo `['ENTREGADO']`, y nada mas, ordena como «Terminados». Cualquier otra combinacion,
- *  aunque incluya `ENTREGADO`, usa el orden de la lista de trabajo. */
+const ESTADOS_CON_ORDEN_DE_TERMINADOS: readonly OrderStatus[] = ['ENTREGADO', 'TERMINADO'];
+
+/** Solo `['ENTREGADO']` o solo `['TERMINADO']` ordenan como «Terminados». Cualquier otra
+ *  combinacion, aunque incluya alguno de los dos, usa el orden de la lista de trabajo. */
 function resolveOrdering(statuses: readonly OrderStatus[]): OrderSummaryOrdering {
-  return statuses.length === 1 && statuses[0] === 'ENTREGADO' ? 'finished_recent_first' : 'work_queue';
+  const [unico] = statuses;
+  return statuses.length === 1 && unico !== undefined && ESTADOS_CON_ORDEN_DE_TERMINADOS.includes(unico)
+    ? 'finished_recent_first'
+    : 'work_queue';
 }
 
 export function createListCompanyOrders(
@@ -54,7 +60,7 @@ export function createListCompanyOrders(
 
     // Sin filtro, los estados que viajan al catalogo son los del flujo de trabajo y no los de
     // declaracion del enum, aunque el orden de la lista no depende de este array: solo
-    // `resolveOrdering` decide, y unicamente cuando el filtro es exactamente `['ENTREGADO']`.
+    // `resolveOrdering` decide, y unicamente cuando el filtro es un solo estado cerrado.
     const statusesEfectivos = [...new Set(statuses ?? ORDER_STATUS_FLOW)];
     const ordering = resolveOrdering(statusesEfectivos);
 

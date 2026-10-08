@@ -33,8 +33,11 @@ import {
   RESPONSIBLES_COLUMN_ID,
   STATUS_COLUMN_ID,
   RECIPE_NAME_COLUMN_ID,
+  STATUS_PARAM,
   buildOrderColumns,
+  parseOrderListParams,
 } from '@/app/(private)/pedidos/components';
+import { Badge } from '@/components/ui/badge';
 import {
   ORDER_PRIORITY_VALUES,
   ORDER_QUERYABLE,
@@ -69,6 +72,8 @@ const ORDER_COLUMNS = buildOrderColumns({
 });
 
 const RECIPE_ID = '22222222-2222-4222-8222-222222222222';
+
+const ESTADOS_DE_ACONDICIONAMIENTO = ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const;
 
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
@@ -465,6 +470,58 @@ describe('estado y prioridad se leen como etiqueta, no como valor crudo del enum
     expect(badge).toHaveTextContent(ORDER_STATUS_LABELS.BLOQUEADO);
     expect(badge.textContent).not.toBe('BLOQUEADO');
   });
+
+  it('R29, R32: el filtro de estado ofrece los tres estados nuevos, en el orden del flujo, entre «En empaque» y «Entregado»', () => {
+    const estado = ORDER_COLUMNS.find((column) => column.id === STATUS_COLUMN_ID)?.filter;
+    const valores = estado?.kind === 'select' ? estado.options.map((option) => option.value) : [];
+
+    const desde = valores.indexOf('EN_EMPAQUE');
+    expect(valores.slice(desde, desde + 5)).toEqual([
+      'EN_EMPAQUE',
+      'POR_ACONDICIONAR',
+      'EN_ACONDICIONAMIENTO',
+      'TERMINADO',
+      'ENTREGADO',
+    ]);
+    for (const status of ESTADOS_DE_ACONDICIONAMIENTO) {
+      expect(estado?.kind === 'select' ? estado.options : []).toContainEqual({
+        value: status,
+        label: ORDER_STATUS_LABELS[status],
+      });
+    }
+  });
+
+  it.each(ESTADOS_DE_ACONDICIONAMIENTO)('R29: el filtro de estado acepta %s en la URL', (status) => {
+    const params = parseOrderListParams({ [STATUS_PARAM]: status });
+
+    expect(params.filters[STATUS_COLUMN_ID]).toEqual({ kind: 'select', values: [status] });
+  });
+
+  it.each([
+    ['POR_ACONDICIONAR', 'Por acondicionar', 'secondary'],
+    ['EN_ACONDICIONAMIENTO', 'En acondicionamiento', 'default'],
+    ['TERMINADO', 'Terminado', 'secondary'],
+  ] as const)(
+    'R29, R32: la celda pinta %s como «%s», con su valor en `data-status` y la variante %s',
+    (status, etiqueta, variante) => {
+      // El texto acordado en R28/R29/R32 se afirma una vez aqui, contra la constante exportada,
+      // y la celda se compara con la constante: si alguien reescribe la etiqueta, falla el primero.
+      expect(ORDER_STATUS_LABELS[status]).toBe(etiqueta);
+
+      const { container: referencia } = render(<Badge variant={variante} />);
+      const claseEsperada = referencia.firstElementChild?.className;
+      cleanup();
+
+      pintarCelda(STATUS_COLUMN_ID, pedido({ status }));
+
+      const badge = screen.getByTestId('order-status');
+      expect(badge).toHaveAttribute('data-status', status);
+      expect(badge).toHaveTextContent(ORDER_STATUS_LABELS[status]);
+      expect(badge.textContent).not.toBe(status);
+      expect(claseEsperada).toBeTruthy();
+      expect(badge.className).toBe(claseEsperada);
+    },
+  );
 
   it('cada prioridad del contrato tiene su etiqueta legible', () => {
     pintarCelda(PRIORITY_COLUMN_ID, pedido({ priority: 'CRITICA' }));

@@ -648,6 +648,9 @@ enum OrderStatus {
   /// Un pedido cuyo material no alcanza queda en BLOQUEADO. Va el ultimo, como los dos de
   /// empaque: reordenar obligaria a recrear el tipo en vez de anadir un valor.
   BLOQUEADO
+  POR_ACONDICIONAR
+  EN_ACONDICIONAMIENTO
+  TERMINADO
 }
 
 /// El orden de declaracion es el de la prioridad, de menor a mayor: Postgres ordena un enum por
@@ -705,6 +708,10 @@ model Order {
   /// nuevos lo conservan), lo exige el CHECK `orders_packed_by_matches_status`. Sin `@relation`:
   /// es drift, con FK COMPUESTA `(packed_by, company_id)` escrita a mano en la migracion.
   packedBy            String?       @map("packed_by") @db.Uuid
+  /// Quien tiene o tuvo el pedido en acondicionamiento. Obligatorio en EN_ACONDICIONAMIENTO y
+  /// TERMINADO, NULL antes de comenzar y opcional en ENTREGADO; lo exige el CHECK
+  /// `orders_conditioned_by_matches_status`. Sin `@relation`: FK compuesta escrita a mano.
+  conditionedBy       String?       @map("conditioned_by") @db.Uuid
   /// La unidad en que se expresa `quantity`. Sin
   /// `@relation`: `Unit` es de `unidades`, es drift. NULL solo en pedidos anteriores sin
   /// presentacion; la aplicacion la exige en el alta y en la edicion.
@@ -721,6 +728,7 @@ model Order {
   @@index([createdBy], map: "orders_created_by_idx")
   @@index([updatedBy], map: "orders_updated_by_idx")
   @@index([packedBy], map: "orders_packed_by_idx")
+  @@index([conditionedBy], map: "orders_conditioned_by_idx")
   @@index([unitId], map: "orders_unit_id_idx")
   @@index([companyId, customerId], map: "orders_company_id_customer_id_idx")
   @@map("orders")

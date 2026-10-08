@@ -877,6 +877,123 @@ describe('QC-145 R8 — un pedido ENTREGADO, CANCELADO, POR_EMPACAR o EN_EMPAQUE
       expect(repo.updateAlive, status).not.toHaveBeenCalled();
     }
   });
+
+  it('R19, R30 (QC-215): POR_ACONDICIONAR, EN_ACONDICIONAMIENTO y TERMINADO -> `invalid_transition`, sin escribir', async () => {
+    for (const status of ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const) {
+      const cat = catalogoDeRecetas();
+      const repo = repositorioConEstado(status);
+      const pres = catalogoDePresentaciones();
+      const updateOrder = createUpdateOrder({
+        customerCatalog: fakeCustomerCatalog(),
+        orders: repo.orders,
+        unitOfWork: repo.unitOfWork,
+        recipes: cat.recipes,
+        products: catalogoDeProductos().products,
+        units: catalogoDeUnidades().units,
+        presentations: pres.presentations,
+        packaging: fakePackagingCatalog(),
+        now: () => AHORA,
+      });
+
+      expect(
+        await codigoDelFallo(() =>
+          updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A }, ACTOR_A),
+        ),
+        status,
+      ).toBe('invalid_transition');
+      // Tambien con un `status` en la entrada que pida quedarse igual.
+      expect(
+        await codigoDelFallo(() =>
+          updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status }, ACTOR_A),
+        ),
+        status,
+      ).toBe('invalid_transition');
+      expect(repo.updateAlive, status).not.toHaveBeenCalled();
+    }
+  });
+});
+
+// QC-215 R38 (D13, D14): la edicion general que SOLO cambia el cliente sigue rechazando con
+// `invalid_transition` en los estados sin edicion general, antes de consultar el catalogo de
+// clientes. En esos estados el cliente cambia solo por la accion «Cliente» (`set-order-customer`).
+describe('QC-215 R38 — la edicion de solo cliente en un estado sin edicion general', () => {
+  const CLIENTE = 'c0000000-0000-4000-8000-00000000000a';
+
+  /** Fila con unidad y sin reparto: la edicion `soloCliente` es igual salvo el cliente. */
+  function filaConUnidad(status: OrderStatus): OrderRow {
+    return {
+      ...filaExistente(),
+      status,
+      cancellationReason: status === 'CANCELADO' ? 'anulado' : null,
+      unitId: UNIT_ID,
+      presentationLines: [],
+      customerId: null,
+    };
+  }
+
+  const soloCliente = {
+    recipeId: RECETA_DE_A,
+    quantity: '10.0000',
+    priority: 'BAJA',
+    unitId: UNIT_ID,
+    presentationLines: [],
+    customerId: CLIENTE,
+  };
+
+  /** Todo explota salvo `findAliveById`; quien espera el atajo pasa `atajo: true`, y entonces el
+   *  catalogo de clientes resuelve y la unidad de trabajo solo admite `setCustomerAlive`. */
+  function escenario(status: OrderStatus, atajo = false) {
+    const fila = filaConUnidad(status);
+    const base = catalogosQueExplotan();
+    const findAliveById = vi.fn(async () => fila);
+    const findAliveRefById = vi.fn(async (id: string) => {
+      if (!atajo) throw new Error('customerCatalog.findAliveRefById no deberia llamarse');
+      return { id, firstNames: 'Ana', lastNames: 'Perez', isDeleted: false };
+    });
+    const customerCatalog = { ...fakeCustomerCatalog(), findAliveRefById };
+    const setCustomerAlive = vi.fn(async () => 'ok' as const);
+    const uow = fakeUnitOfWork({ orders: { setCustomerAlive } });
+    const unitOfWork: OrderUnitOfWork = atajo ? uow.unitOfWork : base.unitOfWork;
+    const updateOrder = createUpdateOrder({
+      ...base,
+      orders: { findAliveById, listAlive: vi.fn() } as unknown as OrderRepository,
+      customerCatalog,
+      unitOfWork,
+      now: () => AHORA,
+    });
+    return { updateOrder, findAliveById, findAliveRefById, setCustomerAlive, uow };
+  }
+
+  it.each<OrderStatus>([
+    'POR_EMPACAR',
+    'EN_EMPAQUE',
+    'POR_ACONDICIONAR',
+    'EN_ACONDICIONAMIENTO',
+    'TERMINADO',
+    'ENTREGADO',
+    'CANCELADO',
+  ])('R38: en %s, solo cambiar el cliente -> invalid_transition, sin consultar el catalogo de clientes ni escribir', async (status) => {
+    const e = escenario(status);
+
+    expect(await codigoDelFallo(() => e.updateOrder(ORDER_ID, soloCliente, ACTOR_A))).toBe('invalid_transition');
+    expect(e.findAliveById).toHaveBeenCalledTimes(1);
+    expect(e.findAliveRefById).not.toHaveBeenCalled();
+    expect(e.setCustomerAlive).not.toHaveBeenCalled();
+  });
+
+  it.each<OrderStatus>(['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'])(
+    'R38 (control): en %s la misma entrada es de solo cliente y va por el atajo: solo setCustomerAlive',
+    async (status) => {
+      const e = escenario(status, true);
+
+      await e.updateOrder(ORDER_ID, soloCliente, ACTOR_A);
+
+      expect(e.findAliveRefById).toHaveBeenCalledWith(CLIENTE, EMPRESA_A);
+      expect(e.setCustomerAlive).toHaveBeenCalledWith(ORDER_ID, CLIENTE, ACTOR_A.id, AHORA, { companyId: EMPRESA_A });
+      expect(e.uow.orders.lockAliveById).not.toHaveBeenCalled();
+      expect(e.uow.orders.updateAlive).not.toHaveBeenCalled();
+    },
+  );
 });
 
 // T5 — la edicion RECALCULA el importe de los ingredientes con la receta del DATO ENTRANTE.

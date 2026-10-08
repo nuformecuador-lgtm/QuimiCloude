@@ -173,17 +173,17 @@ describe('R5 — finishedAt/finished_at solo se escribe en setAliveOrderStatus y
       rutas.length === 1 && rutas[0] === ORDER_PRISMA
         ? undefined
         : 'finishedAt/finished_at solo puede escribirse en `data:` de order-prisma.ts ' +
-            `(setAliveOrderStatus, finishPackingAliveOrder). Se encontro en: ${JSON.stringify(conLaColumna)}.`,
+            `(finishConditioningAliveOrder). Se encontro en: ${JSON.stringify(conLaColumna)}.`,
     ).toEqual([ORDER_PRISMA]);
   });
 
-  it('order-prisma.ts tiene exactamente dos bloques `data:` que nombran finishedAt: setAliveOrderStatus y finishPackingAliveOrder', () => {
+  it('R33 (QC-215): order-prisma.ts tiene exactamente un bloque `data:` que nombra finishedAt, el de Terminar el acondicionamiento hacia TERMINADO', () => {
     const fuente = readFileSync(join(repoRoot, ORDER_PRISMA), 'utf8');
     const bloques = extractDataBlocks(fuente).filter((block) => /finishedAt/.test(block));
 
-    expect(bloques).toHaveLength(2);
-    expect(bloques.some((block) => /status\s*:\s*to\b/.test(block))).toBe(true);
-    expect(bloques.some((block) => /status\s*:\s*['"`]ENTREGADO['"`]/.test(block))).toBe(true);
+    expect(bloques).toHaveLength(1);
+    expect(bloques[0]).toMatch(/status\s*:\s*['"`]TERMINADO['"`]/);
+    expect(bloques.some((block) => /status\s*:\s*to\b/.test(block))).toBe(false);
   });
 
   it('las escrituras conocidas que R5 nombra -insertAliveOrder, updateAliveOrder, cancelAliveOrder, softDeleteAliveOrder- no llevan finishedAt', () => {
@@ -248,15 +248,23 @@ describe('R10 — EN_CURSO/ENTREGADO solo los escribe setAliveOrderStatus o Term
     ).toEqual([]);
   });
 
-  it('order-prisma.ts: la lista exacta de funciones con un bloque `data:` que fija `status:` es cancelAliveOrder, finishPackingAliveOrder, lockAndStartPackingAlive y setAliveOrderStatus', () => {
+  it('order-prisma.ts: la lista exacta de funciones con un bloque `data:` que fija `status:` es la de las seis escrituras de estado conocidas (R8, R12)', () => {
     // 2026-10-06 (QC-82): la escritura de Comenzar empaque se mudo de `startPackingAliveOrder` a
     // `lockAndStartPackingAlive`, que la exportada envuelve en su transaccion y que la fabrica
     // `createOrderPackingRepository` reutiliza dentro de la de quien llama. Es el MISMO bloque
-    // `data:` cambiado de funcion, no una escritura nueva: la lista sigue cerrada en cuatro.
+    // `data:` cambiado de funcion, no una escritura nueva. Comenzar y Terminar el
+    // acondicionamiento suman las dos ultimas.
     const fuente = readFileSync(join(repoRoot, ORDER_PRISMA), 'utf8');
 
     expect(funcionesConStatusEnData(fuente)).toEqual(
-      ['cancelAliveOrder', 'finishPackingAliveOrder', 'lockAndStartPackingAlive', 'setAliveOrderStatus'].sort(),
+      [
+        'cancelAliveOrder',
+        'finishConditioningAliveOrder',
+        'finishPackingAliveOrder',
+        'lockAndStartPackingAlive',
+        'setAliveOrderStatus',
+        'startConditioningAliveOrder',
+      ].sort(),
     );
   });
 

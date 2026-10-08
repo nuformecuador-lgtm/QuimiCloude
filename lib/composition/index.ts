@@ -259,6 +259,7 @@ import {
   createDeleteOrder,
   createExpireStaleOrders,
   createFindCoverage,
+  createFinishConditioning,
   createFinishPacking,
   createGetOrder,
   createGetOrderCustomerFilterOption,
@@ -270,6 +271,7 @@ import {
   createReviewBlockedOrders,
   createSearchOrderCustomers,
   createSetOrderCustomer,
+  createStartConditioning,
   createStartPacking,
   createTransitionOrder,
   createUpdateOrder,
@@ -281,7 +283,9 @@ import {
   findAliveOrderById,
   findBlockedOrderIds,
   findExpirableOrders,
+  finishConditioningAliveOrder,
   listAliveOrders,
+  startConditioningAliveOrder,
   startPackingAliveOrder,
   createOrderPackingRepository,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
@@ -291,6 +295,7 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { verifyCronSecret } from '@/lib/modules/pedidos/adapters/driven/config/cron-secret-env';
 import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log';
+import type { OrderConditioningRepository } from '@/lib/modules/pedidos/ports/order-conditioning-repository';
 import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-packing-repository';
 import type { OrderSummaryReader } from '@/lib/modules/pedidos/ports/order-summary-reader';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
@@ -403,6 +408,8 @@ import {
   createUnassignResponsible,
   createCancelAssignedOrder,
   createRecordStepMove,
+  createStartConditioning as createStartConditioningOrder,
+  createFinishConditioning as createFinishConditioningOrder,
 } from '@/lib/modules/asignaciones';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
@@ -1483,6 +1490,13 @@ const orderPackingRepository: OrderPackingRepository = {
   startPackingAlive: startPackingAliveOrder,
 };
 
+/** Comenzar y Terminar el acondicionamiento: un `UPDATE` condicional cada uno, sobre el cliente
+ *  global y sin `orderUnitOfWork`, porque no tocan inventario. */
+const orderConditioningRepository: OrderConditioningRepository = {
+  startConditioningAlive: startConditioningAliveOrder,
+  finishConditioningAlive: finishConditioningAliveOrder,
+};
+
 const orderSummaryReader: OrderSummaryReader = {
   listAliveByIds: listAliveOrderSummariesByIds,
   listAliveInCompany: listAliveOrderSummariesInCompany,
@@ -1512,6 +1526,8 @@ const orderCatalog: OrderCatalog = {
     presentations: presentationCatalog,
     packaging: packagingCatalog,
   }),
+  startConditioningAliveById: createStartConditioning({ conditioning: orderConditioningRepository }),
+  finishConditioningAliveById: createFinishConditioning({ conditioning: orderConditioningRepository }),
 };
 
 /**
@@ -1741,6 +1757,14 @@ export const asignaciones = {
     assignments: orderAssignmentRepository,
     orders: orderCatalog,
     log: executionLogRepository,
+    now: () => new Date(),
+  }),
+  startConditioning: createStartConditioningOrder({
+    orders: orderCatalog,
+    now: () => new Date(),
+  }),
+  finishConditioning: createFinishConditioningOrder({
+    orders: orderCatalog,
     now: () => new Date(),
   }),
 } as const;

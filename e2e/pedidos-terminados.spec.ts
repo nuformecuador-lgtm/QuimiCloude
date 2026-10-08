@@ -5,10 +5,10 @@
  * `beforeAll` -cada uno inicia su propia sesion, asi que no hay estado de un caso que otro
  * necesite-:
  *   A. el Operador entra y ve SOLO «Mis asignados», sin pestañas;
- *   B. el Empacador ve solo «Terminados» + «Por empacar» -con los ENTREGADO que empaco el, su
- *      fecha y sus responsables, y el sin fecha al final marcado «Sin fecha»-;
- *   C. el Administrador ve SOLO «Todos», con los cuatro estados; al filtrar exactamente por
- *      Entregado aparece la columna de fecha y el orden de terminados; sin ninguna entrada a
+ *   B. el Empacador ve solo «Terminados» + «Por empacar» -con el TERMINADO que empaco el, su
+ *      fecha y sus responsables, y sin el ENTREGADO sin fecha que tambien empaco-;
+ *   C. el Administrador ve SOLO «Todos», con todos los estados del fixture; al filtrar
+ *      exactamente por Entregado queda solo ese y aparece la columna de fecha; sin ninguna entrada a
  *      ejecucion; y `/asignacion/<id>` de un pedido al que no esta asignado le responde
  *      "no encontrado";
  *   D. en `/pedidos`, el panel de edicion del Administrador no ofrece ningun control de estado
@@ -32,8 +32,8 @@
  * de verdad por la ejecucion: ese camino ya se ejercita con el caso de uso real en
  * `tests/integration/asignaciones/finished-orders.int.test.ts` ("finalizar por el caso de uso real
  * -> aparece con fecha"), y repetirlo aqui alargaria el recorrido sin afirmar nada mas sobre la
- * UI. Lo que SI aporta este E2E es que un `ENTREGADO` CON fecha y uno SIN fecha -el que ya existia
- * antes de esta pantalla- conviven en la MISMA pantalla con el orden y el marcador correctos.
+ * UI. Lo que SI aporta este E2E es que un `TERMINADO` CON fecha y un `ENTREGADO` SIN fecha -el que
+ * ya existia antes de esta pantalla- se separan bien: el primero en «Terminados», el segundo no.
  *
  * DATOS Y AISLAMIENTO, mismo patron que `e2e/pedidos-asignados.spec.ts` y
  * `e2e/pedidos-responsables.spec.ts`:
@@ -273,9 +273,10 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
 /** El ano sale del reloj: el CHECK `orders_order_year_matches_created_at` lo ata a `created_at`. */
 async function seedOrder(params: {
   sequence: number;
-  status: 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO' | 'CANCELADO';
+  status: 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO' | 'TERMINADO' | 'CANCELADO';
   finishedAt?: Date | null;
   packedBy?: string | null;
+  conditionedBy?: string | null;
   cancellationReason?: string;
 }): Promise<{ id: string; numberText: string }> {
   if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
@@ -292,6 +293,7 @@ async function seedOrder(params: {
       status: params.status,
       finishedAt: params.finishedAt ?? null,
       packedBy: params.packedBy ?? null,
+      conditionedBy: params.conditionedBy ?? null,
       cancellationReason: params.cancellationReason ?? null,
     },
     select: { id: true },
@@ -377,11 +379,14 @@ test.beforeAll(async () => {
     seedOrder({ sequence: SEQUENCE_PENDING, status: 'PENDIENTE' }),
     seedOrder({ sequence: SEQUENCE_IN_PROGRESS, status: 'EN_CURSO' }),
     // Empacados por el Empacador: sin `asignaciones.ejecutar` solo ve en «Terminados» lo suyo.
+    // «Terminados» es solo `TERMINADO`, que exige fecha, empacador y quien acondiciona; el
+    // `ENTREGADO` sin fecha de antes se queda fuera de esa vista.
     seedOrder({
       sequence: SEQUENCE_DELIVERED_WITH_DATE,
-      status: 'ENTREGADO',
+      status: 'TERMINADO',
       finishedAt: FINISHED_AT,
       packedBy: empacadorUserId,
+      conditionedBy: adminUserId,
     }),
     seedOrder({
       sequence: SEQUENCE_DELIVERED_NO_DATE,
@@ -471,7 +476,7 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     await expect(page.getByTestId(COMPANY_ORDERS_SECTION_TESTID)).toHaveCount(0);
   });
 
-  test('el Empacador ve «Terminados» con el pedido que empaco, su fecha y sus responsables, el «sin fecha» al final, ve «Por empacar» y no ve «Mis asignados» ni «Todos» (R28, R30)', async ({
+  test('el Empacador ve «Terminados» con el pedido TERMINADO que empaco, su fecha y sus responsables, sin el ENTREGADO, ve «Por empacar» y no ve «Mis asignados» ni «Todos» (R28, R30)', async ({
     page,
   }) => {
     const withDateNumber = orderDeliveredWithDateNumber;
@@ -518,27 +523,17 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
       byTestIdAndUserId(withDateRow.getByTestId(RESPONSIBLES_CELL_TESTID), RESPONSIBLE_AVATAR_TESTID, respUserId),
     ).toBeVisible();
 
-    // El entregado sin fecha registrada, marcado y AL FINAL del listado.
-    const noDateRow = rowByNumber(page, noDateNumber);
-    await expect(noDateRow).toHaveCount(1);
-    const noDateDate = noDateRow.getByTestId(FINISHED_ORDER_DATE_TESTID);
-    await expect(noDateDate).toHaveText(MISSING_DATE_TEXT);
-    await expect(noDateDate).toHaveAttribute('data-missing', 'true');
-
-    const withDateIndex = await rowDomIndex(page, withDateId);
-    const noDateIndex = await rowDomIndex(page, noDateId);
-    expect(withDateIndex, 'la fila con fecha deberia estar en la tabla').toBeGreaterThanOrEqual(0);
-    expect(noDateIndex, 'la fila sin fecha deberia estar en la tabla').toBeGreaterThanOrEqual(0);
-    expect(noDateIndex, 'el "sin fecha" va DESPUES del que si tiene fecha').toBeGreaterThan(
-      withDateIndex,
-    );
+    // El entregado sin fecha que empaco el NO es «Terminados»: esa vista es solo `TERMINADO`.
+    expect(await rowDomIndex(page, withDateId), 'la fila terminada deberia estar en la tabla').toBeGreaterThanOrEqual(0);
+    expect(await rowDomIndex(page, noDateId), 'el ENTREGADO no deberia estar en «Terminados»').toBe(-1);
+    await expect(rowByNumber(page, noDateNumber)).toHaveCount(0);
 
     // Ni el pendiente ni el cancelado son «Terminados».
     await expect(rowByNumber(page, pendingNumber)).toHaveCount(0);
     await expect(rowByNumber(page, cancelledNumber)).toHaveCount(0);
   });
 
-  test('el Administrador ve solo «Todos» con los cuatro estados; filtrar por Entregado trae la fecha y el orden de terminados; sin entrada a ejecucion; `/asignacion/<id>` de un pedido no asignado dice "no encontrado" (R28, R35)', async ({
+  test('el Administrador ve solo «Todos» con todos los estados del fixture; filtrar por Entregado trae solo el ENTREGADO con la columna de fecha; sin entrada a ejecucion; `/asignacion/<id>` de un pedido no asignado dice "no encontrado" (R28, R35)', async ({
     page,
   }) => {
     const pendingNumber = orderPendingNumber;
@@ -582,7 +577,9 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     const statusesShown = await page
       .getByTestId(COMPANY_ORDER_STATUS_TESTID)
       .evaluateAll((cells) => cells.map((cell) => cell.getAttribute('data-status')));
-    expect(new Set(statusesShown)).toEqual(new Set(['PENDIENTE', 'EN_CURSO', 'ENTREGADO', 'CANCELADO']));
+    expect(new Set(statusesShown)).toEqual(
+      new Set(['PENDIENTE', 'EN_CURSO', 'TERMINADO', 'ENTREGADO', 'CANCELADO']),
+    );
 
     // Sin filtro, sin columna de fecha.
     await expect(page.getByTestId(COMPANY_ORDER_DATE_TESTID)).toHaveCount(0);
@@ -605,28 +602,20 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     await page.keyboard.press('Escape');
     await expect(page.getByTestId(COMPANY_ORDERS_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
 
-    // Solo los dos ENTREGADO quedan; la columna de fecha aparece y el orden es el de
-    // terminados: el que tiene fecha antes que el que no.
-    await expect(rowByNumber(page, withDateNumber)).toHaveCount(1, { timeout: 60_000 });
-    await expect(rowByNumber(page, noDateNumber)).toHaveCount(1);
+    // Solo el ENTREGADO queda -el TERMINADO no-, y la columna de fecha aparece como hasta ahora.
+    await expect(rowByNumber(page, noDateNumber)).toHaveCount(1, { timeout: 60_000 });
+    await expect(rowByNumber(page, withDateNumber)).toHaveCount(0);
     await expect(rowByNumber(page, pendingNumber)).toHaveCount(0);
     await expect(rowByNumber(page, inProgressNumber)).toHaveCount(0);
     await expect(rowByNumber(page, cancelledNumber)).toHaveCount(0);
 
     const dateCells = page.getByTestId(COMPANY_ORDER_DATE_TESTID);
-    await expect(dateCells).toHaveCount(2);
-    await expect(rowByNumber(page, withDateNumber).getByTestId(COMPANY_ORDER_DATE_TESTID)).toHaveText(
-      FINISHED_AT_TEXT,
-    );
+    await expect(dateCells).toHaveCount(1);
     await expect(rowByNumber(page, noDateNumber).getByTestId(COMPANY_ORDER_DATE_TESTID)).toHaveText(
       MISSING_DATE_TEXT,
     );
-
-    const withDateIndex = await rowDomIndex(page, withDateId);
-    const noDateIndex = await rowDomIndex(page, noDateId);
-    expect(noDateIndex, 'con el filtro exacto Entregado tambien manda el orden de terminados').toBeGreaterThan(
-      withDateIndex,
-    );
+    expect(await rowDomIndex(page, noDateId)).toBeGreaterThanOrEqual(0);
+    expect(await rowDomIndex(page, withDateId)).toBe(-1);
 
     // `/asignacion/<id>` de un pedido al que el Administrador NUNCA fue asignado: "no encontrado",
     // sin que haya escrito nada -no hay boton para intentarlo desde aqui-.

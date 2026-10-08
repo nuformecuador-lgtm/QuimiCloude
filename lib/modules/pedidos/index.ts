@@ -180,6 +180,15 @@ export type { TransitionOrderDeps } from './domain/transition-order';
 export { createStartPacking, createFinishPacking } from './domain/order-packing';
 export type { StartPackingDeps, FinishPackingDeps } from './domain/order-packing';
 
+/** Implementan `OrderCatalog['startConditioningAliveById']` y `['finishConditioningAliveById']`:
+ *  cada uno un `UPDATE` condicional, fuera de la unidad de trabajo de `inventario`. */
+export { createStartConditioning, createFinishConditioning } from './domain/order-conditioning';
+export type {
+  ConditioningDeps,
+  FinishConditioningAliveById,
+  StartConditioningAliveById,
+} from './domain/order-conditioning';
+
 /** Implementan los dos listados de resumen de `OrderCatalog`, con el nombre del envase de cada
  *  linea ya resuelto. */
 export { createListAliveSummariesByIds, createListAliveSummariesInCompany } from './domain/list-order-summaries';

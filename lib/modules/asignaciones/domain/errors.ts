@@ -260,6 +260,26 @@ export class OrderNotPackableError extends AsignacionesError {
   }
 }
 
+/** Comenzar sobre un pedido que acondiciona otra persona, o Terminar activado por quien no es
+ *  quien lo acondiciona. */
+export class OrderConditioningTakenError extends AsignacionesError {
+  readonly code = 'order_conditioning_taken';
+
+  constructor(diagnostic?: string) {
+    super('order_conditioning_taken', diagnostic);
+  }
+}
+
+/** Comenzar o Terminar sobre un pedido cuyo estado actual no admite esa accion de
+ *  acondicionamiento. */
+export class OrderNotConditionableError extends AsignacionesError {
+  readonly code = 'order_not_conditionable';
+
+  constructor(diagnostic?: string) {
+    super('order_not_conditionable', diagnostic);
+  }
+}
+
 /** El pedido esta `POR_EMPACAR` o `EN_EMPAQUE`: sus responsables se congelan igual que en
  *  `ENTREGADO`, con un codigo propio porque la frase que corresponde es otra. */
 export class OrderProducedFrozenError extends AsignacionesError {
