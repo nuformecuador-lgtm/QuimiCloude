@@ -226,7 +226,7 @@ afectado. Es el mismo formato que QC-29 R14. El texto original no se borra.
 
 | Spec | Requisitos | Qué dice la nota |
 | --- | --- | --- |
-| `specs/QC-29-tema-claro-oscuro/requirements.md` | D6, D7, D10, R1–R6, R18, R25 | Paleta, radio, `--chart-*` y paradas del degradado sustituidos por QC-226 D2, D3 y D5. Las medidas de R18–R20 siguen |
+| `specs/QC-29-tema-claro-oscuro/requirements.md` | D6, D7, D10, R1–R6, R18, R25 | Paleta, radio, `--chart-*` y paradas del degradado sustituidos por QC-226 D2, D3 y D5. Las medidas de R18–R20 siguen. **R25 se mantiene** (QC-226 D22): su par `--sidebar-foreground`/`--sidebar` lo vigila QC-226 R5 con los valores nuevos |
 | `specs/QC-30-rediseno-login/requirements.md` | D3, D8, D9, D10, D12, R1, R9, R12, R14, R20, R21, R22, R26 | Título → logo vertical; burbujas → moléculas; vidrio recoloreado; Geist → Plex; radio de 8 px |
 | `specs/11-layout-privado-con-sidebar/requirements.md` | D7, R24 | La versión corta pasa a ser el isotipo; la larga, el logo horizontal |
 | `specs/QC-13-guardia-de-sesion-en-navegacion/requirements.md` | R7 | `BRAND_SHORT_LABEL` y `BRAND_TAGLINE` se retiran (QC-226 D19) |
@@ -241,6 +241,7 @@ Y los tests (D16), caso por caso, con la nota en el nombre o en un comentario co
 | `tests/unit/login-skin.test.tsx` | Burbujas → moléculas, `--qc30-*` → `--login-*`, delimitadores nuevos y valores de R20 |
 | `tests/unit/app-sidebar.test.tsx`, `sidebar-desktop.test.tsx`, `sidebar-mobile.test.tsx`, `sidebar-ajuste.test.tsx` | Los `private-brand-long/short/tagline/mark` pasan a afirmar el `<img>` del logo o del isotipo. El nombre accesible `BRAND_LABEL` no cambia |
 | `e2e/login-skin.spec.ts` | La comprobación de «sin burbujas con movimiento reducido» pasa a «moléculas quietas y visibles» |
+| `tests/unit/login-form.test.tsx` (solo el caso de las líneas 375-381) | Deja de exigir `[data-slot="card-title"]` con «QuimiCloude» y pasa a exigir un `h1` con nombre accesible «QuimiCloude», que sale del `alt` del logo vertical (D21). El resto del archivo no se edita (R23) |
 
 ## 9. Verificación
 
@@ -253,7 +254,8 @@ Y los tests (D16), caso por caso, con la nota en el nombre o en un comentario co
 | R12, R13, R15 | `tests/unit/brand/brand-logo.test.tsx` (proporción, `src`, `alt`, sin clases de fondo o sombra) y `tests/unit/app-sidebar.test.tsx` (expandido e icono) |
 | R14 | `tests/unit/theme/private-header.test.tsx` (isotipo dentro de `md:hidden`, las dos variantes) |
 | R16–R22 | `tests/unit/login-skin.test.tsx` (marcado y CSS) y `e2e/login-skin.spec.ts`, en Chromium y WebKit. El E2E cubre los tokens oscuros computados en el tema claro, las tres moléculas con `animation-name` y duración, la tarjeta que acaba en `opacity: 1`, y con `reducedMotion: 'reduce'` `animation-name: none` en las moléculas, que siguen visibles |
-| R23 | `tests/unit/login-form.test.tsx` y `e2e/login.spec.ts` sin editar; las medidas, en `e2e/login-skin.spec.ts` |
+| R23 | `tests/unit/login-form.test.tsx` (sin editar, salvo el caso enmendado por D21) y `e2e/login.spec.ts` sin editar; las medidas, en `e2e/login-skin.spec.ts` |
+| R5 (par de D22) | `tests/unit/theme/color-tokens.test.ts`: `--sidebar-foreground`/`--sidebar` ≥ 4.5:1 en claro y en oscuro |
 | R24–R27, R29, R30 | `tests/unit/brand/metadata-assets.test.ts`: existencia de los archivos, cabecera PNG y dimensiones leídas del chunk IHDR, `manifest()` con los valores de D12, `metadata` del root layout, ausencia de `file`/`globe`/`window.svg` y presencia de `next`/`vercel.svg`, y los SVG de `public/brand/` con el `viewBox` esperado |
 | R34 | `tests/unit/brand/brand-logo.test.tsx`: el módulo `private-nav` no exporta `BRAND_TAGLINE` ni `BRAND_SHORT_LABEL`, y `BRAND_LABEL === 'QuimiCloude'`; ningún archivo de `app/`, `components/` ni `lib/` las nombra |
 | R25, R26, R28 | `e2e/brand-assets.spec.ts`: sin sesión, `GET` de `/manifest.webmanifest`, `/icon.svg`, `/apple-icon.png`, `/icons/icon-192.png` y de la URL de `og:image` → 2xx, y `/login` con los `<link>` y el `<meta property="og:image">` |

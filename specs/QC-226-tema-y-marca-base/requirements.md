@@ -59,6 +59,8 @@ archivos del kit que usa la app.
 | D18 | La barra de acento de 3 px con halo (`::before`) del ítem activo **no se toca** aquí: se decide en QC-227 | humano, 2026-10-08 (aprobación del spec) | — | R11 |
 | D19 | Se **retiran** las constantes `BRAND_TAGLINE` y `BRAND_SHORT_LABEL`. El nombre accesible de la marca sigue siendo `BRAND_LABEL` («QuimiCloude»). El lema vive en la `description` de los metadatos y en la imagen OG | humano, 2026-10-08 (aprobación del spec) | QC-13 R7; QC-11 D7 | R12, R13, R34 |
 | D20 | La tarjeta del login se mantiene en 400 px de ancho máximo y 28 px de padding (QC-30), no en los 320 px del lienzo | humano, 2026-10-08 (aprobación del spec) | — | R23 |
+| D21 | Opción A: el caso de `tests/unit/login-form.test.tsx:375-381`, que exige `[data-slot="card-title"]` con el texto «QuimiCloude», **se enmienda** igual que en D16. Pasa a exigir un `h1` cuyo nombre accesible es «QuimiCloude», que sale del `alt` del logo vertical | humano, 2026-10-08 | QC-30 R1 (test de QC-7) | R16, R23 |
+| D22 | QC-29 R25 **sigue vigente**: el par `--sidebar-foreground`/`--sidebar` cumple AA de texto en los dos modos | humano, 2026-10-08 | — (se mantiene QC-29 R25) | R5 |
 
 ## Requisitos (EARS)
 
@@ -89,7 +91,8 @@ exactamente los valores del `.dark` de `tokens.css`.
 `--card-foreground`/`--card`, `--muted-foreground`/`--card`, `--muted-foreground`/`--muted`,
 `--primary-foreground`/`--primary`, `--primary`/`--card`, `--secondary-foreground`/`--secondary`,
 `--destructive-foreground`/`--destructive`, `--{success,warning,destructive,info}-text` sobre su
-`-subtle`, y `--sidebar-muted-foreground`/`--sidebar`. También DEBE alcanzar al menos `3:1` en
+`-subtle`, `--sidebar-foreground`/`--sidebar` (D22) y `--sidebar-muted-foreground`/`--sidebar`.
+También DEBE alcanzar al menos `3:1` en
 los pares de interfaz `--input`/`--card` y `--ring`/`--card`.
 
 **R6.** El sistema DEBE declarar en `:root` `--dur-instant: 100ms`, `--dur-fast: 150ms`,
@@ -176,7 +179,9 @@ fundido de 150 ms. La regla DEBE estar acotada a la pantalla de login.
 **R23.** El sistema DEBE conservar de QC-30 la mecánica del formulario (R2–R8), el único `main`
 (R15), las medidas 44/400/18/28 px (R16, R17) y el enlace de recuperación fuera del `<form>`
 (R1). Las pruebas que ya lo cubren DEBEN seguir verdes sin editar sus aserciones de
-comportamiento.
+comportamiento. La única excepción es el caso de `tests/unit/login-form.test.tsx:375-381`:
+deja de exigir `[data-slot="card-title"]` con el texto «QuimiCloude» y pasa a exigir el `h1`
+de R16 con nombre accesible «QuimiCloude» (D21).
 
 ### Iconos y metadatos
 

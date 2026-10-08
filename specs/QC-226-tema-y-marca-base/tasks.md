@@ -44,8 +44,8 @@ tienen que estar hechas antes. Cada task acaba con `pnpm run typecheck`, `pnpm r
 - [ ] **T7 — Login** (R16–R23). En `page.tsx`, el `h1` con el logo vertical y `className="dark"`
   en el `main`. `login-background.tsx` pasa a las tres moléculas. En `globals.css`, el bloque del
   login reescrito (`design.md > 6`). Dep.: T2, T4.
-  *Hecho:* `login-skin.test.tsx` actualizado y en verde; `login-form.test.tsx` en verde sin
-  editarlo; `pnpm exec playwright test e2e/login-skin.spec.ts e2e/login.spec.ts` en verde en
+  *Hecho:* `login-skin.test.tsx` actualizado y en verde; `login-form.test.tsx` en verde, con solo
+  el caso de las líneas 375-381 enmendado (D21); `pnpm exec playwright test e2e/login-skin.spec.ts e2e/login.spec.ts` en verde en
   Chromium y WebKit.
 - [x] **T8 [P] — Manifest y limpieza de `public/`** (R25–R29). Crear `app/manifest.ts` y borrar
   `public/file.svg`, `globe.svg` y `window.svg`. `next.svg`, `vercel.svg` y `app/page.tsx` no se
@@ -97,6 +97,7 @@ tienen que estar hechas antes. Cada task acaba con `pnpm run typecheck`, `pnpm r
 - `tests/unit/theme/sidebar-panel.test.tsx`
 - `tests/unit/theme/private-header.test.tsx`
 - `tests/unit/login-skin.test.tsx`
+- `tests/unit/login-form.test.tsx`
 - `tests/unit/app-sidebar.test.tsx`
 - `tests/unit/sidebar-desktop.test.tsx`
 - `tests/unit/sidebar-mobile.test.tsx`
