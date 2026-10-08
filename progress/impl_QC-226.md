@@ -75,3 +75,112 @@ la cabecera. `theme-provider.test.tsx` solo cambia el mock, con su nota.
 ### Veredicto
 
 Fase 1 hecha: kit versionado sin modificar, tokens y fuentes de la marca aplicados, y R1–R8, R32 con test en verde.
+
+## T8 y T9 — frontend_dev, 2026-10-08
+
+### Archivos
+
+Creados:
+
+- `app/manifest.ts`: `MetadataRoute.Manifest` con los valores de D12 y los tres iconos de R26.
+  Sin `description` (D12 no la fija para el manifest) y sin `metadataBase` en ningún sitio.
+- `tests/unit/brand/metadata-assets.test.ts`
+- `e2e/brand-assets.spec.ts`
+
+Borrados (sin `git add`): `public/file.svg`, `public/globe.svg`, `public/window.svg`. `next.svg`,
+`vercel.svg` y `app/page.tsx` intactos (D17).
+
+Modificados:
+
+- `tests/guards/guard-identificador-de-request.test.ts`: `brand-assets.spec.ts` dado de alta en
+  `E2E_ESPERADOS`. Sin eso la guardia «no hay ningún archivo nuevo en e2e/» se ponía roja.
+- T9, solo inserciones (`git diff --stat`: 83 líneas añadidas, 0 borradas):
+  - `specs/QC-29-tema-claro-oscuro/requirements.md`: notas tras la tabla de decisiones (D6, D7,
+    D10), tras R2 (R1, R2), R3, R4, R5, R6, R25 y R18.
+  - `specs/QC-30-rediseno-login/requirements.md`: notas tras R1, R9, R12, R14, R20, R21, R22, R26
+    y tras la tabla de decisiones (D3, D8, D9, D10, D12, numeradas como en «Cobertura de las
+    decisiones cerradas»).
+  - `specs/11-layout-privado-con-sidebar/requirements.md`: notas tras R24 y tras la tabla de
+    decisiones (D7).
+  - `specs/QC-13-guardia-de-sesion-en-navegacion/requirements.md`: nota tras R7.
+
+### Mapa R<n> → test (T8)
+
+| Requisito | Test |
+| --- | --- |
+| R24 | `tests/unit/brand/metadata-assets.test.ts` > «R24: el root layout declara el titulo y la descripcion de la app», «R24: el root layout no fija metadataBase» |
+| R25 | `metadata-assets.test.ts` > «R25: existe %s» (×4), «R25: el icon.svg cambia de color con prefers-color-scheme», «R25: la imagen OG trae su texto alternativo»; `e2e/brand-assets.spec.ts` > «R25, R26: enlaza icon, apple-touch-icon y manifest», «R25, R28: declara og:image …» |
+| R26 | `metadata-assets.test.ts` > «R26: declara los valores …», «R26: declara los iconos 192 y 512 …», «R26, R27: cada icono del manifest existe …»; `brand-assets.spec.ts` > «R26: el manifest servido trae los valores y los tres iconos», «R25, R26: enlaza …» |
+| R27 | `metadata-assets.test.ts` > «R27: %s es un PNG de %ix%i» (×5, firma PNG + chunk IHDR), «R26, R27: …» |
+| R28 | `brand-assets.spec.ts` > «R28: GET %s responde 2xx sin redirigir al login» (×4: manifest, icon.svg, apple-icon.png, icons/icon-192.png), «R25, R28: declara og:image y su URL responde 2xx …» |
+| R29 | `metadata-assets.test.ts` > «R29: no existe %s» (×3), «R29: conserva %s, que usa app/page.tsx» (×2) |
+| R30 | `metadata-assets.test.ts` > «R30: %s es un SVG con viewBox de %s» (horizontal 227×48, vertical 127×76, isotipos 47×47) |
+
+### Verificación (salida real)
+
+- `pnpm run typecheck` → `tsc --noEmit`, exit 0. (Una primera pasada dio 2 `TS2305` en
+  `sidebar-ajuste.test.tsx` y `sidebar-desktop.test.tsx` por `BRAND_TAGLINE`/`BRAND_SHORT_LABEL`:
+  eran del trabajo en curso de T5, ajeno; al repetir, exit 0.)
+- `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)`, los 7 previos y ajenos.
+  `pnpm exec eslint app/manifest.ts tests/unit/brand/metadata-assets.test.ts e2e/brand-assets.spec.ts tests/guards/guard-identificador-de-request.test.ts` → sin problemas.
+- `pnpm exec vitest run tests/unit/brand/metadata-assets.test.ts` → `Test Files 1 passed (1)`, `Tests 25 passed (25)`.
+- `pnpm exec vitest related --run app/manifest.ts tests/unit/brand/metadata-assets.test.ts` → `Test Files 1 passed (1)`, `Tests 25 passed (25)`.
+- `pnpm exec vitest run guard` → `Test Files 56 passed (56)`, `Tests 744 passed | 11 skipped (755)`.
+- `pnpm exec playwright test e2e/brand-assets.spec.ts` → `14 passed (20.3s)` (7 casos × chromium y
+  webkit). Corrió sin `.env` en el worktree: el spec no toca la base de datos.
+
+### Pendiente
+
+- **Comprobar en el preview de Vercel la URL absoluta de `og:image`** (T8, `design.md > 7` y
+  riesgo de §12). No se puede hacer desde el worktree; en local (`next dev`) el E2E solo afirma que
+  la URL termina en `/opengraph-image.png` y que responde 2xx.
+
+### Veredicto
+
+T8 y T9 hechas: manifest y limpieza de `public/` con R24–R30 en verde (unitario y E2E en Chromium y WebKit), y las enmiendas añadidas sin borrar texto; queda la comprobación del preview de Vercel.
+
+## Fase 2 (T4, T5, T6 y su parte de T10) — frontend_dev, 2026-10-08
+
+### Archivos
+
+Creados:
+
+- `components/shared/brand-logo.tsx`: `BrandLogo` (`next/image` con `unoptimized`, ancho desde la tabla de `viewBox`, `tone="auto"` con `dark:hidden` / `hidden dark:block`).
+- `tests/unit/brand/brand-logo.test.tsx`
+
+Modificados:
+
+- `components/private/app-sidebar.tsx`: el enlace de marca pinta el logo horizontal (28 px) o el isotipo en modo icono (32 px), con `alt=""`; fuera el símbolo provisional, `private-brand-mark/-short/-long/-tagline` y `FlaskConicalIcon`.
+- `lib/shared/navigation/private-nav.ts`: fuera `BRAND_TAGLINE` y `BRAND_SHORT_LABEL`; docblock de `BRAND_LABEL` limpio.
+- `app/globals.css`: paradas de D5 en `--sidebar-panel-gradient` (claro y oscuro), ítem activo de R11 (26 %/5 %, anillo 32 %, `color: #fff`, `font-weight: 600`; `::before` intacto), regla del rail `[data-collapsible='icon'] [data-testid='private-brand-link'] img` (32 px, sin `border-radius`) en lugar de la de `private-brand-mark`. Comentarios de esas reglas limpiados.
+- `app/(private)/layout.tsx`: `<BrandLogo variant="isotipo" tone="auto" height={28} alt={BRAND_LABEL} />` dentro del `md:hidden`; el contenedor pasa a `flex items-center gap-2 md:hidden` para que el isotipo quede en línea con el control (el preflight pinta los `<img>` como `block`).
+- Tests (D16, cada caso cambiado con «ENMIENDA QC-226»): `tests/unit/app-sidebar.test.tsx`, `sidebar-desktop.test.tsx`, `sidebar-mobile.test.tsx`, `sidebar-ajuste.test.tsx`, `tests/unit/theme/sidebar-panel.test.tsx`, `tests/unit/theme/private-header.test.tsx` (caso nuevo). `private-layout.test.tsx` sin editar.
+
+Nota de tipo: `BrandLogoProps` es una unión; `tone="auto"` solo se admite con `variant="isotipo"`, porque en el repo solo está la versión clara del isotipo (no la de los logos completos).
+
+### Mapa R<n> → test (Fase 2)
+
+| Requisito | Test |
+| --- | --- |
+| R9 | `tests/unit/theme/sidebar-panel.test.tsx` > «R9: pinta el panel flotante con radio 22px y el degradado …» (ENMIENDA QC-226), «R9: el degradado del panel es estatico, sin animacion ni transicion» |
+| R10 | `sidebar-panel.test.tsx` > «usa 272px …», «da al menos 44px …» y `sidebar-ajuste.test.tsx` > «en modo icono el boton se fuerza a 44px …», sin cambios y en verde |
+| R11 | `tests/unit/sidebar-ajuste.test.tsx` > «R11: el activo lleva el degradado al 26-5 %, el anillo al 32 % y el texto blanco en 600», «R11: la barra de acento del borde izquierdo queda como estaba» |
+| R12 | `tests/unit/app-sidebar.test.tsx` > «R12: expandida, la marca pinta el logo horizontal oscuro a 28px sin texto visible»; `sidebar-ajuste.test.tsx` > «R12, R15: la marca es el logo horizontal …»; `sidebar-mobile.test.tsx` > «en viewport angosto no se aplica el modo icono» (ENMIENDA QC-226); `brand-logo.test.tsx` > «R12, R13: con alt vacio …» |
+| R13 | `app-sidebar.test.tsx` > «R13: en modo icono, la marca pinta el isotipo oscuro a 32px …»; `sidebar-ajuste.test.tsx` > «R13: en modo icono la marca es solo el isotipo …», «R13: en modo icono el isotipo de la marca mide 32px, sin radio de esquina»; `sidebar-desktop.test.tsx` > «activar el control alterna a modo icono …» (ENMIENDA QC-226) |
+| R14 | `tests/unit/theme/private-header.test.tsx` > «R14: en viewport angosto muestra el isotipo con la version de cada tema, y en ancho no»; `brand-logo.test.tsx` > «R14, R15: el isotipo con tone="auto" …» |
+| R15 | `tests/unit/brand/brand-logo.test.tsx` > «R15, R30: $variant sobre fondo oscuro pinta $src con la proporcion de su viewBox» (×3), «R15: el logo horizontal a 28 px sale a 132 px …», «R15: no anade fondo, sombra, brillo ni contorno …» |
+| R30 | `brand-logo.test.tsx` > «R15, R30: …» (×3), «R30: sirve el SVG tal cual, sin pasar por el optimizador» (la igualdad byte a byte con el kit es de `metadata-assets.test.ts`, T8) |
+| R34 | `brand-logo.test.tsx` > «R34: private-nav no exporta BRAND_TAGLINE ni BRAND_SHORT_LABEL …», «R34: ningun archivo de app/, components/ ni lib/ nombra …» |
+
+D16, caso por caso: `app-sidebar` (el «R4» deja de afirmar `private-brand-long`; sus dos casos equivalentes son R12 y R13), `sidebar-desktop` (cuatro aserciones `brandLong/brandShort` → `src` del `<img>`), `sidebar-mobile` (marca larga → logo horizontal dentro del `Sheet`), `sidebar-ajuste` («simbolo y bajada» → R12/R15; «simbolo con las iniciales» → R13), `sidebar-panel` (regex de las paradas). Ningún caso borrado sin equivalente.
+
+### Verificación (salida real)
+
+- `pnpm run typecheck` → `tsc --noEmit`, exit 0.
+- `pnpm run lint` → `ESLint: 0 errors, 7 warnings in 2 files` (los 7 previos, en `confirm-catalog-import.test.ts` y `order-service.test.ts`).
+- `pnpm exec vitest run tests/unit/brand/ tests/unit/app-sidebar.test.tsx tests/unit/sidebar-desktop.test.tsx tests/unit/sidebar-mobile.test.tsx tests/unit/sidebar-ajuste.test.tsx tests/unit/theme/ tests/unit/private-layout.test.tsx tests/unit/login-skin.test.tsx` → `Test Files 18 passed (18)`, `Tests 173 passed (173)`.
+- `pnpm exec vitest related --run <5 archivos de producción + 7 tests>` → `Test Files 1 failed | 90 passed (91)`, `Tests 1 failed | 1407 passed | 20 skipped`. El rojo es `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx > '/pedidos' se sirve con el permiso …`: `TypeError … reading 'status'` en `app/(private)/pedidos/page.tsx:96` (`loadFormCatalogs`). Ninguno de los archivos de esta tanda está en esa traza ni el test nombra la marca; no lo verifiqué contra la base.
+
+### Veredicto
+
+Fase 2 hecha: logo e isotipo en barra, rail y encabezado, R9–R15, R30 y R34 con test en verde; un rojo ajeno en `pantallas-exigen-permiso` por confirmar contra la base.

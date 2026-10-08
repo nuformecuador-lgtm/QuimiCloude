@@ -12,6 +12,7 @@ import PrivateLayout from '@/app/(private)/layout';
 import { LOGOUT_LABEL } from '@/app/(private)/components/logout-button';
 import { THEME_TOGGLE_LABEL } from '@/app/(private)/components/theme-toggle';
 import { SIDEBAR_TOGGLE_LABEL } from '@/app/(private)/components/sidebar-toggle';
+import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import type { SessionUser } from '@/lib/modules/identity';
 
 import {
@@ -135,6 +136,30 @@ describe('encabezado privado con el control de tema', () => {
     expect(landmarks).toHaveLength(1);
 
     expect(screen.getByRole('button', { name: SIDEBAR_TOGGLE_LABEL })).toBeInTheDocument();
+  });
+
+  it('R14: en viewport angosto muestra el isotipo con la version de cada tema, y en ancho no', async () => {
+    await renderLayout();
+
+    const encabezado = screen.getByTestId('private-header');
+    const isotipos = Array.from(encabezado.querySelectorAll('img'));
+    const clara = isotipos.find((img) => img.getAttribute('src') === '/brand/isotipo.svg');
+    const oscura = isotipos.find((img) => img.getAttribute('src') === '/brand/isotipo-dark.svg');
+
+    expect(isotipos).toHaveLength(2);
+    expect(clara?.className.split(/\s+/)).toContain('dark:hidden');
+    expect(oscura?.className.split(/\s+/)).toEqual(expect.arrayContaining(['hidden', 'dark:block']));
+
+    for (const img of isotipos) {
+      expect(img).toHaveAttribute('alt', BRAND_LABEL);
+      expect(Number(img.getAttribute('height'))).toBeGreaterThanOrEqual(24);
+      // Mismo contenedor que el control de la barra: el que se oculta en viewport ancho.
+      const contenedor = img.parentElement;
+      expect(contenedor?.className.split(/\s+/)).toContain('md:hidden');
+      expect(contenedor).toContainElement(screen.getByRole('button', { name: SIDEBAR_TOGGLE_LABEL }));
+      // No es un enlace: no anade un destino tactil mas.
+      expect(img.closest('a')).toBeNull();
+    }
   });
 
   it('no convierte el layout privado en Client Component', () => {

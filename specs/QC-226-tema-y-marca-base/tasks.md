@@ -24,17 +24,17 @@ tienen que estar hechas antes. Cada task acaba con `pnpm run typecheck`, `pnpm r
 
 ## Fase 2 — marca
 
-- [ ] **T4 — `components/shared/brand-logo.tsx`** (R15, R30). Dep.: T1.
+- [x] **T4 — `components/shared/brand-logo.tsx`** (R15, R30). Dep.: T1.
   *Hecho:* `tests/unit/brand/brand-logo.test.tsx` en verde: proporción por variante, `src`
   correcto, `tone="auto"` con las dos imágenes y sus clases `dark:`, y sin clases de fondo,
   sombra ni borde.
-- [ ] **T5 [P] — Barra lateral** (R9–R13, R34). En `app-sidebar.tsx`, el logo horizontal o el
+- [x] **T5 [P] — Barra lateral** (R9–R13, R34). En `app-sidebar.tsx`, el logo horizontal o el
   isotipo en el enlace de marca, sin textos visibles. En `private-nav.ts`, retirar
   `BRAND_TAGLINE` y `BRAND_SHORT_LABEL`. En `globals.css`, las paradas de D5, el ítem activo de
   R11 sin tocar la barra `::before`, y las reglas del rail para el `<img>`. Dep.: T2, T4.
   *Hecho:* `app-sidebar`, `sidebar-desktop`, `sidebar-mobile`, `sidebar-ajuste` y
   `sidebar-panel` actualizados (T10) y en verde.
-- [ ] **T6 [P] — Encabezado privado** (R14). El isotipo `tone="auto"` dentro del `md:hidden` de
+- [x] **T6 [P] — Encabezado privado** (R14). El isotipo `tone="auto"` dentro del `md:hidden` de
   `app/(private)/layout.tsx`. Dep.: T4.
   *Hecho:* `tests/unit/theme/private-header.test.tsx` en verde con el caso nuevo, y
   `private-layout.test.tsx` en verde sin editarlo.
@@ -47,14 +47,14 @@ tienen que estar hechas antes. Cada task acaba con `pnpm run typecheck`, `pnpm r
   *Hecho:* `login-skin.test.tsx` actualizado y en verde; `login-form.test.tsx` en verde sin
   editarlo; `pnpm exec playwright test e2e/login-skin.spec.ts e2e/login.spec.ts` en verde en
   Chromium y WebKit.
-- [ ] **T8 [P] — Manifest y limpieza de `public/`** (R25–R29). Crear `app/manifest.ts` y borrar
+- [x] **T8 [P] — Manifest y limpieza de `public/`** (R25–R29). Crear `app/manifest.ts` y borrar
   `public/file.svg`, `globe.svg` y `window.svg`. `next.svg`, `vercel.svg` y `app/page.tsx` no se
   tocan (D17). Comprobar en el preview de Vercel la URL absoluta de `og:image`. Dep.: T1.
   *Hecho:* `tests/unit/brand/metadata-assets.test.ts` y `e2e/brand-assets.spec.ts` en verde.
 
 ## Fase 4 — enmiendas y cierre
 
-- [ ] **T9 [P] — Enmiendas a los specs cerrados.** Añadir las notas
+- [x] **T9 [P] — Enmiendas a los specs cerrados.** Añadir las notas
   `> ENMIENDA DEL 2026-10-08 (QC-226)` de `design.md > 8` en QC-29, QC-30, QC-13 y
   `11-layout-privado-con-sidebar`.
   *Hecho:* cada requisito de la tabla de `design.md > 8` tiene su nota y nada del texto original

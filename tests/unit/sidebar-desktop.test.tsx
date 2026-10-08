@@ -6,7 +6,7 @@ import { SIDEBAR_TOGGLE_LABEL } from '@/app/(private)/components';
 import { SIDEBAR_PANEL_ID } from '@/components/private/app-sidebar';
 import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
 import {
-  BRAND_SHORT_LABEL,
+  BRAND_LABEL,
   PRIVATE_NAV_ITEMS,
   type NavGroup,
 } from '@/lib/shared/navigation/private-nav';
@@ -96,13 +96,21 @@ const RUTA_SIN_COINCIDENCIA = '/ruta-que-no-esta-en-la-navegacion';
 const testId = {
   sidebar: 'private-sidebar',
   brandLink: 'private-brand-link',
-  brandLong: 'private-brand-long',
-  brandShort: 'private-brand-short',
   toggle: 'private-sidebar-toggle',
   userTrigger: 'private-user-trigger',
   logout: 'private-logout',
   logoutForm: 'private-logout-form',
 } as const;
+
+const LOGO_HORIZONTAL = '/brand/logo-horizontal-dark.svg';
+const ISOTIPO_DEL_RAIL = '/brand/isotipo-dark.svg';
+
+/** `src` de la unica imagen del enlace de marca: logo horizontal o isotipo segun el modo. */
+function srcDeLaMarca(): string | null {
+  const imagenes = screen.getByTestId(testId.brandLink).querySelectorAll('img');
+  expect(imagenes).toHaveLength(1);
+  return imagenes[0].getAttribute('src');
+}
 
 /** El `cookies()` de servidor no ve nada: primer montaje sin preferencia guardada. */
 function sinCookieDePreferencia(): void {
@@ -208,29 +216,28 @@ describe('barra lateral privada en viewport ancho (modo icono)', () => {
   });
 
   it('activar el control alterna a modo icono y muestra la marca corta', async () => {
-    // R24 (y R4 se conserva en los dos modos)
+    // R24 (y R4 se conserva en los dos modos). ENMIENDA QC-226 (R12, R13): la marca larga es el
+    // logo horizontal y la corta, el isotipo.
     const user = setupUser();
     await renderLayout();
 
     const control = screen.getByTestId(testId.toggle);
-    expect(screen.getByTestId(testId.brandLong)).toBeInTheDocument();
-    expect(screen.queryByTestId(testId.brandShort)).toBeNull();
+    expect(srcDeLaMarca()).toBe(LOGO_HORIZONTAL);
     expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', ASSIGNED_ORDERS_ROUTE);
 
     await alternarBarra(user, 'collapsed');
 
     expect(panelDeEscritorio()).toHaveAttribute('data-collapsible', 'icon');
     expect(control).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByTestId(testId.brandShort)).toHaveTextContent(BRAND_SHORT_LABEL);
-    expect(screen.queryByTestId(testId.brandLong)).toBeNull();
+    expect(srcDeLaMarca()).toBe(ISOTIPO_DEL_RAIL);
+    expect(screen.getByTestId(testId.brandLink)).toHaveAccessibleName(BRAND_LABEL);
     expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', ASSIGNED_ORDERS_ROUTE);
 
     await alternarBarra(user, 'expanded');
 
     expect(panelDeEscritorio()).toHaveAttribute('data-collapsible', '');
     expect(control).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByTestId(testId.brandLong)).toBeInTheDocument();
-    expect(screen.queryByTestId(testId.brandShort)).toBeNull();
+    expect(srcDeLaMarca()).toBe(LOGO_HORIZONTAL);
     expect(screen.getByTestId(testId.brandLink)).toHaveAttribute('href', ASSIGNED_ORDERS_ROUTE);
   });
 
@@ -319,7 +326,8 @@ describe('barra lateral privada en viewport ancho (modo icono)', () => {
     expect(panelDeEscritorio()).toHaveAttribute('data-state', 'collapsed');
     expect(panelDeEscritorio()).toHaveAttribute('data-collapsible', 'icon');
     expect(screen.getByTestId(testId.toggle)).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByTestId(testId.brandShort)).toBeInTheDocument();
+    // ENMIENDA QC-226: la marca corta es el isotipo.
+    expect(srcDeLaMarca()).toBe(ISOTIPO_DEL_RAIL);
   });
 
   it('el modo expandido se conserva al volver a montar el layout', async () => {
@@ -346,7 +354,8 @@ describe('barra lateral privada en viewport ancho (modo icono)', () => {
     expect(panelDeEscritorio()).toHaveAttribute('data-state', 'expanded');
     expect(panelDeEscritorio()).toHaveAttribute('data-collapsible', '');
     expect(screen.getByTestId(testId.toggle)).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByTestId(testId.brandLong)).toBeInTheDocument();
+    // ENMIENDA QC-226: la marca larga es el logo horizontal.
+    expect(srcDeLaMarca()).toBe(LOGO_HORIZONTAL);
   });
 
   it('sin sesion, el layout redirige al login y no pinta la barra lateral', async () => {

@@ -178,17 +178,13 @@
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
 }
 
-/* Panel flotante de la barra lateral (T13, `design.md > 6`, R18-R20).
-   Las paradas del degradado van en hex: el insumo (`design-input-tokens.md > 4`) solo da 4 de
-   las 8 con equivalente oklch publicado en su tabla de tokens, y convertir las otras 4 por
-   cuenta propia seria inventar numeros (regla 6 de CLAUDE.md). Los tokens de color de arriba
-   si van en oklch porque el insumo los da asi. */
+/* Las paradas van en hex porque así las fija la marca: convertirlas a oklch alteraría los valores. */
 :root {
-  --sidebar-panel-gradient: linear-gradient(166deg, #ffffff 0%, #f6fcfb 34%, #ecf7f5 68%, #dfefed 100%);
+  --sidebar-panel-gradient: linear-gradient(166deg, #0A4A47 0%, #003634 38%, #002828 70%, #021E1E 100%);
 }
 
 .dark {
-  --sidebar-panel-gradient: linear-gradient(166deg, #1b3b39 0%, #133032 34%, #0f2426 68%, #091a1c 100%);
+  --sidebar-panel-gradient: linear-gradient(166deg, #0B2F2F 0%, #062222 42%, #031515 100%);
 }
 
 /* Reglas del panel flotante, a proposito FUERA de `@layer`.
@@ -223,32 +219,29 @@
   padding: 10px !important;
 }
 
-/* El simbolo de marca es mas grande que un icono de menu, asi que en modo icono necesita
-   su propio ajuste: 32px de simbolo dentro de 44 de boton dejan 6px de aire por lado. */
+/* El isotipo es mas grande que un icono de menu: 32px dentro de 44 de boton dejan 6px de aire por lado. */
 [data-collapsible='icon'] [data-testid='private-brand-link'] {
   padding: 6px !important;
 }
 
-[data-collapsible='icon'] [data-testid='private-brand-mark'] {
+[data-collapsible='icon'] [data-testid='private-brand-link'] img {
   width: 32px;
   height: 32px;
-  border-radius: 11px;
 }
 
-/* Elemento activo con el acento naranja.
-   El primitivo lo marca con `data-active:bg-sidebar-accent`, que es el velo agua, asi que
-   `--sidebar-primary` quedaba definido y sin usar: el color mas caracteristico de la paleta
-   no aparecia en ninguna parte de la barra. Se corrige desde aqui y no editando
-   `components/ui/sidebar.tsx`, por el mismo motivo que el resto de este bloque: una regla
-   sin capa gana a las utilidades, que si viven en capa. */
+/* Elemento activo con el acento. El primitivo lo pinta con `data-active:bg-sidebar-accent`;
+   esta regla sin capa le gana sin editar `components/ui/sidebar.tsx`. Va sobre el token y no
+   en hex para que un retoque del acento llegue solo. */
 [data-slot='sidebar-menu-button'][data-active] {
   position: relative;
   background: linear-gradient(
     90deg,
-    color-mix(in oklch, var(--sidebar-primary) 22%, transparent),
-    color-mix(in oklch, var(--sidebar-primary) 4%, transparent)
+    color-mix(in oklch, var(--sidebar-primary) 26%, transparent),
+    color-mix(in oklch, var(--sidebar-primary) 5%, transparent)
   );
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--sidebar-primary) 26%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--sidebar-primary) 32%, transparent);
+  color: #fff;
+  font-weight: 600;
 }
 
 /* La barra de acento del borde izquierdo. Va en un pseudoelemento y no en un `<span>` para
