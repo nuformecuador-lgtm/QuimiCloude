@@ -3,7 +3,11 @@ import type { Metadata } from 'next';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 
-import { DashboardContent } from './components';
+import {
+  DashboardContent,
+  parseExecutionTraceListParams,
+  type ExecutionTraceListSearchParams,
+} from './components';
 
 export const metadata: Metadata = {
   title: `Dashboard · ${BRAND_LABEL}`,
@@ -30,22 +34,28 @@ export const metadata: Metadata = {
  * 2026-09-02): lo reconecta QC-13. El item ya apunta a la misma constante que ubica esta
  * pantalla, asi que deja de dar 404 sin que aqui se edite nada de la navegacion (R11).
  *
- * Server Component sin datos (R6, R7): ni consultas, ni red, ni props de sesion. El contenedor
- * exterior es un `<div>` y **no** un `<main>` (R4): `SidebarInset` del layout privado ya es el
- * `<main>` y R5 de QC-11 exige que sea unico.
+ * Server Component sin consultas propias ni props de sesion: solo acota la consulta de la URL y se
+ * la pasa al area de contenido, que es quien lee. El contenedor exterior es un `<div>` y **no** un
+ * `<main>`: `SidebarInset` del layout privado ya es el `<main>` y tiene que ser unico.
  *
  * Es `async` desde QC-75 porque `requirePagePermission` lo es. Sigue siendo un Server Component
  * sin datos propios.
  */
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<ExecutionTraceListSearchParams>;
+}) {
   await requirePagePermission('dashboard.consultar');
+
+  const params = parseExecutionTraceListParams(await searchParams);
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
       <h1 data-testid="dashboard-title" className="text-2xl font-semibold">
         Dashboard
       </h1>
-      <DashboardContent />
+      <DashboardContent params={params} />
     </div>
   );
 }

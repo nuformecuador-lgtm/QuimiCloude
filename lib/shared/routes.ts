@@ -257,6 +257,11 @@ export function packingOrderRoute(id: string): string {
   return `${ASSIGNED_ORDERS_ROUTE}/empaque/${id}`;
 }
 
+/** Ya cae bajo el prefijo privado de `DASHBOARD_ROUTE`: la comparacion es por segmentos. */
+export function executionTraceRoute(orderId: string): string {
+  return `${DASHBOARD_ROUTE}/recorrido/${orderId}`;
+}
+
 /**
  * Nombre del parametro de consulta con el que Terminar anuncia, al volver a la pestaña «Por
  * empacar», que un pedido acaba de quedar `ENTREGADO`: `?vista=por_empacar&empacado=<numero>`.
