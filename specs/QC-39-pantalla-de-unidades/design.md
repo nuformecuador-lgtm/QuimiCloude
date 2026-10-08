@@ -389,6 +389,13 @@ compartida y `components/shared/data-table/` **no se abre** (R31). El test de R1
 declaración** en vez de listar literales: añadir una columna de ámbito, de `id` o de marcas de
 tiempo obligaría a tocarla, que es justo lo que el test en negativo vigila.
 
+> **Enmienda 2026-10-08 (QC-177 D4).** La celda de equivalencia puede recortarse con puntos
+> suspensivos (`overflow-hidden text-ellipsis`): es el contrato por defecto de la tabla compartida
+> para una columna sin `hideText`, que entró en `3018853a` fuera del flujo y el humano aceptó. La
+> frase de equivalencia completa sigue en el DOM de la celda; el truncado es solo visual. R27
+> (desbordamiento contenido en la tabla, sin scroll del documento, celda dentro del desplazador y
+> visible) no cambia.
+
 `searchable` se deja **ausente** (= `true`), porque `UNIT_QUERYABLE.searchable` es `true`; y el
 texto de la caja de búsqueda dice **por nombre**, porque el adaptador compara contra
 `nameNormalized` y nada más (R18): una caja que insinuara «nombre o símbolo» mentiría.
