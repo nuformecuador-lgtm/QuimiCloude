@@ -114,7 +114,7 @@
 
 ## T11 — Cierre
 
-- [ ] **T11.** Mapa `R<n> -> test` completo (R1–R23) en
+- [x] **T11.** Mapa `R<n> -> test` completo (R1–R23) en
       `progress/impl_QC-221-permiso-y-modulo-de-integraciones.md`, con R22 y R23 justificados
       como «revisión + guardia» (`design.md > 7`). Verificar que el diff no toca nada de esto:
       - `e2e/`, `app/`, `components/` y `hooks/`;
@@ -124,6 +124,11 @@
       - `package.json` y `db/schema.prisma`.
 
       **Hecho cuando:** `./init.sh` está en verde. Depende de: T2 y T5–T10.
+
+      **Cerrada** con la nota de `progress/features/QC-221.md > Tandas` (2026-10-08): `./init.sh`
+      rojo solo por 4 tests ajenos — 3 de `tests/baseline-rojos.json` que el `--exclude` de
+      `test-rapido.mjs` no sacó en Windows y `catalog-line.int.test.ts`, que falla igual en `dev`.
+      CI (`gate-completo`) decide.
 
 ## Archivos esperados
 

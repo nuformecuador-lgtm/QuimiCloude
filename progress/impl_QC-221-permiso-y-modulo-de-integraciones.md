@@ -120,4 +120,5 @@ Preparación del worktree: copia de `.env` (ignorado), `pnpm install --frozen-lo
 ## Pendiente
 
 - T11: `./init.sh` lo corre el leader (gate). El mapa R1–R23 ya está completo arriba.
+- T11 marcada `[x]` (arreglo del review, hallazgo 1): gate local rojo solo por 4 tests ajenos (3 de baseline no excluidos en Windows + `catalog-line.int.test.ts`, rojo también en `dev`); ver `progress/features/QC-221.md > Tandas`.
 - Choque conocido con QC-167 (PR #171) en `lib/shared/routes.ts` y `tests/unit/identity/permissions.test.ts`: cambios aditivos; la que mergee después reubica.
