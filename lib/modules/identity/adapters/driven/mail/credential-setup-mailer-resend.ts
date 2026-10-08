@@ -21,62 +21,17 @@
 //      del error del proveedor.
 import { Resend } from 'resend';
 
-import { credentialSetupRoute } from '@/lib/shared/routes';
-
 import { readResendMailConfigFromEnv } from '../config/mail-config-env';
+import {
+  CREDENTIAL_SETUP_MAIL_BODY,
+  CREDENTIAL_SETUP_MAIL_SUBJECT,
+  credentialSetupLinkUrl,
+} from './credential-setup-mail-content';
 
 import type { ResendMailConfig } from '../config/mail-config-env';
 
-/**
- * ASUNTO del correo. **Copy provisional, pendiente de QC-72** (`internacionalizacion-de-textos`,
- * hoy `pending`): es la **pregunta abierta 2** de `requirements.md` —«que dice el correo»—, que
- * sigue SIN cerrar. No se inventa el copy definitivo: esto es el minimo funcional.
- *
- * Vive aqui arriba, junto al cuerpo, para que cambiarlo sea una linea y para que el dia que llegue
- * QC-72 migrarlo sea mover dos cadenas a un archivo de idioma (`design.md > 7.3`).
- *
- * Sin tildes, como el resto de los textos de cara al usuario del repo
- * (`lib/modules/errores/domain/error-catalog.ts`).
- */
-const CREDENTIAL_SETUP_MAIL_SUBJECT = 'Establece la contrasena de tu cuenta';
-
-/**
- * CUERPO del correo, con un **unico hueco: la URL** (`design.md > 7.3`). Mismo aviso que el asunto:
- * **copy provisional pendiente de QC-72**, pregunta abierta 2 de `requirements.md`.
- *
- * **No contiene ninguna contrasena** (R29) y no puede contenerla: la funcion no recibe ninguna. Lo
- * unico sensible que transporta es el enlace (R13).
- */
-const CREDENTIAL_SETUP_MAIL_BODY = (url: string): string =>
-  [
-    'Hola:',
-    '',
-    'Se ha creado una cuenta para ti. Para poder entrar, establece tu contrasena en este enlace:',
-    '',
-    url,
-    '',
-    'El enlace caduca en 7 dias y solo se puede usar una vez.',
-    'Si no esperabas este correo, puedes ignorarlo.',
-  ].join('\n');
-
 /** Prefijo estable del registro, para poder buscar la linea en los logs sin adivinar el texto. */
 const LOG_PREFIX = '[identity]';
-
-/**
- * La URL del enlace: base de configuracion + el camino que compone `credentialSetupRoute`, con
- * **el secreto EN EL CAMINO** y nunca en la cadena de consulta (`design.md > 4.4`). En el camino
- * no lo escriben como un parametro mas los registros de acceso de la mayoria de los
- * intermediarios, y base64url no necesita escapado.
- *
- * El literal de la ruta ya no vive aqui (T19): esta en `lib/shared/routes.ts`, que es de donde lo
- * toman tambien la pagina publica y el transporte de buzon. Lo unico que queda en este archivo es
- * pegarle delante la base, que sale de la configuracion (R28).
- *
- * La barra final de la base se recorta para no producir `//establecer-contrasena/...`.
- */
-function credentialSetupLinkUrl(baseUrl: string, secret: string): string {
-  return `${baseUrl.replace(/\/+$/, '')}${credentialSetupRoute(secret)}`;
-}
 
 /**
  * La UNICA escritura a consola de este archivo. Recibe un `detalle` que **ya viene acotado** por

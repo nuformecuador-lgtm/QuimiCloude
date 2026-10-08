@@ -180,7 +180,7 @@ describe(`guardia: la libreria de correo esta aislada en un archivo (${DESIGN} >
         'transporte por defecto se deriva de esa posicion. Condicion 1 de ' +
         `${DESIGN} > 9.2: una variable que nadie puso no puede acabar escribiendo los correos a ` +
         'un archivo en silencio.',
-    ).toContain(`export const MAIL_TRANSPORTS = ['${LIBRERIA}', 'outbox'] as const`)
+    ).toContain(`export const MAIL_TRANSPORTS = ['${LIBRERIA}', `)
 
     expect(
       fuente,
@@ -217,5 +217,42 @@ describe(`guardia: la libreria de correo esta aislada en un archivo (${DESIGN} >
       `${TRANSPORTE_DE_BUZON} NO puede importar \`${LIBRERIA}\`: existe justamente para no hablar ` +
         'con el proveedor (R27).',
     ).toEqual([])
+  })
+})
+
+/**
+ * Transporte `smtp` TEMPORAL: `nodemailer` queda aislado igual que `resend`, en UN archivo. Quitar
+ * el transporte es borrar ese archivo y una rama de `lib/composition`.
+ */
+const LIBRERIA_SMTP = 'nodemailer'
+const IMPORTADOR_SMTP_AUTORIZADO =
+  'lib/modules/identity/adapters/driven/mail/credential-setup-mailer-smtp.ts'
+const PATRON_SMTP = new RegExp(
+  `from\\s+['"]${LIBRERIA_SMTP}['"]|require\\(\\s*['"]${LIBRERIA_SMTP}['"]\\s*\\)|import\\(\\s*['"]${LIBRERIA_SMTP}['"]\\s*\\)`,
+)
+
+function importadoresSmtpDe(censo: ReadonlyMap<string, string>): string[] {
+  return [...censo.entries()].filter(([, fuente]) => PATRON_SMTP.test(fuente)).map(([ruta]) => ruta).sort()
+}
+
+describe(`guardia: \`${LIBRERIA_SMTP}\` esta aislada en un archivo (transporte smtp temporal)`, () => {
+  it(`solo ${IMPORTADOR_SMTP_AUTORIZADO} importa \`${LIBRERIA_SMTP}\``, () => {
+    expect(
+      importadoresSmtpDe(CENSO),
+      `\`${LIBRERIA_SMTP}\` solo puede importarse desde ${IMPORTADOR_SMTP_AUTORIZADO}. Lo que ` +
+        'necesites del correo se pide por el puerto `CredentialSetupMailer`.',
+    ).toEqual([IMPORTADOR_SMTP_AUTORIZADO])
+  })
+
+  it('SENSIBILIDAD: un segundo import pondria esta guardia en rojo', () => {
+    for (const forma of [
+      `import nodemailer from '${LIBRERIA_SMTP}'`,
+      `const nodemailer = require('${LIBRERIA_SMTP}')`,
+      `const mod = await import('${LIBRERIA_SMTP}')`,
+    ]) {
+      const censo = new Map(CENSO)
+      censo.set('lib/modules/identity/adapters/driven/mail/otro-mailer.ts', forma)
+      expect(importadoresSmtpDe(censo).length, `la forma \`${forma}\` deberia detectarse`).toBe(2)
+    }
   })
 })

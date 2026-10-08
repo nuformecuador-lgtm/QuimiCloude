@@ -110,6 +110,11 @@ const IN_TRANSIT_ALLOWLIST: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   // Clave del schema zod que valida esa entrada (y del mapa de errores de campo).
   // Es el contrato del formulario, no un modelo de datos.
   ['lib/modules/identity/domain/credentials.ts', new Set(['password'])],
+  // Contrasena de aplicacion de la cuenta SMTP del transporte temporal `smtp`: se lee del
+  // entorno y se entrega a `nodemailer` en la invocacion. No es de ningun usuario del ERP ni
+  // se escribe en ninguna tabla.
+  ['lib/modules/identity/adapters/driven/config/mail-config-env.ts', new Set(['pass'])],
+  ['lib/modules/identity/adapters/driven/mail/credential-setup-mailer-smtp.ts', new Set(['pass'])],
 ])
 
 /** Ruta comparable: separadores POSIX, para casar la allowlist venga la ruta como venga. */
