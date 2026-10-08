@@ -92,11 +92,11 @@ Si propone una librería nueva, lo dice aquí: la aprobación del spec la incluy
 Checklist de pasos discretos y verificables. Cada task pequeña, con criterio de
 "hecho". Marca dependencias y las que pueden ir en paralelo `[P]`.
 
-Incluye una sección **«Archivos esperados»** con las rutas que la feature va a tocar, cada una
-entre backticks. `scripts/archivos-en-vuelo.mjs` lee **todas** las rutas entre backticks del
-`tasks.md`, desde la rama publicada, para detectar choques con las features en vuelo de todo el
-equipo; la sección es la que garantiza que ninguna falte (`docs/equipo.md > Conflicto de archivos
-entre personas`).
+Incluye una sección **`## Archivos esperados`** con las rutas que la feature va a tocar, cada una
+entre backticks. `scripts/archivos-en-vuelo.mjs` lee **solo** las rutas de esa sección, desde la
+rama publicada, para detectar choques con las features en vuelo de todo el equipo: una ruta citada
+en otra parte del `tasks.md` no cuenta, y un comando (`./init.sh`) tampoco (`docs/equipo.md >
+Conflicto de archivos entre personas`).
 
 ## La puerta de aprobación humana (`spec_ready`)
 

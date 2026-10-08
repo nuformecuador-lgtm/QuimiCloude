@@ -59,10 +59,30 @@ node scripts/archivos-en-vuelo.mjs --candidata <key>   # exit 1 si choca
 
 Por cada feature en vuelo de cualquiera, el script mira dos fuentes:
 - los archivos que su rama remota **ya toca**: `git diff origin/<integracion>...origin/<rama>`;
-- los que su `tasks.md` **dice que tocará**: las rutas entre backticks.
+- los que su `tasks.md` **dice que tocará**: las rutas entre backticks de su sección
+  `## Archivos esperados` (`docs/specs.md > 3. tasks.md`).
+
+Reglas de lectura:
+- **Lista en `## Archivos esperados` todo archivo que vas a editar**, también los de la raíz
+  (`init.sh`, `package.json`). Fuera de esa sección, las rutas citadas no cuentan.
+- **Si un `tasks.md` no tiene la sección**, el script lee todo el archivo, descarta las rutas
+  que empiezan por `./` (son comandos: `./init.sh`) y lo avisa.
+- **Los archivos de apéndice compartidos dan AVISO, no CHOCA**: `tests/baseline-rojos.json` y
+  `progress/deudas.md`. La lista se amplía en `arnes.config.json > equipo.archivos_compartidos`
+  (sustituye a la de por defecto). Edítalos añadiendo, sin reordenar, como `progress/deudas.md`.
+- `specs/` y `progress/` nunca cuentan: cada feature escribe en su carpeta.
 
 Si choca, la candidata espera. Para que esto funcione, **cada tanda termina con `git push`**: una
 rama sin publicar es invisible para los demás, y el script lo avisa.
+
+### Por qué
+
+- 2026-10-08: `--candidata QC-177` daba CHOCA con **todas** las features en vuelo. Dos causas
+  ajenas a un conflicto real: cada `tasks.md` cita `./init.sh` como comando entre backticks y
+  contaba como archivo, y `tests/baseline-rojos.json` lo edita toda feature que limpia rojos. El
+  candado se volvió ruido y dejó de distinguir el choque de verdad (QC-180 con QC-167 en
+  `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`). Lo prueba
+  `tests/guards/guard-archivos-en-vuelo-sin-ruido.test.ts`.
 
 ## Dónde se edita `progress/deudas.md`
 
