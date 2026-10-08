@@ -552,6 +552,16 @@
       "archivo": "pedidos/order-customer.int.test.ts",
       "motivo": "B6 (QC-156): ejercita el cambio de cliente, la edicion que solo cambia el cliente y los filtros de cliente del listado con los adaptadores reales; 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' sobre el cliente GLOBAL y el listado y el catalogo de clientes leen con ese mismo cliente, asi que una transaccion del test con ROLLBACK no los envolveria. Cada caso fabrica sus empresas efimeras con randomUUID (dos usuarios, rol, tipo de documento, unidad, presentacion, recetas, materias primas, clientes) y las limpia en un 'finally' en orden de FK (los tres libros -> pedidos -> clientes -> recetas -> lotes y productos -> presentacion -> unidad -> usuarios -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-06"
+    },
+    {
+      "archivo": "pedidos/order-delivery.int.test.ts",
+      "motivo": "La entrega de producto terminado por la fachada real de 'lib/composition': 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' sobre el cliente GLOBAL (entrega, salida de inventario y estado del pedido), y la lectura del sheet usa ese mismo cliente, asi que una transaccion del test con ROLLBACK no las envolveria. Cada caso fabrica dos empresas efimeras con randomUUID (tres usuarios, roles, tipos de documento, unidad, receta, clientes, presentaciones, pedidos, lineas, productos terminados y lotes; tests/helpers/order-delivery-seed.ts) y las borra en un 'finally' por 'company_id' en orden de FK (asientos -> lineas de entrega -> entregas -> lotes -> productos -> lineas -> pedidos -> clientes -> receta -> presentaciones -> unidad -> usuarios -> roles -> tipos de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-08"
+    },
+    {
+      "archivo": "pedidos/order-delivery-concurrency.int.test.ts",
+      "motivo": "Dos entregas reales a la vez por la fachada de 'lib/composition': cada 'withOrderTransaction' tiene que CONFIRMAR para que la otra vea lo que escribio despues de esperar el bloqueo del pedido o del producto, asi que una transaccion del test con ROLLBACK no puede envolverlas. Cada caso fabrica su empresa efimera con randomUUID (tests/helpers/order-delivery-seed.ts) y la borra en un 'finally' por 'company_id' en orden de FK (asientos -> lineas de entrega -> entregas -> lotes -> productos -> lineas -> pedidos -> clientes -> receta -> presentaciones -> unidad -> usuarios -> roles -> tipos de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-08"
     }
   ]
 }

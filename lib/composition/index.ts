@@ -120,6 +120,8 @@ import {
   createReservationQueries,
 } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
+import { createFinishedGoodsDispatch } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-dispatch-prisma';
+import { findDeliverableBatches } from '@/lib/modules/inventario/adapters/driven/persistence/deliverable-batches-prisma';
 import { listStockGroups } from '@/lib/modules/inventario/adapters/driven/persistence/finished-stock-prisma';
 import {
   claimImport,
@@ -294,6 +296,7 @@ import {
   createOrderPackingRepository,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
+import { createOrderDeliveryRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma';
 import {
   withOrderTransaction,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
@@ -303,7 +306,6 @@ import type { OrderConditioningRepository } from '@/lib/modules/pedidos/ports/or
 import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-packing-repository';
 import type { OrderSummaryReader } from '@/lib/modules/pedidos/ports/order-summary-reader';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
-import type { OrderDeliveryRepository } from '@/lib/modules/pedidos/ports/order-delivery-repository';
 import type { OrderDeliveryUnitOfWork } from '@/lib/modules/pedidos/ports/order-delivery-unit-of-work';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import {
@@ -1371,16 +1373,18 @@ const reviewBlockedOrders = createReviewBlockedOrders({
  */
 const customerCatalog = buildCustomerCatalog();
 
-// Dobles provisionales de la entrega hasta que existan sus adaptadores: no entregan nada y la
-// lectura no encuentra entregas ni lotes.
-const orderDeliveryReads: Pick<OrderDeliveryRepository, 'sumDeliveredPackages'> = {
-  sumDeliveredPackages: async () => new Map(),
-};
-const finishedBatchCatalog: FinishedBatchCatalog = { findDeliverableBatches: async () => [] };
+const finishedBatchCatalog: FinishedBatchCatalog = { findDeliverableBatches };
+
+/** La entrega, la salida de `inventario` y el estado del pedido confirman o se deshacen juntos. */
 const orderDeliveryUnitOfWork: OrderDeliveryUnitOfWork = {
-  run: async () => {
-    throw new Error('orderDeliveryUnitOfWork: la entrega todavia no tiene adaptador');
-  },
+  run: (work) =>
+    withOrderTransaction((tx) =>
+      work({
+        orders: createOrderWriteRepository(tx),
+        deliveries: createOrderDeliveryRepository(tx),
+        finishedGoods: createFinishedGoodsDispatch(tx),
+      }),
+    ),
 };
 
 export const pedidos = {
@@ -1463,7 +1467,7 @@ export const pedidos = {
   getOrderCustomerFilterOption: createGetOrderCustomerFilterOption({ customerCatalog }),
   getOrderDelivery: createGetOrderDelivery({
     orders: orderRepository,
-    deliveries: orderDeliveryReads,
+    deliveries: createOrderDeliveryRepository(),
     lines: createOrderWriteRepository(),
     presentations: presentationCatalog,
     finishedBatches: finishedBatchCatalog,

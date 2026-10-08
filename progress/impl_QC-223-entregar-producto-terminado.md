@@ -255,3 +255,48 @@ B2 listo: salida física, lectura de lotes entregables y las tres guardias enmen
 ### Tests (salida real)
 - `order-deliveries-migration` + `order-delivery-constraints.int` + `order-delivery-repository.int` (plantilla nueva `qct_tpl_add408c2fe85`): `Test Files 3 passed (3)`, `Tests 34 passed (34)`.
 - Suites que escriben entregas o reaplican downs (`finished-goods-dispatch.int`, `ledger-cuadre.int`, `reservations-and-decimal-stock-migration.int`, `pedidos/company-scope.int`, `clientes/scope`, `guard-identificador-de-request`, `delivery-permission-migration.int`, `identity-seed.int`): `Test Files 8 passed (8)`, `Tests 111 passed (111)`.
+
+## B5 — Cableado real, actions e integración del caso de uso (backend_dev, tanda 2, 2026-10-08)
+
+### Archivos modificados
+- `lib/composition/index.ts`: fuera los tres dobles de T0. `finishedBatchCatalog = { findDeliverableBatches }` (adaptador real de `inventario`); `orderDeliveryUnitOfWork.run` sobre `withOrderTransaction` con `createOrderWriteRepository(tx)`, `createOrderDeliveryRepository(tx)` y `createFinishedGoodsDispatch(tx)` en la misma `tx`; `getOrderDelivery.deliveries` = `createOrderDeliveryRepository()` sobre el cliente global. Se quita el `import type { OrderDeliveryRepository }` que solo usaba el doble.
+- `lib/modules/pedidos/adapters/driving/order-actions.ts`: sin cambio. T0 ya dejó el cuerpo real de las dos actions (`currentActor()` una vez, el caso de uso de `@/lib/composition`, `toErrorState`); B5 solo cambia lo que hay detrás de la fachada.
+- `tests/unit/identity/session-once-per-request-actions.test.ts`: `ACCIONES` + `getOrderDeliveryAction` y `deliverOrderAction` (nota «QC-223 2026-10-08»; entrada válida para que llegue a `currentActor()`).
+- `tests/integration/aislamiento.json`: las dos suites nuevas en `commit` con motivo y `desde: 2026-10-08`.
+
+### Archivos creados
+- `tests/unit/pedidos/order-actions-delivery.test.ts` (28 casos).
+- `tests/helpers/order-delivery-seed.ts`: siembra confirmada compartida por los dos `.int` (empresa, usuarios, cliente, presentación, pedido con sus CHECK, terminado, lote por la ruta real `addImportedFinishedGoodsBatch`) y limpieza en orden de FK.
+- `tests/integration/pedidos/order-delivery.int.test.ts` (8 casos, por la fachada real `pedidos` de `@/lib/composition`).
+- `tests/integration/pedidos/order-delivery-concurrency.int.test.ts` (2 casos).
+
+### Censos revisados
+- `order-actions.test.ts` ya contaba las dos actions (T0, 15 y no 13). `module-contract` de `pedidos`, `guard-aislamiento-integracion`, `guard-arquitectura-modulos`, `guard-ambito-empresa-*`, `tests/unit/composition`: verdes sin cambio. `guard-teclear-y-plazo` no afecta (el helper no usa `user-event`). Ninguna lista E2E nombra la entrega.
+
+### R → test (B5)
+| R | Test |
+|---|---|
+| R2 | `order-actions-delivery.test.ts` «R2, R5: getOrderDeliveryAction entrega el id y el actor…», «R2: <action> lee cada cara de la sesion una sola vez…», «R2: <action> sin sesion entrega actor null…», «R2: ninguna de las dos actions repite la comprobacion de permiso» |
+| R5 | `order-delivery.int.test.ts` «R5, R6, R7, R9: devuelve pedidos, entregados y faltan…», «R5: un pedido de otra empresa es order_not_found y un pedido ENTREGADO es action_not_allowed» |
+| R17 | `order-delivery.int.test.ts` «R17: un pedido de la empresa B es order_not_found y un pedido no TERMINADO es action_not_allowed, sin escribir nada» |
+| R18, R19, R20 (traducción) | `order-actions-delivery.test.ts` «R18, R19, R20: <action> traduce <code> al ErrorState del catalogo» (8 códigos × 2 actions) |
+| R21 | `order-delivery.int.test.ts` «R21: un cliente de la empresa B o un cliente dado de baja es customer_not_found…» |
+| R22 | `order-actions-delivery.test.ts` «R22: deliverOrderAction pasa la entrada tal cual al caso de uso…» |
+| R25, R26 | `order-delivery.int.test.ts` «R25, R26: una entrega parcial guarda entrega, lineas y asientos…, deja el pedido TERMINADO y no toca orders.customer_id» |
+| R27 | `order-delivery.int.test.ts` «R27: la entrega que completa todas las lineas deja ENTREGADO con finished_at, packed_by y conditioned_by intactos» |
+| R26, R27, R29 (resultado) | `order-actions-delivery.test.ts` «R26, R27, R29: success lleva el DeliverOrderResult…» (×3) |
+| R28 | `order-delivery-concurrency.int.test.ts` «R28: dos entregas a la vez del mismo pedido…», «R28: dos pedidos que piden a la vez al mismo lote…» |
+| R29 | `order-delivery.int.test.ts` «R29: la misma clave dos veces deja un solo juego de filas y un solo asiento por lote…» |
+| R30 | `order-delivery.int.test.ts` «R30: si el segundo lote no alcanza no queda nada escrito…»; `order-actions-delivery.test.ts` «R30: <action> devuelve un error ajeno como unexpected, sin su detalle» |
+
+### Verificación (salida real)
+- `pnpm run typecheck`: `tsc --noEmit` sin errores.
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)` (los 7 heredados de `confirm-catalog-import.test.ts` y `order-service.test.ts`).
+- `pnpm exec vitest run guard tests/unit/pedidos/module-contract.test.ts tests/unit/inventario tests/unit/composition`: `Test Files 159 passed (159)`, `Tests 2377 passed | 16 skipped (2393)`.
+- `order-actions-delivery.test.ts`: `Tests 28 passed (28)`; `session-once-per-request-actions.test.ts`: `Tests 70 passed (70)`.
+- `order-delivery.int` + `order-delivery-concurrency.int`: `Test Files 2 passed (2)`, `Tests 10 passed (10)`.
+- `pnpm exec vitest related --run <10 archivos de los pasos 3 y 4>`: `Test Files 1 failed | 271 passed (272)`, `Tests 1 failed | 4255 passed | 2 skipped (4258)`. El único rojo es `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` («'/pedidos' se sirve con el permiso…»), en `tests/baseline-rojos.json`. Las dos suites nuevas pasaron aquí por segunda vez.
+- El MCP del grafo no se usó (Grep/Read).
+
+### Veredicto
+B5 listo: cableado real sin dobles y en verde contra Postgres, también con concurrencia. Queda abierto el bloqueo de la desviación 2 (tipo de `orderStatus` en `already_registered`), que tiene que decidir el humano.
