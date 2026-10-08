@@ -184,3 +184,89 @@ D16, caso por caso: `app-sidebar` (el «R4» deja de afirmar `private-brand-long
 ### Veredicto
 
 Fase 2 hecha: logo e isotipo en barra, rail y encabezado, R9–R15, R30 y R34 con test en verde; un rojo ajeno en `pantallas-exigen-permiso` por confirmar contra la base.
+
+## T7 — Login (parcial: R16 BLOQUEADO) — frontend_dev, 2026-10-08
+
+### Bloqueo: R16 contra `tests/unit/login-form.test.tsx`
+
+`tests/unit/login-form.test.tsx:375-381` («muestra la marca del producto como titulo de la tarjeta»)
+exige `document.querySelector('[data-slot="card-title"]')` con `textContent` `QuimiCloude`. R16 y
+`design.md > 6` sustituyen `CardTitle` por un `<h1>` cuyo nombre sale del `alt` del logo (sin texto),
+así que ese caso se pone rojo. La consigna de T7 dice que ese archivo no se edita y queda verde, y
+`design.md > 8` no lo lista entre los tests que se enmiendan (D16). No se resolvió: `page.tsx` conserva
+`<CardTitle>QuimiCloude</CardTitle>` y R16 no tiene test todavía. Opciones para el humano/leader:
+
+- **A (recomendada):** enmendar ese caso como D16 («ENMIENDA QC-226»: un único `h1` con nombre
+  `BRAND_LABEL` y el `<img>` del logo vertical) y añadir `login-form.test.tsx` a la tabla de `design.md > 8`.
+- **B:** `<h1 data-slot="card-title">` con `<BrandLogo … alt="" />` y un `<span className="sr-only">`
+  con `QuimiCloude`. Deja el test verde sin editarlo, pero contradice `design.md > 6`
+  (`alt={BRAND_LABEL}`, «no hace falta texto oculto») y finge un `CardTitle` solo para el test.
+
+### Archivos
+
+- `app/(public)/login/page.tsx`: `className="dark"` en el `<main data-login="screen">`; limpiado el
+  docblock que hablaba de burbujas. **Sin** el `h1` (bloqueo de arriba).
+- `app/(public)/login/components/login-background.tsx`: tres `<svg data-login="molecule">` con los
+  polígonos, trazos y colores de `Login.dc.html` 72–85; sin `style`, sin `width`/`height`,
+  `aria-hidden` en la capa. Server Component.
+- `app/globals.css`: bloque del login reescrito en su sitio (final del archivo), delimitadores
+  `Pantalla de login — INICIO` / `— FIN`, sin `@layer`, contiguo. Variables `--login-*` en
+  `[data-login='screen']`, `color-scheme: dark` y fondo de R17, medidas sin cambios, base opaca +
+  `@supports` con `blur(14px)` y `-webkit-`, transparencia reducida, entrada `login-card-enter`,
+  moléculas con tamaño, posición, opacidad y ciclo del lienzo, y `@media (prefers-reduced-motion:
+  reduce)` acotado con `login-card-fade 150ms linear both`. Nada tocado fuera del bloque.
+- `tests/unit/login-skin.test.tsx`: actualizado («ENMIENDA QC-226» en el nombre de cada caso cambiado).
+- `e2e/login-skin.spec.ts`: los dos casos de burbujas sustituidos y dos casos nuevos (R17, R21).
+
+### D16, caso por caso (`login-skin`)
+
+| Caso anterior | Equivalente |
+| --- | --- |
+| encierra todo lo de QC-30 entre sus delimitadores | R32: encierra todo lo del login… (delimitadores nuevos, `--login-`, keyframes nuevas) |
+| fuera de toda capa | R23: declara el bloque del login fuera de toda capa |
+| prefijo `-webkit-` (22px) | R20: blur(14px) con y sin prefijo, también en la condición |
+| base opaca y vidrio en `@supports` | R20: base opaca y `--login-card-glass` dentro de `@supports` (+ caso de orden) |
+| exactamente tres burbujas | R18: exactamente tres moléculas |
+| burbujas desaparecen con movimiento reducido | R22: moléculas quietas y visibles, tarjeta con fundido (+ fundido solo opacidad, + regla acotada) |
+| retardos negativos y ciclos 17/18/19 | R19: ciclos 22/30/26, dirección y curva, ninguno < 20 s |
+| solo variables `--qc30-` | R17: solo variables `--login-` salvo `--card-spacing` |
+| valores móviles/escritorio de las burbujas | R18: tamaño, posición y opacidad de cada molécula |
+| valores del insumo en los dos modos | R17, R20: fondo, vidrio y sombra en un solo juego (+ `color-scheme: dark`) |
+| filo y brillo en la sombra, también con transparencia reducida | R20: `box-shadow: var(--login-card-shadow)` en las dos ramas |
+| opacidad, deriva, recorrido y escala de cada burbuja | R19: keyframes `translateY(-36px) rotate(24deg)` |
+| capa sin puntero y bajo la tarjeta | R18: capa de moléculas sin puntero, z-index 1/2 |
+| (nivel 2) tres burbujas decorativas | R18: tres moléculas decorativas (+ sin `style`, + polígonos y colores) |
+| (nivel 2) capa hermana antes de la tarjeta | R18: capa de moléculas hermana y antes |
+| (E2E) oculta las burbujas con movimiento reducido | R22: moléculas visibles con `animation-name: none`; la tarjeta usa `login-card-fade`, sin `transform`, y acaba en opacity 1 |
+| (E2E) pinta las tres burbujas | R18, R19: tres moléculas con `animation-name`, duración, dirección e iteraciones |
+
+Sin cambios: medidas 44/400/18/28 (texto y E2E), panel flotante, radio/anillo/tipografía, `main`
+único, enlace fuera del `<form>`, primitivas intactas, `min-h-svh`. Ningún caso borrado sin equivalente.
+
+### Mapa R<n> → test (T7)
+
+| Requisito | Test |
+| --- | --- |
+| R16 | **sin test: bloqueado** (ver arriba) |
+| R17 | `login-skin.test.tsx` > «R17 (ENMIENDA QC-226): el main lleva el ambito oscuro…», «…solo declara variables propias con prefijo --login-…», «R17, R20…: fondo petroleo, vidrio y sombra…», «R17…: color-scheme oscuro»; `e2e/login-skin.spec.ts` > «R17 (ENMIENDA QC-226): con el tema claro de la app, el login resuelve los tokens oscuros» |
+| R18 | `login-skin.test.tsx` > «R18…: no deja marcado ni CSS de las burbujas…», «…exactamente tres moleculas», «…tamano, posicion y opacidad…», «…capa de moleculas sin capturar el puntero…», nivel 2 «…tres moleculas como capa decorativa…», «…sin style en linea…», «…poligonos y trazos del lienzo…», «…hermana de la tarjeta…»; E2E «R18, R19…» |
+| R19 | `login-skin.test.tsx` > «R19…: ciclos de 22, 30 y 26 s…», «R19…: flotan 36 px y giran 24 grados…»; E2E «R18, R19…» |
+| R20 | `login-skin.test.tsx` > «R20…: blur(14px) con y sin prefijo…», «…opaca como base y el vidrio solo dentro de @supports», «…transparencia reducida va despues del @supports…», «…conserva la sombra…», «R17, R20…» |
+| R21 | `login-skin.test.tsx` > «R21 (ENMIENDA QC-226): la tarjeta entra una vez…»; E2E «R21…: la tarjeta entra una vez y acaba con opacidad 1» |
+| R22 | `login-skin.test.tsx` > tres casos «R22 (ENMIENDA QC-226)…»; E2E «R22…: con movimiento reducido deja las tres moleculas visibles y quietas» |
+| R23 | `login-form.test.tsx` sin editar (verde porque el bloqueo sigue sin resolver); `login-skin.test.tsx`: medidas, `main` único y enlace fuera del form; E2E: medidas 44/400/16 px; `e2e/login.spec.ts` sin editar (no corre por entorno, abajo) |
+| R32 | `color-tokens.test.ts` > «R32: …» sigue verde con los delimitadores nuevos; `login-skin.test.tsx` > «R32 (ENMIENDA QC-226)…» |
+
+### Verificación (salida real)
+
+- `pnpm run typecheck` → `tsc --noEmit`, exit 0, sin errores.
+- `pnpm run lint` → `ESLint: 0 errors, 7 warnings in 2 files` (los 7 previos, en `confirm-catalog-import.test.ts` y `order-service.test.ts`).
+- `pnpm exec vitest run tests/unit/login-skin.test.tsx tests/unit/login-form.test.tsx tests/unit/theme/color-tokens.test.ts` → `Test Files 3 passed (3)`, `Tests 72 passed (72)` (35 de ellos en login-skin).
+- `pnpm exec vitest related --run "app/(public)/login/page.tsx" "app/(public)/login/components/login-background.tsx" app/globals.css tests/unit/login-skin.test.tsx` → `Test Files 6 passed (6)`, `Tests 100 passed (100)`.
+- `pnpm exec playwright test e2e/login-skin.spec.ts` → `14 passed (15.9s)` (7 casos × chromium y webkit).
+- `pnpm exec playwright test e2e/login-skin.spec.ts e2e/login.spec.ts` → `10 failed`, `14 passed`. Los 10 rojos son los 5 casos de `e2e/login.spec.ts` en los 2 motores, todos con
+  `PrismaClientInitializationError: Invalid prisma.role.findMany() invocation … error: Environment variable not found: DATABASE_URL.` (`e2e/login.spec.ts:242`). No hay `.env` en el worktree y no se copió el de la raíz, así que esos casos quedan sin verificar.
+
+### Veredicto
+
+T7 parcial: fondo de moléculas, ámbito oscuro, vidrio, entrada y movimiento reducido hechos y en verde (unitarios y E2E en los dos motores). R16 (el `h1` con el logo) queda bloqueado porque choca con `login-form.test.tsx`, y `e2e/login.spec.ts` no corre sin `DATABASE_URL`.
