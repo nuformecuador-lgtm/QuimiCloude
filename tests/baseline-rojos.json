@@ -37,14 +37,6 @@
       "motivo": "Deuda ajena de dev: el caso R32 espera un PrismaClientKnownRequestError y hoy recibe un ValidationError (la entrada se valida antes de llegar a la base). Falla igual en origin/dev 1a1db86e, sin los cambios del arnes v2; llego con los merges del 2026-10-06 (QC-209/QC-213). Detectado por el primer gate completo del arnes v2. Ver progress/deudas.md D33.",
       "desde": "2026-10-06"
     },
-    "tests/unit/identity/seed/deploy-hook.test.ts": {
-      "motivo": "Deuda ajena de dev, roja desde b79a43c4 (fix build command, 2026-10-07): scripts.build paso a 'prisma migrate deploy && prisma generate && tsx scripts/seed.ts && next build' (cuatro tramos) y el caso 'los tres comandos van unidos por && ... en ese orden' exige exactamente tres. Hay que decidir si el test acepta prisma generate o si el build vuelve a tres tramos. Detectado por el gate-completo del PR #161, que no toca package.json.",
-      "desde": "2026-10-07"
-    },
-    "tests/unit/identity/seed/deploy-hook.test.ts": {
-      "motivo": "Deuda ajena de dev, roja desde b79a43c4 (fix build command, 2026-10-07): scripts.build paso a 'prisma migrate deploy && prisma generate && tsx scripts/seed.ts && next build' (cuatro tramos) y el test exige tres. Falla igual en origin/dev puro. Ajeno a feature/mail-smtp-nodemailer, que no toca scripts.build. Salida limpia: actualizar el test al build de cuatro tramos y borrar esta entrada.",
-      "desde": "2026-10-07"
-    },
     "tests/unit/recetas-ui/recipe-form-packing-steps.test.tsx": {
       "motivo": "Intermitente en el runner de GitHub: el caso R8 (QC-211, error del paso de envasado vacio) tardo 5068 ms, por encima del plazo de 5 s, y no encontro recipe-packing-step-field-error-1. Pasa en local (10/10) tanto en origin/dev puro como en feature/mail-smtp-nodemailer, que no toca recetas. Salida limpia: acotar el render del caso o subirle el plazo, y borrar esta entrada.",
       "desde": "2026-10-07"
