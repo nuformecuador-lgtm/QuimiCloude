@@ -333,3 +333,125 @@ Solo tests, sin código de producción. Cada enmienda lleva nota fechada 2026-10
 
 Veredicto T12: los cuatro verdes salvo el rojo de baseline de `/pedidos`, y no se quitó ninguna
 aserción de R2/R4/R6/R7/R8.
+
+## Tanda 4: rojo de CI, T13, T14, T15 y T16 (2026-10-08)
+
+### Rojo de CI y censos (solo tests, todos con nota fechada 2026-10-08, sin quitar aserciones)
+
+- **Fachada de asignaciones:** `tests/unit/composition/asignaciones-facade.test.ts`. El censo pasa
+  de 18 a 20 con `getExecutionTrace` y `listExecutionTraces`. El caso ahora se llama «expone las
+  doce anteriores, las CUATRO de QC-168, las DOS de QC-82 y las DOS de QC-167, y ninguna mas».
+- **Barrido de censos, dos rojos más que había metido la rama:**
+  - `execution-trace-format.ts` del dashboard importa el tipo `OrderStatus` de
+    `@/lib/modules/pedidos`, que es lo que pide el design en «Etiquetas de estado».
+  - `tests/unit/pedidos/module-contract.test.ts`: el caso «las Server Actions viven en UN SOLO
+    archivo driving…» recibe una excepción solo para ese archivo, y además exige que importe
+    justo el barril.
+  - `tests/unit/pedidos/scope.test.ts`: el caso «solo la pantalla de pedidos importa el
+    modulo…» recibe la constante `FORMATO_RECORRIDO_DASHBOARD` como excepción. Ese archivo sigue
+    sin poder entrar en el interior del módulo.
+- **Guardia de E2E:** `tests/guards/guard-identificador-de-request.test.ts` da de alta
+  `recorrido-ejecucion.spec.ts` en `E2E_ESPERADOS`. El spec no lee el identificador de petición ni
+  `reference`.
+- **Censos revisados que siguen verdes:** los de `tests/unit/composition/*`,
+  `order-distribution-view.test.ts` y todos los `module-contract` y `scope`.
+  `recetas/scope` y `recetas/module-contract` siguen rojos, pero ya están en
+  `tests/baseline-rojos.json`.
+
+### T13: seed y catálogo sin cambios (R21)
+
+La rama no toca `lib/modules/identity`, `db/` ni `prisma/`. `tests/unit/identity/permissions.test.ts`
+ya lo afirma con igualdad exacta del catálogo y de cada rol, así que no se duplica:
+- «R2: contiene exactamente los codigos del requisito, sin duplicados»
+- «R8 (enmendado por R36): el Administrador tiene el catalogo menos los codigos excluidos, escrito
+  uno a uno»
+- «R9 (enmendado por QC-86 R26 y QC-201 R3): el Operador tiene exactamente inventario.consultar,
+  asignaciones.consultar y asignaciones.ejecutar»
+- «R36 (enmendado desde QC-144 R8): el Empacador tiene exactamente…»
+- «R8: el Maestro recibe exactamente…»
+- «R8: el Administrador de acondicionamiento recibe exactamente…»
+- «R6: el seed asigna permisos SOLO a roles, sin ninguna clave de empresa»
+
+### T14: ni dependencias ni migraciones (R27)
+
+`git diff --name-only origin/dev...HEAD` (con `origin/dev` como ancestro de HEAD) no lista
+`package.json`, `pnpm-lock.yaml`, `db/` ni `prisma/`. `guard-dependencias-aprobadas` entra en
+`pnpm exec vitest run guard`, que sale 55/55. El `pnpm install --frozen-lockfile` de la tanda 2
+solo instaló el lockfile que ya traía dev.
+
+### T15: E2E `e2e/recorrido-ejecucion.spec.ts`
+
+- **Siembra:** por Prisma con el prefijo `qc167_e2e_` más el id del worker.
+  - Empresa A: un Administrador y un Operador.
+  - Pedido `POR_EMPACAR` con anotaciones de las dos personas y un retroceder.
+  - Pedido `EN_CURSO`.
+  - Pedido dado de baja: está `EN_CURSO` por el CHECK `orders_delivered_not_deleted`.
+  - Empresa B: un pedido con anotaciones y un usuario propio, que exige la FK compuesta.
+- **Datos fijos:** números con `formatOrderNumber`, rutas con `executionTraceRoute` y
+  `DASHBOARD_ROUTE`, y los textos y parámetros importados de los componentes. Tres textos van
+  escritos a mano porque los componentes no los exportan: «Personas», `/^Volver/` y «Anotaciones».
+- **Limpieza:** `afterAll` borra solo las dos empresas de su worker. Tras la corrida quedan 0
+  empresas, usuarios y recetas con el prefijo.
+- **Salida** de `pnpm exec playwright test e2e/recorrido-ejecucion.spec.ts`: el servidor arrancó a la
+  primera; chromium `4 passed`, webkit `4 passed`, total `8 passed (2.2m)`.
+
+### T16: trazabilidad y gate
+
+`./init.sh` **no** se corrió: en esta máquina lo mata la falta de memoria. Por decisión del humano,
+el gate es CI (`gate-completo` en el PR #171). En local se corrieron typecheck, lint, guardias y los
+tests de cada archivo tocado.
+
+### Salida de los tests (tanda 4)
+
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `0 errors, 7 warnings`, todos ajenos.
+- `asignaciones-facade`, `pedidos/module-contract` y `pedidos/scope`: `Test Files 3 passed (3)`,
+  `Tests 36 passed (36)`.
+- Barrido de censos (`composition/*`, `order-distribution-view`, `identity/permissions`, todos los
+  `module-contract` y `scope`): `16 passed | 2 failed (18)` archivos y 268/270 tests. Los dos rojos
+  son los de recetas que ya están en la baseline.
+- `pnpm exec vitest run guard`, con el alta del E2E: `Test Files 55 passed (55)`,
+  `Tests 741 passed | 11 skipped (752)`.
+- E2E: `8 passed (2.2m)` (chromium 4, webkit 4).
+
+## Mapa consolidado R1–R29 → test
+
+Rutas abreviadas:
+- **unit:** `tests/unit/{pedidos,asignaciones,dashboard}/…`
+- **int:** `tests/integration/{pedidos,asignaciones}/…`
+- **ui:** `tests/ui/dashboard/…`
+- **e2e:** `e2e/recorrido-ejecucion.spec.ts`
+
+Los nombres exactos de los casos están en el mapa de cada tanda, más arriba.
+
+| R | Tests |
+|---|---|
+| R1 | int `order-catalog-including-deleted` («R1, R18: incluye el pedido dado de baja…»); unit `list-summaries-including-deleted` («R1, R4: …»), `list-execution-traces` («R1: …», «R1 R24: …», «R1 R2 R3: …»); ui `execution-trace-table` («R1 - …»); e2e «R1 R2 R13 R18 - el pedido dado de baja…» |
+| R2 | unit `list-execution-traces` («R2 R15: …», «R1 R2 R3: …»); ui `execution-trace-table` («R2 - numero, estado, personas…», «R2 - la fila dada de baja…»); e2e «R1 R2 R13 R18 …» |
+| R3 | unit `execution-trace` («R3: %s es open…», «R3: dado de baja con estado EN_CURSO es unclosed…»), `list-execution-traces` («R3: …»), `execution-trace-format` («R3 - …»); ui `execution-trace-table` («R3 - la fila activa…») |
+| R4 | int `order-catalog-including-deleted` («R4: ordena por numero descendente…»); unit `list-summaries-including-deleted` («R1, R4: …»), `list-execution-traces` («R4: …»); ui `execution-trace-table` («R4 - ninguna columna ofrece ordenar…») |
+| R5 | unit `list-execution-traces` («R5: …»), `execution-trace-list-params` («R5 - …»); ui `execution-trace-table` («R5 - cambiar el tamano a 25…») |
+| R6 | unit `order-number-contains` (10 casos «R6: …»), `list-summaries-including-deleted` («R6, R10: …», «R6: …»), `list-execution-traces` («R6: …»), `execution-trace-list-params` («R6 - …»); int `order-catalog-including-deleted` («R6: `42` encuentra…»); ui `execution-trace-table` («R6 - buscar un numero…»); e2e R28 (filtro por parte del número) |
+| R7 | int `execution-log-read` («R7: …»); unit `execution-log-prisma` («R7 / R8: …»), `list-execution-traces` («R7: …»), `execution-trace-list-params` («R7 - …»); ui `execution-trace-table` («R7 - …»); e2e R28 (filtro por persona) |
+| R8 | int `execution-log-read` («R8: …»); unit `execution-log-prisma` («R7 / R8: …»), `list-execution-traces` («R8: …»), `execution-trace-list-params` («R8 - …»); ui `execution-trace-table` («R8 - …») |
+| R9 | int `order-catalog-including-deleted` («R9: respeta `statuses`…»); unit `list-execution-traces` («R9: …»), `execution-trace-list-params` («R9 - …»); ui `execution-trace-table` («R9 - el interruptor…») |
+| R10 | int `order-catalog-including-deleted` («R10: …»); unit `list-summaries-including-deleted` («R6, R10: …»), `list-execution-traces` («R10: …») |
+| R11 | unit `execution-trace-list-params` («R11 - …»); ui `execution-trace-table` («R11 - paginar conserva los filtros»); e2e R28 («Volver» con los mismos filtros) |
+| R12 | unit `get-execution-trace` («R12 R18: …»), `execution-trace-list-params` («R12 - …»); ui `execution-trace-table` («R12 - el enlace es executionTraceRoute(id)…»), `execution-trace-detail` («R12 - …»); e2e R28 (abre el recorrido) |
+| R13 | unit `get-execution-trace` («R13: …»), `execution-trace-format` («R13 - …»); ui `execution-trace-detail` («R13 - resumen…», «R13 - todas las anotaciones en orden…»); e2e R28 y «R1 R2 R13 R18 …» |
+| R14 | unit `execution-trace` («R14: cada anotacion salvo la ultima…»), `execution-log-prisma` («R14: …»); int `execution-log-read` («R14: …»); ui `execution-trace-detail` («R14 - …») |
+| R15 | unit `execution-trace` («R15: …»), `list-execution-traces` («R2 R15: …»), `get-execution-trace` («R15: …»), `execution-trace-format` («R15 - …»); ui `execution-trace-table` («R15 - …»), `execution-trace-detail` («R15 - …») |
+| R16 | unit `execution-trace` («R16: cada go_back…»); ui `execution-trace-detail` («R16 - …»), `execution-trace-table` («R16 - …»); e2e R28 («Vuelta atrás» visible) |
+| R17 | unit `execution-trace-list-params` («R17 - …»); ui `execution-trace-detail` («R17 - con la consulta del detalle…», «R17 - sin parametros…»); e2e R28 («Volver» → misma URL) |
+| R18 | int `order-catalog-including-deleted` («R1, R18: …»); unit `get-execution-trace` («R18: …»), `execution-trace-actions` («R18: …»); ui `execution-trace-detail` («R18 - …»); e2e «R18 R23 - …» y «R1 R2 R13 R18 …» |
+| R19 | unit `list-execution-traces` y `get-execution-trace` («R19: un actor %s se rechaza sin llamar a ningun puerto», «R19: con dashboard.consultar solo…»), `execution-trace-actions` («R19: …»), `tests/unit/identity/session-once-per-request-actions.test.ts` (fila `getExecutionTraceAction`) |
+| R20 | ui `execution-trace-detail` («R20 - …»); `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` (filas `/dashboard` y `/dashboard/recorrido/[id]`); `tests/guards/guard-pantallas-exigen-permiso.test.ts` (veintiuna pantallas); `tests/unit/dashboard-route-contract.test.ts` («R20: …»); e2e R29 |
+| R21 | `tests/unit/identity/permissions.test.ts` (los casos listados en T13) |
+| R22 | unit `execution-log-repository` («R31 / R22: el puerto no declara nada que modifique ni borre…»), `execution-log-prisma` («R31 / R22: las unicas operaciones…») |
+| R23 | int `execution-log-read` («R23: …»), `order-catalog-including-deleted` («R23, R24: …»); unit `list-summaries-including-deleted` («R23, R24: …»), `list-execution-traces` («R23: …»), `get-execution-trace` («R23: …»); e2e «R18 R23 - …» y R28 (el pedido ajeno no sale) |
+| R24 | unit `list-summaries-including-deleted` («R23, R24: …»), `list-execution-traces` («R1 R24: …»), `execution-trace-actions` («R24: …»); int `order-catalog-including-deleted` («R23, R24: …»); guardias, `module-contract` y `asignaciones-facade` |
+| R25 | `tests/unit/dashboard-page.test.tsx` («R25: el area de contenido contiene la lista del recorrido y nada mas»); `tests/unit/dashboard-route-contract.test.ts` (R6, R7, R8 y `100vh`/`hover` ampliado) |
+| R26 | ui `execution-trace-table` («R26 - el interruptor…», «R26 - el enlace de cada fila…»), `execution-trace-detail` («R26 - «Volver» mide 44x44…») |
+| R27 | T14: `git diff --name-only origin/dev...HEAD` sin `package.json`/`pnpm-lock.yaml`/`db/`/`prisma/`; `guard-dependencias-aprobadas` verde |
+| R28 | e2e «R28 - el Administrador ve los pedidos de su empresa y no el ajeno…» |
+| R29 | e2e «R29 - el Operador recibe 404 en el dashboard y en el recorrido…» |

@@ -157,19 +157,19 @@
   **Hecho cuando:** los cuatro verdes y ninguna aserción de R2/R4/R6/R7/R8 de QC-12 ni de QC-75
   quitada. Cubre **R20, R25**.
 
-- [ ] **T13 [P] — Seed y catálogo sin cambios.** Test que compara `SEED_ROLE_PERMISSIONS` y
+- [x] **T13 [P] — Seed y catálogo sin cambios.** Test que compara `SEED_ROLE_PERMISSIONS` y
   `PERMISSIONS` de esta rama con los de su base: mismos códigos y `dashboard.consultar` solo en el
   Administrador. Si un test existente ya lo afirma (`tests/unit/identity/permissions.test.ts`), se
   cita en el mapa de trazabilidad y no se duplica. Cubre **R21**.
 
-- [ ] **T14 [P] — Ni dependencias ni migraciones.** Comprobar que el diff de la rama no toca
+- [x] **T14 [P] — Ni dependencias ni migraciones.** Comprobar que el diff de la rama no toca
   `package.json`, `pnpm-lock.yaml` ni `db/` (`guard-dependencias-aprobadas` verde y `git diff
   --stat` de la rama contra su base sin `db/`). Se anota en `progress/impl_QC-167.md`. Cubre
   **R27**.
 
 ## Bloque E — Extremo a extremo
 
-- [ ] **T15 — E2E `e2e/recorrido-ejecucion.spec.ts`.** *Depende de T10, T11, T12.*
+- [x] **T15 — E2E `e2e/recorrido-ejecucion.spec.ts`.** *Depende de T10, T11, T12.*
   Siembra por Prisma (como `e2e/ejecucion-receta.spec.ts`): una empresa, un Administrador, un
   Operador, dos pedidos con anotaciones de dos personas (uno con un retroceder, uno `EN_CURSO`), un
   pedido **dado de baja** con anotaciones y un pedido de **otra empresa** con anotaciones. Números
@@ -188,8 +188,10 @@
 
 ## Bloque F — Cierre
 
-- [ ] **T16 — Trazabilidad y gate local.** `progress/impl_QC-167.md` con el mapa `R1…R29 → test`
-  (archivo y nombre del caso) y `./init.sh` verde.
+- [x] **T16 — Trazabilidad y gate local.** `progress/impl_QC-167.md` con el mapa `R1…R29 → test`
+  (archivo y nombre del caso) y `./init.sh` verde. *Nota 2026-10-08: `./init.sh` no se corre en
+  local porque la falta de memoria lo mata. Por decisión del humano, el gate es CI
+  (`gate-completo`, PR #171).*
 
 ## Mapa de cobertura (previsto)
 
