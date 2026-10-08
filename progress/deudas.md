@@ -183,7 +183,8 @@ Rescatados de *Evaluaciones* y *Features en curso* del archivo: no estaban en *D
 - **Qué falta:** el caso R32 espera `PrismaClientKnownRequestError` y recibe `ValidationError`. O el test se adapta a la validación previa, o la validación sobra. Entró al baseline con motivo; al arreglarlo, se borra la entrada.
 - **Dueño:** sin asignar. Llegó con los merges de QC-209/QC-213, sin CI que lo viera.
 
-### D34 — `credential-setup.int.test.ts` R11 intermitente en CI
+### D34 — `credential-setup.int.test.ts` R11 intermitente en CI (resuelta)
 - **Origen:** primeras corridas de `gate-completo` en GitHub Actions (2026-10-06/07). Falló en 2 de 5.
 - **Qué falta:** en el runner de 2 vCPU las dos emisiones concurrentes a veces no llegan a encolarse tras el bloqueo (`waitForLockWaiters`). Alargar la espera no lo arregla (con 20 s choca con el `testTimeout`): hay que entender por qué no se encolan (pool de conexiones, orden de arranque, `pg_stat_activity`) y hacer el test determinista. Mientras tanto está en `tests/baseline-rojos.json`; al arreglarlo, se borra la entrada.
+- **Estado:** resuelta el 2026-10-07 en `chore/ci-velocidad-y-d34`. Causa: orden de arranque —las emisiones se lanzaban sin esperar a que el `FOR UPDATE` del bloqueo estuviera tomado; si una llegaba antes, ganaba sin esperar y no quedaba nada encolado—. Ahora se lanzan solo con el bloqueo tomado (y se afirma que atrapó 1 fila). Entrada borrada del baseline. Detalle: `progress/fix-d34-credential-setup.md`.
 - **Dueño:** sin asignar.

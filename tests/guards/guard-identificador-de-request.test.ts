@@ -514,14 +514,17 @@ export function hallazgosDeSchema(schemaSource: string): readonly string[] {
 // El 2026-10-06 entraron `read-excel-file` y `papaparse` -leer la hoja y el CSV de la
 // importacion de inventario- y, como devDependency, `@types/papaparse`, con los cuatro checks,
 // aprobacion humana y su fila en `docs/dependencias.md`: de 39 a 41 y de 20 a 21.
+// El 2026-10-07 entro `nodemailer` -transporte SMTP temporal del correo- y, como devDependency,
+// `@types/nodemailer`, pedidas por el humano y con su fila en `docs/dependencias.md`: de 41 a 42
+// y de 21 a 22.
 //
 // Que este conteo sea un absoluto es fragil y conviene saberlo: no distingue «alguien colo una
 // libreria» de «entro una aprobada», asi que lo rompe cualquier feature posterior que anada una
 // legitima. La pregunta «toda dependencia declarada esta aprobada» ya la responde
 // `guard-dependencias-aprobadas.test.ts`, que compara contra el registro. Lo robusto aqui seria
 // comparar contra el merge-base de la propia rama en vez de contar absolutos.
-export const DEPENDENCIAS_ESPERADAS = 41
-export const DEV_DEPENDENCIAS_ESPERADAS = 21
+export const DEPENDENCIAS_ESPERADAS = 42
+export const DEV_DEPENDENCIAS_ESPERADAS = 22
 
 /** `crypto.randomUUID()` es un global: una libreria de identificadores o de criptografia sobra. */
 export const FRAGMENTOS_PROHIBIDOS = ['uuid', 'nanoid', 'cuid', 'crypto'] as const

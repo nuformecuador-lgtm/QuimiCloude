@@ -16,6 +16,7 @@ import {
   readCredentialSetupLinkBaseUrlFromEnv,
   readMailTransportFromEnv,
   readResendMailConfigFromEnv,
+  readSmtpMailConfigFromEnv,
 } from '@/lib/modules/identity/adapters/driven/config/mail-config-env';
 
 function findRepoRoot(startDir: string): string {
@@ -194,7 +195,7 @@ describe('readCredentialSetupLinkBaseUrlFromEnv: la base de la URL, sin exigir n
   });
 });
 
-describe('readMailTransportFromEnv: resend por defecto, outbox a peticion, nada mas (R28)', () => {
+describe('readMailTransportFromEnv: resend por defecto, outbox o smtp a peticion, nada mas (R28)', () => {
   const originalEnv = { ...process.env };
 
   afterEach(() => {
@@ -218,18 +219,18 @@ describe('readMailTransportFromEnv: resend por defecto, outbox a peticion, nada 
     expect(readMailTransportFromEnv()).toBe('resend');
   });
 
-  it('los dos transportes admitidos se resuelven tal cual', () => {
+  it('los transportes admitidos se resuelven tal cual', () => {
     for (const name of ALL_VARS) delete process.env[name];
 
     for (const transporte of MAIL_TRANSPORTS) {
       process.env.MAIL_TRANSPORT = transporte;
       expect(readMailTransportFromEnv()).toBe(transporte);
     }
-    expect(MAIL_TRANSPORTS).toEqual(['resend', 'outbox']);
+    expect(MAIL_TRANSPORTS).toEqual(['resend', 'outbox', 'smtp']);
   });
 
   it('cualquier otro valor falla nombrando la variable y sin repetir el valor recibido', () => {
-    for (const invalido of ['smtp', 'RESEND', 'outbox-de-prueba', 'nodemailer']) {
+    for (const invalido of ['SMTP', 'RESEND', 'outbox-de-prueba', 'nodemailer']) {
       for (const name of ALL_VARS) delete process.env[name];
       process.env.MAIL_TRANSPORT = invalido;
 
@@ -237,5 +238,75 @@ describe('readMailTransportFromEnv: resend por defecto, outbox a peticion, nada 
       expect(mensaje, `el valor ${invalido} deberia fallar`).toContain(TRANSPORT_VAR);
       expect(mensaje, `el mensaje repite el valor ${invalido}`).not.toContain(invalido);
     }
+  });
+});
+
+describe('readSmtpMailConfigFromEnv: transporte smtp temporal (nodemailer)', () => {
+  const originalEnv = { ...process.env };
+  const SMTP_VARS = {
+    SMTP_HOST: 'smtp.dominio-de-prueba.com',
+    SMTP_PORT: '587',
+    SMTP_USER: 'cuenta@dominio-de-prueba.com',
+    SMTP_PASS: 'contrasena-de-aplicacion-de-prueba',
+    MAIL_FROM_ADDRESS: VALORES.MAIL_FROM_ADDRESS,
+    APP_BASE_URL: VALORES.APP_BASE_URL,
+  } as const;
+
+  beforeEach(() => {
+    delete process.env.SMTP_SECURE;
+    Object.assign(process.env, SMTP_VARS);
+  });
+
+  afterEach(() => {
+    for (const name of [...Object.keys(SMTP_VARS), 'SMTP_SECURE']) delete process.env[name];
+    Object.assign(process.env, originalEnv);
+  });
+
+  it('resuelve la configuracion; sin SMTP_SECURE, 587 es STARTTLS y 465 es TLS directo', () => {
+    expect(readSmtpMailConfigFromEnv()).toEqual({
+      host: SMTP_VARS.SMTP_HOST,
+      port: 587,
+      secure: false,
+      user: SMTP_VARS.SMTP_USER,
+      pass: SMTP_VARS.SMTP_PASS,
+      from: SMTP_VARS.MAIL_FROM_ADDRESS,
+      baseUrl: SMTP_VARS.APP_BASE_URL,
+    });
+
+    process.env.SMTP_PORT = '465';
+    expect(readSmtpMailConfigFromEnv().secure).toBe(true);
+  });
+
+  it('SMTP_SECURE explicito manda sobre el puerto', () => {
+    process.env.SMTP_SECURE = 'true';
+    expect(readSmtpMailConfigFromEnv().secure).toBe(true);
+    process.env.SMTP_SECURE = 'false';
+    process.env.SMTP_PORT = '465';
+    expect(readSmtpMailConfigFromEnv().secure).toBe(false);
+  });
+
+  it('si faltan variables, las nombra todas juntas sin incluir ningun valor', () => {
+    delete process.env.SMTP_HOST;
+    delete process.env.SMTP_PASS;
+
+    const mensaje = mensajeDe(readSmtpMailConfigFromEnv);
+    expect(mensaje).toContain('SMTP_HOST');
+    expect(mensaje).toContain('SMTP_PASS');
+    for (const valor of Object.values(SMTP_VARS)) expect(mensaje).not.toContain(valor);
+  });
+
+  it('un puerto o un SMTP_SECURE invalidos fallan nombrando la variable y sin el valor', () => {
+    for (const invalido of ['abc', '0', '70000', '58.7']) {
+      process.env.SMTP_PORT = invalido;
+      const mensaje = mensajeDe(readSmtpMailConfigFromEnv);
+      expect(mensaje, `el puerto ${invalido} deberia fallar`).toContain('SMTP_PORT');
+      expect(mensaje).not.toContain(invalido);
+    }
+
+    process.env.SMTP_PORT = '587';
+    process.env.SMTP_SECURE = 'quizas';
+    const mensaje = mensajeDe(readSmtpMailConfigFromEnv);
+    expect(mensaje).toContain('SMTP_SECURE');
+    expect(mensaje).not.toContain('quizas');
   });
 });

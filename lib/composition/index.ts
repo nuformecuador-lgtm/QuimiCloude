@@ -331,6 +331,7 @@ import {
 import { readMailTransportFromEnv } from '@/lib/modules/identity/adapters/driven/config/mail-config-env';
 import { sendCredentialSetupLink as sendCredentialSetupLinkToOutbox } from '@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-outbox';
 import { sendCredentialSetupLink as sendCredentialSetupLinkWithResend } from '@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-resend';
+import { sendCredentialSetupLink as sendCredentialSetupLinkWithSmtp } from '@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-smtp';
 import {
   applyCredentialAndActivate,
   issueForPendingUser,
@@ -639,14 +640,21 @@ const credentialSetupLinkRepository: CredentialSetupLinkRepository = {
  * un valor equivocado tumbaria tests que no tienen nada que ver con el correo.
  *
  * `resend` es el valor POR DEFECTO (sin la variable, el transporte real); `outbox` es el buzon en
- * disco que hace posible el E2E de R41 y que se niega a arrancar en produccion. Los dos cumplen el
- * MISMO puerto, asi que cambiar de uno a otro es esta linea y nada mas.
+ * disco que hace posible el E2E de R41 y que se niega a arrancar en produccion; `smtp` es el envio
+ * TEMPORAL por `nodemailer` con una cuenta de Gmail u Outlook. Los tres cumplen el MISMO puerto,
+ * asi que cambiar de uno a otro es esta funcion y nada mas.
  */
 const credentialSetupMailer: CredentialSetupMailer = {
-  sendCredentialSetupLink: (input) =>
-    readMailTransportFromEnv() === 'outbox'
-      ? sendCredentialSetupLinkToOutbox(input)
-      : sendCredentialSetupLinkWithResend(input),
+  sendCredentialSetupLink: (input) => {
+    switch (readMailTransportFromEnv()) {
+      case 'outbox':
+        return sendCredentialSetupLinkToOutbox(input);
+      case 'smtp':
+        return sendCredentialSetupLinkWithSmtp(input);
+      case 'resend':
+        return sendCredentialSetupLinkWithResend(input);
+    }
+  },
 };
 
 /**
