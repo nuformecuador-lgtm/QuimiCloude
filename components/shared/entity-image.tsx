@@ -47,11 +47,41 @@ export type EntityImageProps = {
    */
   readonly name: string;
   readonly testId?: string;
+  /** `thumbnail`: miniatura de fila. `fill`: hueco cuadrado de ancho completo. */
+  readonly size?: 'thumbnail' | 'fill';
+  /** Texto alternativo cuando `name` es vacío. */
+  readonly emptyAlt?: string;
 };
 
-export function EntityImage({ path, name, testId }: EntityImageProps) {
+export function EntityImage({
+  path,
+  name,
+  testId,
+  size = 'thumbnail',
+  emptyAlt,
+}: EntityImageProps) {
   const [fallo, setFallo] = useState(false);
   const usaMarcador = path === null || path === '' || fallo;
+  const alt = name === '' && emptyAlt !== undefined ? emptyAlt : name;
+
+  if (size === 'fill') {
+    return (
+      <div className="flex w-full items-center justify-center overflow-hidden rounded-xl border bg-muted aspect-square">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          key={path ?? ''}
+          src={usaMarcador ? MISSING_IMAGE_SRC : path}
+          alt={alt}
+          loading="lazy"
+          decoding="async"
+          onError={() => setFallo(true)}
+          className="h-full w-full object-contain"
+          data-testid={testId}
+          data-missing={usaMarcador ? 'true' : undefined}
+        />
+      </div>
+    );
+  }
 
   return (
     /*
@@ -63,7 +93,7 @@ export function EntityImage({ path, name, testId }: EntityImageProps) {
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={usaMarcador ? MISSING_IMAGE_SRC : path}
-      alt={name}
+      alt={alt}
       width={THUMBNAIL_SIZE}
       height={THUMBNAIL_SIZE}
       loading="lazy"
