@@ -2,7 +2,15 @@
 
 Implementer, 2026-10-08. Worktree `.worktrees/QC-222-menu-de-integraciones`.
 
-## Estado (2026-10-08, tras la enmienda E1–E3): T0–T8 y T10 hechos; T9 BLOQUEADO
+## Estado (2026-10-08, tras la enmienda E4): T0–T11 hechos
+
+Enmienda E4 (`design.md > 14`, commit `322cb79a`, aprobada por el humano): T11 da de alta
+`'integraciones.spec.ts'` en `E2E_ESPERADOS` y T9 se cierra con el gate local aprobado (guardias + tests
+relacionados por separado; `gate-completo` de CI es el gate final). Detalle y salida en
+`## T11 + T9 — gate local aprobado` al final. Los dos bloqueos de abajo quedan resueltos así:
+el 1 con T11 y el 2 con el gate local aprobado, porque los 3 rojos son del baseline.
+
+### Histórico: estado tras la enmienda E1–E3 (T9 entonces bloqueado)
 
 La enmienda (`design.md > 14`, commit `a27396d4`) resolvió los 7 rojos de la tabla de abajo. Se hicieron en
 T10 (commit `1bb7fc85`). T9 queda abierto por dos cosas:
@@ -62,6 +70,11 @@ Además: **desviación de §8 en la E2E** (ver T8). Y `e2e/permisos.spec.ts:258-
 - M `tests/unit/configuracion-ui/private-nav-configuracion.test.ts` (:76, 3 items)
 - M `tests/unit/configuracion-ui/private-nav-usuarios.test.ts` (3 items en orden; casos renombrados)
 - A `e2e/integraciones.spec.ts`
+- T10: `guard-nav-permisos-declarados`, `guard-pantallas-exigen-permiso`, `private-layout-menu`,
+  `private-nav-unidades`, `inventario/scope`, `proveedores/scope` (ver `## T10`)
+- M `tests/guards/guard-identificador-de-request.test.ts` (T11: +10 líneas, solo la entrada
+  `'integraciones.spec.ts'` y su comentario, entre `grupos-de-trabajo` e `inventario`; sin excepción,
+  `hallazgosDeE2e` intacto)
 - Fuera de código: `specs/QC-222-menu-de-integraciones/tasks.md` (checks), esta bitácora.
 
 No tocados: `components/private/app-sidebar.tsx`, `components/ui/**`, `lib/modules/**`,
@@ -174,3 +187,31 @@ Sin corte por memoria: tardó unos 10 min y salió rojo en `test:rapido`.
   Corrida aparte, la de guardias da 1 rojo (bloqueo 1).
 - Revisión del diff para R7/R22: sin cambios en `components/private/app-sidebar.tsx`, `components/ui/**`, `lib/modules/**`,
   `lib/composition/**`, `db/**`, `middleware.ts`, `route-guard-middleware.ts` ni `package.json`.
+
+## T11 + T9 — gate local aprobado (`design.md > 14`), 2026-10-08
+
+T11 (backend_dev): entrada `'integraciones.spec.ts'` + comentario con el patrón de las altas previas (QC-222 R21,
+recorrido que ejercita, diferimiento de QC-71 R21 INTACTO). Comprobado con grep que `e2e/integraciones.spec.ts`
+no lee ni afirma nada sobre el identificador de petición ni `reference`. `git diff --stat`: 1 archivo, +10/-0.
+
+T9, sin `./init.sh` (no cierra en Windows: `scripts/test-rapido.mjs --exclude`). Logs en el scratchpad de la sesión.
+- `pnpm exec vitest run guard` (todas las guardias):
+  ```
+  Test Files  56 passed (56)
+       Tests  744 passed | 11 skipped (755)
+  ```
+- `pnpm exec vitest related --run <22 .ts/.tsx del diff contra origin/dev, sin e2e/>`:
+  ```
+  Test Files  3 failed | 321 passed (324)
+       Tests  3 failed | 4919 passed | 45 skipped (4967)
+  FAIL tests/unit/recetas/module-contract.test.ts
+  FAIL tests/unit/recetas/scope.test.ts
+  FAIL tests/unit/navegacion/pantallas-exigen-permiso.test.tsx
+  ```
+  Los 3 están en `tests/baseline-rojos.json`: no son fallos de QC-222. Ningún otro rojo.
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: exit 0, 0 errors, 7 warnings (ya estaban).
+- Revisión del diff (R7, R22): `git diff --name-only origin/dev...HEAD` no toca `components/private/app-sidebar.tsx`,
+  `components/ui/**`, `lib/modules/**`, `lib/composition/**`, `db/**`, `middleware.ts`, `route-guard-middleware.ts`,
+  `package.json` ni `e2e/permisos.spec.ts`. Todo lo tocado está en `tasks.md > Archivos esperados`.
+- Gate final: check `gate-completo` de CI (lo lleva el leader).

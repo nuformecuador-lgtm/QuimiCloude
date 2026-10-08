@@ -114,7 +114,7 @@ constantes de ruta. Esta rama todavía no la tiene: T0 la trae.
     - ninguna guardia gana una excepción (R14);
     - el diff de los dos tests de alcance no cambia `screenPattern` ni `PATRON_PROVEEDORES`.
 
-- [ ] **T11 — Dar de alta `integraciones.spec.ts` en `E2E_ESPERADOS`**
+- [x] **T11 — Dar de alta `integraciones.spec.ts` en `E2E_ESPERADOS`**
   (enmienda 2026-10-08, `design.md > 14`, E4; va antes de T9)
   - Depende de: T8.
   - Hacer: la fila E4 de `design.md > 7.2`: añadir `'integraciones.spec.ts'` a `E2E_ESPERADOS` en
@@ -127,7 +127,7 @@ constantes de ruta. Esta rama todavía no la tiene: T0 la trae.
     - el diff del archivo solo añade la entrada y su comentario: ni excepción, ni cambio en
       `hallazgosDeE2e` ni en ningún otro caso.
 
-- [ ] **T9 — Cierre**
+- [x] **T9 — Cierre**
   - Depende de: T0, T2–T8, T10 y T11.
   - Hacer:
     - `./init.sh`;
