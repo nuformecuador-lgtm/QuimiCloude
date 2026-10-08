@@ -22,7 +22,7 @@
 > terminado sin cambios · **[D3]** `finished_at` · **[D4]** no se cancela · **[D5]** quién toma el
 > pedido · **[D6]** por permiso · **[D7]** nombres y sin migración de datos · **[D8]** «Todos» ·
 > **[D9]** E2E · **[D10]** dependencia · **[D11]** encadenado con QC-202 · **[D12]** QC-215 crea
-> `TERMINADO`. **[P1]** marca lo que quedó resuelto por D12: lo implementa esta feature.
+> `TERMINADO` · **[D13]** error de la edición acotada · **[D14]** cambio de cliente cerrado solo en los finales. **[P1]** marca lo que quedó resuelto por D12: lo implementa esta feature.
 >
 > Vocabulario fijo:
 >
@@ -148,9 +148,13 @@ QC-216 R17 abriendo esas dos rutas exactas. [D6]
 rechazar con `not_cancellable`, sin modificar ninguna fila ni liberar nada. [D4]
 
 **R19.** SI se borra un pedido en un estado de acondicionamiento, ENTONCES el sistema DEBE rechazar
-con `not_deletable`. SI se edita, ENTONCES DEBE rechazar con `invalid_transition`. Vale para la
-edición general y para la edición acotada de reparto y unidad. En los dos casos, sin modificar
-ninguna fila. [D4]
+con `not_deletable`. SI se edita, ENTONCES el error depende de la edición:
+
+- la edición general DEBE rechazar con `invalid_transition`;
+- la edición acotada de reparto y unidad DEBE rechazar con `order_presentation_line_not_editable`,
+  como hoy con `ENTREGADO`.
+
+En todos los casos, sin modificar ninguna fila. *(Texto corregido el 2026-10-08, D13.)* [D4, D13]
 
 **R20.** SI se intenta asignar responsables, quitar un grupo de trabajo o desasignar a un
 responsable de un pedido en un estado de acondicionamiento, ENTONCES el sistema DEBE rechazar con
@@ -255,6 +259,45 @@ aserciones y en nada más. [D9]
 
 **R35.** Esta feature NO DEBE añadir ninguna dependencia a `package.json`. [D10]
 
+### Cambio de cliente (enmienda a QC-156 R14, D14)
+
+> «Estados de cliente cerrado» = `ENTREGADO` y `CANCELADO`, los dos finales. «Estados de cliente
+> abierto» = los otros ocho: `PENDIENTE`, `EN_CURSO`, `BLOQUEADO`, `POR_EMPACAR`, `EN_EMPAQUE`,
+> `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO` y `TERMINADO`. *(Corregido el 2026-10-08: la primera
+> versión de D14 cerraba también los tres estados nuevos.)*
+
+**R36.** SI un actor con `pedidos.modificar` hace un cambio de cliente sobre un pedido vivo de su
+empresa que está `ENTREGADO` o `CANCELADO`, ENTONCES el sistema DEBE rechazarlo con
+`action_not_allowed`:
+
+- después de comprobar que el pedido existe y antes de consultar el catálogo de clientes;
+- también cuando el cliente indicado es el que el pedido ya tiene, y cuando la entrada quita el
+  cliente;
+- sin modificar ninguna fila. [D14]
+
+**R37.** CUANDO un actor con `pedidos.modificar` hace un cambio de cliente sobre un pedido vivo de su
+empresa en un estado de cliente abierto, el sistema DEBE aceptarlo con las garantías de QC-156 R11,
+R12, R15, R16 y R17, sin cambios. Vale en particular para `BLOQUEADO`, `POR_ACONDICIONAR`,
+`EN_ACONDICIONAMIENTO` y `TERMINADO`. El cambio NO DEBE mover el estado, `finishedAt`, `packedBy` ni
+quien acondiciona. [D14]
+
+**R38.** SI la edición general de un pedido cambia solo el cliente y el estado del pedido no admite
+edición (`POR_EMPACAR`, `EN_EMPAQUE`, los estados de acondicionamiento, `TERMINADO`, `ENTREGADO` o
+`CANCELADO`), ENTONCES el sistema DEBE rechazarla con `invalid_transition`, sin consultar el catálogo
+de clientes ni modificar ninguna fila. Es la regla de R19 y la de hoy: en esos estados el cliente
+cambia solo por la acción «Cliente». [D13, D14]
+
+**R39.** MIENTRAS un pedido esté `ENTREGADO` o `CANCELADO`, el menú de fila de `/pedidos` DEBE
+mostrar la acción «Cliente» deshabilitada (como «Editar», R22). En un estado de cliente abierto,
+incluidos los estados de acondicionamiento y `TERMINADO`, DEBE mostrarla habilitada. SI el actor no
+tiene `pedidos.modificar`, ENTONCES la acción NO DEBE pintarse, como hoy. [D14]
+
+**R40.** El E2E existente que cambia el cliente de un pedido `CANCELADO` (`e2e/pedido-con-cliente.spec.ts`,
+caso «R40(c)» de QC-156) DEBE ajustarse para afirmar que en un pedido `CANCELADO` la acción «Cliente»
+está deshabilitada y el cliente no cambia. Es la única aserción E2E que cambia por D14, y ningún spec
+E2E es nuevo. R1–R39 DEBEN probarse con tests unitarios, de integración y guardias, igual que R34. [D9,
+D14]
+
 ### Cobertura de la tabla de decisiones
 
 | Decisión | Requisitos |
@@ -267,14 +310,18 @@ aserciones y en nada más. [D9]
 | D6 Por permiso | R15, R16, R17 |
 | D7 Nombres y sin migración de datos | R1, R25, R26, R27 |
 | D8 «Todos» | R28, R29, R32 |
-| D9 E2E | R34 |
+| D9 E2E | R34, R40 |
 | D10 Dependencia | R35 |
 | D11 Encadenado con QC-202 | R2, R3, R4, R12, R30, R31, R32, R33 |
 | D12 QC-215 crea `TERMINADO` | R30, R31, R32, R33 |
+| D13 Error de la edición acotada | R19, R38 |
+| D14 Cambio de cliente: solo se bloquea en ENTREGADO y CANCELADO (enmienda QC-156 R14) | R36, R37, R38, R39, R40 |
 
 ## Preguntas abiertas
 
-Ninguna. P1 (quién crea `TERMINADO`) se cerró el 2026-10-07: fila D12 de «Decisiones cerradas».
+P1 (quién crea `TERMINADO`) se cerró el 2026-10-07: fila D12 de «Decisiones cerradas».
+
+P2 (cambio de cliente en `BLOQUEADO`) se cerró el 2026-10-08 con la corrección de D14: se permite.
 
 **Pendiente para el leader (no lo toca esta ficha):** `specs/QC-202-estado-terminado-tras-empaque/`
 queda desfasado. Sus R2, R3, R5, R6, R11 y R24 asumen `EN_EMPAQUE → TERMINADO`, y con D12 esta
@@ -296,3 +343,5 @@ ficha absorbe `TERMINADO`. Toca cancelar QC-202 citando QC-215, o reducirla.
 | 2026-10-06 | ¿Dependencia nueva? | **Ninguna librería.** Cambia el enum de estados, por migración |
 | 2026-10-07 | ¿Cómo convive con QC-202 (`estado-terminado-tras-empaque`, `TERMINADO`)? | **Se encadenan** (salida (b) de `docs/specs.md > Antes de especificar`): PENDIENTE → EN_CURSO → POR_EMPACAR → EN_EMPAQUE → POR_ACONDICIONAR → EN_ACONDICIONAMIENTO → **TERMINADO** → ENTREGADO. Terminar el acondicionamiento lleva a TERMINADO, no a ENTREGADO; `finished_at` se escribe al pasar a TERMINADO; «Terminados» lista TERMINADO (QC-202 D5); ENTREGADO conserva su sentido de entrega al cliente (QC-156). Enmienda las filas del flujo y de `finished_at`. Quién crea TERMINADO **no está decidido**: `## Preguntas abiertas` P1 (cerrada por la fila siguiente) |
 | 2026-10-07 | P1: ¿Quién crea `TERMINADO`? | **(A) QC-215 crea `TERMINADO`** (valor del enum, estado cerrado, `CHECK`, «Terminados» = TERMINADO, etiqueta y filtro: R30–R33). QC-215 no depende de QC-202, que queda absorbida (se cancela o se reduce, cita QC-202) |
+| 2026-10-08 | D13: ¿Con qué error rechaza la edición acotada de reparto y unidad en los estados de acondicionamiento? | **`order_presentation_line_not_editable`**, como hoy con ENTREGADO. La edición general sigue con `invalid_transition`. Corrige el texto de R19 |
+| 2026-10-08 | D14: ¿Se puede cambiar el cliente en los estados nuevos? (enmienda QC-156 R14, que lo permite en los siete estados) | **Corregida el mismo día por el humano: «en los nuevos no bloquea, solo los finales».** El cambio de cliente **se rechaza solo en ENTREGADO y CANCELADO**. Se acepta en todos los demás: PENDIENTE, EN_CURSO, BLOQUEADO, POR_EMPACAR, EN_EMPAQUE, POR_ACONDICIONAR, EN_ACONDICIONAMIENTO y TERMINADO (TERMINADO no es final: tiene salida a ENTREGADO). Cierra P2: BLOQUEADO permite. **Enmienda QC-156 R14** (y con ella su R32 y el caso E2E R40(c)). ~~Versión anterior, sustituida: **No.** Palabras del humano: bloquearlo en los estados nuevos, y «los finales como entregado y cancelado no se pueden modificar». Lectura literal del leader: el cambio de cliente **se rechaza** en POR_ACONDICIONAR, EN_ACONDICIONAMIENTO, TERMINADO, ENTREGADO y CANCELADO, y **sigue permitido** en PENDIENTE, EN_CURSO, POR_EMPACAR y EN_EMPAQUE.~~ |

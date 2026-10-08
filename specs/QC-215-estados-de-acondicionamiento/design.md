@@ -1,6 +1,6 @@
 # QC-215 — estados-de-acondicionamiento · design.md
 
-> El **qué** está en `requirements.md` (R1–R35); aquí, el **cómo**. Lo marcado **[P1]** es la parte
+> El **qué** está en `requirements.md` (R1–R40); aquí, el **cómo**. Lo marcado **[P1]** es la parte
 > de `TERMINADO`, que esta ficha crea (D12, 2026-10-07; § 8). Ninguna librería nueva.
 
 ## Lo que ya existe
@@ -255,6 +255,57 @@ Zona `backend`, pero estos `app/` se tocan solo porque los mapas son exhaustivos
   y también los que siembran `ENTREGADO` para «Terminados»: `e2e/pedidos-terminados.spec.ts` y
   `e2e/pedidos-asignados.spec.ts`.
 - **Orden de merge con QC-216:** ya está mergeada, así que no hay bloqueo.
+
+## 7b. Edición acotada y cambio de cliente (D13, D14; 2026-10-08)
+
+**D13, el error de la edición acotada.** `update-order-presentation-lines.ts` ya rechaza con
+`order_presentation_line_not_editable` todo estado fuera de `REPARTO_EDITABLE_STATUSES` (`PENDIENTE`,
+`EN_CURSO`, `POR_EMPACAR`, `BLOQUEADO`), así que el código no cambia. El cambio va en el texto de
+R19 y en sus tests. La edición general sigue rechazando por `assertTransition(s, s)`.
+
+**D14, el cambio de cliente cerrado solo en `ENTREGADO` y `CANCELADO`**
+(`lib/modules/pedidos/domain/set-order-customer.ts`). Corregida el 2026-10-08: la primera versión
+cerraba también `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO` y `TERMINADO`.
+
+- Lista blanca nueva en el dominio de `pedidos`, `CUSTOMER_EDITABLE_STATUSES`, con los ocho estados
+  abiertos: `PENDIENTE`, `EN_CURSO`, `BLOQUEADO`, `POR_EMPACAR`, `EN_EMPAQUE`, `POR_ACONDICIONAR`,
+  `EN_ACONDICIONAMIENTO` y `TERMINADO`. Es lista blanca y no «todo menos los finales» por el mismo
+  motivo que `CANCELABLES`: un estado nuevo nace cerrado y obliga a decidir. Para `TERMINADO`,
+  aceptar el cambio es compatible con sus `CHECK` (§ 1.3): la escritura solo toca `customer_id`,
+  `updated_by` y `updated_at`.
+- Tras `findAliveById` y antes de comparar el cliente (`customerId === row.customerId`): si el estado
+  no está en la lista, `throw new ActionNotAllowedError()`. No se lee el catálogo de clientes ni se
+  abre la unidad de trabajo (R36).
+- La comprobación va **también** dentro de `unitOfWork.run`, sobre la fila bloqueada, porque otra
+  operación pudo moverla entre las dos lecturas (mismo patrón que `update-order.ts`): se llama a
+  `transaction.orders.lockAliveById` antes de `setCustomerAlive`, como en `cancel-order.ts`, y el
+  puerto no cambia.
+- **Código de error: `action_not_allowed`** («La accion no esta permitida.»). Existe en el catálogo
+  cerrado desde la décima enmienda, y `identity`, `inventario` y `recetas` lo usan para una acción
+  autorizada que no se admite en el estado del dato, que es exactamente el caso. `pedidos` no tiene
+  todavía la clase: se añade `ActionNotAllowedError` a `lib/modules/pedidos/domain/errors.ts`, igual
+  que en `recetas`. No hace falta enmendar el catálogo.
+- **Descartados:** `invalid_transition` («El pedido no admite ese cambio de estado.») es falso, porque
+  no se cambia el estado. `order_presentation_line_not_editable` habla del reparto. Un código nuevo
+  costaría una enmienda al catálogo sin aportar nada, porque el diálogo ya ve que el pedido está
+  cerrado (R39).
+- **Edición general (R38):** `update-order.ts` ya llama a `assertTransition(row.status, row.status)`
+  antes del atajo de «solo cliente». Todo estado sin «quedarse igual» la rechaza con
+  `invalid_transition`: `POR_EMPACAR`, `EN_EMPAQUE`, los de acondicionamiento, `TERMINADO`,
+  `ENTREGADO` y `CANCELADO`. `PENDIENTE`, `EN_CURSO` y `BLOQUEADO` la siguen aceptando. En los
+  estados abiertos sin edición general, el cliente cambia solo por la acción «Cliente». Sin cambios
+  de código: solo tests.
+- **UI (R39):** `order-row-actions.tsx` pinta «Cliente» con `disabled` según un mapa
+  `ORDER_STATUS_ACCEPTS_CUSTOMER_CHANGE: Record<OrderStatus, boolean>`, exhaustivo como sus vecinos:
+  `false` solo en `ENTREGADO` y `CANCELADO`. **No** se reutiliza `ORDER_STATUS_IS_FINAL`, porque esa
+  marca vale `true` también en los estados de acondicionamiento y en `TERMINADO` (R22), y ahí
+  «Cliente» va habilitada. `app/` no importa el dominio para esto: es el mismo duplicado consciente
+  que `ORDER_STATUS_IS_FINAL`, vigilado por su test.
+- **E2E (R40):** `e2e/pedido-con-cliente.spec.ts`, caso R40(c), pasa a afirmar que la acción está
+  deshabilitada en el `CANCELADO` y que su cliente no cambia.
+
+QC-156 queda enmendada en R14, R32 y su E2E R40(c). No se toca `specs/QC-156-pedido-con-cliente/`:
+marcarlo como enmendado es tarea del leader.
 
 ## 8. `TERMINADO` lo crea esta ficha (D12)
 

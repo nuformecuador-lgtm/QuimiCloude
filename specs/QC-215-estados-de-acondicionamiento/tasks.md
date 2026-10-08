@@ -3,7 +3,7 @@
 > Zona: `backend` · Complejidad: `medium` · depends_on: `QC-216` · Rama:
 > `feature/QC-215-estados-de-acondicionamiento`
 >
-> El **qué** está en `requirements.md` (R1–R35) y el **cómo** en `design.md`. `[P]` = se puede
+> El **qué** está en `requirements.md` (R1–R40) y el **cómo** en `design.md`. `[P]` = se puede
 > hacer en paralelo con las otras `[P]` del mismo bloque.
 >
 > **Cierre de cada task:** `pnpm run typecheck`, `pnpm run lint` y `pnpm exec vitest related --run
@@ -137,6 +137,49 @@
   sin que falte ningún R1–R35. R35: `package.json` no aparece en el diff. Después, `./init.sh`.
   **Hecho cuando:** está en verde. Depende de: todo.
 
+## Bloque 7 — Decisiones del 2026-10-08 (D13, D14 corregida: cliente cerrado solo en los finales)
+
+- [ ] **T20.** `[P]` D13, solo tests (el código ya rechaza así, `design.md > 7b`):
+  `tests/unit/pedidos/update-order-presentation-lines.test.ts` afirma
+  `order_presentation_line_not_editable` en `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO` y `TERMINADO`,
+  sin escribir. Si algún test de la tanda anterior afirmaba `invalid_transition` para la edición
+  acotada, se corrige. **Hecho cuando:** R19 está en verde con el texto nuevo. Depende de: —.
+- [ ] **T21.** D14 en el dominio:
+  - `ActionNotAllowedError` en `lib/modules/pedidos/domain/errors.ts`;
+  - `CUSTOMER_EDITABLE_STATUSES` en `set-order-customer.ts`, con los ocho estados abiertos (todos
+    menos `ENTREGADO` y `CANCELADO`, `design.md > 7b`);
+  - la comprobación, después de leer el pedido y antes de comparar el cliente, y otra vez sobre la
+    fila de `lockAliveById` dentro de la unidad de trabajo.
+
+  Tests en `tests/unit/pedidos/set-order-customer.test.ts`:
+  - R36, en `ENTREGADO` y `CANCELADO`: mismo cliente, quitar y cliente nuevo, con puertos que fallan
+    si se toca el catálogo de clientes o la escritura;
+  - R37, en los ocho abiertos, con mención explícita de `BLOQUEADO`, `POR_ACONDICIONAR`,
+    `EN_ACONDICIONAMIENTO` y `TERMINADO`.
+
+  `tests/integration/pedidos/order-customer.int.test.ts` prueba contra la base:
+  - R36 con un `ENTREGADO` y un `CANCELADO`;
+  - R37 con un `EN_ACONDICIONAMIENTO` y un `TERMINADO`, comprobando que estado, `finished_at`,
+    `packed_by` y `conditioned_by` no cambian.
+
+  **Hecho cuando:** pasan y la guardia de ámbito de empresa sigue en verde. Depende de: T15.
+- [ ] **T22.** `[P]` R38, solo tests: `tests/unit/pedidos/update-order.test.ts` comprueba que la
+  edición de solo cliente rechaza con `invalid_transition`, sin consultar el catálogo de clientes,
+  en los estados sin edición general (`POR_EMPACAR`, `EN_EMPAQUE`, los de acondicionamiento,
+  `TERMINADO`, `ENTREGADO`, `CANCELADO`). **Hecho cuando:** pasa. Depende de: —.
+- [ ] **T23.** `[P]` R39: `ORDER_STATUS_ACCEPTS_CUSTOMER_CHANGE` (`false` solo en `ENTREGADO` y
+  `CANCELADO`) y `disabled` en `app/(private)/pedidos/components/order-row-actions.tsx`. Test:
+  `tests/unit/pedidos-ui/order-row-actions.test.tsx`, que cubre los diez estados (con «Cliente»
+  habilitada en los de acondicionamiento y `TERMINADO`) y el caso sin `pedidos.modificar`. **Hecho
+  cuando:** pasa. Depende de: —.
+- [ ] **T24.** R40: en `e2e/pedido-con-cliente.spec.ts`, el caso R40(c) pasa a afirmar que la acción
+  «Cliente» está deshabilitada en el `CANCELADO` y que su cliente no cambia. Ningún spec nuevo.
+  **Hecho cuando:** `pnpm exec playwright test e2e/pedido-con-cliente.spec.ts` está en verde.
+  Depende de: T21, T23.
+- [ ] **T25.** Ampliar el mapa `R<n> → test` de
+  `progress/impl_QC-215-estados-de-acondicionamiento.md` con R36–R40 y el R19 corregido. Después,
+  `./init.sh`. **Hecho cuando:** está en verde. Depende de: T20–T24.
+
 ## Archivos esperados
 
 **Producción:**
@@ -171,7 +214,9 @@
 `app/(private)/asignacion/components/company-orders-skeleton.tsx`,
 `app/(private)/asignacion/components/packed-order-notice.tsx`,
 `app/(private)/pedidos/components/order-status-badge.tsx`,
-`app/(private)/pedidos/components/order-row-actions.tsx`.
+`app/(private)/pedidos/components/order-row-actions.tsx`,
+`lib/modules/pedidos/domain/set-order-customer.ts` (T21),
+`lib/modules/pedidos/domain/errors.ts` (T21).
 
 **Tests nuevos:**
 `tests/unit/pedidos/schema/order-conditioning-states-migration.test.ts`,
@@ -183,6 +228,9 @@
 `tests/integration/pedidos/order-conditioning-states-rollback.int.test.ts`.
 
 **Tests modificados:**
+`tests/unit/pedidos/update-order-presentation-lines.test.ts` (T20),
+`tests/unit/pedidos/set-order-customer.test.ts` (T21),
+`tests/integration/pedidos/order-customer.int.test.ts` (T21),
 `tests/unit/pedidos/order-transitions.test.ts`,
 `tests/unit/pedidos/module-contract.test.ts`,
 `tests/unit/pedidos/transition-order.test.ts`,
@@ -222,7 +270,8 @@
 `e2e/pedido-en-varias-presentaciones.spec.ts`,
 `e2e/producto-terminado.spec.ts`,
 `e2e/pedidos-terminados.spec.ts`,
-`e2e/pedidos-asignados.spec.ts`.
+`e2e/pedidos-asignados.spec.ts`,
+`e2e/pedido-con-cliente.spec.ts` (T24).
 
 **Progreso:** `progress/impl_QC-215-estados-de-acondicionamiento.md`.
 
