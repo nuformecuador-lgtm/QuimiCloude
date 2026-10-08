@@ -32,14 +32,6 @@
     "tests/unit/navegacion/pantallas-exigen-permiso.test.tsx": {
       "motivo": "Deuda ajena de dev, roja desde 897a4f91 (feat(grupos,usuarios): alta de grupo con miembros, 2026-10-02): el caso «'/pedidos' se sirve con el permiso» rechaza con TypeError: Cannot read properties of undefined (reading 'status') en loadFormCatalogs (app/(private)/pedidos/page.tsx:91) porque el test no mockea listRecipesAction. page.tsx y el test son identicos a origin/dev. Ajeno a QC-170. Salida limpia: QC-180 borra esta entrada.",
       "desde": "2026-10-02"
-    },
-    "tests/integration/proveedores/catalog-line.int.test.ts": {
-      "motivo": "Deuda ajena de dev: el caso R32 espera un PrismaClientKnownRequestError y hoy recibe un ValidationError (la entrada se valida antes de llegar a la base). Falla igual en origin/dev 1a1db86e, sin los cambios del arnes v2; llego con los merges del 2026-10-06 (QC-209/QC-213). Detectado por el primer gate completo del arnes v2. Ver progress/deudas.md D33.",
-      "desde": "2026-10-06"
-    },
-    "tests/unit/recetas-ui/recipe-form-packing-steps.test.tsx": {
-      "motivo": "Intermitente en el runner de GitHub: el caso R8 (QC-211, error del paso de envasado vacio) tardo 5068 ms, por encima del plazo de 5 s, y no encontro recipe-packing-step-field-error-1. Pasa en local (10/10) tanto en origin/dev puro como en feature/mail-smtp-nodemailer, que no toca recetas. Salida limpia: acotar el render del caso o subirle el plazo, y borrar esta entrada.",
-      "desde": "2026-10-07"
     }
   }
 }

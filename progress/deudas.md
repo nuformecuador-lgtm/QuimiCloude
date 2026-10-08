@@ -178,10 +178,11 @@ Rescatados de *Evaluaciones* y *Features en curso* del archivo: no estaban en *D
 - **Qué falta:** `harnessConfig/` (entonces en la raíz) iba por delante: `docs/orquestacion.md`, la regla «si un subagente falla, el leader NO hace su trabajo», soporte de opencode. Solo se portó la sección de comentarios. Nada avisa de la divergencia. `harnessConfig/` ya no está en la raíz el 2026-10-06; el arnés v2 (con `harness_config/` aparte) debería absorberlo.
 - **Dueño:** arnés v2.
 
-### D33 — `catalog-line.int.test.ts` R32 en rojo en `dev`
+### D33 — `catalog-line.int.test.ts` R32 en rojo en `dev` (resuelta)
 - **Origen:** primer `./init.sh --completo` del arnés v2 (2026-10-06), sobre `origin/dev` 1a1db86e.
 - **Qué falta:** el caso R32 espera `PrismaClientKnownRequestError` y recibe `ValidationError`. O el test se adapta a la validación previa, o la validación sobra. Entró al baseline con motivo; al arreglarlo, se borra la entrada.
-- **Dueño:** sin asignar. Llegó con los merges de QC-209/QC-213, sin CI que lo viera.
+- **Estado:** resuelta el 2026-10-07 en `chore/rojos-sueltos-d33-packing`. No había validación previa ni la trajeron QC-209/QC-213: el adaptador no cambió desde QC-158. Causa: con un Postgres en inglés (`lc_messages = en_US.utf8`, el de Docker local y el `postgres:17` de CI) Prisma 6.19.3 sí entrega `meta.constraint` en el `P2003`, y el adaptador traduce como pide `QC-52 design.md > 6.2` (presentación/unidad → `invalid_input`, autor → crudo). El test afirmaba el comportamiento degradado de un Postgres en español. Ahora espía el `create` del delegado: exige el rechazo de la base con la restricción de la columna y la traducción correcta; muerde al quitar las FK y al traducir a ciegas o no traducir. Entrada borrada del baseline. Detalle: `progress/fix-rojos-sueltos.md`.
+- **Dueño:** sin asignar.
 
 ### D34 — `credential-setup.int.test.ts` R11 intermitente en CI (resuelta)
 - **Origen:** primeras corridas de `gate-completo` en GitHub Actions (2026-10-06/07). Falló en 2 de 5.
