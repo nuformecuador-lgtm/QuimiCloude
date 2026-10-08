@@ -200,6 +200,16 @@ export const E2E_ESPERADOS = [
   'pedidos-responsables.spec.ts',
   'permisos.spec.ts',
   'pedidos-asignados.spec.ts',
+  // Alta el 2026-10-08 (QC-167) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja
+  // -el archivo se nombra, uno a uno-. Lo que ejercita: el Administrador ve en el dashboard el
+  // recorrido de ejecucion de los pedidos de su empresa (no el de otra), lo filtra por persona y
+  // por parte del numero, abre el detalle con la vuelta atras marcada y vuelve con los mismos
+  // filtros; un pedido dado de baja sale marcado; el Operador y el pedido ajeno dan 404. NO
+  // ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni afirma nada
+  // sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue
+  // INTACTO.
+  'recorrido-ejecucion.spec.ts',
   // Alta el 2026-09-23 por el MISMO motivo y en el MISMO sitio que las demas: la lista
   // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se
   // relaja -el archivo se nombra, uno a uno-. Lo que ejercita: el bloque de coste del panel de
