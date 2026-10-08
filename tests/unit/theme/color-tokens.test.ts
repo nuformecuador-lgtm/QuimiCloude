@@ -222,6 +222,8 @@ const TEXT_PAIRS: ReadonlyArray<readonly [TokenName, TokenName]> = [
   ['warning-text', 'warning-subtle'],
   ['destructive-text', 'destructive-subtle'],
   ['info-text', 'info-subtle'],
+  // D22: QC-29 R25 sigue vigente, el texto de la barra lateral cumple AA sobre su fondo.
+  ['sidebar-foreground', 'sidebar'],
   ['sidebar-muted-foreground', 'sidebar'],
 ];
 

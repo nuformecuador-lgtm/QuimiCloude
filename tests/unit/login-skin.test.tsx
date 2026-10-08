@@ -17,6 +17,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 
 import LoginPage from '@/app/(public)/login/page';
 import type { LoginFormState } from '@/lib/modules/identity/adapters/driving/login-form-state';
+import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 
 // `__dirname` y no `import.meta.url`: en el proyecto `ui` (jsdom) la URL del modulo no es de
 // esquema `file` y `fileURLToPath` lanza. Mismo patron que `tests/unit/theme/sidebar-panel.test.tsx`.
@@ -592,6 +593,25 @@ describe('nivel 2 · contrato del marcado de la pantalla de login', () => {
     const landmarks = screen.getAllByRole('main');
     expect(landmarks).toHaveLength(1);
     expect(landmarks[0]).toHaveAttribute('data-login', 'screen');
+  });
+
+  it('R16: la cabecera de la tarjeta es un unico h1 con el logo vertical oscuro y sin texto visible', () => {
+    render(<LoginPage />);
+
+    const titulos = screen.getAllByRole('heading', { level: 1 });
+    expect(titulos).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1, name: BRAND_LABEL })).toBe(titulos[0]);
+
+    const titulo = titulos[0];
+    const logo = titulo.querySelector('img');
+    expect(logo).not.toBeNull();
+    expect(logo?.getAttribute('src')).toContain('/brand/logo-vertical-dark.svg');
+    expect(logo).toHaveAttribute('alt', BRAND_LABEL);
+
+    // Sin titulo de texto: el h1 solo contiene el logo, y el nombre sale de su `alt`.
+    expect(titulo.textContent?.trim()).toBe('');
+    expect(titulo.children).toHaveLength(1);
+    expect(document.querySelector('[data-slot="card-title"]')).toBeNull();
   });
 
   it('R17 (ENMIENDA QC-226): el main lleva el ambito oscuro y el Toaster queda fuera', () => {

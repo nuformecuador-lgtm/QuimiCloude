@@ -41,7 +41,7 @@ tienen que estar hechas antes. Cada task acaba con `pnpm run typecheck`, `pnpm r
 
 ## Fase 3 — login y metadatos
 
-- [ ] **T7 — Login** (R16–R23). En `page.tsx`, el `h1` con el logo vertical y `className="dark"`
+- [x] **T7 — Login** (R16–R23). En `page.tsx`, el `h1` con el logo vertical y `className="dark"`
   en el `main`. `login-background.tsx` pasa a las tres moléculas. En `globals.css`, el bloque del
   login reescrito (`design.md > 6`). Dep.: T2, T4.
   *Hecho:* `login-skin.test.tsx` actualizado y en verde; `login-form.test.tsx` en verde, con solo

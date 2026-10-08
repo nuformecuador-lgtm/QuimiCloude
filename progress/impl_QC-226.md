@@ -270,3 +270,40 @@ Sin cambios: medidas 44/400/18/28 (texto y E2E), panel flotante, radio/anillo/ti
 ### Veredicto
 
 T7 parcial: fondo de moléculas, ámbito oscuro, vidrio, entrada y movimiento reducido hechos y en verde (unitarios y E2E en los dos motores). R16 (el `h1` con el logo) queda bloqueado porque choca con `login-form.test.tsx`, y `e2e/login.spec.ts` no corre sin `DATABASE_URL`.
+
+## T7 — R16 (D21) y par de D22 en R5 — frontend_dev, 2026-10-08
+
+El bloqueo de arriba se resuelve con D21 (opción A, decisión humana). D22 mantiene QC-29 R25.
+
+### Archivos
+
+- `app/(public)/login/page.tsx`: `CardTitle` sustituido por `<h1>` con
+  `<BrandLogo variant="vertical" tone="on-dark" height={79} alt={BRAND_LABEL} />`; sin texto oculto;
+  import de `CardTitle` retirado; `BRAND_LABEL` importado de `lib/shared/navigation/private-nav`.
+- `tests/unit/login-form.test.tsx`: **solo** el caso «muestra la marca del producto como titulo de la
+  tarjeta (ENMIENDA QC-226 (D21))»: ahora `getByRole('heading', { level: 1, name: 'QuimiCloude' })`.
+  Resto del archivo intacto.
+- `tests/unit/login-skin.test.tsx`: caso nuevo de R16 (nivel 2) e import de `BRAND_LABEL`.
+- `tests/unit/theme/color-tokens.test.ts`: par `['sidebar-foreground', 'sidebar']` añadido a
+  `TEXT_PAIRS` (lo recorren los dos casos `it.each` de R5, claro y oscuro). Ningún token tocado.
+  Ratios con la conversión del test: claro 13.66:1, oscuro 16.24:1.
+
+### Mapa R<n> → test (completa el de T7)
+
+| Requisito | Test |
+| --- | --- |
+| R16 | `login-skin.test.tsx` > «R16: la cabecera de la tarjeta es un unico h1 con el logo vertical oscuro y sin texto visible»; `login-form.test.tsx` > «muestra la marca del producto como titulo de la tarjeta (ENMIENDA QC-226 (D21))» |
+| R5 (par de D22) | `color-tokens.test.ts` > «R5 (ENMIENDA QC-226): en modo claro…» y «…en modo oscuro los pares de texto llegan a 4.5:1…» (`sidebar-foreground/sidebar` en `TEXT_PAIRS`) |
+| R23 | `login-form.test.tsx` en verde con solo el caso de D21 enmendado |
+
+### Verificación (salida real)
+
+- `pnpm run typecheck` → `tsc --noEmit`, exit 0.
+- `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)` (los 7 previos, en `confirm-catalog-import.test.ts` y `order-service.test.ts`).
+- `pnpm exec vitest run tests/unit/login-form.test.tsx tests/unit/login-skin.test.tsx tests/unit/theme/color-tokens.test.ts tests/unit/brand` → `Test Files 6 passed (6)`, `Tests 114 passed (114)`.
+- `pnpm exec playwright test e2e/login-skin.spec.ts` → `14 passed (23.5s)` (7 casos × chromium y webkit). El servidor avisa de que `/brand/logo-vertical-dark.svg` es el LCP y sugiere `loading="eager"`: solo aviso, no se toca `BrandLogo` (fuera del encargo).
+- `e2e/login.spec.ts` no se corrió aquí (lo corre el leader).
+
+### Veredicto
+
+T7 completo en lo que toca a frontend_dev: R16 con el `h1` del logo y su test, D21 aplicado en el único caso permitido, y el par de D22 en verde en los dos modos.

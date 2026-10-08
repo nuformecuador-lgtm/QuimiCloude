@@ -2,14 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
 
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { BrandLogo } from '@/components/shared/brand-logo';
+import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { RETURN_PARAM, resolveReturnPath } from '@/lib/modules/identity';
+import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import { FORGOT_PASSWORD_ROUTE } from '@/lib/shared/routes';
 
 import { LoginBackground, LoginForm } from './components';
@@ -95,6 +91,9 @@ async function pantallaConDestinoDeVuelta(
  * La clase `dark` del `<main>` pinta la pantalla con los tokens oscuros sea cual sea el tema; el
  * `Toaster` del layout queda fuera y sigue el tema del usuario.
  *
+ * El `h1` de la tarjeta es el logo vertical: su nombre accesible sale del `alt` del logo, sin
+ * texto oculto.
+ *
  * El enlace de recuperacion va en el pie de la Card y FUERA del `<form>` (R22, `design.md > 5.4`):
  * no es un control del formulario y dentro estorbaria el orden de tabulacion entre la contrasena y
  * el boton de envio. Su ruta destino no existe todavia y hoy devuelve 404 (supuesto S6).
@@ -112,7 +111,9 @@ function pantallaDeLogin(next: string): ReactElement {
       <LoginBackground />
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>QuimiCloude</CardTitle>
+          <h1>
+            <BrandLogo variant="vertical" tone="on-dark" height={79} alt={BRAND_LABEL} />
+          </h1>
         </CardHeader>
         <CardContent>
           <LoginForm next={next} />
