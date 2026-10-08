@@ -76,3 +76,52 @@ QC-229 + `progress/features/QC-229.md > Decisiones`.
 ## Veredicto
 
 **RECHAZADO** por el hallazgo 1: un test que ya existia (`deploy-hook.test.ts`, QC-6 R19/R20) queda rojo y el CI no pasara. Ademas, la propagacion del fallo del seed al build (R20) no la cubre ningun test. Los menores no bloquean.
+
+## Vuelta 2 (acotada a cf44b30d..9f9afbaa)
+
+Commits: `7a80743f` (arreglos del review) y `9f9afbaa` (CLI aprobada, bitacora, review v1).
+
+### Bloqueante 1: resuelto
+- [x] `tests/unit/identity/seed/deploy-hook.test.ts` esta adaptado, no borrado:
+  - `scripts.build` es `node scripts/build.mjs`;
+  - con `it.each`, fuera de Vercel y en Vercel production, `pasosDelBuild` da los cuatro pasos en orden (R19);
+  - si el seed falla, `ejecutarBuild` sale con un codigo distinto de 0 y `next build` no se llama (R20).
+
+  Los bloques de R6 y R21 siguen intactos.
+- [x] Enmienda del 2026-10-08 en `specs/QC-6-seed-roles-y-usuario-inicial/requirements.md`: cambia el mecanismo y no la intencion, y apunta a los dos tests.
+- [x] `scripts/build.mjs` saca `ejecutarBuild(env, ejecutar, salida)` con el ejecutor inyectado. `tests/unit/scripts/build.test.ts` anade 6 casos:
+  - todo ok, 0;
+  - falla el seed: devuelve su codigo (3) y no corre `next build`;
+  - falla el primer paso: no corre ninguno mas;
+  - `status null` cuenta como 1;
+  - error al lanzar: 1 y un mensaje por stderr;
+  - el orden de los logs.
+- [x] Muerde: con `return r.status ?? 1` cambiado por `continue`, salen 4 rojos entre `deploy-hook` y `build.test`. Revertido.
+- [x] El bloque de entrada sigue igual que antes: `spawnSync` con `shell: true` y `process.exit(codigo)`.
+
+### Menores
+- [x] 2: corregido. La tanda de `progress/features/QC-229.md` ya no dice que sin `VERCEL_ENV` se migre.
+- [x] 3: la guardia anade tres afirmaciones:
+  - `concurrency` con grupo fijo y `cancel-in-progress: false` explicito;
+  - un paso con `-n "$SECRET"` para los tres secrets y `exit 1`, que va antes del deploy;
+  - ningun `--token`.
+
+  Muerde: con `cancel-in-progress: true` sale 1 rojo. Revertido.
+- [x] 4: fila de la CLI `vercel@63.1.0` en `docs/dependencias.md > Herramientas fuera de package.json`:
+  - los cuatro checks, con datos del registro;
+  - la aprobacion humana del 2026-10-08;
+  - lo que queda abierto (dependencias transitivas sin lockfile, version del mismo dia).
+
+  La primera celda no va entre backticks a proposito, para no disparar la guardia de dependencias, y la guardia sigue en verde.
+- [x] 6: `--token` quitado. La CLI lee `VERCEL_TOKEN`, que va en el `env:` del paso. No lo comprobe contra la CLI real: queda para el primer despliegue real, que ya estaba abierto.
+- [ ] 5 (menor, sigue abierto): el org ID y el project ID siguen en texto plano en `progress/features/QC-229.md:23`. No son secretos y no bloquea; lo decide el leader.
+
+### Verificacion
+- `pnpm exec vitest run tests/unit/identity tests/unit/scripts tests/guards`: 154 archivos, 2630 tests en verde y 36 saltados.
+- `./init.sh`: exit 0, `== init OK ==`. 3 tests relacionados y 57 guardias en verde; lint con 0 errores.
+- El arbol quedo limpio tras las mutaciones.
+
+### Hallazgos nuevos
+Ninguno.
+
+### Veredicto vuelta 2: **OK**
