@@ -170,7 +170,62 @@ B1 listo: tres migraciones con down probado, esquema y cliente regenerados, cens
 - `pnpm exec vitest run guard`: `Test Files 55 passed (55)`, `Tests 747 passed | 11 skipped (758)`.
 - `deliver-order.test.ts`: `Tests 45 passed (45)`; `get-order-delivery.test.ts`: `Tests 20 passed (20)`.
 - `order-delivery-repository.int.test.ts` contra Postgres (copia `qct_qc223_…` de la plantilla): `Test Files 1 passed (1)`, `Tests 9 passed (9)`.
-- `pnpm exec vitest related --run <tocados>`: PENDIENTE_RELATED
+- `pnpm exec vitest related --run <8 archivos tocados>`: `Test Files 1 failed | 335 passed (336)`, `Tests 1 failed | 5296 passed | 2 skipped (5299)`. El único rojo es `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` («'/pedidos' se sirve con el permiso…»), que está en `tests/baseline-rojos.json`.
+- Censos de `pedidos` (`module-contract`, `scope`, `company-scope`, `search-order-customer-options`): `Tests 40 passed (40)`.
 
 ### Veredicto
-PENDIENTE_VEREDICTO
+B3 y B4 listos y en verde contra dobles y contra Postgres. Hay una desviación del design para validar: la entrega se crea antes de comprobar el tope, para que se cumpla R29.
+
+## B2 — Salida física en `inventario` (backend_dev, 2026-10-08)
+
+### Archivos creados
+- `lib/modules/inventario/adapters/driven/persistence/finished-goods-dispatch-prisma.ts`: `createFinishedGoodsDispatch(tx)` (molde de `createFinishedGoodsIntake`).
+- `lib/modules/inventario/adapters/driven/persistence/deliverable-batches-prisma.ts`: `findDeliverableBatches(recipeId, presentationIds, companyId)` sobre el cliente global; la consulta vive en `findBatchesWithStock(..., scope: InventoryScope)` para pasar `guard-ambito-empresa-inventario` (mismo molde que `findFinishedGoodsReceipts`).
+- `tests/unit/inventario/finished-goods-dispatch-prisma.test.ts` (tx doblado, 10 casos).
+- `tests/integration/inventario/finished-goods-dispatch.int.test.ts` (modo `transaccion`, 4 casos).
+- `tests/integration/inventario/deliverable-batches.int.test.ts` (modo `commit`, 2 casos).
+
+### Archivos modificados
+- `product-prisma.ts`: `dispatchFinishedGoods` (`design.md > 4.2`): `FOR NO KEY UPDATE` del terminado vivo → `findMany` de lotes (empresa, producto, `package_content IS NOT NULL`) → por asignación `updateMany` condicional (`stock >= qty`) + `writeMovement` `delivery` negativo → un `recalculateProductStock`. Sin allocations devuelve `dispatched` vacío sin tocar la base.
+- `batch-movement-prisma.ts`: `writeMovement` escribe `orderDeliveryId` solo cuando llega (los demás asientos no nombran la columna; el test de forma exacta de `writeMovement` sigue verde).
+- `domain/finished-goods-dispatch.ts`: + `quantityForPackages(packages, packageContent)` (BigInt, `'d.dddd'`). No se publica en el barrel.
+- Enmiendas de censo, con nota «QC-223 2026-10-08» y sin quitar aserciones previas:
+  - `tests/guards/guard-libro-de-inventario.test.ts`: `CAMINOS_ESPERADOS` + `dispatchFinishedGoods`, y el título del caso.
+  - `tests/unit/inventario/qc121-alcance.test.ts`: `CAMINOS_ESPERADOS` + `dispatchFinishedGoods`; fuente fabricada de siete caminos; «séptimo» → «octavo» camino fabricado; «seis» → «siete» en el censo real.
+  - `tests/unit/inventario/qc91-alcance.test.ts`: `llamaAMetodoFueraDe`/`llamaAUpdateManyFueraDe` aceptan uno o varios nombres (con uno se comportan igual: los casos sintéticos previos no cambian); el caso real usa `['consumeBatchStock', 'dispatchFinishedGoods']` y además afirma que solo con `consumeBatchStock` el real SÍ da hallazgo; caso sintético nuevo: un tercer `updateMany` sigue en rojo.
+  - `tests/unit/inventario/batch-movement-prisma.test.ts`: caso nuevo de `orderDeliveryId`.
+  - `tests/unit/inventario/finished-goods-dispatch.test.ts`: casos de `quantityForPackages`.
+  - `tests/integration/inventario/ledger-cuadre.int.test.ts`: caso con entrega.
+  - `tests/integration/aislamiento.json`: `inventario/finished-goods-dispatch.int.test.ts` en `transaccion`; `inventario/deliverable-batches.int.test.ts` en `commit` con motivo y `desde: 2026-10-08` (edición mínima, sin reescribir el archivo).
+- Revisados sin cambio (verdes): `guard-ambito-empresa-inventario` (barre los archivos nuevos), `tests/unit/inventario/scope.test.ts`, `company-scope.test.ts`, `inventario-schema.test.ts` (barrel sin cambio).
+
+### Decisiones
+- `findDeliverableBatches.presentationId` sale de `products.presentation_id` (la combinación filtrada), no de `product_batches.presentation_id`.
+- El orden lo pone Postgres (`purchase_date ASC, lot ASC`); `lot` es único por empresa, así que no hace falta desempate.
+
+### R → test (B2)
+| R | Test |
+|---|---|
+| R7 | `deliverable-batches.int.test.ts` «R7: devuelve los lotes de produccion e importacion con al menos un envase, por fecha de entrada y luego por lote» (excluye <1 envase, sin existencia, sin contenido, otra presentación, otra receta, producto de baja, empresa B; comprueba orden y forma) y «R7: sin presentaciones pedidas ...» |
+| R19 | `finished-goods-dispatch-prisma.test.ts` (producto ausente, lote que no vuelve —ajeno/otro producto—, lote sin contenido; lectura acotada); `finished-goods-dispatch.int.test.ts` «R19: un lote de la empresa B ...», «R19: un lote de otro producto ...» |
+| R20 | `finished-goods-dispatch-prisma.test.ts` «R20: count === 0 da insufficient ...», «R20: si el segundo lote no alcanza ...»; `finished-goods-dispatch.int.test.ts` «R20: pedir mas envases enteros ...» |
+| R23 | `finished-goods-dispatch-prisma.test.ts` «R23: producto -> lotes -> ...»; `finished-goods-dispatch.int.test.ts` «R23, R24: ...»; `finished-goods-dispatch.test.ts` `quantityForPackages (R23)`; `ledger-cuadre.int.test.ts` «QC-223 R23, R24: cuadra con un lote ... entrega» |
+| R24 | `finished-goods-dispatch-prisma.test.ts` «R24: cada asiento es delivery ...», «R24: dispatchForDelivery ...»; `batch-movement-prisma.test.ts` «QC-223 R24: escribe orderDeliveryId ...»; `finished-goods-dispatch.int.test.ts` «R23, R24: ...» |
+| R28 (parte inventario) | `finished-goods-dispatch-prisma.test.ts` «R28: el decremento es condicional ...» |
+
+### Salida real
+- `pnpm run typecheck`: `tsc --noEmit` sin errores.
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)` (los mismos 7 heredados, en `confirm-catalog-import.test.ts` y `order-service.test.ts`).
+- `pnpm exec vitest run guard` + `qc121-alcance` + `qc91-alcance` + `batch-movement-prisma`: `Test Files 58 passed (58)`, `Tests 826 passed | 11 skipped (837)`.
+- Nuevos unit: `Test Files 3 passed (3)`, `Tests 38 passed (38)`.
+- Nuevos/enmendados `.int` (`finished-goods-dispatch`, `deliverable-batches`, `ledger-cuadre`) contra `QuimiCloude_QC223`: `Test Files 3 passed (3)`, `Tests 12 passed (12)`.
+- `pnpm exec vitest related --run <14 archivos tocados>`: `Test Files 2 failed | 469 passed (471)`, `Tests 2 failed | 7546 passed | 8 skipped (7556)`. Los dos rojos son de baseline: `tests/unit/recetas/module-contract.test.ts` y `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` ('/pedidos').
+- El MCP del grafo no se usó en esta tanda (Grep/Read).
+
+### Veredicto
+B2 listo: salida física, lectura de lotes entregables y las tres guardias enmendadas, en verde contra Postgres.
+
+### Re-verificación de B2 contra el worktree (backend_dev, tanda 2, 2026-10-08)
+- Los 4 archivos de `lib/` y los 7 de `tests/` de `tasks.md > B2` existen. Las enmiendas llevan nota «QC-223 2026-10-08»: `guard-libro-de-inventario` (`CAMINOS_ESPERADOS` y título), `qc121-alcance` (censo, fuente fabricada, octavo camino), `qc91-alcance` (dos funciones permitidas y el caso sintético «R30: updateMany en consumeBatchStock y dispatchFinishedGoods no es hallazgo; uno en una tercera funcion si»), `ledger-cuadre` (caso «QC-223 R23, R24: cuadra con un lote ... entrega»). `aislamiento.json`: `finished-goods-dispatch` en `transaccion`, `deliverable-batches` en `commit` con motivo y `desde`. Sin huecos.
+- Unit + guardia (`finished-goods-dispatch-prisma`, `finished-goods-dispatch`, `batch-movement-prisma`, `qc121-alcance`, `qc91-alcance`, `guard-libro-de-inventario`): `Test Files 6 passed (6)`, `Tests 125 passed (125)`.
+- `.int` (`finished-goods-dispatch`, `deliverable-batches`, `ledger-cuadre`): `Test Files 3 passed (3)`, `Tests 12 passed (12)` (plantilla `qct_tpl_7dede18c795f`).
