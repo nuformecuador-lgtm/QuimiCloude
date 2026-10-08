@@ -307,6 +307,36 @@ describe('deliverOrder contra Postgres', () => {
     }
   });
 
+  it('R29: reintentar con la misma clave la entrega que dejo el pedido ENTREGADO es already_registered con ENTREGADO, sin escribir nada mas', async () => {
+    const e = await crearEscenario();
+    try {
+      const entrada = {
+        orderId: e.orderId,
+        deliveryKey: randomUUID(),
+        customerId: e.customerId,
+        allocations: [
+          { presentationLineId: e.lineId, batchId: e.batchId, packages: 4 },
+          { presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 1 },
+          { presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 3 },
+        ],
+      };
+
+      expect(await pedidos.deliverOrder(entrada, e.a.actor)).toEqual({ status: 'delivered', orderStatus: 'ENTREGADO' });
+      expect(await pedidos.deliverOrder(entrada, e.a.actor)).toEqual({
+        status: 'already_registered',
+        orderStatus: 'ENTREGADO',
+      });
+
+      expect((await pedido(e.orderId)).status).toBe('ENTREGADO');
+      expect(await escritoPorEntregas(e.a.companyId)).toEqual({ entregas: 1, lineas: 3, asientos: 3 });
+      expect(await stockDeLote(e.batchId)).toBe('0.0000');
+      expect(await stockDeLote(e.secondBatchId)).toBe('4.0000');
+      expect(await stockDeLote(e.smallBatchId)).toBe('3.0000');
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+
   it('R30: si el segundo lote no alcanza no queda nada escrito, ni siquiera la salida del primero', async () => {
     const e = await crearEscenario();
     try {

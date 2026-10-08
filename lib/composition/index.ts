@@ -1476,6 +1476,7 @@ export const pedidos = {
   deliverOrder: createDeliverOrder({
     customerCatalog,
     unitOfWork: orderDeliveryUnitOfWork,
+    deliveries: createOrderDeliveryRepository(),
     orders: orderRepository,
   }),
 } as const;

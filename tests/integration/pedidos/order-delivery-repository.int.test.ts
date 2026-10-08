@@ -275,6 +275,20 @@ describe('OrderDeliveryRepository contra Postgres real', () => {
     })
   })
 
+  it('R29: findByKey devuelve la entrega de la empresa con su pedido, y no ve la clave de otra empresa', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const b = await createTenant(tx, 'B')
+      const repo = createOrderDeliveryRepository(tx)
+      const key = randomUUID()
+      const id = await createdId(repo, a, key)
+
+      expect(await repo.findByKey(key, { companyId: a.companyId })).toEqual({ id, orderId: a.orderId })
+      expect(await repo.findByKey(key, { companyId: b.companyId })).toBeNull()
+      expect(await repo.findByKey(randomUUID(), { companyId: a.companyId })).toBeNull()
+    })
+  })
+
   it('R31: create con el ambito de otra empresa no puede apuntar al pedido de A', async () => {
     await inRolledBackTransaction(async (tx) => {
       const a = await createTenant(tx, 'A')

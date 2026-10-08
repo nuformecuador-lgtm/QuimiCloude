@@ -14,7 +14,7 @@ import { checkDelivery, DELIVERY_MAX_ALLOCATIONS, type DeliveryAllocation } from
 import type { OrderScope } from './order-scope';
 import { assertTransition } from './order-transitions';
 
-import type { NewOrderDeliveryLine } from '../ports/order-delivery-repository';
+import type { NewOrderDeliveryLine, OrderDeliveryRepository } from '../ports/order-delivery-repository';
 import type { OrderDeliveryTransactionScope, OrderDeliveryUnitOfWork } from '../ports/order-delivery-unit-of-work';
 import type { OrderRepository } from '../ports/order-repository';
 import type { FinishPackingLine } from '../ports/order-write-repository';
@@ -29,7 +29,9 @@ export type DeliverOrderResult = {
 export type DeliverOrderDeps = {
   readonly customerCatalog: Pick<CustomerCatalog, 'findAliveRefById'>;
   readonly unitOfWork: OrderDeliveryUnitOfWork;
-  /** Solo para responder con el estado actual cuando la clave de entrega ya estaba registrada. */
+  /** Sobre el cliente global: la clave se mira antes de abrir la transaccion (R29). */
+  readonly deliveries: Pick<OrderDeliveryRepository, 'findByKey'>;
+  /** Solo para responder con el estado del pedido de la entrega ya registrada (R29). */
   readonly orders: OrderRepository;
   readonly now?: () => Date;
 };
@@ -57,8 +59,8 @@ const deliverOrderSchema = z
 
 type DeliverOrderInput = z.infer<typeof deliverOrderSchema>;
 
-/** Deshace la transaccion cuando la clave de entrega ya existe; fuera se responde con el estado
- *  que dejo la primera entrega. */
+/** Deshace la transaccion cuando otra peticion inserto la misma clave entre la lectura previa y el
+ *  `INSERT`; fuera se vuelve a leer la entrega ya confirmada. */
 class DeliveryAlreadyRegisteredSignal extends Error {
   constructor() {
     super('la clave de entrega ya estaba registrada');
@@ -90,8 +92,8 @@ async function deliverInTransaction(
   const lineById = new Map<string, FinishPackingLine>(lines.map((line) => [line.id, line]));
   if (input.allocations.some((a) => !lineById.has(a.presentationLineId))) throw new ValidationError();
 
-  // Antes de comprobar el tope: un reintento con la misma clave tiene que responder que ya estaba
-  // registrada, no que ahora excede lo que falta por su propia primera entrega.
+  // Antes de comprobar el tope: si otra peticion confirmo la misma clave despues de la lectura
+  // previa, tiene que responder que ya estaba registrada, no que ahora excede lo que falta.
   const created = await tx.deliveries.create(
     {
       deliveryKey: input.deliveryKey,
@@ -145,6 +147,9 @@ async function deliverInTransaction(
   return { status: 'delivered', orderStatus: 'ENTREGADO' };
 }
 
+/** Responde con el estado del pedido DE LA ENTREGA registrada, no del pedido pedido: la clave es
+ *  unica por empresa, no por pedido. Ese pedido solo puede estar `TERMINADO` o `ENTREGADO`, porque
+ *  la entrega exige `TERMINADO` y `TERMINADO` no se cancela. */
 async function alreadyRegistered(
   orders: OrderRepository,
   orderId: string,
@@ -168,17 +173,24 @@ export function createDeliverOrder(
     const parsed = deliverOrderSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
     const data = parsed.data;
+    const scope: OrderScope = { companyId: actor.companyId };
+
+    // La clave antes que el cliente, el bloqueo y el estado: un reintento sobre un pedido que la
+    // primera ya dejo ENTREGADO tiene que responder que ya estaba registrada (R29).
+    const registered = await deps.deliveries.findByKey(data.deliveryKey, scope);
+    if (registered !== null) return alreadyRegistered(deps.orders, registered.orderId, scope);
 
     await requireAliveCustomer(deps.customerCatalog, data.customerId, actor.companyId);
 
     assertTransition('TERMINADO', 'ENTREGADO');
 
-    const scope: OrderScope = { companyId: actor.companyId };
     try {
       return await deps.unitOfWork.run((tx) => deliverInTransaction(tx, data, actor.id, now(), scope));
     } catch (error) {
-      if (error instanceof DeliveryAlreadyRegisteredSignal) return alreadyRegistered(deps.orders, data.orderId, scope);
-      throw error;
+      if (!(error instanceof DeliveryAlreadyRegisteredSignal)) throw error;
+      const raced = await deps.deliveries.findByKey(data.deliveryKey, scope);
+      if (raced === null) throw new Error('deliverOrder: duplicate_key sin entrega con esa clave');
+      return alreadyRegistered(deps.orders, raced.orderId, scope);
     }
   };
 }

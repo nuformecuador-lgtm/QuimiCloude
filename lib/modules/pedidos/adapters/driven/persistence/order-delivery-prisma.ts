@@ -9,6 +9,7 @@ import type {
   NewOrderDelivery,
   NewOrderDeliveryLine,
   OrderDeliveryRepository,
+  RegisteredOrderDelivery,
 } from '../../../ports/order-delivery-repository';
 
 type PrismaLike = PrismaClient | Prisma.TransactionClient;
@@ -19,6 +20,20 @@ type CreateOutcome = { readonly kind: 'created'; readonly id: string } | { reado
  *  clave de entrega por empresa. El choque aborta la transaccion de quien llama. */
 function isDuplicateDeliveryKey(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+}
+
+/** Lee por el indice unico `(company_id, delivery_key)`: la empresa va en el `where`, asi que la
+ *  clave de otra empresa no aparece. */
+async function findOrderDeliveryByKey(
+  deliveryKey: string,
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<RegisteredOrderDelivery | null> {
+  const { companyId } = companyScopeColumns(scope);
+  return tx.orderDelivery.findUnique({
+    where: { companyId_deliveryKey: { companyId, deliveryKey } },
+    select: { id: true, orderId: true },
+  });
 }
 
 async function createOrderDelivery(
@@ -85,6 +100,7 @@ async function sumOrderDeliveredPackages(
  *  `delete` ni `upsert`: una entrega registrada no se modifica. */
 export function createOrderDeliveryRepository(tx: PrismaLike = prisma): OrderDeliveryRepository {
   return {
+    findByKey: (deliveryKey, scope) => findOrderDeliveryByKey(deliveryKey, scope, tx),
     create: (delivery, scope) => createOrderDelivery(delivery, scope, tx),
     addLines: (deliveryId, lines, scope) => addOrderDeliveryLines(deliveryId, lines, scope, tx),
     sumDeliveredPackages: (orderId, scope) => sumOrderDeliveredPackages(orderId, scope, tx),

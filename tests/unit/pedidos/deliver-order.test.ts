@@ -28,6 +28,7 @@ import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { PedidosError } from '@/lib/modules/pedidos/domain/errors'
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification'
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
+import type { RegisteredOrderDelivery } from '@/lib/modules/pedidos/ports/order-delivery-repository'
 import type { OrderDeliveryTransactionScope } from '@/lib/modules/pedidos/ports/order-delivery-unit-of-work'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { FinishPackingLine, LockedOrderRow } from '@/lib/modules/pedidos/ports/order-write-repository'
@@ -82,6 +83,7 @@ type Montaje = {
     readonly finishedGoods: { readonly dispatchForDelivery: ReturnType<typeof vi.fn> }
   }
   readonly run: ReturnType<typeof vi.fn>
+  readonly findByKey: ReturnType<typeof vi.fn>
   readonly findAliveById: ReturnType<typeof vi.fn>
   readonly findAliveRefById: ReturnType<typeof vi.fn>
   /** Lo que lanzo el trabajo dentro de `run`, o `null` si termino bien. */
@@ -98,6 +100,11 @@ function montar(
     setStatus?: 'ok' | 'not_found' | 'stale'
     leido?: OrderRow | null
     cliente?: CustomerRef | null
+    /** Lo que devuelve la lectura previa de la clave; sin el, `null` (clave nueva). */
+    registrada?: RegisteredOrderDelivery | null
+    /** Entregas registradas por `${companyId}:${clave}`; si se da, sustituye a `registrada` y a la
+     *  relectura tras la carrera. */
+    claves?: ReadonlyMap<string, RegisteredOrderDelivery>
   } = {},
 ): Montaje {
   const tx = {
@@ -128,6 +135,15 @@ function montar(
     opciones.leido === undefined ? pedidoTerminado({ status: 'ENTREGADO' }) : opciones.leido,
   )
   const findAliveRefById = vi.fn(async () => (opciones.cliente === undefined ? CLIENTE : opciones.cliente))
+  // La primera llamada es la lectura previa; una segunda solo ocurre tras `duplicate_key`, cuando
+  // la otra peticion ya confirmo la entrega de este pedido.
+  let lecturasDeClave = 0
+  const findByKey = vi.fn(async (deliveryKey: string, scope: { companyId: string }) => {
+    lecturasDeClave += 1
+    if (opciones.claves !== undefined) return opciones.claves.get(`${scope.companyId}:${deliveryKey}`) ?? null
+    if (lecturasDeClave === 1) return opciones.registrada ?? null
+    return { id: DELIVERY_ID, orderId: DELIVERY_ORDER_ID }
+  })
   const explota = (nombre: string) =>
     vi.fn(() => {
       throw new Error(`OrderRepository.${nombre} no deberia llamarse`)
@@ -138,11 +154,13 @@ function montar(
     deps: {
       customerCatalog: { findAliveRefById },
       unitOfWork: { run } as unknown as DeliverOrderDeps['unitOfWork'],
+      deliveries: { findByKey },
       orders: orders as unknown as OrderRepository,
       now: () => AHORA,
     },
     tx,
     run,
+    findByKey,
     findAliveById,
     findAliveRefById,
     lanzoDentro: () => lanzado,
@@ -166,6 +184,7 @@ function nadaEscrito(m: Montaje): void {
 
 function ningunPuerto(m: Montaje): void {
   expect(m.findAliveRefById).not.toHaveBeenCalled()
+  expect(m.findByKey).not.toHaveBeenCalled()
   expect(m.run).not.toHaveBeenCalled()
   expect(m.findAliveById).not.toHaveBeenCalled()
   expect(m.tx.orders.lockAliveById).not.toHaveBeenCalled()
@@ -483,6 +502,70 @@ describe('deliverOrder — clave de entrega ya registrada (R29)', () => {
       status: 'already_registered',
       orderStatus: 'TERMINADO',
     })
+    nadaEscrito(m)
+  })
+  it('R29: un reintento sobre un pedido que la primera ya dejo ENTREGADO es already_registered con ENTREGADO, sin bloquear ni escribir', async () => {
+    const m = montar({
+      registrada: { id: DELIVERY_ID, orderId: DELIVERY_ORDER_ID },
+      pedido: pedidoTerminado({ status: 'ENTREGADO' }),
+      leido: pedidoTerminado({ status: 'ENTREGADO' }),
+    })
+
+    await expect(createDeliverOrder(m.deps)(deliverInput(), ENTREGADOR)).resolves.toEqual({
+      status: 'already_registered',
+      orderStatus: 'ENTREGADO',
+    })
+    expect(m.findByKey).toHaveBeenCalledTimes(1)
+    expect(m.findByKey).toHaveBeenCalledWith(DELIVERY_KEY, SCOPE)
+    expect(m.findAliveById).toHaveBeenCalledWith(DELIVERY_ORDER_ID, SCOPE)
+    expect(m.run).not.toHaveBeenCalled()
+    expect(m.findAliveRefById).not.toHaveBeenCalled()
+    expect(m.tx.orders.lockAliveById).not.toHaveBeenCalled()
+    expect(m.tx.deliveries.create).not.toHaveBeenCalled()
+    nadaEscrito(m)
+  })
+
+  it('R29: una clave reutilizada contra OTRO pedido de la empresa responde con el estado del pedido de la entrega, no del pedido pedido', async () => {
+    const OTRO_PEDIDO = '77777777-7777-4777-8777-777777777777'
+    const m = montar({ registrada: { id: DELIVERY_ID, orderId: OTRO_PEDIDO } })
+    m.findAliveById.mockImplementation(async (id: string) =>
+      id === OTRO_PEDIDO ? pedidoTerminado({ id: OTRO_PEDIDO, status: 'ENTREGADO' }) : pedidoTerminado(),
+    )
+
+    await expect(createDeliverOrder(m.deps)(deliverInput(), ENTREGADOR)).resolves.toEqual({
+      status: 'already_registered',
+      orderStatus: 'ENTREGADO',
+    })
+    expect(m.findAliveById).toHaveBeenCalledTimes(1)
+    expect(m.findAliveById).toHaveBeenCalledWith(OTRO_PEDIDO, SCOPE)
+    expect(m.run).not.toHaveBeenCalled()
+    nadaEscrito(m)
+  })
+
+  it('R29: la clave registrada en OTRA empresa no la ve la lectura con el ambito del actor, y la entrega se registra', async () => {
+    const OTRA_EMPRESA = '44444444-4444-4444-8444-444444444444'
+    const m = montar({
+      claves: new Map([[`${OTRA_EMPRESA}:${DELIVERY_KEY}`, { id: DELIVERY_ID, orderId: DELIVERY_ORDER_ID }]]),
+    })
+
+    await expect(createDeliverOrder(m.deps)(deliverInput(), ENTREGADOR)).resolves.toEqual({
+      status: 'delivered',
+      orderStatus: 'TERMINADO',
+    })
+    expect(m.findByKey).toHaveBeenCalledWith(DELIVERY_KEY, SCOPE)
+    expect(m.findAliveById).not.toHaveBeenCalled()
+    expect(m.tx.deliveries.create).toHaveBeenCalledTimes(1)
+  })
+
+  it('R29: si otra peticion inserta la clave entre la lectura y el INSERT, duplicate_key vuelve a leer la entrega y responde con su pedido', async () => {
+    const m = montar({ creada: { kind: 'duplicate_key' }, leido: pedidoTerminado() })
+
+    await expect(createDeliverOrder(m.deps)(deliverInput(), ENTREGADOR)).resolves.toEqual({
+      status: 'already_registered',
+      orderStatus: 'TERMINADO',
+    })
+    expect(m.findByKey).toHaveBeenCalledTimes(2)
+    expect(m.lanzoDentro(), 'la senal tiene que deshacer la transaccion').not.toBeNull()
     nadaEscrito(m)
   })
 })

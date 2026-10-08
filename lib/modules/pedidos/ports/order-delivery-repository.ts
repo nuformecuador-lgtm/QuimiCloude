@@ -8,6 +8,12 @@ export type NewOrderDelivery = {
   readonly now: Date;
 };
 
+/** Lo minimo de una entrega ya registrada para responder a un reintento con su clave (R29). */
+export type RegisteredOrderDelivery = {
+  readonly id: string;
+  readonly orderId: string;
+};
+
 export type NewOrderDeliveryLine = {
   readonly presentationLineId: string;
   readonly batchId: string;
@@ -17,6 +23,8 @@ export type NewOrderDeliveryLine = {
 
 /** Las entregas de un pedido y sus lineas. Solo se insertan: ni se editan ni se borran. */
 export interface OrderDeliveryRepository {
+  /** La entrega de la empresa con esa clave, o `null`. Una clave de otra empresa no se ve (R29, R31). */
+  findByKey(deliveryKey: string, scope: OrderScope): Promise<RegisteredOrderDelivery | null>;
   /** `duplicate_key` si la empresa ya tiene una entrega con esa clave. */
   create(
     delivery: NewOrderDelivery,

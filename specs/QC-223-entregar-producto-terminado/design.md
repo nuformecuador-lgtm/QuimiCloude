@@ -196,7 +196,13 @@ export type NewOrderDeliveryLine = {
   readonly quantity: string;
 };
 
+/** Lo mínimo de una entrega ya registrada para responder a un reintento (R29). */
+export type RegisteredOrderDelivery = { readonly id: string; readonly orderId: string };
+
 export interface OrderDeliveryRepository {
+  /** La entrega de la empresa con esa clave, o null; la de otra empresa no se ve (R29, R31).
+   *  Decisión del leader 2026-10-08, opción b. */
+  findByKey(deliveryKey: string, scope: OrderScope): Promise<RegisteredOrderDelivery | null>;
   /** 'duplicate_key' si (company_id, delivery_key) ya existe (R29). */
   create(delivery: NewOrderDelivery, scope: OrderScope):
     Promise<{ readonly kind: 'created'; readonly id: string } | { readonly kind: 'duplicate_key' }>;
@@ -287,7 +293,8 @@ export type DeliverOrderResult = {
 export type DeliverOrderDeps = {
   readonly customerCatalog: Pick<CustomerCatalog, 'findAliveRefById'>;
   readonly unitOfWork: OrderDeliveryUnitOfWork;
-  readonly orders: OrderRepository; // solo para responder en R29 con el estado actual
+  readonly deliveries: Pick<OrderDeliveryRepository, 'findByKey'>; // cliente global (R29)
+  readonly orders: OrderRepository; // solo para responder en R29 con el estado del pedido de la entrega
   readonly now?: () => Date;
 };
 
@@ -298,8 +305,11 @@ export function createDeliverOrder(deps: DeliverOrderDeps):
 Orden de validación. Cada paso corta antes del siguiente:
 1. `requirePermission(actor, 'entregas.modificar')`: es la primera sentencia (R2, R3).
 2. `safeParse`: si falla, `ValidationError` (R22).
-3. `requireAliveCustomer`: si falla, `CustomerNotFoundError` (R21).
-4. `unitOfWork.run`: §4.
+3. `deliveries.findByKey(deliveryKey, scope)`: si hay entrega, responde `already_registered` con el
+   estado del pedido de esa entrega (§4.1) y no sigue (R29). *Decisión del leader 2026-10-08,
+   opción b.*
+4. `requireAliveCustomer`: si falla, `CustomerNotFoundError` (R21).
+5. `unitOfWork.run`: §4.
 
 `assertTransition('TERMINADO', 'ENTREGADO')` se llama antes de abrir la transacción, igual que
 `createFinishPacking`, para que falle rápido si la matriz dejara de admitirlo.
@@ -543,13 +553,17 @@ Todo ocurre dentro de `unitOfWork.run` (`withOrderTransaction`). El orden de blo
 producto y lote, el mismo que Terminar el empaque (pedido y luego producto) y el ajuste (producto y
 luego lote). No aparece ningún ciclo nuevo.
 
+0. *Antes de la transacción* (§2.4, paso 3): `deliveries.findByKey(deliveryKey, scope)` sobre el
+   cliente global. Si la clave ya está registrada en la empresa, responde `already_registered` con
+   el estado del pedido de esa entrega y no abre la transacción: no bloquea, no mira el estado del
+   pedido pedido y no escribe nada (R29). *Decisión del leader 2026-10-08, opción b.*
 1. `orders.lockAliveById(orderId, scope)`. Si devuelve `null`, `OrderNotFoundError`. Si
    `status !== 'TERMINADO'`, `ActionNotAllowedError` (R17).
 2. `orders.findPresentationLinesForFinish(orderId, scope)`. Cada `presentationLineId` de la entrada
    tiene que estar en ellas; si no, `ValidationError` (R22). Un pedido sin líneas rechaza siempre
    por aquí.
-3. `deliveries.create(...)`. Si devuelve `duplicate_key`, se lanza `DeliveryAlreadyRegisteredSignal`
-   (§4.1).
+3. `deliveries.create(...)`. Si devuelve `duplicate_key` (otra petición insertó la clave entre el
+   paso 0 y este), se lanza `DeliveryAlreadyRegisteredSignal` (§4.1).
 4. `deliveries.sumDeliveredPackages(orderId, scope)` con el pedido ya bloqueado. Dos entregas del
    mismo pedido se serializan en el paso 1 (R28). La entrega recién creada aún no tiene líneas, así
    que no cambia la suma.
@@ -577,16 +591,24 @@ luego lote). No aparece ningún ciclo nuevo.
 
 La pantalla genera la clave de entrega (`crypto.randomUUID()`) al crear el borrador y la guarda con
 él (R35). Si la misma clave llega dos veces (doble clic, reintento tras perder la respuesta, recarga
-con el borrador intacto), el `INSERT` choca con `order_deliveries_company_key_unique`.
-`create` devuelve `duplicate_key` (P2002 capturado en el adaptador) y el paso 3 lanza una señal
-interna. La señal deshace la transacción, y fuera el caso de uso lee el estado del pedido con
-`orders.findAliveById` y devuelve `{ status: 'already_registered', orderStatus }`.
+con el borrador intacto), el paso 0 la encuentra con `deliveries.findByKey`, el caso de uso lee con
+`orders.findAliveById` el estado del pedido **de esa entrega** (`orderId` de la fila, no el de la
+entrada) y devuelve `{ status: 'already_registered', orderStatus }`. Ese pedido solo puede estar
+`TERMINADO` o `ENTREGADO`: la entrega exige `TERMINADO`, de `TERMINADO` solo se sale a `ENTREGADO` y
+`TERMINADO` no se cancela; por eso cabe en `DeliverOrderResult.orderStatus`. Una clave reutilizada
+contra otro pedido de la misma empresa responde igual, con el estado del pedido de la entrega
+registrada, y no escribe nada en el pedido pedido.
 
-Si dos peticiones con la misma clave llegan a la vez, la segunda espera el bloqueo del pedido
-(paso 1), y al llegar al paso 3 la primera ya confirmó. Si la primera dejó el pedido `ENTREGADO`, la
-segunda sale antes, por el paso 1, con `action_not_allowed`. El sheet trata ese código, cuando viene
-tras un envío con la misma clave, igual que un rechazo normal: vuelve a leer y muestra el pedido ya
-entregado. Esa carrera exacta no tiene requisito propio; queda cubierta por R28 y R30.
+*Decisión del leader 2026-10-08, opción b.* La clave se comprueba antes del cliente, del bloqueo y
+del estado. Así, un reintento sobre un pedido que la primera ya dejó `ENTREGADO` responde
+`already_registered` con `ENTREGADO`, y no `action_not_allowed`. Si dos peticiones con la misma clave
+llegan a la vez, las dos pasan el paso 0 sin verla; la segunda espera el bloqueo del pedido (paso 1).
+Si la primera lo dejó `ENTREGADO`, la segunda sale por el paso 1 con `action_not_allowed` (el sheet
+vuelve a leer y muestra el pedido ya entregado; queda cubierta por R28 y R30). Si lo dejó
+`TERMINADO`, el `INSERT` del paso 3 choca con `order_deliveries_company_key_unique`, `create`
+devuelve `duplicate_key` (P2002 capturado en el adaptador) y se lanza una señal interna que deshace
+la transacción; fuera, el caso de uso vuelve a leer la entrega con `findByKey`, ya confirmada, y
+responde como arriba.
 
 ### 4.2 `dispatchFinishedGoods` en `product-prisma.ts`
 

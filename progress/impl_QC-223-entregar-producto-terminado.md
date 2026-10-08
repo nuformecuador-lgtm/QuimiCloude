@@ -317,3 +317,59 @@ B5 listo: cableado real sin dobles y en verde contra Postgres, también con conc
   `Test Files 55 passed (55)`, `Tests 747 passed | 11 skipped (758)`.
 - Pendiente para TC: el caso R16 exige importar del barrel de `pedidos`, pero los casos de uso importan de
   `./order-delivery` (evita un ciclo). TC debe aceptar esa ruta.
+
+## B4 opción b (backend_dev, 2026-10-08)
+
+Decisión del leader 2026-10-08, opción b: la clave de entrega se comprueba antes del cliente, del
+bloqueo y del estado; un acierto responde `already_registered` con el estado del pedido DE LA
+ENTREGA registrada. `DeliverOrderResult` sin cambios.
+
+### Archivos
+- `lib/modules/pedidos/ports/order-delivery-repository.ts`: `RegisteredOrderDelivery` y
+  `findByKey(deliveryKey, scope)`.
+- `lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma.ts`: `findByKey` por el
+  único `(company_id, delivery_key)`, con la empresa en el `where`.
+- `lib/modules/pedidos/domain/deliver-order.ts`: dep nueva `deliveries: Pick<…, 'findByKey'>`.
+  Orden: permiso → `safeParse` → `findByKey` (acierto → `alreadyRegistered(orderId de la entrega)`)
+  → cliente → `assertTransition` → transacción. El camino `duplicate_key` (P2002) se conserva para
+  la carrera: tras deshacer, vuelve a leer con `findByKey` y responde con el pedido de la entrega.
+- `lib/composition/index.ts`: `deliveries: createOrderDeliveryRepository()` en `deliverOrder`.
+- `specs/QC-223-entregar-producto-terminado/design.md`: §2.3 (puerto), §2.4 (orden de validación,
+  paso 3 nuevo), §4 (paso 0 nuevo, paso 3 aclarado), §4.1 (reescrito el primer y el segundo párrafo).
+  Todo con la nota «decisión del leader 2026-10-08, opción b».
+- Tests: `tests/unit/pedidos/deliver-order.test.ts`,
+  `tests/integration/pedidos/order-delivery.int.test.ts`,
+  `tests/integration/pedidos/order-delivery-repository.int.test.ts`.
+- Censos: ninguno se rompió (guardias en verde sin enmiendas).
+
+### R → test (R29, nuevos)
+- R29 → `deliver-order.test.ts` «R29: un reintento sobre un pedido que la primera ya dejo ENTREGADO es already_registered con ENTREGADO, sin bloquear ni escribir».
+- R29 → `deliver-order.test.ts` «R29: una clave reutilizada contra OTRO pedido de la empresa responde con el estado del pedido de la entrega, no del pedido pedido».
+- R29 → `deliver-order.test.ts` «R29: la clave registrada en OTRA empresa no la ve la lectura con el ambito del actor, y la entrega se registra».
+- R29 → `deliver-order.test.ts` «R29: si otra peticion inserta la clave entre la lectura y el INSERT, duplicate_key vuelve a leer la entrega y responde con su pedido».
+- R29 → `order-delivery.int.test.ts` «R29: reintentar con la misma clave la entrega que dejo el pedido ENTREGADO es already_registered con ENTREGADO, sin escribir nada mas».
+- R29 → `order-delivery-repository.int.test.ts` «R29: findByKey devuelve la entrega de la empresa con su pedido, y no ve la clave de otra empresa».
+- R2 y R22: `ningunPuerto` ahora también exige que `findByKey` no se llame.
+
+### Puntos del spec para el humano
+- R29 dice «con el mismo estado del pedido que dejó la primera». La implementación responde con el
+  estado ACTUAL del pedido de la entrega. Coinciden salvo un caso: una entrega parcial (dejó
+  `TERMINADO`) cuyo pedido otra entrega completó después; su reintento responde `ENTREGADO`, no
+  `TERMINADO`. El estado posterior a cada entrega no se guarda en `order_deliveries`. Leerlo
+  literalmente exigiría una columna nueva. No se ha hecho: queda abierto.
+- Clave reutilizada contra otro pedido: R29 no lo distingue («clave ya registrada en la empresa»),
+  así que la opción b no contradice el spec. La respuesta lleva el estado del pedido de la entrega
+  registrada, no del pedido pedido.
+- La clave se comprueba también antes de `requireAliveCustomer`. Si se comprobara después, un
+  reintento con el cliente dado de baja entre medias daría `customer_not_found`, en contra de R29.
+  §2.4 lo recoge.
+
+### Verificación (salida real)
+- `pnpm run typecheck`: un solo error, `app/(private)/pedidos/components/order-sheet.tsx(20,36): error TS2307: Cannot find module './order-delivery-sheet'`. Es el trabajo en curso de frontend_dev; ningún error en archivos de backend.
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)` (avisos previos en documentos/confirm-catalog-import y pedidos/order-service).
+- `pnpm exec vitest run tests/unit/pedidos/deliver-order.test.ts`: `Test Files  1 passed (1)`, `Tests  49 passed (49)`.
+- `pnpm exec vitest run tests/integration/pedidos/order-delivery.int.test.ts tests/integration/pedidos/order-delivery-repository.int.test.ts tests/integration/pedidos/order-delivery-concurrency.int.test.ts`: `Test Files  3 passed (3)`, `Tests  21 passed (21)`.
+- `pnpm exec vitest run guard`: `Test Files  55 passed (55)`, `Tests  747 passed | 11 skipped (758)`.
+- `pnpm exec vitest related --run <archivos tocados>`: `Test Files  1 failed | 337 passed (338)`, `Tests  1 failed | 5347 passed | 2 skipped (5350)`. El rojo es `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` ('/pedidos', `loadFormCatalogs` en `app/(private)/pedidos/page.tsx:96`), que está en `tests/baseline-rojos.json`.
+
+B4 opción b lista: la clave se comprueba antes del cliente, el bloqueo y el estado, y se conserva la carrera P2002. Todo en verde salvo rojos ajenos (baseline y frontend en curso). Queda abierta para el humano la lectura literal de «el estado que dejó la primera».
