@@ -186,3 +186,150 @@ Tests:
   `execution-trace`: `Test Files 6 passed (6)`, `Tests 188 passed (188)`.
 - `pnpm exec vitest run guard`: `Test Files 55 passed (55)`, `Tests 741 passed | 11 skipped (752)`.
 - `.int` `order-catalog-including-deleted` tras añadir `customerId`: `Test Files 1 passed (1)`, `Tests 7 passed (7)`.
+
+## Tanda 3: T8, T9, T10 y T11 (+ T12) (2026-10-08)
+
+Antes de empezar, el texto de T4(b) en `tasks.md` se cambió por la prueba equivalente que aceptó el
+humano (opción A). El test no se tocó.
+
+T8-T11 cambian la firma de `DashboardContent` (recibe `params`) y añaden la pantalla privada 21. Con
+eso, sin T12 la rama quedaba con typecheck rojo (TS2554 en `dashboard-page.test.tsx` y
+`pantallas-exigen-permiso.test.tsx`) y con `guard-pantallas-exigen-permiso` rojo. Por eso T12 entra
+en esta tanda; ver más abajo.
+
+### Archivos
+
+Producción:
+- `lib/shared/routes.ts` (`executionTraceRoute`)
+- `app/(private)/dashboard/page.tsx` (`searchParams`)
+- `app/(private)/dashboard/components/dashboard-content.tsx` (`params`, `<Suspense>`)
+- `app/(private)/dashboard/components/index.ts`
+- nuevos en `app/(private)/dashboard/components/`:
+  - `execution-trace-list-params.ts`
+  - `execution-trace-format.ts`
+  - `execution-trace-columns.tsx`
+  - `execution-trace-table.tsx`
+  - `execution-trace-list-section.tsx`
+- nuevos: `app/(private)/dashboard/recorrido/[id]/page.tsx` y
+  `recorrido/[id]/components/{execution-trace-detail.tsx,index.ts}`
+
+Tests nuevos:
+- `tests/unit/dashboard/execution-trace-list-params.test.ts` (params)
+- `tests/unit/dashboard/execution-trace-format.test.ts` (format)
+- `tests/ui/dashboard/execution-trace-table.test.tsx` (table)
+- `tests/ui/dashboard/execution-trace-detail.test.tsx` (detail)
+
+### Desvíos y notas para el reviewer
+
+- **Marca «En curso» (R3):** sigue el design. «En curso» es la etiqueta de estado de `EN_CURSO`, y
+  toda duración abierta lleva el sufijo «(en curso)». Un pedido activo en `POR_EMPACAR` o
+  `EN_EMPAQUE` solo se marca por ese sufijo. **Decisión para el humano:** si R3 pide una marca
+  explícita en todo pedido activo, esto cambia.
+- **Filtro de persona:** el `select` del `DataTable` compartido permite marcar varias personas, pero
+  el caso de uso acepta una. Cuenta solo la última marcada, que sustituye a la anterior.
+- **Formatos que el spec no fija:**
+  - «12 min 05 s»: los segundos van a dos cifras cuando hay minutos y no hay horas.
+  - El tramo del detalle usa el mismo formato, sin sufijo.
+  - Una persona que el directorio no devuelve se pinta «—», con nombre accesible «Sin dato».
+- **«Volver» sin parámetros:** lleva a `/dashboard?page=1&pageSize=10`, que es lo que da
+  `build(parse({}))`.
+- **Errores del detalle:** `order_not_found` llama a `notFound()`. Cualquier otro error pinta un
+  aviso con el enlace de volver.
+- **Barril de otra ruta:** el detalle importa los formateadores y `DeletedOrderMark` del barril del
+  dashboard. El design ya anota el riesgo: no hay precedente de una ruta que importe el barril de
+  otra. Si el reviewer lo rechaza, se sube a `lib/shared/ui/`.
+- **Validación del uuid:** se hace con `zod`, que ya era dependencia, como en el backend.
+
+### Mapa R<n> → test (tanda 3)
+
+| R | Archivo | Caso |
+|---|---|---|
+| R1 | table | «R1 - con datos, monta la tabla…»; «R1 - un error de la accion se avisa dentro del area…» |
+| R2 | table | «R2 - numero, estado, personas…»; «R2 - la fila dada de baja lleva el texto «Dado de baja»…» |
+| R3 | table | «R3 - la fila activa se marca «En curso»…» |
+| R3 | format | «R3 - una duracion abierta se marca (en curso)» |
+| R4 | table | «R4 - ninguna columna ofrece ordenar…» |
+| R5 | params | «R5 - …» (7 casos) |
+| R5 | table | «R5 - cambiar el tamano a 25…» |
+| R6 | params | «R6 - …» (4 casos) |
+| R6 | table | «R6 - buscar un numero navega con q y page 1» |
+| R7 | params | «R7 - …» |
+| R7 | table | «R7 - el filtro de persona ofrece las personas del servidor…» |
+| R8 | params | «R8 - …» |
+| R8 | table | «R8 - el rango de fechas navega…» |
+| R9 | params | «R9 - …» |
+| R9 | table | «R9 - el interruptor «solo cancelados»…» |
+| R11 | params | «R11 - …» (7 casos) |
+| R11 | table | «R11 - paginar conserva los filtros» |
+| R12 | table | «R12 - el enlace es executionTraceRoute(id)…» |
+| R12 | detail | «R12 - pide el recorrido del id de la ruta…» |
+| R12 | params | «R12 - executionTraceRoute…» |
+| R13 | detail | «R13 - resumen…»; «R13 - todas las anotaciones en orden…» |
+| R13 | format | «R13 - …» |
+| R14 | detail | «R14 - cada anotacion salvo la ultima…» |
+| R15 | format | «R15 - …» |
+| R15 | table | «R15 - una sola cifra por fila…» |
+| R15 | detail | «R15 - una sola duracion…» |
+| R16 | detail | «R16 - cada retroceder se marca…» |
+| R16 | table | «R16 - las vueltas atras…» |
+| R17 | params | «R17 - …» |
+| R17 | detail | «R17 - con la consulta del detalle…»; «R17 - sin parametros…» |
+| R18 | detail | «R18 - order_not_found responde 404»; «R18 - un pedido dado de baja…» |
+| R20 (página del detalle) | detail | «R20 - exige dashboard.consultar…»; «R20 - sin permiso…»; «R20 - la primera linea…» |
+| R26 | table | «R26 - el interruptor…»; «R26 - el enlace de cada fila…» |
+| R26 | detail | «R26 - «Volver» mide 44x44…» |
+
+### Salida de los tests (T8-T11, antes de T12)
+
+- `pnpm run typecheck`: 2 errores TS2554, los dos en tests que enmienda T12.
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)`, todos ajenos.
+- Los 4 tests nuevos: `Test Files 4 passed (4)`, `Tests 98 passed (98)`.
+- `pnpm exec vitest run guard`: `Test Files 1 failed | 54 passed (55)`. El rojo es
+  `guard-pantallas-exigen-permiso` (pantalla 21) y lo arregla T12.
+
+### T12, dentro de la tanda 3 (2026-10-08)
+
+Solo tests, sin código de producción. Cada enmienda lleva nota fechada 2026-10-08.
+
+### Archivos modificados
+
+- `tests/unit/dashboard-page.test.tsx`: el caso R3 «área vacía» pasa a «R25: el area de contenido
+  contiene la lista del recorrido y nada mas». Afirma un solo hijo, que es la sección; que el texto
+  del área es el de la sección; que ningún rol de contenido queda fuera de ella; y que la sección
+  recibe `parseExecutionTraceListParams(searchParams)`. R12 pasa a «un hijo a los dos anchos».
+  La sección se simula con su `data-testid` y su título reales, y la acción se mockea porque el
+  mock de `@/lib/composition` no trae `observabilidad`. R1, R2, R4 y R5 siguen igual; solo cambia
+  la forma de invocar la página, que ahora recibe `searchParams`.
+- `tests/unit/dashboard-route-contract.test.ts`: R6, R7, R8, R9, R10 y R11 siguen sobre
+  `page.tsx` + `dashboard-content.tsx`. La guardia `100vh`/`hover` ahora mira también la sección,
+  la tabla, la página del detalle y su componente. Caso nuevo «R20: la pagina del detalle vive en
+  la ruta que declara executionTraceRoute», con la ruta sacada de `executionTraceRoute('[id]')`.
+- `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`: el dashboard se invoca con
+  `searchParams` espía y pasa a `leeAlgo: true`. Fila nueva para `/dashboard/recorrido/[id]`
+  (espías en `params` y `searchParams`). `listExecutionTracesAction` y `getExecutionTraceAction`
+  se espían igual que las demás acciones.
+- `tests/guards/guard-pantallas-exigen-permiso.test.ts`: de veinte a veintiuna pantallas, con
+  `/dashboard/recorrido/[id]`.
+
+### Mapa R<n> → test (T12)
+
+| R | Archivo | Caso |
+|---|---|---|
+| R20 | `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` | `'/dashboard' …` y `'/dashboard/recorrido/[id]' …` en los cuatro `it.each`: 404 sin permiso, 404 sin permisos, sirve con permiso, login sin sesión |
+| R20 | `tests/guards/guard-pantallas-exigen-permiso.test.ts` | «el barrido encuentra exactamente las veintiuna pantallas privadas de hoy»; «cada pantalla privada llama a requirePagePermission…» |
+| R20 | `tests/unit/dashboard-route-contract.test.ts` | «R20: la pagina del detalle vive en la ruta que declara executionTraceRoute»; «la pagina exige dashboard.consultar…» |
+| R25 | `tests/unit/dashboard-page.test.tsx` | «R25: el area de contenido contiene la lista del recorrido y nada mas»; «R12: renderiza titulo y un hijo en el area…»; R2 y R4 sin cambios |
+| R25 | `tests/unit/dashboard-route-contract.test.ts` | «la pantalla no consulta datos…» (R6); «…se renderizan en servidor» (R7); «la pantalla no valida sesion…» (R8); «no usa 100vh ni hover…» (ampliado) |
+
+### Salida de los tests
+
+- `pnpm run typecheck`: `tsc --noEmit` sin errores.
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)`, todos en archivos ajenos
+  (`confirm-catalog-import.test.ts`, `order-service.test.ts`).
+- Los 4 archivos: `Test Files 1 failed | 3 passed (4)`, `Tests 1 failed | 71 passed (72)`. El único
+  rojo es «'/pedidos' se sirve con el permiso», que ya está en `tests/baseline-rojos.json` y no es
+  de esta feature.
+- `pnpm exec vitest run guard`: `Test Files 55 passed (55)`, `Tests 741 passed | 11 skipped (752)`.
+
+Veredicto T12: los cuatro verdes salvo el rojo de baseline de `/pedidos`, y no se quitó ninguna
+aserción de R2/R4/R6/R7/R8.

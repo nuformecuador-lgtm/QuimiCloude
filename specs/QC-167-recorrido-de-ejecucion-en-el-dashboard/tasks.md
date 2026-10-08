@@ -102,7 +102,7 @@
 
 ## Bloque C — Pantalla (frontend)
 
-- [ ] **T8 [P] — Ruta y parámetros de la URL.** `executionTraceRoute` en `lib/shared/routes.ts`;
+- [x] **T8 [P] — Ruta y parámetros de la URL.** `executionTraceRoute` en `lib/shared/routes.ts`;
   `components/execution-trace-list-params.ts` (`design.md > 4.1`, `> 4.2`). *Sin dependencias de
   backend.*
   **Hecho cuando:** unit: `parse` nunca lanza y acota cada parámetro de la tabla del design;
@@ -111,7 +111,7 @@
   lista vacía, no filtro ignorado) y `q` de solo espacios se descarta. Cubre **R5, R6, R11, R17**
   (parte pura).
 
-- [ ] **T9 [P] — Formato.** `components/execution-trace-format.ts`: duraciones, instantes UTC,
+- [x] **T9 [P] — Formato.** `components/execution-trace-format.ts`: duraciones, instantes UTC,
   etiquetas de acción (las ocho, exhaustivo por tipo), de estado (exhaustivo por `OrderStatus`,
   «En curso» para `EN_CURSO`) y la marca «Dado de baja» (`design.md > 4.3`).
   **Hecho cuando:** unit de los tres `kind` de duración («(en curso)», «(sin cierre anotado)», nada
@@ -120,7 +120,7 @@
   `2 d 02 h 05 min`, segundos truncados), y que ningún formato usa `toLocaleString` ni
   `Intl.NumberFormat`. Cubre **R3, R13, R15**.
 
-- [ ] **T10 — Lista en el dashboard.** `dashboard-content.tsx` (recibe `params`, `<Suspense>`),
+- [x] **T10 — Lista en el dashboard.** `dashboard-content.tsx` (recibe `params`, `<Suspense>`),
   `execution-trace-list-section.tsx`, `execution-trace-table.tsx`, `execution-trace-columns.tsx`,
   barril y `page.tsx` con `searchParams` (`design.md > 4.3`). *Depende de T7, T8, T9.*
   **Hecho cuando** (proyecto `ui`, acción simulada): columnas de R2 con **una** columna de duración;
@@ -132,7 +132,7 @@
   dentro del área sin tumbar la pantalla; interruptor y enlaces con `min-h-11 min-w-11`, `label`
   accesible y operables por teclado. Cubre **R1, R2, R3, R5, R6, R7, R8, R9, R11, R15, R26**.
 
-- [ ] **T11 — Detalle del recorrido.** `app/(private)/dashboard/recorrido/[id]/page.tsx` y
+- [x] **T11 — Detalle del recorrido.** `app/(private)/dashboard/recorrido/[id]/page.tsx` y
   `components/{execution-trace-detail.tsx,index.ts}` (`design.md > 4.3`). *Depende de T7, T8, T9.*
   **Hecho cuando** (proyecto `ui`): primera línea `requirePagePermission('dashboard.consultar')`;
   `OrderNotFoundError` → `notFound()`; resumen con número, estado, marca «Dado de baja» cuando
@@ -144,7 +144,7 @@
 
 ## Bloque D — Enmiendas de tests existentes
 
-- [ ] **T12 — La costura y las pantallas que exigen permiso.** *Depende de T10, T11.*
+- [x] **T12 — La costura y las pantallas que exigen permiso.** *Depende de T10, T11.*
   Con **nota fechada** en cada test enmendado (`design.md > 7`):
   - `tests/unit/dashboard-page.test.tsx`: el caso «área vacía» pasa a «el área contiene la lista del
     recorrido y nada más»; el de R12, a «un hijo a los dos anchos». R2 y R4 sin tocar.
