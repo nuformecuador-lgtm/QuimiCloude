@@ -154,3 +154,64 @@ Los dos rojos nuevos **no** están en `tests/baseline-rojos.json`, y `--rapido` 
 Los dos primeros pondrían en rojo `gate-completo` en el PR. El código de la feature, la trazabilidad
 de R1-R44 + R5bis, la seguridad (permisos, empresa, RLS) y la multiplataforma están bien. La vuelta 2
 puede acotarse a esos tres puntos.
+
+## Vuelta 2 (acotada a `29871e70..cf68893a`)
+
+Revisé solo ese diff (12 archivos) contra los 9 hallazgos de la vuelta 1 y sus posibles regresiones.
+El MCP del grafo no lo usé: el diff es corto y lo leí entero con `git diff`/Grep.
+
+### Verificación que corrí yo (HEAD `cf68893a`, base `QuimiCloude_QC82` según `.env`)
+
+- `pnpm exec vitest run` sobre `qc145-estado-solo-planta`, `asignaciones/cancel-assigned-order`,
+  `recetas-ui/step-reader`, `asignaciones-ui/{order-execution-screen,packing-order-screen,
+  order-execution-step-log,order-cancel-dialog}` ⇒ **7 archivos, 205/205 verdes**.
+- `tests/integration/pedidos/company-scope.int.test.ts` ⇒ **12/12 verdes** (antes: 3 rojos).
+- `tests/integration/identity/work-groups-constraints.int.test.ts` ⇒ **24/24 verdes**.
+- typecheck, lint y `test:rapido` los corrió el leader en `cf68893a`: 7 rojos, todos en
+  `tests/baseline-rojos.json`; no los repito.
+
+### Checklist de la vuelta 1
+
+- [x] **1 (BLOQ)** — `qc145-estado-solo-planta.test.ts`: la lista cerrada pasa a nombrar
+  `lockAndStartPackingAlive` en lugar de `startPackingAliveOrder`. Sigue cerrada en cuatro y con
+  `toEqual` exacto, y lleva nota fechada. El resto del archivo está intacto. Verde.
+- [x] **2 (BLOQ)** — `company-scope.int.test.ts`: suelta y restaura
+  `order_execution_entries_order_id_company_id_fkey`. La forma es la misma que la migración (FK
+  compuesta, `RESTRICT`/`CASCADE`) y la nota está fechada. Verde contra `QuimiCloude_QC82`.
+  - `users_id_company_id_key`: el único test que corre el `down.sql` de work groups contra Postgres
+    es `work-groups-constraints.int.test.ts`, y está verde. Los otros tres que lo nombran son
+    barridos de fuente. No falta nada.
+- [x] **3 (BLOQ)** — T20 y T23 en `[x]`; no queda ninguna tarea sin marcar (T4 está retirada). La
+  bitácora tiene la salida de Playwright: chromium y webkit, 10 specs, 41/42; el único rojo fue un
+  fallo de `browser.newContext` en webkit, y al repetir `pedidos-asignados` pasó 4/4. La lista de
+  E2E confirmadas y descartadas de T23 ya estaba. Lo doy por cumplido.
+- [x] **4** — nota fechada en `design.md > 4` sobre `lockAndStartPackingAlive`.
+- [x] **5** — `impl_QC-168` lleva una nota fechada: R45 se queda sin test por decisión humana.
+- [x] **6** — un barrido de fuente R37 sobre `packing-order-screen.tsx` (sin comentarios) se pone
+  rojo si aparece `onStepChange` o `initialStepPosition`.
+- [x] **7** — `cancelAssignedOrder` vuelve a leer una vez el pedido y su asignación. Si el estado
+  cambió, `pedidos` decide (`not_cancellable` / `ok`); si no, `not_found` sin abrir la transacción.
+  Seis casos nuevos cubren las ramas, incluido el tope de un solo reintento.
+- [x] **8** — una sola regla, `clampStepPosition`, en `step-reader.tsx`. `initialIndexFor` y la
+  pantalla de ejecución la usan; tiene test de bordes. Ver hallazgo nuevo 1.
+- [ ] **9** — el assignee en Jira está bien (el leader lo verificó en vivo el 2026-10-07), pero
+  `progress/features/QC-82.md` sigue diciendo «sin asignar». Lo actualiza el leader, no el
+  implementer: no bloquea esta vuelta.
+
+### Hallazgos de la vuelta 2
+
+1. menor — `order-execution-screen.tsx` importa `clampStepPosition` desde
+   `@/components/shared/step-reader/step-reader`, por ruta profunda. El docstring del barrel
+   `components/shared/step-reader/index.ts` dice que es «la UNICA superficie publica» y que ningún
+   consumidor alcanza piezas por ruta profunda. `docs/architecture.md > Componentes` no lo prohíbe
+   para `components/shared/` («por su ruta de siempre»), y ninguna guardia lo detecta. Aun así,
+   contradice el contrato escrito del propio barrel; en QC-103 se trató igual con `data-table`.
+   Para cerrarlo hay dos salidas: exportar `clampStepPosition` desde el barrel y ajustar su
+   docstring, o anotar la excepción en ese docstring.
+2. menor — (arrastre del 9) la ficha `progress/features/QC-82.md` debe pasar a «Christian Quevedo»
+   antes del cierre (`CHECKPOINTS.md > Equipo`).
+
+### Veredicto
+
+**APROBADO.** Los tres bloqueantes de la vuelta 1 están cerrados y verificados con ejecución
+propia. Quedan dos menores que no bloquean.
