@@ -128,6 +128,19 @@
 - **Qué falta:** QC-174 dejó abierta QC-180 (tres rojos de `897a4f91` en el baseline), pero la key no aparece en `feature_list.json` el 2026-10-06. Comprobar en el board e importarla.
 - **Dueño:** leader (F0).
 
+### D35 — Tres mapas `OrderStatus → texto` duplicados en rutas distintas (QC-167)
+- **Origen:** QC-167 (2026-10-08), `specs/QC-167-recorrido-de-ejecucion-en-el-dashboard/design.md > 4.3 > Etiquetas de estado`.
+- **Qué falta:** la etiqueta de cada estado de pedido se declara tres veces:
+  - `app/(private)/pedidos/components/order-status-badge.tsx`
+  - `app/(private)/asignacion/components/company-orders-columns.tsx`
+  - `app/(private)/dashboard/components/execution-trace-format.ts` (`TRACE_ORDER_STATUS_LABELS`)
+
+  Los tres son exhaustivos por tipo, así que un estado nuevo no se olvida: el typecheck obliga a
+  añadirlo en los tres, como pasó con los de QC-215. Pero el texto puede divergir entre pantallas.
+  Arreglo: promover un único mapa a `components/shared/` (o a `lib/shared/ui/`) y que las tres rutas
+  lo importen. No se hizo en QC-167 porque tocaba dos rutas de fichas en vuelo.
+- **Dueño:** sin asignar.
+
 ## Pendientes humanos de fichas cerradas
 Rescatados de *Evaluaciones* y *Features en curso* del archivo: no estaban en *Deudas*, pero se habrían perdido al congelarlo.
 

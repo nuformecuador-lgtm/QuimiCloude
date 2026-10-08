@@ -18,3 +18,11 @@ export type OrderNumber = {
 export function formatOrderNumber({ year, sequence }: OrderNumber): string {
   return `${year}-${String(sequence).padStart(7, '0')}`;
 }
+
+/** Busca sobre el numero tal como se ve, ceros de relleno incluidos, para que pegar lo que hay en
+ *  pantalla lo encuentre. Un texto sin ningun digito no casa con nada, aunque el guion sea
+ *  subcadena de todos los numeros. */
+export function orderNumberContains(number: OrderNumber, text: string): boolean {
+  const needle = text.trim();
+  return /\d/.test(needle) && formatOrderNumber(number).includes(needle);
+}

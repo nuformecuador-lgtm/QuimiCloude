@@ -16,15 +16,17 @@ vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }));
 
 import { asignaciones } from '@/lib/composition';
 
-describe('QC-88 T8 (censo crecido por QC-63, QC-145 y QC-168) — la fachada de `asignaciones` lista sus DIECISEIS operaciones', () => {
+describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167 y QC-215) — la fachada de `asignaciones` lista sus VEINTIDOS operaciones', () => {
   // El censo CRECE, no se afloja: primero llegaron las tres de la pantalla de ejecucion, luego
   // las tres de las vistas nuevas -`listFinishedOrders`, `listCompanyOrders`,
   // `listResponsibleCandidates`- y ahora las CUATRO del empaque de QC-168. Siguen nombradas UNA A
   // UNA y comparadas por igualdad exacta: una operacion futura que nadie declare aqui pone el caso
   // en rojo, que es justo lo que este censo promete.
   // 2026-10-06 (QC-82): crece con `cancelAssignedOrder` y `recordStepMove`.
+  // 2026-10-08 (QC-167): crece con DOS operaciones de solo lectura del recorrido de ejecucion,
+  // `listExecutionTraces` y `getExecutionTrace` (`design.md` de QC-167). Ninguna previa se quita.
   // 2026-10-08 (QC-215): crece con `startConditioning` y `finishConditioning`.
-  it('expone las doce anteriores, las CUATRO de QC-168, las DOS de QC-82 y las DOS de QC-215, y ninguna mas', () => {
+  it('expone las doce anteriores, las CUATRO de QC-168, las DOS de QC-82, las DOS de QC-167 y las DOS de QC-215, y ninguna mas', () => {
     expect(Object.keys(asignaciones).sort()).toEqual([
       'assignResponsibles',
       'cancelAssignedOrder',
@@ -32,9 +34,11 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145 y QC-168) — la fachada de 
       'finishConditioning',
       'finishPacking',
       'getAssignedOrderExecution',
+      'getExecutionTrace',
       'getPackingOrder',
       'listAssignedOrders',
       'listCompanyOrders',
+      'listExecutionTraces',
       'listFinishedOrders',
       'listOrderResponsibles',
       'listPackingOrders',

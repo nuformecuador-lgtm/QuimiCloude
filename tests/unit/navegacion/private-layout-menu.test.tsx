@@ -9,6 +9,7 @@ import {
   SEED_ROLE_PERMISSIONS,
 } from '@/lib/modules/identity';
 import { PRIVATE_NAV_ITEMS, PRIVATE_NAV_LABEL } from '@/lib/shared/navigation/private-nav';
+import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
 
 import {
   clearSidebarStateCookie,
@@ -227,8 +228,11 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     // no se escribe a mano en ningun sitio, sale de `PERMISSIONS`.
     await renderLayout(TODOS_LOS_PERMISOS);
 
+    // 2026-10-08 (QC-167): el humano pide volver a mostrar el item Dashboard; con todo el
+    // catalogo vuelve a estar en el arbol.
     for (const item of [
       testId.asignacion,
+      testId.dashboard,
       testId.inventario,
       testId.pedidos,
       testId.proveedores,
@@ -241,13 +245,32 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     }
   });
 
-  it('con `dashboard.consultar` el item del dashboard sigue sin pintarse: esta oculto del menu', async () => {
-    expect(TODOS_LOS_PERMISOS).toContain('dashboard.consultar');
+  // 2026-10-08 (QC-167): el humano pide volver a mostrar el item Dashboard. Este caso afirmaba
+  // que con `dashboard.consultar` el item seguia sin pintarse; lo sustituyen los dos R30 de abajo,
+  // que afirman el par completo con los permisos reales del seed.
+  it('R30 — con los permisos del Administrador el layout pinta el enlace «Dashboard» hacia /dashboard', async () => {
+    const permisos = SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR];
+    expect(permisos, 'el seed deberia asignar permisos al Administrador').toBeDefined();
+    expect(permisos).toContain('dashboard.consultar');
 
-    await renderLayout(TODOS_LOS_PERMISOS);
+    await renderLayout(permisos ?? []);
 
+    const enlace = screen.getByRole('link', { name: 'Dashboard' });
+    expect(enlace).toHaveAttribute('href', DASHBOARD_ROUTE);
+    expect(enlace).toHaveAttribute('data-testid', testId.dashboard);
+  });
+
+  it('R30 — con los permisos del Operador el enlace «Dashboard» no llega al arbol', async () => {
+    const permisos = SEED_ROLE_PERMISSIONS[ROLE_OPERADOR];
+    expect(permisos, 'el seed deberia asignar permisos al Operador').toBeDefined();
+    expect(permisos).not.toContain('dashboard.consultar');
+
+    await renderLayout(permisos ?? []);
+
+    // Positivo junto al negativo: el `null` no puede serlo por un layout roto.
     expect(screen.getByTestId(testId.inventario)).toBeInTheDocument();
     expect(screen.queryByTestId(testId.dashboard)).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Dashboard' })).toBeNull();
   });
 
   it('el layout hace una sola lectura de sesion para pintar el menu', async () => {
@@ -306,7 +329,9 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
     expect(screen.queryByTestId(testId.unidades)).toBeNull();
   });
 
-  it('ancla: el menu real tiene los nueve items que este test vigila', async () => {
+  // 2026-10-08 (QC-167): el humano pide volver a mostrar el item Dashboard; el ancla vuelve a
+  // diez, con `nav-dashboard` SEGUNDO, detras de «Asignación».
+  it('ancla: el menu real tiene los diez items que este test vigila', async () => {
     // Anti-vacuidad: si alguien renombra un `testId` de `PRIVATE_NAV_ITEMS`, los
     // `queryByTestId(...) === null` de arriba pasarian por buenos sin comprobar nada.
     // TENSADO el 2026-09-08 (QC-39 T4, R9/R10/R47): el ancla sube de seis a siete con
@@ -317,6 +342,7 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
 
     expect(testIds).toEqual([
       testId.asignacion,
+      testId.dashboard,
       testId.inventario,
       testId.pedidos,
       testId.produccion,

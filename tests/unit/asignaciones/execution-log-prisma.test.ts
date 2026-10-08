@@ -13,6 +13,7 @@ const { transaction } = vi.hoisted(() => ({ transaction: vi.fn() }))
 vi.mock('@/lib/shared/db/prisma', () => ({ prisma: { $transaction: transaction } }))
 
 import {
+  EXECUTION_ACTION_FROM_PRISMA,
   EXECUTION_ACTION_TO_PRISMA,
   createExecutionLogRepository,
 } from '@/lib/modules/asignaciones/adapters/driven/persistence/execution-log-prisma'
@@ -120,10 +121,96 @@ describe('execution-log-prisma: solo anexar (R31)', () => {
     expect(fuente).not.toMatch(/\$executeRaw|\$queryRaw|\bUPDATE\b|\bDELETE\b/)
   })
 
-  it('R31: las unicas operaciones sobre orderExecutionEntry son create y findFirst', () => {
+  // Enmendado el 2026-10-07 (QC-167): el registro gana tres lecturas (`findMany`, `groupBy`); la
+  // unica escritura sigue siendo `create`.
+  it('R31 / R22: las unicas operaciones sobre orderExecutionEntry son create y tres de lectura', () => {
     const fuente = readFileSync(REGISTRO_ABS, 'utf8')
     const operaciones = [...fuente.matchAll(/orderExecutionEntry\s*\.\s*(\w+)/g)].map((m) => m[1])
-    expect([...new Set(operaciones)].sort()).toEqual(['create', 'findFirst'])
+    expect([...new Set(operaciones)].sort()).toEqual(['create', 'findFirst', 'findMany', 'groupBy'])
+  })
+})
+
+describe('execution-log-prisma: el mapa inverso del enum (QC-167 T4a)', () => {
+  it.each(EXECUTION_ACTIONS)('R14: %s va al enum y vuelve igual', (action) => {
+    expect(EXECUTION_ACTION_FROM_PRISMA[EXECUTION_ACTION_TO_PRISMA[action]]).toBe(action)
+  })
+
+  it.each(Object.values(OrderExecutionAction))('R14: el valor %s del enum vuelve a su accion y de ahi a si mismo', (value) => {
+    const action = EXECUTION_ACTION_FROM_PRISMA[value]
+    expect(EXECUTION_ACTIONS).toContain(action)
+    expect(EXECUTION_ACTION_TO_PRISMA[action]).toBe(value)
+  })
+
+  it('R14: el mapa inverso tiene exactamente ocho pares', () => {
+    expect(Object.keys(EXECUTION_ACTION_FROM_PRISMA).sort()).toEqual([...Object.values(OrderExecutionAction)].sort())
+    expect(new Set(Object.values(EXECUTION_ACTION_FROM_PRISMA)).size).toBe(8)
+  })
+
+  it('R14: el inverso se deriva del mapa de ida, no se escribe a mano', () => {
+    const fuente = readFileSync(REGISTRO_ABS, 'utf8')
+    expect(fuente.match(/'PACK_FINISH'/g)).toHaveLength(1)
+  })
+})
+
+function clienteDeLectura() {
+  const findMany = vi.fn()
+  const groupBy = vi.fn()
+  const db = { orderExecutionEntry: { findMany, groupBy } } as unknown as PrismaClient
+  return { db, findMany, groupBy }
+}
+
+describe('execution-log-prisma: las tres lecturas', () => {
+  const FROM = new Date('2026-09-01T00:00:00.000Z')
+  const BEFORE = new Date('2026-09-03T00:00:00.000Z')
+
+  it('R23: listExecutedOrderIds sin filtro agrupa por pedido solo con la empresa', async () => {
+    const { db, groupBy } = clienteDeLectura()
+    groupBy.mockResolvedValue([{ orderId: ORDER }])
+    await expect(createExecutionLogRepository(db).listExecutedOrderIds(COMPANY, {})).resolves.toEqual([ORDER])
+    expect(groupBy).toHaveBeenCalledWith({ by: ['orderId'], where: { companyId: COMPANY } })
+  })
+
+  it('R7 / R8: listExecutedOrderIds lleva la persona y el rango gte / lt en el where', async () => {
+    const { db, groupBy } = clienteDeLectura()
+    groupBy.mockResolvedValue([])
+    await createExecutionLogRepository(db).listExecutedOrderIds(COMPANY, {
+      userId: USER,
+      occurredFrom: FROM,
+      occurredBefore: BEFORE,
+    })
+    expect(groupBy).toHaveBeenCalledWith({
+      by: ['orderId'],
+      where: { companyId: COMPANY, userId: USER, occurredAt: { gte: FROM, lt: BEFORE } },
+    })
+  })
+
+  it('R8: un extremo ausente no aparece en el where', async () => {
+    const { db, groupBy } = clienteDeLectura()
+    groupBy.mockResolvedValue([])
+    await createExecutionLogRepository(db).listExecutedOrderIds(COMPANY, { occurredBefore: BEFORE })
+    expect(groupBy.mock.calls[0][0].where).toEqual({ companyId: COMPANY, occurredAt: { lt: BEFORE } })
+  })
+
+  it('R23: listEntriesForOrders filtra por empresa, ordena por pedido, instante e id y traduce la accion', async () => {
+    const { db, findMany } = clienteDeLectura()
+    findMany.mockResolvedValue([
+      { id: 'e1', orderId: ORDER, userId: USER, action: 'GO_BACK', stepPosition: 2, reason: null, occurredAt: NOW },
+    ])
+    const entries = await createExecutionLogRepository(db).listEntriesForOrders(COMPANY, [ORDER])
+    expect(entries).toEqual([
+      { id: 'e1', orderId: ORDER, userId: USER, action: 'go_back', stepPosition: 2, reason: null, occurredAt: NOW },
+    ])
+    expect(findMany.mock.calls[0][0]).toMatchObject({
+      where: { companyId: COMPANY, orderId: { in: [ORDER] } },
+      orderBy: [{ orderId: 'asc' }, { occurredAt: 'asc' }, { id: 'asc' }],
+    })
+  })
+
+  it('R23: listUserIdsWithEntries agrupa por persona solo con la empresa', async () => {
+    const { db, groupBy } = clienteDeLectura()
+    groupBy.mockResolvedValue([{ userId: USER }])
+    await expect(createExecutionLogRepository(db).listUserIdsWithEntries(COMPANY)).resolves.toEqual([USER])
+    expect(groupBy).toHaveBeenCalledWith({ by: ['userId'], where: { companyId: COMPANY } })
   })
 })
 

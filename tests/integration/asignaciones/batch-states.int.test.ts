@@ -134,6 +134,7 @@ function casosDelOperador(fixture: Fixture) {
     findAliveById: findAliveOrderTargetById,
     listAliveSummariesByIds: summaryReaders.listAliveSummariesByIds,
     listAliveSummariesInCompany: noUsado('listAliveSummariesInCompany'),
+    listSummariesByIdsIncludingDeleted: noUsado('listSummariesByIdsIncludingDeleted'),
     transitionAliveById: noUsado('transitionAliveById'),
     startPackingAliveById: noUsado('startPackingAliveById'),
     finishPackingAliveById: noUsado('finishPackingAliveById'),

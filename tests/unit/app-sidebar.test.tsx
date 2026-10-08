@@ -5,7 +5,6 @@ import { AppSidebar } from '@/components/private/app-sidebar';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import {
   BRAND_LABEL,
-  HIDDEN_DASHBOARD_NAV_ITEM,
   PRIVATE_NAV_ITEMS,
   PRIVATE_NAV_LABEL,
   INVENTORY_ROUTE,
@@ -225,8 +224,11 @@ describe('barra lateral privada', () => {
     // orden lo manda la SECCION (Operacion, Cadena, Configuracion), no la posicion en el array:
     // «Usuarios» es el ultimo item declarado en `PRIVATE_NAV_ITEMS` pero se dibuja junto a los
     // demas de «Operación».
+    // 2026-10-08 (QC-167): el humano pide volver a mostrar el item Dashboard; se dibuja detras de
+    // «Asignación», dentro de «Operación».
     const esperado = [
       'nav-asignacion',
+      'nav-dashboard',
       'nav-inventario',
       'nav-pedidos',
       'nav-usuarios',
@@ -240,14 +242,16 @@ describe('barra lateral privada', () => {
     expect(enDom).toEqual(esperado);
   });
 
-  it('el item del dashboard no se pinta en el menu aunque su ruta siga existiendo', () => {
+  // 2026-10-08 (QC-167): el humano pide volver a mostrar el item Dashboard. Este caso afirmaba
+  // que NO se pintaba; ahora afirma lo contrario: se pinta, una sola vez, hacia `DASHBOARD_ROUTE`.
+  it('el item del dashboard se pinta en el menu y apunta a su ruta', () => {
     renderSidebar();
 
-    expect(screen.queryByTestId(HIDDEN_DASHBOARD_NAV_ITEM.testId)).toBeNull();
+    expect(screen.getByTestId('nav-dashboard')).toHaveAttribute('href', DASHBOARD_ROUTE);
     const enlacesDelMenu = Array.from(
       screen.getByTestId(testId.nav).querySelectorAll('a[href]'),
     ).map((enlace) => enlace.getAttribute('href'));
-    expect(enlacesDelMenu).not.toContain(DASHBOARD_ROUTE);
+    expect(enlacesDelMenu.filter((href) => href === DASHBOARD_ROUTE)).toHaveLength(1);
   });
 
   it('con una coleccion de navegacion vacia no renderiza entradas y el layout sigue en pie', () => {
@@ -551,9 +555,12 @@ describe('el borrado de items de relleno (QC-13)', () => {
     // TENSADO: la entrada nueva es la pantalla de clientes, ULTIMO del array y de la seccion
     // «Cadena», detras de proveedores. El ancla se TENSA, nunca se afloja: sube de nueve a DIEZ.
     // El dashboard esta fuera temporalmente: vive en `HIDDEN_DASHBOARD_NAV_ITEM`.
-    expect(PRIVATE_NAV_ITEMS).toHaveLength(9);
+    // 2026-10-08 (QC-167): el humano pide volver a mostrar el item Dashboard. Vuelve a DIEZ, con
+    // el dashboard SEGUNDO, detras de «Asignación», para no cambiar el aterrizaje de nadie.
+    expect(PRIVATE_NAV_ITEMS).toHaveLength(10);
     expect(PRIVATE_NAV_ITEMS.map((item) => item.testId)).toEqual([
       'nav-asignacion',
+      'nav-dashboard',
       'nav-inventario',
       'nav-pedidos',
       'nav-produccion',

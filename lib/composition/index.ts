@@ -265,6 +265,7 @@ import {
   createGetOrderCustomerFilterOption,
   createListAliveSummariesByIds,
   createListAliveSummariesInCompany,
+  createListSummariesByIdsIncludingDeleted,
   createListOrders,
   createQuoteOrderCost,
   createQuoteOrderPresentationAvailability,
@@ -408,6 +409,8 @@ import {
   createUnassignResponsible,
   createCancelAssignedOrder,
   createRecordStepMove,
+  createListExecutionTraces,
+  createGetExecutionTrace,
   createStartConditioning as createStartConditioningOrder,
   createFinishConditioning as createFinishConditioningOrder,
 } from '@/lib/modules/asignaciones';
@@ -421,6 +424,8 @@ import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
   listAliveOrderSummariesInCompany,
+  listOrderHistoryByIdsIncludingDeleted,
+  listOrderNumbersByIdsIncludingDeleted,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
@@ -1500,6 +1505,8 @@ const orderConditioningRepository: OrderConditioningRepository = {
 const orderSummaryReader: OrderSummaryReader = {
   listAliveByIds: listAliveOrderSummariesByIds,
   listAliveInCompany: listAliveOrderSummariesInCompany,
+  listNumbersByIdsIncludingDeleted: listOrderNumbersByIdsIncludingDeleted,
+  listHistoryByIdsIncludingDeleted: listOrderHistoryByIdsIncludingDeleted,
 };
 
 const orderCatalog: OrderCatalog = {
@@ -1509,6 +1516,7 @@ const orderCatalog: OrderCatalog = {
     summaries: orderSummaryReader,
     packaging: packagingCatalog,
   }),
+  listSummariesByIdsIncludingDeleted: createListSummariesByIdsIncludingDeleted({ summaries: orderSummaryReader }),
   // Finalizar ya no da de alta ningun lote, asi que `createTransitionOrder`
   // ya no necesita `recipeCatalog`/`productCatalog`/`unitCatalog` -esos catalogos siguen
   // cableados mas abajo para quien todavia los usa-.
@@ -1758,6 +1766,16 @@ export const asignaciones = {
     orders: orderCatalog,
     log: executionLogRepository,
     now: () => new Date(),
+  }),
+  listExecutionTraces: createListExecutionTraces({
+    log: executionLogRepository,
+    orders: orderCatalog,
+    people: peopleDirectory,
+  }),
+  getExecutionTrace: createGetExecutionTrace({
+    log: executionLogRepository,
+    orders: orderCatalog,
+    people: peopleDirectory,
   }),
   startConditioning: createStartConditioningOrder({
     orders: orderCatalog,
