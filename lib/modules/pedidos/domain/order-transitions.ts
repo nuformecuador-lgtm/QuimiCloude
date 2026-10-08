@@ -11,11 +11,11 @@ import type { OrderStatus } from './order-classification';
  * que el unico origen del Finalizar es `EN_CURSO`. `EN_CURSO` pasa a `POR_EMPACAR`, no a
  * `ENTREGADO`: el material se consume ahi.
  *
- * `POR_EMPACAR -> EN_EMPAQUE` y `EN_EMPAQUE -> ENTREGADO` SI estan en esta tabla -son transiciones
- * legales del pedido-, pero `transitionAliveById` (el puerto que usa `asignaciones` para el
- * Finalizar) rechaza esos dos destinos igual: solo se alcanzan por las dos acciones de empaque,
- * que usan su propio puerto. Ninguno de los dos admite «quedarse igual»: sin esa entrada, `POR_
- * EMPACAR` y `EN_EMPAQUE` no son editables desde Pedidos.
+ * Los pares del empaque y del acondicionamiento SI estan en esta tabla -son transiciones legales
+ * del pedido-, pero `transitionAliveById` (el puerto que usa `asignaciones` para el Finalizar)
+ * rechaza esos destinos igual: solo se alcanzan por sus acciones propias, que usan su propio
+ * puerto. Ninguno de esos estados admite «quedarse igual»: sin esa entrada, no son editables
+ * desde Pedidos.
  *
  * `ENTREGADO` y `CANCELADO` tienen la lista VACIA porque un pedido final no admite NINGUNA
  * edicion, ni siquiera la que solo cambia la prioridad.
@@ -40,13 +40,16 @@ const ALLOWED: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
   PENDIENTE: ['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'],
   EN_CURSO: ['EN_CURSO', 'POR_EMPACAR'],
   POR_EMPACAR: ['EN_EMPAQUE'],
-  EN_EMPAQUE: ['ENTREGADO'],
+  EN_EMPAQUE: ['POR_ACONDICIONAR', 'ENTREGADO'],
+  POR_ACONDICIONAR: ['EN_ACONDICIONAMIENTO'],
+  EN_ACONDICIONAMIENTO: ['TERMINADO'],
+  TERMINADO: ['ENTREGADO'],
   ENTREGADO: [], // final: ni siquiera 'ENTREGADO', porque un ENTREGADO no admite EDICION
   CANCELADO: [], // final, por el mismo motivo
   BLOQUEADO: ['BLOQUEADO', 'PENDIENTE'],
 };
 
-/** ¿Es legal pasar de `from` a `to` en una EDICION? Predicado puro, para poder probar los 49
+/** ¿Es legal pasar de `from` a `to` en una EDICION? Predicado puro, para poder probar todos los
  *  pares de la matriz sin capturar excepciones. */
 export function isAllowedTransition(from: OrderStatus, to: OrderStatus): boolean {
   return ALLOWED[from].includes(to);

@@ -559,6 +559,9 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       'POR_EMPACAR',
       'EN_EMPAQUE',
       'BLOQUEADO',
+      'POR_ACONDICIONAR',
+      'EN_ACONDICIONAMIENTO',
+      'TERMINADO',
     ])
     expect([...ORDER_STATUS_VALUES]).toEqual(enumValues('OrderStatus'))
 

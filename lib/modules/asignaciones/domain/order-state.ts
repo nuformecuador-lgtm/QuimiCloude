@@ -61,6 +61,9 @@ const ERROR_POR_ESTADO = {
   EN_EMPAQUE: (): AsignacionesError => new OrderProducedFrozenError(),
   ENTREGADO: (): AsignacionesError => new OrderDeliveredFrozenError(),
   CANCELADO: (): AsignacionesError => new OrderCancelledNotAssignableError(),
+  POR_ACONDICIONAR: (): AsignacionesError => new OrderProducedFrozenError(),
+  EN_ACONDICIONAMIENTO: (): AsignacionesError => new OrderProducedFrozenError(),
+  TERMINADO: (): AsignacionesError => new OrderProducedFrozenError(),
 } satisfies Record<OrderStatus, (() => AsignacionesError) | null>;
 
 /**

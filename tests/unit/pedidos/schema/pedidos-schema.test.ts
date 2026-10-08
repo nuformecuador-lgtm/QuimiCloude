@@ -161,6 +161,7 @@ const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['reservedAt', 'reserved_at'],
   ['finishedAt', 'finished_at'], // instante en que paso a ENTREGADO por Finalizar, opcional
   ['packedBy', 'packed_by'], // quien tiene el pedido en empaque, opcional
+  ['conditionedBy', 'conditioned_by'], // quien tiene o tuvo el pedido en acondicionamiento, opcional
   ['unitId', 'unit_id'], // la unidad en que se expresa quantity, opcional [Q4]
 ]
 
@@ -379,14 +380,14 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(order.body).toMatch(/@@index\(\[recipeId\],\s*map:\s*"orders_recipe_id_idx"\)/)
   })
 
-  it('OrderStatus declara PENDIENTE, EN_CURSO, ENTREGADO, CANCELADO, POR_EMPACAR, EN_EMPAQUE, BLOQUEADO y OrderPriority BAJA, MEDIA, ALTA, CRITICA, en ese orden y sin ningun valor mas (R1)', () => {
+  it('OrderStatus declara PENDIENTE, EN_CURSO, ENTREGADO, CANCELADO, POR_EMPACAR, EN_EMPAQUE, BLOQUEADO, POR_ACONDICIONAR, EN_ACONDICIONAMIENTO, TERMINADO y OrderPriority BAJA, MEDIA, ALTA, CRITICA, en ese orden y sin ningun valor mas (R1)', () => {
     // R16 y decision cerrada 4: dos conjuntos CERRADOS del propio esquema, con esos valores
     // exactos. EL ORDEN DE DECLARACION DE LA PRIORIDAD ES SU ORDEN, de menor a mayor: Postgres
     // ordena un enum por declaracion, no alfabeticamente, asi que reordenar cambia el dato.
     //
     // `POR_EMPACAR` y `EN_EMPAQUE` van al FINAL y eso NO es indiferente: `ALTER TYPE ... ADD
     // VALUE` anade al final, y ponerlos en otra posicion obligaria a recrear el tipo. La lista
-    // sigue siendo cerrada: un septimo valor pone este test rojo.
+    // sigue siendo cerrada: un valor mas pone este test rojo.
     expect(parseEnum('OrderStatus')).toEqual([
       'PENDIENTE',
       'EN_CURSO',
@@ -395,6 +396,9 @@ describe('db/schema.prisma — modelo de pedido', () => {
       'POR_EMPACAR',
       'EN_EMPAQUE',
       'BLOQUEADO',
+      'POR_ACONDICIONAR',
+      'EN_ACONDICIONAMIENTO',
+      'TERMINADO',
     ])
     expect(parseEnum('OrderPriority')).toEqual(['BAJA', 'MEDIA', 'ALTA', 'CRITICA'])
 
@@ -681,6 +685,7 @@ describe('db/schema.prisma — modelo de pedido', () => {
       'orders_created_by_idx',
       'orders_updated_by_idx',
       'orders_packed_by_idx',
+      'orders_conditioned_by_idx',
       'orders_unit_id_idx',
     ])
     // `finished_at` no gana `@@index` en el esquema: su indice parcial vive solo en la
@@ -758,6 +763,17 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(packedBy.attributes).not.toMatch(/@default\(/)
     expect(packedBy.attributes).not.toMatch(/@relation/)
     expect(order.body).toMatch(/@@index\(\[packedBy\],\s*map:\s*"orders_packed_by_idx"\)/)
+  })
+
+  it('R25: conditionedBy es uuid anulable, sin @relation y con su indice', () => {
+    const conditionedBy = field(order, 'conditionedBy')
+    expect(conditionedBy.type).toBe('String')
+    expect(conditionedBy.isOptional).toBe(true)
+    expect(conditionedBy.attributes).toContain('@db.Uuid')
+    expect(conditionedBy.attributes).toContain('@map("conditioned_by")')
+    expect(conditionedBy.attributes).not.toMatch(/@default\(/)
+    expect(conditionedBy.attributes).not.toMatch(/@relation/)
+    expect(order.body).toMatch(/@@index\(\[conditionedBy\],\s*map:\s*"orders_conditioned_by_idx"\)/)
   })
 
   it('no nace ninguna columna de moneda (R16)', () => {

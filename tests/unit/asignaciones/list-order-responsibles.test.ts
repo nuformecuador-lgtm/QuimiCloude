@@ -210,15 +210,18 @@ describe('QC-87 — consultar los responsables de un pedido', () => {
     const rows = [filaSuelta(ANA), filaDeGrupo(BRUNO)];
     const refs = [persona(ANA, 'Ana Perez'), persona(BRUNO, 'Bruno Diaz')];
 
-    it('los SIETE estados son exactamente estos siete', () => {
+    it('R20: los estados recorridos son todos, incluidos los de acondicionamiento y TERMINADO', () => {
       expect([...ESTADOS].sort()).toEqual([
         'BLOQUEADO',
         'CANCELADO',
         'ENTREGADO',
+        'EN_ACONDICIONAMIENTO',
         'EN_CURSO',
         'EN_EMPAQUE',
         'PENDIENTE',
+        'POR_ACONDICIONAR',
         'POR_EMPACAR',
+        'TERMINADO',
       ]);
     });
 

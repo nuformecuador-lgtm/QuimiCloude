@@ -47,6 +47,9 @@ export const COMPANY_ORDER_STATUS_LABELS: Readonly<Record<OrderStatus, string>> 
   ENTREGADO: 'Entregado',
   CANCELADO: 'Cancelado',
   BLOQUEADO: 'Bloqueado',
+  POR_ACONDICIONAR: 'Por acondicionar',
+  EN_ACONDICIONAMIENTO: 'En acondicionamiento',
+  TERMINADO: 'Terminado',
 };
 
 export const COMPANY_ORDER_PRIORITY_LABELS: Readonly<Record<OrderPriority, string>> = {

@@ -69,6 +69,9 @@ const ORDER_STATUS_IS_FINAL: Readonly<Record<OrderStatus, boolean>> = {
   ENTREGADO: true,
   CANCELADO: true,
   BLOQUEADO: false,
+  POR_ACONDICIONAR: true,
+  EN_ACONDICIONAMIENTO: true,
+  TERMINADO: true,
 };
 
 /**
@@ -94,6 +97,9 @@ const ORDER_STATUS_ACCEPTS_DISTRIBUTION_EDIT: Readonly<Record<OrderStatus, boole
   CANCELADO: false,
   // La edicion general sigue abierta en BLOQUEADO y ya cubre reparto y unidad.
   BLOQUEADO: false,
+  POR_ACONDICIONAR: false,
+  EN_ACONDICIONAMIENTO: false,
+  TERMINADO: false,
 };
 
 export function acceptsDistributionEdit(status: OrderStatus): boolean {

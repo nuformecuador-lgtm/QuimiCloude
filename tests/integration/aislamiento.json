@@ -42,6 +42,8 @@
     "inventario/reservations-and-decimal-stock-migration.int.test.ts",
     "inventario/reserve-existing-orders-migration.int.test.ts",
     "pedidos/company-scope.int.test.ts",
+    "pedidos/order-conditioning-constraints.int.test.ts",
+    "pedidos/order-conditioning-states-rollback.int.test.ts",
     "pedidos/order-crud.int.test.ts",
     "pedidos/order-packing-constraints.int.test.ts",
     "pedidos/order-packing-states-rollback.int.test.ts",

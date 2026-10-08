@@ -261,7 +261,15 @@ describe('el predicado de estado final es UNO solo y sale del contrato (R24, R42
   it('exactamente `ENTREGADO`, `CANCELADO`, `POR_EMPACAR` y `EN_EMPAQUE` de los valores que publica `pedidos`', () => {
     const finales = ORDER_STATUS_VALUES.filter((status) => isFinalOrderStatus(status));
 
-    expect(finales).toEqual(['ENTREGADO', 'CANCELADO', 'POR_EMPACAR', 'EN_EMPAQUE']);
+    expect(finales).toEqual([
+      'ENTREGADO',
+      'CANCELADO',
+      'POR_EMPACAR',
+      'EN_EMPAQUE',
+      'POR_ACONDICIONAR',
+      'EN_ACONDICIONAMIENTO',
+      'TERMINADO',
+    ]);
   });
 });
 
