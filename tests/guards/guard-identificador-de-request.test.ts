@@ -99,6 +99,10 @@ export const E2E_ESPERADOS = [
   // afirma nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71
   // R21 sigue INTACTO.
   'ajuste-de-inventario.spec.ts',
+  // Alta el 2026-10-08 (QC-226) por el MISMO motivo que las demas. Lo que ejercita: sin sesion,
+  // el manifest, los iconos y la imagen OG responden 2xx sin redirigir, y el <head> de /login los
+  // enlaza. No lee ni afirma nada sobre el identificador de peticion.
+  'brand-assets.spec.ts',
   // QC-101 T10 / R17: la E2E del cierre de TODAS las sesiones de otra persona desde la pantalla.
   // Alta por el MISMO motivo y en el MISMO sitio que las de QC-49, QC-67, QC-79, QC-85 y QC-102:
   // esta lista es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO

@@ -148,6 +148,11 @@ la barra mediante `aria-expanded` y la referencie mediante `aria-controls`.
 alternar la barra lateral entre modo expandido y modo icono, mostrando la versión corta de la
 marca en modo icono y la versión larga en modo expandido.
 
+> **ENMIENDA DEL 2026-10-08 (QC-226).** La versión corta de la marca pasa a ser el isotipo para fondo
+> oscuro, a 32 px, en lugar de «QC»; la larga, el logo horizontal para fondo oscuro, a 28 px de
+> alto, sin los textos visibles. El nombre accesible del enlace de marca sigue siendo
+> `BRAND_LABEL` (QC-226 D7, R12, R13).
+
 **R25** — MIENTRAS la barra lateral está en modo icono, el sistema DEBE conservar el nombre
 accesible de cada entrada de navegación aunque su etiqueta de texto no sea visible.
 
@@ -224,3 +229,7 @@ revisión (a) están todas respondidas y trasladadas a `## Decisiones cerradas` 
 | 2026-08-06 | Rutas | Siempre en constantes exportadas, nunca literales (R13) |
 | 2026-08-06 | Fase 2 bloqueada | La implementación no arranca hasta que la feature 7 esté `done` y su base esté en `dev` (`progress/current.md > Feature 8`) |
 | 2026-08-06 | Asserts de los tests | Sobre roles ARIA, `data-testid` y constantes exportadas; **nunca** sobre literales de copy |
+
+> **ENMIENDA DEL 2026-10-08 (QC-226).** **D7** (marca) queda enmendada: la versión corta «QC» pasa a ser
+> el isotipo y el texto largo «QuimiCloude», el logo horizontal. «QuimiCloude» queda como nombre
+> accesible (`BRAND_LABEL`), no como texto visible (QC-226 D7, D19).
