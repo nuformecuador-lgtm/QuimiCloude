@@ -23,7 +23,12 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-import { SUPPLIERS_ROUTE } from '@/lib/shared/routes'
+import {
+  AI_PROVIDER_INTEGRATION_ROUTE,
+  INVENTORY_INTEGRATION_ROUTE,
+  SUPPLIERS_ROUTE,
+  WHATSAPP_INTEGRATION_ROUTE,
+} from '@/lib/shared/routes'
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
@@ -252,13 +257,59 @@ describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla
     // permite es LA PANTALLA DE QC-44, no «cualquier cosa bajo app/»: un route handler en
     // `app/api/proveedores/` o un componente de proveedores colgado de otra ruta caen aqui
     // porque no empiezan por la carpeta de la pantalla.
+    //
+    // 2026-10-08 (menu de integraciones): falso positivo por nombre. Bajo la carpeta de
+    // integraciones viven paginas cascaron, una por integracion; la del proveedor IA casa con
+    // `PATRON_PROVEEDORES` solo por llamarse «proveedor-ia». No es una pieza de proveedores. La
+    // carpeta se deriva de las rutas de `@/lib/shared/routes`, nunca de un literal a mano, y abajo
+    // se exige que lo que casa ahi sea EXACTAMENTE esa pagina y nada mas.
+    const primerosSegmentosDeIntegraciones = [
+      AI_PROVIDER_INTEGRATION_ROUTE,
+      INVENTORY_INTEGRATION_ROUTE,
+      WHATSAPP_INTEGRATION_ROUTE,
+    ].map((ruta) => ruta.split('/').filter((segmento) => segmento.length > 0)[0])
+    const [segmentoDeIntegraciones] = primerosSegmentosDeIntegraciones
+    if (!segmentoDeIntegraciones) throw new Error('la ruta del proveedor IA no tiene segmentos')
+    expect(
+      primerosSegmentosDeIntegraciones,
+      'las rutas de integraciones ya no comparten su primer segmento',
+    ).toEqual([segmentoDeIntegraciones, segmentoDeIntegraciones, segmentoDeIntegraciones])
+    const CARPETA_DE_INTEGRACIONES = join('(private)', segmentoDeIntegraciones)
+      .split(sep)
+      .join('/')
     const fueraDeSuCarpeta = enApp.filter(
-      (relativa) => !relativa.startsWith(`${RUTA_DE_LA_PANTALLA}/`),
+      (relativa) =>
+        !relativa.startsWith(`${RUTA_DE_LA_PANTALLA}/`) &&
+        !relativa.startsWith(`${CARPETA_DE_INTEGRACIONES}/`),
     )
     expect(
       fueraDeSuCarpeta,
       `pieza de proveedores fuera de app/${RUTA_DE_LA_PANTALLA}/: ${fueraDeSuCarpeta.join(', ')}`,
     ).toEqual([])
+
+    // Defensa extra de la exclusion de integraciones: lo que casa bajo esa carpeta es
+    // EXACTAMENTE la pagina cascaron del proveedor IA, y su fuente no menciona proveedores.
+    // Cualquier otro archivo que case ahi, o esa pagina convertida en pieza de proveedores,
+    // pone esto en rojo.
+    const PAGINA_DEL_PROVEEDOR_IA = join(
+      '(private)',
+      ...AI_PROVIDER_INTEGRATION_ROUTE.split('/').filter((segmento) => segmento.length > 0),
+      'page.tsx',
+    )
+      .split(sep)
+      .join('/')
+    const dentroDeIntegraciones = enApp.filter((relativa) =>
+      relativa.startsWith(`${CARPETA_DE_INTEGRACIONES}/`),
+    )
+    expect(
+      dentroDeIntegraciones,
+      `archivos inesperados bajo app/${CARPETA_DE_INTEGRACIONES}/: ${dentroDeIntegraciones.join(', ')}`,
+    ).toEqual([PAGINA_DEL_PROVEEDOR_IA])
+    const fuenteDelProveedorIa = readFileSync(join(repoRoot, 'app', PAGINA_DEL_PROVEEDOR_IA), 'utf8')
+    expect(
+      PATRON_PROVEEDORES.test(fuenteDelProveedorIa),
+      `pieza de proveedores escondida en app/${PAGINA_DEL_PROVEEDOR_IA}`,
+    ).toBe(false)
 
     // Esta mitad sigue en negativo, pero con una unica excepcion, tan estrecha como la carpeta
     // que la motiva: `components/` (compartido entre pantallas) no gana ninguna pieza de

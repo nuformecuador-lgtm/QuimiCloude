@@ -33,7 +33,7 @@ constantes de ruta. Esta rama todavía no la tiene: T0 la trae.
     está en verde sobre la rama y las líneas reales de los tests rojos están anotadas en
     `progress/impl_QC-222-menu-de-integraciones.md`.
 
-- [ ] **T2 [P] — Etiquetas, icono y grupo del menú**
+- [x] **T2 [P] — Etiquetas, icono y grupo del menú**
   - Depende de: T0.
   - Hacer:
     - en `private-nav.ts`: las cuatro `*_LABEL`, `'puzzle'` en `NavIconName` y el `NavGroup` como
@@ -62,7 +62,7 @@ constantes de ruta. Esta rama todavía no la tiene: T0 la trae.
   - Hecho cuando: `tests/unit/integraciones-ui/integration-pages.test.tsx` (escrito en esta task)
     cubre R9, R10, R11, R12 y la parte de página de R13 en verde, y R2 de T2 pasa a verde.
 
-- [ ] **T5 — Prefijos privados**
+- [x] **T5 — Prefijos privados**
   - Depende de: T4. La guardia exige que la página exista antes que el prefijo.
   - Hacer: añadir las tres constantes al final de `PRIVATE_ROUTE_PREFIXES` y borrar el comentario
     que QC-221 dejó encima de ellas (`design.md > 5`).
@@ -80,14 +80,14 @@ constantes de ruta. Esta rama todavía no la tiene: T0 la trae.
     - no queda ningún `AVISO_DE_ENMIENDA` ni ningún mensaje que nombre QC-222;
     - hay un caso de anticegado que ve el código en las cuatro rutas nuevas.
 
-- [ ] **T7 [P] — Tensar los tests que fijan la forma del menú**
+- [x] **T7 [P] — Tensar los tests que fijan la forma del menú**
   - Depende de: T2.
   - Hacer: las cuatro filas de `design.md > 7.2`. Se tensan a la lista exacta nueva y no se
     relajan a `toContain`.
   - Hecho cuando: `pnpm exec vitest related --run lib/shared/navigation/private-nav.ts` está en
     verde.
 
-- [ ] **T8 — E2E `e2e/integraciones.spec.ts`**
+- [x] **T8 — E2E `e2e/integraciones.spec.ts`**
   - Depende de: T5.
   - Hacer: el spec de `design.md > 8`: un caso para el Administrador y un caso por cada rol sin el
     permiso, derivado de `SEED_ROLE_PERMISSIONS` y menos el Maestro, con su motivo escrito.
@@ -95,7 +95,7 @@ constantes de ruta. Esta rama todavía no la tiene: T0 la trae.
     WebKit sobre una base sembrada, y `guard-e2e-landing` sigue verde. Cubre R19, R20 y R21. La
     salida se pega en `progress/impl_QC-222-menu-de-integraciones.md`.
 
-- [ ] **T10 — Tensar cinco tests más y excluir integraciones de los tests de alcance**
+- [x] **T10 — Tensar cinco tests más y excluir integraciones de los tests de alcance**
   (enmienda 2026-10-08, `design.md > 14`, E1 y E2; va antes de T9 y conserva su número para no
   renumerar las demás)
   - Depende de: T5.

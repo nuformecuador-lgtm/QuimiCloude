@@ -237,6 +237,8 @@ describe('barra lateral privada', () => {
       'nav-clientes',
       'nav-presentaciones',
       'nav-unidades',
+      // «Integraciones» es el ultimo item de «Configuración»: se dibuja detras de Unidades.
+      'nav-integraciones',
     ];
 
     expect(enDom).toEqual(esperado);

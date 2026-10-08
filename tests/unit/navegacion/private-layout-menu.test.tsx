@@ -112,6 +112,8 @@ const testId = {
   // Item de la seccion «Cadena», junto a Proveedores. Declara `clientes.consultar`, que el seed
   // da SOLO al Administrador -el Operador no lo tiene-, igual que unidades.
   clientes: 'nav-clientes',
+  // Grupo de la seccion «Configuración», ULTIMO del array.
+  integraciones: 'nav-integraciones',
 } as const;
 
 /** Los codigos del catalogo de QC-74, sin escribir ninguno a mano. QC-38 lo dejo en ONCE al
@@ -331,7 +333,7 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
 
   // 2026-10-08 (QC-167): el humano pide volver a mostrar el item Dashboard; el ancla vuelve a
   // diez, con `nav-dashboard` SEGUNDO, detras de «Asignación».
-  it('ancla: el menu real tiene los diez items que este test vigila', async () => {
+  it('ancla: el menu real tiene los once items que este test vigila', async () => {
     // Anti-vacuidad: si alguien renombra un `testId` de `PRIVATE_NAV_ITEMS`, los
     // `queryByTestId(...) === null` de arriba pasarian por buenos sin comprobar nada.
     // TENSADO el 2026-09-08 (QC-39 T4, R9/R10/R47): el ancla sube de seis a siete con
@@ -357,6 +359,9 @@ describe('el layout privado filtra el menu con los permisos de la sesion', () =>
       // Sube de ocho a nueve con `nav-clientes`, ULTIMO del array y de la seccion «Cadena», tras
       // Proveedores.
       testId.clientes,
+      // Sube de diez a once con el grupo `nav-integraciones`, ULTIMO del array y de la seccion
+      // «Configuración». Sigue siendo la lista EXACTA y en orden.
+      testId.integraciones,
     ]);
   });
 
