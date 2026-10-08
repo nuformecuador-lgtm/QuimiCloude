@@ -372,3 +372,8 @@ con la feature y **ninguna migración nueva**, así que no hizo falta `migrate d
   archivos, aunque `test-rapido` los pasa como `--exclude`, **corrieron igual**: el
   `--exclude` no los filtró en `vitest related` (Windows). Es un defecto del arnés y queda para el leader.
 - **Push:** primera publicación de `feature/QC-156-pedido-con-cliente` en origin.
+- **Baseline (F2.4):** `./init.sh --completo` salió rojo solo por `tests/unit/identity/seed/deploy-hook.test.ts`
+  (espera 3 tramos en `scripts.build`; el commit directo en dev `b79a43c4 fix build command` añadió
+  `prisma generate` y son 4). Deuda ajena, no de QC-156: entra en `tests/baseline-rojos.json` (desde 2026-10-07),
+  sin tocar el test ni `package.json`. Comparador sobre `.vitest-rojos.json`: «sin rojos nuevos (9 rojos, todos
+  en el baseline de 11); 2 por limpiar» (`credential-setup.int` y `catalog-line.int` ya pasan), exit 0.
