@@ -507,10 +507,13 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
       })
       .map((entry) => entry.name)
       .sort()
+    // QC-223 2026-10-08: + `order_deliveries`, que solo REFERENCIA `customers` con una FK
+    // compuesta desde la tabla nueva; no altera `customers`.
     expect(tocanCustomers).toEqual([
       '20260924120000_customers',
       '20260924200000_customers_search_normalized',
       '20261006160000_orders_customer',
+      '20261008150100_order_deliveries',
     ])
   })
 

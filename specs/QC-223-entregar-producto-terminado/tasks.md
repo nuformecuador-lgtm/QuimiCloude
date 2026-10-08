@@ -17,7 +17,7 @@
 
 ---
 
-## [ ] T0 — Publicar el contrato (bloquea todo lo demás)
+## [x] T0 — Publicar el contrato (bloquea todo lo demás)
 
 Implementa `design.md > 2` tal cual, con el stub de `design.md > 2.8`.
 
@@ -76,7 +76,7 @@ Cubre: R16 (función), base de R1, R10, R18, R20 y R38.
 
 ## Bloque B — backend (`backend_dev`)
 
-### [ ] B1 — Migraciones, esquema y permiso sembrado
+### [x] B1 — Migraciones, esquema y permiso sembrado
 Depende de: T0.
 
 Archivos:

@@ -484,6 +484,11 @@ export const MIGRACIONES_ESPERADAS = [
   '20261007120000_order_conditioning_states',
   // El indice de pedidos terminados; no toca el identificador.
   '20261007120100_order_terminated_finished_index',
+  // QC-223 2026-10-08: la entrega de producto terminado (valor de enum, tablas y permiso); ninguna
+  // toca el identificador.
+  '20261008150000_inventory_movement_kind_delivery',
+  '20261008150100_order_deliveries',
+  '20261008150200_delivery_permission',
 ] as const
 
 export function hallazgosDeMigraciones(
