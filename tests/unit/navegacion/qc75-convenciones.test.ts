@@ -76,6 +76,7 @@ export const CODIGOS_QC74 = [
   'empresas.consultar',
   'empresas.modificar',
   'acondicionamiento.modificar',
+  'integraciones.modificar',
 ] as const;
 
 /** Los modulos de negocio del ERP, en el orden en que cada uno entro al catalogo. */
@@ -150,7 +151,7 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
     // `dashboard` es una pantalla y no un modulo del ERP (solo lleva `consultar`); `usuarios`,
     // `terminados`, `empaque`, `empresas` y `acondicionamiento` no son carpetas de `lib/modules/`
     // -viven dentro de `identity`-. `empaque` y `acondicionamiento` ademas son solo de escritura:
-    // unicamente llevan `modificar`.
+    // unicamente llevan `modificar`. `integraciones` tambien solo escribe, pero si es carpeta.
     const esperados = [
       ...new Set([
         ...MODULOS_DE_NEGOCIO,
@@ -160,6 +161,7 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
         'empaque',
         'empresas',
         'acondicionamiento',
+        'integraciones',
       ]),
     ].sort();
     expect(modulos).toEqual(esperados);

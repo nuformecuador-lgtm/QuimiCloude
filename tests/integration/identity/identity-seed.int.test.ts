@@ -1142,6 +1142,92 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
     });
   });
 
+  it('QC-221 R21, R18 — sobre base vacia, integraciones.modificar lo tiene solo el Administrador, cada rol tiene exactamente lo declarado, y la segunda corrida no cambia nada', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const CODIGO = 'integraciones.modificar';
+      await resetIdentityToEmptyState(tx);
+      const repository = createInitialAccessRepository(tx);
+      const deps = {
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
+      };
+
+      const first = await seedInitialAccess(deps);
+      expect(first.createdPermissions).toContain(CODIGO);
+
+      expect(
+        await tx.rolePermission.findMany({
+          where: { permissionCode: CODIGO },
+          select: { role: { select: { name: true } } },
+        }),
+      ).toEqual([{ role: { name: ROLE_ADMINISTRADOR } }]);
+      for (const roleName of SEED_ROLE_NAMES) {
+        expect(await codigosEnBaseDe(tx, roleName), roleName).toEqual(codigosSembradosDe(roleName));
+      }
+      expect(codigosSembradosDe(ROLE_ADMINISTRADOR)).toContain(CODIGO);
+
+      const trasLaPrimera = await fotoDeLoQueSiembra(tx);
+      const second = await seedInitialAccess(deps);
+      expect(second.createdRoles).toEqual([]);
+      expect(second.createdPermissions).toEqual([]);
+      expect(second.createdRolePermissions).toBe(0);
+      expect(await fotoDeLoQueSiembra(tx)).toEqual(trasLaPrimera);
+    });
+  });
+
+  it('QC-221 R18 — sobre la base ya sembrada salvo integraciones.modificar, el seed crea solo ese permiso y la asignacion del Administrador, deja intacto lo demas, y la segunda corrida no cambia nada', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const CODIGO = 'integraciones.modificar';
+      await tx.rolePermission.deleteMany({ where: { permissionCode: CODIGO } });
+      await tx.permission.deleteMany({ where: { code: CODIGO } });
+
+      const permisosAntes = await tx.permission.findMany({ orderBy: { code: 'asc' } });
+      const asignacionesAntes = await tx.rolePermission.findMany({
+        orderBy: [{ roleId: 'asc' }, { permissionCode: 'asc' }],
+      });
+      const rolesAntes = await tx.role.findMany({ orderBy: { id: 'asc' } });
+
+      const repository = createInitialAccessRepository(tx);
+      const deps = {
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
+      };
+
+      const first = await seedInitialAccess(deps);
+      expect(first.createdRoles).toEqual([]);
+      expect(first.createdPermissions).toEqual([CODIGO]);
+      expect(first.createdRolePermissions).toBe(1);
+      expect(await tx.permission.findMany({ where: { code: { not: CODIGO } }, orderBy: { code: 'asc' } })).toEqual(
+        permisosAntes,
+      );
+      expect(
+        await tx.rolePermission.findMany({
+          where: { permissionCode: { not: CODIGO } },
+          orderBy: [{ roleId: 'asc' }, { permissionCode: 'asc' }],
+        }),
+      ).toEqual(asignacionesAntes);
+      expect(await tx.role.findMany({ orderBy: { id: 'asc' } })).toEqual(rolesAntes);
+      expect(
+        await tx.rolePermission.findMany({
+          where: { permissionCode: CODIGO },
+          select: { role: { select: { name: true } } },
+        }),
+      ).toEqual([{ role: { name: ROLE_ADMINISTRADOR } }]);
+
+      const trasLaPrimera = await fotoDeLoQueSiembra(tx);
+      const second = await seedInitialAccess(deps);
+      expect(second.createdPermissions).toEqual([]);
+      expect(second.createdRolePermissions).toBe(0);
+      expect(await fotoDeLoQueSiembra(tx)).toEqual(trasLaPrimera);
+    });
+  });
+
   // Caso 11 (QC-65 R7, R10): el estado de cuenta del administrador inicial, contra Postgres
   // REAL. El unitario de `tests/unit/identity/seed/seed-initial-access.test.ts` afirma que el
   // dominio PASA el valor; este afirma que llega a la fila. Es el riesgo n.o 1 de
