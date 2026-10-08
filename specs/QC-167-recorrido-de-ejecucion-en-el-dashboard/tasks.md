@@ -60,8 +60,10 @@
   implementación en `execution-log-prisma.ts`, con el mapa inverso del enum derivado del existente
   (`design.md > 3.1`, `> 3.2`). *Depende de T3 (tipo de lectura).*
   **Hecho cuando:** (a) unit: el mapa ida-y-vuelta da las ocho acciones; (b) `.int`: los tres métodos
-  filtran por empresa (anotaciones de otra empresa con la misma persona o el mismo pedido no
-  vuelven), el filtro de persona y el de rango (`gte` / `lt`) funcionan, `listEntriesForOrders`
+  filtran por empresa (la empresa B tiene anotaciones propias, y pedir con la empresa B el pedido o
+  la persona de la empresa A —y al revés— no devuelve nada; no se siembran filas con empresa y
+  pedido/persona cruzados porque las FK compuestas de `order_execution_entries` las impiden;
+  decisión del humano, 2026-10-08), el filtro de persona y el de rango (`gte` / `lt`) funcionan, `listEntriesForOrders`
   ordena por `occurredAt, id`; (c) el puerto sigue sin ningún método de modificar o borrar. Cubre
   **R7, R8, R22, R23, R24**.
 
