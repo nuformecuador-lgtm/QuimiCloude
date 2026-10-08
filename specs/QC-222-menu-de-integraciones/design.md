@@ -369,6 +369,14 @@ tensan igual que las cuatro de arriba: a la lista o la cifra exactas nuevas.
 | `tests/unit/configuracion-ui/private-nav-unidades.test.ts:79` y `:92` | «Configuración» tiene exactamente **2** items | **3**, y se renombra el caso. El resto de lo que afirma de Unidades no cambia |
 | `tests/guards/guard-pantallas-exigen-permiso.test.ts`, `RUTAS_ESPERADAS_HOY` | El barrido encuentra exactamente las **21** pantallas privadas de hoy | **24**: las tres rutas entran en la lista como **entradas**, no como excepciones (R14, §5). Se renombra el caso a la cifra nueva |
 
+**Enmienda 2026-10-08 (§14, E4).** Una fila más, aprobada por el humano. No fija la forma del menú
+sino la lista cerrada de archivos de `e2e/`, y se pone roja con el `e2e/integraciones.spec.ts` que
+exige R21.
+
+| Archivo:línea | Qué fija | Cambio |
+|---|---|---|
+| `tests/guards/guard-identificador-de-request.test.ts:893` (caso «no hay ningun archivo nuevo en e2e/ y existe el test que lo sustituye (R21)»), lista `E2E_ESPERADOS` | `e2e/` contiene exactamente los `.spec.ts` nombrados en la lista cerrada | Se añade la entrada `'integraciones.spec.ts'` con su comentario, con el patrón de las altas previas: por qué entra (QC-222 R21), qué recorrido ejercita, y que no lee ni afirma nada sobre el identificador de petición ni sobre `reference`, así que el diferimiento de QC-71 R21 sigue intacto. Es una **entrada** de la lista, no una excepción; no se toca `hallazgosDeE2e` ni ningún otro caso |
+
 **No se ponen rojos**, porque derivan del dato o miran otra cosa:
 
 - `guard-nav-serializable` y `guard-rutas-privadas-cubiertas`. (Enmienda 2026-10-08:
@@ -578,7 +586,7 @@ Queda como decisión técnica de este diseño, sin reabrir nada: una fila de
 Las aprobó el humano el 2026-10-08, con el spec ya aprobado, tras el bloqueo que T0 dejó en
 `progress/features/QC-222.md > Preguntas abiertas` y en
 `progress/impl_QC-222-menu-de-integraciones.md`. Están en `requirements.md > Decisiones cerradas`
-como D15–D17. No cambian ningún requisito ni el mapa `R<n> -> test`; solo amplían los tests que
+como D15–D18. No cambian ningún requisito ni el mapa `R<n> -> test`; solo amplían los tests que
 se tocan.
 
 | # | Enmienda | Dónde |
@@ -586,3 +594,12 @@ se tocan.
 | E1 (D15) | Se tensan cinco tests más a la forma nueva del menú: `app-sidebar.test.tsx:229-242`, `private-layout-menu.test.tsx:343-360`, `guard-nav-permisos-declarados.test.ts:112-124` (10→13), `private-nav-unidades.test.ts:79,92` (2→3) y `RUTAS_ESPERADAS_HOY` de `guard-pantallas-exigen-permiso.test.ts` (21→24, entrada de lista, no excepción). Se corrige §5, que daba esas guardias por verdes | hallazgo 10, §5, §7.2, `tasks.md > T10` |
 | E2 (D16) | `inventario/scope.test.ts` y `proveedores/scope.test.ts` excluyen `app/(private)/integraciones/` por nombre, con su motivo escrito y con el patrón de sus exclusiones previas. No se toca ninguna regex | §7.5, `tasks.md > T10` |
 | E3 (D17) | E2E: `private-user-trigger` no existe desde el 2026-09-07; el paso de teclado comprueba que `private-logout` es visible y recibe el foco por teclado | §8 |
+| E4 (D18) | `tests/guards/guard-identificador-de-request.test.ts:893` está en rojo: `E2E_ESPERADOS` es una lista cerrada y no nombra `e2e/integraciones.spec.ts` (exigido por R21). Se da de alta como una entrada con nombre y su comentario, que es como crece esa lista. Sin excepción ni relajación de la guardia | §7.2, `tasks.md > T11` |
+
+**Gate local de esta feature (aprobado por el humano el 2026-10-08).** El cierre local de T9 y
+T11 es: **las guardias y los tests relacionados, corridos por separado**
+(`pnpm exec vitest run guard` y `pnpm exec vitest related --run <archivos del diff>`), y el
+**check `gate-completo` de CI como gate final**. Motivo: `scripts/test-rapido.mjs --exclude` no
+funciona en Windows (deuda conocida del arnés), así que `./init.sh` no puede cerrar en verde en
+local en esta máquina. No se relaja ninguna guardia ni se salta ningún test: solo cambia dónde
+corre la parte que el script no puede correr.

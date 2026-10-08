@@ -114,8 +114,21 @@ constantes de ruta. Esta rama todavía no la tiene: T0 la trae.
     - ninguna guardia gana una excepción (R14);
     - el diff de los dos tests de alcance no cambia `screenPattern` ni `PATRON_PROVEEDORES`.
 
+- [ ] **T11 — Dar de alta `integraciones.spec.ts` en `E2E_ESPERADOS`**
+  (enmienda 2026-10-08, `design.md > 14`, E4; va antes de T9)
+  - Depende de: T8.
+  - Hacer: la fila E4 de `design.md > 7.2`: añadir `'integraciones.spec.ts'` a `E2E_ESPERADOS` en
+    `tests/guards/guard-identificador-de-request.test.ts` como una entrada con nombre y su
+    comentario, con el patrón de las altas previas (motivo, recorrido que ejercita y que el
+    diferimiento de QC-71 R21 sigue intacto).
+  - Hecho cuando:
+    - el caso «no hay ningun archivo nuevo en e2e/ y existe el test que lo sustituye (R21)»
+      (`:893`) y el resto del archivo están en verde con `pnpm exec vitest run guard`;
+    - el diff del archivo solo añade la entrada y su comentario: ni excepción, ni cambio en
+      `hallazgosDeE2e` ni en ningún otro caso.
+
 - [ ] **T9 — Cierre**
-  - Depende de: T0, T2–T8 y T10.
+  - Depende de: T0, T2–T8, T10 y T11.
   - Hacer:
     - `./init.sh`;
     - revisar el diff contra R7 y R22: sin cambios en `components/private/app-sidebar.tsx`,
@@ -151,6 +164,13 @@ tests siguen fijando la forma exacta del menú y de las pantallas, y respaldan R
 
 - **2026-10-08** (`design.md > 14`, aprobadas por el humano): E1 y E2 entran como T10; E3 cambia
   el paso de teclado de T8 (`design.md > 8`) y no añade task.
+- **2026-10-08** (`design.md > 14`, aprobada por el humano): E4 entra como T11 (antes de T9; T9
+  depende de ella). No añade ni quita requisitos ni cambia el mapa: respalda R21.
+- **2026-10-08** (`design.md > 14 > Gate local de esta feature`, aprobado por el humano): en T9 y
+  T11 el gate local es **guardias + tests relacionados corridos por separado**
+  (`pnpm exec vitest run guard` y `pnpm exec vitest related --run <archivos del diff>`), y el
+  **check `gate-completo` de CI es el gate final**. Motivo: `scripts/test-rapido.mjs --exclude` no
+  funciona en Windows (deuda conocida del arnés).
 
 ## Archivos esperados
 
@@ -178,3 +198,4 @@ tests siguen fijando la forma exacta del menú y de las pantallas, y respaldan R
 - `tests/guards/guard-pantallas-exigen-permiso.test.ts`
 - `tests/unit/inventario/scope.test.ts`
 - `tests/unit/proveedores/scope.test.ts`
+- `tests/guards/guard-identificador-de-request.test.ts`
