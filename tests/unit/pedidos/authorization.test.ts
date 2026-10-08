@@ -42,6 +42,7 @@ import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-reposito
 import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work'
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
+import type { CustomerCatalog } from '@/lib/modules/clientes'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
@@ -107,6 +108,12 @@ function dobles() {
     findCostingBatches: explota('packaging.findCostingBatches'),
   } as unknown as PackagingCatalog
 
+  const customerCatalog = {
+    findRefsIncludingDeleted: explota('customerCatalog.findRefsIncludingDeleted'),
+    findAliveRefById: explota('customerCatalog.findAliveRefById'),
+    searchRefs: explota('customerCatalog.searchRefs'),
+  } as unknown as CustomerCatalog
+
   // QC-57 (R34): el log del campo omitido tampoco puede sonar sin autorizacion.
   // `requirePermission` va antes de zod y antes de sanear, asi que un actor rechazado no llega
   // ni a saber que su consulta traia campos no declarados.
@@ -124,7 +131,7 @@ function dobles() {
       unitOfWork.run as unknown as ReturnType<typeof vi.fn>,
     ] as readonly ReturnType<typeof vi.fn>[]
 
-  return { orders, recipes, products, units, presentations, packaging, log, unitOfWork, llamadas }
+  return { orders, recipes, products, units, presentations, packaging, customerCatalog, log, unitOfWork, llamadas }
 }
 
 /** Los dobles de la invocacion en curso. Se renuevan en CADA caso para que el contador de uno
@@ -139,6 +146,7 @@ function depsDeTurno() {
     units: enCurso.units,
     presentations: enCurso.presentations,
     packaging: enCurso.packaging,
+    customerCatalog: enCurso.customerCatalog,
     log: enCurso.log,
     unitOfWork: enCurso.unitOfWork,
   }

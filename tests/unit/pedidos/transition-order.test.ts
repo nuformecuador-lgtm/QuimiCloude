@@ -40,6 +40,7 @@ function filaBloqueada(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow 
     updatedBy: 'admin-0',
     presentationLines: [],
     unitId: null,
+    customerId: null,
     reservedAt: null,
     packagingCost: null,
     ...overrides,
@@ -84,6 +85,34 @@ describe('createTransitionOrder', () => {
 
     expect(lockAliveById).not.toHaveBeenCalled();
   });
+
+  // Los tres pares son legales en la matriz: lo que se prueba es que la transicion generica los
+  // reserva a sus casos de uso propios.
+  const DESTINOS_DE_ACONDICIONAMIENTO = [
+    ['EN_EMPAQUE', 'POR_ACONDICIONAR'],
+    ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO'],
+    ['EN_ACONDICIONAMIENTO', 'TERMINADO'],
+    ['TERMINADO', 'ENTREGADO'],
+  ] as const;
+
+  for (const [desde, hacia] of DESTINOS_DE_ACONDICIONAMIENTO) {
+    it(`R4 (QC-215): rechaza ${hacia} como destino desde ${desde} con invalid_transition, SIN abrir la unidad de trabajo`, async () => {
+      const lockAliveById = vi.fn();
+      const { unitOfWork, orders } = fakeUnitOfWork({ orders: { lockAliveById } });
+      const run = vi.spyOn(unitOfWork, 'run');
+      const transitionAliveById = createTransitionOrder({ unitOfWork });
+
+      const error = await transitionAliveById('o-1', EMPRESA, desde, hacia, 'actor-1', AHORA).catch(
+        (e: unknown) => e,
+      );
+
+      expect(error).toBeInstanceOf(InvalidTransitionError);
+      expect((error as InvalidTransitionError).code).toBe('invalid_transition');
+      expect(run).not.toHaveBeenCalled();
+      expect(lockAliveById).not.toHaveBeenCalled();
+      expect(orders.setStatus).not.toHaveBeenCalled();
+    });
+  }
 
   it('R2: rechaza ENTREGADO como destino, aunque la matriz lo admita, SIN abrir la unidad de trabajo', async () => {
     const lockAliveById = vi.fn();

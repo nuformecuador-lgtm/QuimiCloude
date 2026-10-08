@@ -61,6 +61,7 @@ import type { SessionRevocationRepository } from '@/lib/modules/identity/ports/s
 import type { UserCredentialsReader } from '@/lib/modules/identity/ports/user-credentials-reader';
 import {
   createAdjustBatchStock,
+  createConfirmInventoryImport,
   createCreatePresentation,
   createCreateProduct,
   createCreateRawMaterial,
@@ -74,6 +75,7 @@ import {
   createListProductBatches,
   createListProductFormUnits,
   createListProducts,
+  createPreviewInventoryImport,
   createUpdatePresentation,
   createUpdateProduct,
 } from '@/lib/modules/inventario';
@@ -119,6 +121,21 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
 import { listStockGroups } from '@/lib/modules/inventario/adapters/driven/persistence/finished-stock-prisma';
+import {
+  claimImport,
+  findAliveFinishedProducts,
+  findAliveProductsByNormalizedNames,
+  findBatchesByLots,
+  findImport,
+  finishImport,
+  receiveImportedFinishedGoods,
+} from '@/lib/modules/inventario/adapters/driven/persistence/inventory-import-prisma';
+import { readCsv } from '@/lib/modules/inventario/adapters/driven/spreadsheet/csv-reader';
+import { fileDigest } from '@/lib/modules/inventario/adapters/driven/spreadsheet/file-digest';
+import { readXlsx } from '@/lib/modules/inventario/adapters/driven/spreadsheet/xlsx-reader';
+import type { ImportFormulaLookup } from '@/lib/modules/inventario/ports/import-formula-lookup';
+import type { InventoryImportRepository } from '@/lib/modules/inventario/ports/inventory-import-repository';
+import type { SpreadsheetReader } from '@/lib/modules/inventario/ports/spreadsheet-reader';
 import type { FinishedOrderRepository } from '@/lib/modules/inventario/ports/finished-order-repository';
 import type { ListQueryLog } from '@/lib/modules/inventario/ports/list-query-log';
 import type { OrderNumberFormatter } from '@/lib/modules/inventario/ports/order-number-formatter';
@@ -236,19 +253,25 @@ import type { SupplierCatalogRepository } from '@/lib/modules/proveedores/ports/
 import type { SupplierRepository } from '@/lib/modules/proveedores/ports/supplier-repository';
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 import {
+  createCancelAliveOrder,
   createCancelOrder,
   createCreateOrder,
   createDeleteOrder,
   createExpireStaleOrders,
   createFindCoverage,
+  createFinishConditioning,
   createFinishPacking,
   createGetOrder,
+  createGetOrderCustomerFilterOption,
   createListAliveSummariesByIds,
   createListAliveSummariesInCompany,
   createListOrders,
   createQuoteOrderCost,
   createQuoteOrderPresentationAvailability,
   createReviewBlockedOrders,
+  createSearchOrderCustomers,
+  createSetOrderCustomer,
+  createStartConditioning,
   createStartPacking,
   createTransitionOrder,
   createUpdateOrder,
@@ -260,8 +283,11 @@ import {
   findAliveOrderById,
   findBlockedOrderIds,
   findExpirableOrders,
+  finishConditioningAliveOrder,
   listAliveOrders,
+  startConditioningAliveOrder,
   startPackingAliveOrder,
+  createOrderPackingRepository,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
 import {
@@ -269,6 +295,7 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { verifyCronSecret } from '@/lib/modules/pedidos/adapters/driven/config/cron-secret-env';
 import type { ListQueryLog as PedidosListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log';
+import type { OrderConditioningRepository } from '@/lib/modules/pedidos/ports/order-conditioning-repository';
 import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-packing-repository';
 import type { OrderSummaryReader } from '@/lib/modules/pedidos/ports/order-summary-reader';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
@@ -314,6 +341,7 @@ import {
 import { readMailTransportFromEnv } from '@/lib/modules/identity/adapters/driven/config/mail-config-env';
 import { sendCredentialSetupLink as sendCredentialSetupLinkToOutbox } from '@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-outbox';
 import { sendCredentialSetupLink as sendCredentialSetupLinkWithResend } from '@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-resend';
+import { sendCredentialSetupLink as sendCredentialSetupLinkWithSmtp } from '@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-smtp';
 import {
   applyCredentialAndActivate,
   issueForPendingUser,
@@ -378,9 +406,17 @@ import {
   createStartAssignedOrder,
   createStartPacking as createStartPackingOrder,
   createUnassignResponsible,
+  createCancelAssignedOrder,
+  createRecordStepMove,
+  createStartConditioning as createStartConditioningOrder,
+  createFinishConditioning as createFinishConditioningOrder,
 } from '@/lib/modules/asignaciones';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
+import { createExecutionLogRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/execution-log-prisma';
+import { withExecutionTransaction } from '@/lib/modules/asignaciones/adapters/driven/persistence/execution-transaction-prisma';
+import type { ExecutionLogRepository } from '@/lib/modules/asignaciones/ports/execution-log-repository';
+import type { ExecutionTransaction } from '@/lib/modules/asignaciones/ports/execution-transaction';
 import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
@@ -475,6 +511,12 @@ import {
 } from '@/lib/modules/clientes/adapters/driven/persistence/customer-prisma';
 import type { ListQueryLog as ClientesListQueryLog } from '@/lib/modules/clientes/ports/list-query-log';
 import type { CustomerRepository } from '@/lib/modules/clientes/ports/customer-repository';
+import type { CustomerCatalog } from '@/lib/modules/clientes';
+import {
+  findAliveCustomerRefById,
+  findCustomerRefsIncludingDeleted,
+  searchCustomerRefs,
+} from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
 // QC-19: una sola instancia de la politica, la misma que se expone en la fachada y la que
@@ -622,14 +664,21 @@ const credentialSetupLinkRepository: CredentialSetupLinkRepository = {
  * un valor equivocado tumbaria tests que no tienen nada que ver con el correo.
  *
  * `resend` es el valor POR DEFECTO (sin la variable, el transporte real); `outbox` es el buzon en
- * disco que hace posible el E2E de R41 y que se niega a arrancar en produccion. Los dos cumplen el
- * MISMO puerto, asi que cambiar de uno a otro es esta linea y nada mas.
+ * disco que hace posible el E2E de R41 y que se niega a arrancar en produccion; `smtp` es el envio
+ * TEMPORAL por `nodemailer` con una cuenta de Gmail u Outlook. Los tres cumplen el MISMO puerto,
+ * asi que cambiar de uno a otro es esta funcion y nada mas.
  */
 const credentialSetupMailer: CredentialSetupMailer = {
-  sendCredentialSetupLink: (input) =>
-    readMailTransportFromEnv() === 'outbox'
-      ? sendCredentialSetupLinkToOutbox(input)
-      : sendCredentialSetupLinkWithResend(input),
+  sendCredentialSetupLink: (input) => {
+    switch (readMailTransportFromEnv()) {
+      case 'outbox':
+        return sendCredentialSetupLinkToOutbox(input);
+      case 'smtp':
+        return sendCredentialSetupLinkWithSmtp(input);
+      case 'resend':
+        return sendCredentialSetupLinkWithResend(input);
+    }
+  },
 };
 
 /**
@@ -877,13 +926,42 @@ const stockIncreaseListener: StockIncreaseListener = {
  * `{ id, roleName }` con lo que devuelve `SessionUser`. `lib/composition` no conoce
  * cookies ni sesion; solo ata puerto -> adaptador.
  */
+const createProductUseCase = createCreateProduct({
+  products: productRepository,
+  stockIncreases: stockIncreaseListener,
+  packageUnit: { findPackageUnitId },
+  units: { findRefs: findUnitRefs },
+});
+
+const inventoryImportRepository: InventoryImportRepository = {
+  findAliveProductsByNormalizedNames,
+  findAliveFinishedProducts,
+  findBatchesByLots,
+  findImport,
+  claimImport,
+  finishImport,
+  receiveImportedFinishedGoods,
+};
+
+const spreadsheetReader: SpreadsheetReader = {
+  read: async (bytes, format) => (format === 'csv' ? readCsv(bytes) : readXlsx(bytes)),
+};
+
+const importFormulaLookup: ImportFormulaLookup = {
+  findAliveOriginalByName: findAliveRecipeByNormalizedName,
+};
+
+// Los adaptadores y no `unitCatalog` ni `presentationCatalog`, que se declaran mas abajo.
+const inventoryImportReadDeps = {
+  reader: spreadsheetReader,
+  imports: inventoryImportRepository,
+  units: { listVisibleRefs: listVisibleUnitRefs },
+  presentations: { findRefs: findPresentationRefs, findByNormalizedNames: findPresentationsByNormalizedNames },
+  formulas: importFormulaLookup,
+};
+
 export const inventario = {
-  createProduct: createCreateProduct({
-    products: productRepository,
-    stockIncreases: stockIncreaseListener,
-    packageUnit: { findPackageUnitId },
-    units: { findRefs: findUnitRefs },
-  }),
+  createProduct: createProductUseCase,
   createRawMaterial: createCreateRawMaterial({ products: productRepository }),
   updateProduct: createUpdateProduct({ products: productRepository }),
   deleteProduct: createDeleteProduct({ products: productRepository }),
@@ -919,6 +997,13 @@ export const inventario = {
   }),
   // El adaptador y no `unitCatalog`, que se declara mas abajo.
   listProductFormUnits: createListProductFormUnits({ units: { listVisibleRefs: listVisibleUnitRefs } }),
+  previewInventoryImport: createPreviewInventoryImport(inventoryImportReadDeps),
+  confirmInventoryImport: createConfirmInventoryImport({
+    ...inventoryImportReadDeps,
+    createProduct: createProductUseCase,
+    stockIncreases: stockIncreaseListener,
+    digest: fileDigest,
+  }),
 } as const;
 
 // El modulo `unidades` (QC-32) siembra su catalogo con su propia migracion. `recetas`
@@ -1198,26 +1283,33 @@ const orderRepository: OrderRepository = {
   findBlockedIds: findBlockedOrderIds,
 };
 
+type OrderTransactionClient = Parameters<Parameters<typeof withOrderTransaction>[0]>[0];
+
 /**
- * `OrderUnitOfWork.run` sobre `withOrderTransaction`: abre la transaccion y construye cada
- * pieza del scope con el MISMO `tx`, para que todas vean la misma instantanea sin abrir una
+ * Cada pieza del scope sobre el MISMO `tx`, para que todas vean la misma instantanea sin abrir una
  * segunda conexion mientras esta retiene la suya. `createMaterialReservations` no convierte
  * nada: la necesidad le llega ya en la unidad del producto.
  */
+function orderTransactionScopeOn(tx: OrderTransactionClient): OrderTransactionScope {
+  return {
+    orders: createOrderWriteRepository(tx),
+    reservations: createMaterialReservations(tx),
+    recipes: createRecipeExecutionReader(tx),
+    finishedGoods: createFinishedGoodsIntake(tx),
+    products: { findRefs: (ids, companyId) => findProductRefs(ids, companyId, tx) },
+    units: createUnitCatalogReader(tx),
+  };
+}
+
+/** `OrderUnitOfWork.run` sobre `withOrderTransaction`: abre la transaccion y construye el scope. */
 const orderUnitOfWork: OrderUnitOfWork = {
-  run: (work) =>
-    withOrderTransaction((tx) => {
-      const scope: OrderTransactionScope = {
-        orders: createOrderWriteRepository(tx),
-        reservations: createMaterialReservations(tx),
-        recipes: createRecipeExecutionReader(tx),
-        finishedGoods: createFinishedGoodsIntake(tx),
-        products: { findRefs: (ids, companyId) => findProductRefs(ids, companyId, tx) },
-        units: createUnitCatalogReader(tx),
-      };
-      return work(scope);
-    }),
+  run: (work) => withOrderTransaction((tx) => work(orderTransactionScopeOn(tx))),
 };
+
+/** Se une a una transaccion ya abierta: no confirma ni deshace, eso lo decide quien la abrio. */
+function joinOrderUnitOfWork(tx: OrderTransactionClient): OrderUnitOfWork {
+  return { run: (work) => work(orderTransactionScopeOn(tx)) };
+}
 
 /** Lectura de la cobertura de un pedido, FUERA de transaccion, sobre el cliente global:
  *  `findCoverage` la usa una vez por pagina. */
@@ -1267,6 +1359,8 @@ const reviewBlockedOrders = createReviewBlockedOrders({
  * `updateOrder` son los dos que si costean y aparta, asi que son los dos que reciben tambien
  * `products` y `unitOfWork`.
  */
+const customerCatalog = buildCustomerCatalog();
+
 export const pedidos = {
   createOrder: createCreateOrder({
     recipes: recipeCatalog,
@@ -1275,6 +1369,7 @@ export const pedidos = {
     presentations: presentationCatalog,
     packaging: packagingCatalog,
     unitOfWork: orderUnitOfWork,
+    customerCatalog,
   }),
   getOrder: createGetOrder({
     orders: orderRepository,
@@ -1283,6 +1378,7 @@ export const pedidos = {
     packaging: packagingCatalog,
     // La unidad vuelve al pedido: `getOrder` vuelve a necesitar `units`.
     units: unitCatalog,
+    customerCatalog,
   }),
   listOrders: createListOrders({
     orders: orderRepository,
@@ -1292,6 +1388,7 @@ export const pedidos = {
     // Mismo motivo que `getOrder`, una llamada por pagina.
     units: unitCatalog,
     log: pedidosListQueryLog,
+    customerCatalog,
   }),
   updateOrder: createUpdateOrder({
     orders: orderRepository,
@@ -1301,6 +1398,7 @@ export const pedidos = {
     presentations: presentationCatalog,
     packaging: packagingCatalog,
     unitOfWork: orderUnitOfWork,
+    customerCatalog,
   }),
   cancelOrder: createCancelOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
   deleteOrder: createDeleteOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
@@ -1333,6 +1431,14 @@ export const pedidos = {
     presentations: presentationCatalog,
     units: unitCatalog,
   }),
+  // El cliente se cambia sin catalogos de recetas, inventario ni unidades: no recalcula ni aparta.
+  setOrderCustomer: createSetOrderCustomer({
+    orders: orderRepository,
+    customerCatalog,
+    unitOfWork: orderUnitOfWork,
+  }),
+  searchOrderCustomers: createSearchOrderCustomers({ customerCatalog }),
+  getOrderCustomerFilterOption: createGetOrderCustomerFilterOption({ customerCatalog }),
 } as const;
 
 // ---------------------------------------------------------------------------------------
@@ -1384,6 +1490,13 @@ const orderPackingRepository: OrderPackingRepository = {
   startPackingAlive: startPackingAliveOrder,
 };
 
+/** Comenzar y Terminar el acondicionamiento: un `UPDATE` condicional cada uno, sobre el cliente
+ *  global y sin `orderUnitOfWork`, porque no tocan inventario. */
+const orderConditioningRepository: OrderConditioningRepository = {
+  startConditioningAlive: startConditioningAliveOrder,
+  finishConditioningAlive: finishConditioningAliveOrder,
+};
+
 const orderSummaryReader: OrderSummaryReader = {
   listAliveByIds: listAliveOrderSummariesByIds,
   listAliveInCompany: listAliveOrderSummariesInCompany,
@@ -1413,6 +1526,8 @@ const orderCatalog: OrderCatalog = {
     presentations: presentationCatalog,
     packaging: packagingCatalog,
   }),
+  startConditioningAliveById: createStartConditioning({ conditioning: orderConditioningRepository }),
+  finishConditioningAliveById: createFinishConditioning({ conditioning: orderConditioningRepository }),
 };
 
 /**
@@ -1441,6 +1556,41 @@ const workGroupDirectory: WorkGroupDirectory = assignmentDirectoryPrisma;
  * este archivo, y abrirla aqui seria meter una decision de ejecucion en el punto de composicion.
  */
 const orderAssignmentRepository: OrderAssignmentRepository = createOrderAssignmentRepository();
+
+/** El registro fuera de transaccion: anotar un paso o el retomar es una sola sentencia. */
+const executionLogRepository: ExecutionLogRepository = createExecutionLogRepository();
+
+/**
+ * La transaccion de ejecucion la abre `asignaciones`, y `pedidos` se une a ella sin abrir otra:
+ * la escritura del pedido, lo que `pedidos` escriba en `inventario` y la anotacion se confirman
+ * juntas o no se confirma ninguna. Comenzar empaque no va por la unidad de trabajo, asi que su
+ * repositorio se construye tambien sobre `tx`. Las lecturas de catalogo de Terminar siguen siendo
+ * las globales, como en `orderCatalog`.
+ */
+const executionTransaction: ExecutionTransaction = {
+  run: (work) =>
+    withExecutionTransaction((tx) =>
+      work({
+        orders: {
+          transitionAliveById: createTransitionOrder({ unitOfWork: joinOrderUnitOfWork(tx) }),
+          cancelAliveById: createCancelAliveOrder({ unitOfWork: joinOrderUnitOfWork(tx) }),
+        },
+        packing: {
+          startPackingAliveById: createStartPacking({ packing: createOrderPackingRepository(tx) }),
+          finishPackingAliveById: createFinishPacking({
+            packing: createOrderPackingRepository(tx),
+            unitOfWork: joinOrderUnitOfWork(tx),
+            recipes: recipeCatalog,
+            products: productCatalog,
+            units: unitCatalog,
+            presentations: presentationCatalog,
+            packaging: packagingCatalog,
+          }),
+        },
+        log: createExecutionLogRepository(tx),
+      }),
+    ),
+};
 
 /**
  * Fachada del modulo `asignaciones` ya cableada (T11, `design.md > 2.3`). Es lo que consumen las
@@ -1521,6 +1671,8 @@ export const asignaciones = {
     units: unitCatalog,
     products: productCatalog,
     presentations: presentationCatalog,
+    log: executionLogRepository,
+    transaction: executionTransaction,
     now: () => new Date(),
   }),
   finishAssignedOrder: createFinishAssignedOrder({
@@ -1528,6 +1680,8 @@ export const asignaciones = {
     orders: orderCatalog,
     people: peopleDirectory,
     groups: workGroupDirectory,
+    log: executionLogRepository,
+    transaction: executionTransaction,
     now: () => new Date(),
   }),
   // Claves NUEVAS al final: ninguna de las de arriba se toca. MISMOS `orderCatalog`,
@@ -1583,9 +1737,33 @@ export const asignaciones = {
   }),
   startPacking: createStartPackingOrder({
     orders: orderCatalog,
+    log: executionLogRepository,
+    transaction: executionTransaction,
     now: () => new Date(),
   }),
   finishPacking: createFinishPackingOrder({
+    orders: orderCatalog,
+    log: executionLogRepository,
+    transaction: executionTransaction,
+    now: () => new Date(),
+  }),
+  cancelAssignedOrder: createCancelAssignedOrder({
+    assignments: orderAssignmentRepository,
+    orders: orderCatalog,
+    transaction: executionTransaction,
+    now: () => new Date(),
+  }),
+  recordStepMove: createRecordStepMove({
+    assignments: orderAssignmentRepository,
+    orders: orderCatalog,
+    log: executionLogRepository,
+    now: () => new Date(),
+  }),
+  startConditioning: createStartConditioningOrder({
+    orders: orderCatalog,
+    now: () => new Date(),
+  }),
+  finishConditioning: createFinishConditioningOrder({
     orders: orderCatalog,
     now: () => new Date(),
   }),
@@ -1915,3 +2093,14 @@ export const clientes = {
   getCustomer: createGetCustomer({ customers: customerRepository }),
   listCustomers: createListCustomers({ customers: customerRepository, log: clientesListQueryLog }),
 } as const;
+
+/** Servicio de lectura que `clientes` ofrece a `pedidos`. El ambito interno de `clientes` se
+ *  construye aqui, a partir de la empresa que ya resolvio el caso de uso que llama. Es una
+ *  declaracion de funcion para que `pedidos`, evaluado mas arriba, pueda usarla. */
+function buildCustomerCatalog(): CustomerCatalog {
+  return {
+    findRefsIncludingDeleted: (ids, companyId) => findCustomerRefsIncludingDeleted(ids, { companyId }),
+    findAliveRefById: (id, companyId) => findAliveCustomerRefById(id, { companyId }),
+    searchRefs: (query, companyId) => searchCustomerRefs(query, { companyId }),
+  };
+}

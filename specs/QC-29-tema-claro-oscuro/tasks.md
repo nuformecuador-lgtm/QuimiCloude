@@ -51,7 +51,7 @@
 - **No** se añade aserción sobre `--primary` / `--primary-foreground`: D10 cerró ese par en
   `3,75:1`. Dejarlo escrito como comentario en el test para que nadie lo lea como olvido.
 - **Hecho cuando:** los 7 tests pasan y, borrando un token de `globals.css`, el test **muerde**
-  (`docs/verification.md > Probar que muerde`).
+  (`docs/gate.md > Probar que muerde`).
 
 ## Bloque 2 — elección de modo (mecanismo propio)
 

@@ -111,7 +111,7 @@ DEBE nombrar en **inglés** y `snake_case` toda tabla, columna y restricción nu
 **R17.** `inventory_movements` DEBE nacer con su **columna de empresa** obligatoria, su clave
 foránea a `companies`, su índice, y con RLS **activada y forzada** sin policies, siguiendo el molde
 ya construido para `product_batches` (QC-49) y `recipes` (QC-50)
-(`docs/architecture.md > Dominio` n.º 1, `CHECKPOINTS.md > Datos y seguridad`).
+(`docs/architecture.md > Dominio` n.º 1, `docs/checkpoints-proyecto.md > Datos y seguridad`).
 
 **R18.** Toda lectura y toda escritura del libro DEBE filtrar por la empresa del actor, tomada de la
 sesión del servidor y **nunca** de la entrada; y CUANDO se pide ajustar o listar el historial de un

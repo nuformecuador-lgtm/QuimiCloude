@@ -42,6 +42,7 @@ import {
   readRows,
   actorOf,
 } from './use-case-fixture';
+import { executionOnClient } from '../../helpers/execution-transaction-on-client';
 
 async function createRoleWithPermissions(
   tx: Prisma.TransactionClient,
@@ -113,10 +114,11 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
         orders: ordersDoblados(pedido),
         people: assignmentDirectoryPrisma,
         groups: assignmentDirectoryPrisma,
+        ...executionOnClient(fixture.tx, ordersDoblados(pedido)),
         now: () => NOW,
       });
       const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
-      await finish(actor, { orderId: pedido });
+      await finish(actor, { orderId: pedido, stepPosition: null });
 
       const filas = await readRows(fixture.tx, pedido);
       expect(filas.map((fila) => fila.userId).sort()).toEqual(
@@ -148,10 +150,11 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
         orders: ordersDoblados(pedido),
         people: assignmentDirectoryPrisma,
         groups: assignmentDirectoryPrisma,
+        ...executionOnClient(fixture.tx, ordersDoblados(pedido)),
         now: () => NOW,
       });
       const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
-      await finish(actor, { orderId: pedido });
+      await finish(actor, { orderId: pedido, stepPosition: null });
 
       const filas = await readRows(fixture.tx, pedido);
       expect(filas.map((fila) => fila.userId).sort()).toEqual(
@@ -183,10 +186,11 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
         orders: ordersDoblados(pedido),
         people: assignmentDirectoryPrisma,
         groups: assignmentDirectoryPrisma,
+        ...executionOnClient(fixture.tx, ordersDoblados(pedido)),
         now: () => NOW,
       });
       const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
-      await finish(actor, { orderId: pedido });
+      await finish(actor, { orderId: pedido, stepPosition: null });
 
       const filas = await readRows(fixture.tx, pedido);
       expect(filas).toHaveLength(3);

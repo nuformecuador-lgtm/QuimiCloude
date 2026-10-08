@@ -381,6 +381,11 @@ model InventoryMovement {
   /// `@relation`: `OrderPresentationLine` es de `pedidos`; su FK esta escrita a mano y es drift.
   orderPresentationLineId String? @map("order_presentation_line_id") @db.Uuid
 
+  /// Solo en un ajuste: la existencia leida con el lote bloqueado y el total contado. Van los
+  /// dos o ninguno, y `countedStock = stockBefore + quantity`; los `CHECK` son drift.
+  stockBefore   Decimal? @map("stock_before") @db.Decimal(14, 4)
+  countedStock  Decimal? @map("counted_stock") @db.Decimal(14, 4)
+
   batch ProductBatch @relation(fields: [batchId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([batchId], map: "inventory_movements_batch_id_idx")
@@ -422,6 +427,30 @@ model ReservationMovement {
   @@index([companyId], map: "reservation_movements_company_id_idx")
   @@index([createdBy], map: "reservation_movements_created_by_idx")
   @@map("reservation_movements")
+}
+
+/// Una confirmacion de importacion de inventario. `importKey` es la clave de idempotencia que manda
+/// la pantalla. `companyId` y `createdBy` no llevan `@relation`: `Company` y `User` son de otro
+/// modulo; sus FK estan escritas a mano y son drift. Sin `deletedAt` ni borrado: es auditoria.
+/// @module inventario
+model InventoryImport {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String    @map("company_id") @db.Uuid
+  importKey       String    @map("import_key") @db.Uuid
+  fileName        String    @map("file_name")
+  fileSha256      String    @map("file_sha256")
+  rowsTotal       Int?      @map("rows_total")
+  createdCount    Int?      @map("created_count")
+  batchAddedCount Int?      @map("batch_added_count")
+  duplicateCount  Int?      @map("duplicate_count")
+  errorCount      Int?      @map("error_count")
+  createdBy       String    @map("created_by") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt     DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  @@unique([companyId, importKey], map: "inventory_imports_company_key_unique")
+  @@index([companyId, createdAt], map: "inventory_imports_company_created_idx")
+  @@map("inventory_imports")
 }
 
 /// `createdBy` y `updatedBy` no llevan `@relation`: un `include` cruzaria a `users` sin que la
@@ -619,6 +648,9 @@ enum OrderStatus {
   /// Un pedido cuyo material no alcanza queda en BLOQUEADO. Va el ultimo, como los dos de
   /// empaque: reordenar obligaria a recrear el tipo en vez de anadir un valor.
   BLOQUEADO
+  POR_ACONDICIONAR
+  EN_ACONDICIONAMIENTO
+  TERMINADO
 }
 
 /// El orden de declaracion es el de la prioridad, de menor a mayor: Postgres ordena un enum por
@@ -633,9 +665,9 @@ enum OrderPriority {
 /// Sin fecha de solicitud: es `createdAt`. El correlativo es un indice unico total, no parcial: un
 /// pedido dado de baja conserva su numero, y se mide DENTRO de la empresa: `(empresa, ano,
 /// secuencia)`. `orderYear` es el ano de `createdAt` en UTC, y lo exige el CHECK
-/// `orders_order_year_matches_created_at`. `recipeId`, `createdBy`, `updatedBy` y `companyId` van
-/// sin `@relation` porque apuntan a otros modulos; sus FK y CHECK estan escritos a mano y son drift:
-/// hay que borrar a mano su `DROP CONSTRAINT` de toda migracion generada.
+/// `orders_order_year_matches_created_at`. `recipeId`, `createdBy`, `updatedBy`, `companyId` y
+/// `customerId` van sin `@relation` porque apuntan a otros modulos; sus FK y CHECK estan escritos a
+/// mano y son drift: hay que borrar a mano su `DROP CONSTRAINT` de toda migracion generada.
 /// `orders_id_company_id_key` es la clave candidata a la que apunta la FK COMPUESTA de
 /// `order_assignments`: quitarla la rompe.
 /// Los indices de listado son parciales y viven en la migracion `list_query_indexes`.
@@ -676,10 +708,17 @@ model Order {
   /// nuevos lo conservan), lo exige el CHECK `orders_packed_by_matches_status`. Sin `@relation`:
   /// es drift, con FK COMPUESTA `(packed_by, company_id)` escrita a mano en la migracion.
   packedBy            String?       @map("packed_by") @db.Uuid
+  /// Quien tiene o tuvo el pedido en acondicionamiento. Obligatorio en EN_ACONDICIONAMIENTO y
+  /// TERMINADO, NULL antes de comenzar y opcional en ENTREGADO; lo exige el CHECK
+  /// `orders_conditioned_by_matches_status`. Sin `@relation`: FK compuesta escrita a mano.
+  conditionedBy       String?       @map("conditioned_by") @db.Uuid
   /// La unidad en que se expresa `quantity`. Sin
   /// `@relation`: `Unit` es de `unidades`, es drift. NULL solo en pedidos anteriores sin
   /// presentacion; la aplicacion la exige en el alta y en la edicion.
   unitId              String?       @map("unit_id") @db.Uuid
+  /// Cliente del pedido, opcional. Sin `@relation`: `Customer` es de `clientes`, es drift. FK
+  /// COMPUESTA `(company_id, customer_id)` a `customers_company_id_id_key`, escrita a mano.
+  customerId          String?       @map("customer_id") @db.Uuid
 
   presentationLines OrderPresentationLine[]
 
@@ -689,7 +728,9 @@ model Order {
   @@index([createdBy], map: "orders_created_by_idx")
   @@index([updatedBy], map: "orders_updated_by_idx")
   @@index([packedBy], map: "orders_packed_by_idx")
+  @@index([conditionedBy], map: "orders_conditioned_by_idx")
   @@index([unitId], map: "orders_unit_id_idx")
+  @@index([companyId, customerId], map: "orders_company_id_customer_id_idx")
   @@map("orders")
 }
 
@@ -840,4 +881,37 @@ model Customer {
   @@index([createdBy], map: "customers_created_by_idx")
   @@index([updatedBy], map: "customers_updated_by_idx")
   @@map("customers")
+}
+
+enum OrderExecutionAction {
+  START
+  RESUME
+  ADVANCE
+  GO_BACK
+  CANCEL
+  FINISH
+  PACK_START
+  PACK_FINISH
+}
+
+/// Una fila por movimiento sobre la ejecucion de un pedido. Solo se inserta: no se edita ni se
+/// borra, y por eso no hay `created_at`, `updated_at` ni `deleted_at`. `occurredAt` no tiene
+/// default porque el caso de uso escribe el mismo instante que deja en el pedido. Sin
+/// `@relation`: las dos FK son compuestas con `company_id` y estan escritas a mano en la
+/// migracion, igual que sus tres CHECK; hay que borrar su `DROP CONSTRAINT` de toda migracion
+/// generada.
+/// @module asignaciones
+model OrderExecutionEntry {
+  id           String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String               @map("company_id") @db.Uuid
+  orderId      String               @map("order_id") @db.Uuid
+  userId       String               @map("user_id") @db.Uuid
+  action       OrderExecutionAction
+  stepPosition Int?                 @map("step_position")
+  reason       String?
+  occurredAt   DateTime             @map("occurred_at") @db.Timestamptz(6)
+
+  @@index([orderId, occurredAt(sort: Desc)], map: "order_execution_entries_order_id_occurred_at_idx")
+  @@index([userId], map: "order_execution_entries_user_id_idx")
+  @@map("order_execution_entries")
 }

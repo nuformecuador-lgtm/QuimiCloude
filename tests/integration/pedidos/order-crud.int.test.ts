@@ -64,6 +64,11 @@ import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/in
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 
+// Ningun caso de este archivo asigna cliente: si se llamara, fallaria a la vista.
+const customerCatalog = {
+  findAliveRefById: () => Promise.reject(new Error('sin uso en este archivo')),
+}
+
 const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
 // ---------------------------------------------------------------------------
@@ -1037,8 +1042,8 @@ function casosDeUsoSobre(tx: Prisma.TransactionClient) {
   } as unknown as UnitCatalog
   const now = () => new Date()
   return {
-    createOrder: createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now }),
-    updateOrder: createUpdateOrder({ orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now }),
+    createOrder: createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now }),
+    updateOrder: createUpdateOrder({ customerCatalog, orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now }),
   }
 }
 

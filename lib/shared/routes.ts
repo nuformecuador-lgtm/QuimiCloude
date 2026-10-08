@@ -35,6 +35,9 @@ export const LOGIN_ROUTE_SESSION_ENDED = `${LOGIN_ROUTE}?${SESSION_ENDED_PARAM}=
  */
 export const INVENTORY_ROUTE = '/inventario';
 
+/** Cuelga de `INVENTORY_ROUTE`, así que su prefijo privado ya la cubre. */
+export const INVENTORY_IMPORT_ROUTE = '/inventario/importar';
+
 /**
  * Pantalla de recetas de produccion (QC-26, R3).
  *
@@ -261,6 +264,12 @@ export function packingOrderRoute(id: string): string {
  * en dos pestañas distintas.
  */
 export const PACKED_ORDER_PARAM = 'empacado';
+
+/**
+ * Nombre del parametro de consulta con el que la lista de pedidos asignados anuncia que uno
+ * acaba de cancelarse: `?cancelado=<numero>`. El aviso se pinta en cualquier vista.
+ */
+export const CANCELLED_ORDER_PARAM = 'cancelado';
 
 /**
  * Pantalla de clientes.

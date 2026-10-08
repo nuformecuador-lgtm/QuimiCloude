@@ -39,7 +39,7 @@ fuera), R24 (E2E heredado de QC-8).
 
 **Ninguno.** Esta feature no añade tablas, columnas, indices, policies de RLS ni migraciones: la
 sesion ya viaja firmada en la cookie (QC-7/QC-8) y el middleware no consulta la base (R4). No hay
-`down.sql` que escribir. Se dice explicitamente porque `CHECKPOINTS.md > Datos y seguridad` se
+`down.sql` que escribir. Se dice explicitamente porque `docs/checkpoints-proyecto.md > Datos y seguridad` se
 revisa fila a fila: aqui todas esas filas quedan **no aplica**.
 
 Tampoco hay variables de entorno nuevas: se reutiliza `SESSION_SECRET`, ya declarada por QC-7.
@@ -89,7 +89,7 @@ unica duplicacion que esta feature acepta en la raiz, y R22 le pone test.
 **Por que el middleware es un adaptador driving y no «el sitio donde se programa esto»:** es el
 borde del framework. Recibe una `NextRequest`, pregunta al dominio que hacer y traduce la respuesta
 a `NextResponse`. Ni decide que es privado, ni compone la URL de vuelta, ni valida nada. Eso es
-`CHECKPOINTS.md > Modulos hexagonales` («la logica de negocio esta en `domain/`, no en la Server
+`docs/checkpoints-proyecto.md > Modulos hexagonales` («la logica de negocio esta en `domain/`, no en la Server
 Action» — aqui, no en el middleware), y es lo que hace que R7, R9, R10, R12 y R13 se testeen sin
 levantar Next.
 

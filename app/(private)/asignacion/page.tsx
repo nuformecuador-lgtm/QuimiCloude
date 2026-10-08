@@ -10,6 +10,7 @@ import {
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { ASSIGNED_ORDERS_LABEL, BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import {
+  CANCELLED_ORDER_PARAM,
   DELIVERED_ORDER_PACKAGES_PARAM,
   DELIVERED_ORDER_PARAM,
   DELIVERED_ORDER_PRODUCT_PARAM,
@@ -17,6 +18,7 @@ import {
 } from '@/lib/shared/routes';
 
 import {
+  AssignedOrderCancelledNotice,
   AssignedOrderDeliveredNotice,
   AssignedOrdersListSection,
   AssignedOrdersSkeleton,
@@ -74,6 +76,7 @@ export default async function AsignacionPage({
     resolvedSearchParams[DELIVERED_ORDER_PRODUCT_PARAM],
   );
   const packedOrderNumber = firstSearchParamValue(resolvedSearchParams[PACKED_ORDER_PARAM]);
+  const cancelledOrderNumber = firstSearchParamValue(resolvedSearchParams[CANCELLED_ORDER_PARAM]);
 
   const assignedOrdersParams = parseAssignedOrdersListParams(resolvedSearchParams);
   const genericListParams = parseAssignmentListParams(resolvedSearchParams);
@@ -92,6 +95,9 @@ export default async function AsignacionPage({
           packages={deliveredOrderPackages}
           productName={deliveredOrderProductName}
         />
+      ) : null}
+      {cancelledOrderNumber !== undefined ? (
+        <AssignedOrderCancelledNotice orderNumber={cancelledOrderNumber} />
       ) : null}
       {vista === 'por_empacar' && packedOrderNumber !== undefined ? (
         <PackedOrderNotice orderNumber={packedOrderNumber} />

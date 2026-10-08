@@ -14,6 +14,8 @@ import type { OrderCoverage } from '@/lib/modules/inventario';
 import { cn } from '@/lib/utils';
 
 import { buildOrderColumns } from './order-columns';
+import { OrderCustomerFilter } from './order-customer-filter';
+import type { OrderCustomerChoice } from './order-customer-label';
 import type { OrderResponsiblesCatalog } from './order-responsibles';
 import { FIRST_PAGE, orderListHref, withSearchResetsPage } from './order-list-params';
 import type { RecipePickerPage } from './recipe-picker';
@@ -123,6 +125,10 @@ export type OrderTableProps = {
   readonly coverageByOrder?: Readonly<Record<string, OrderCoverage>>;
   /** Si el actor puede modificar pedidos; lo resuelve el servidor. */
   readonly canEditDistribution?: boolean;
+  /** Si el actor puede cambiar el cliente; lo resuelve el servidor. */
+  readonly canEditCustomer?: boolean;
+  /** El valor del filtro de cliente, ya resuelto por el servidor a partir de la direccion. */
+  readonly customerFilter?: OrderCustomerChoice | null;
   /**
    * Presente solo con cero filas y un termino vigente: pinta el estado «sin coincidencias»
    * DENTRO de la tabla, con la caja montada, en vez del vacio de `order-list-empty.tsx`.
@@ -141,6 +147,8 @@ export function OrderTable({
   responsiblesCatalog,
   coverageByOrder,
   canEditDistribution,
+  canEditCustomer,
+  customerFilter = null,
   noMatches,
 }: OrderTableProps) {
   const router = useRouter();
@@ -185,8 +193,18 @@ export function OrderTable({
         responsiblesCatalog,
         coverageByOrder,
         canEditDistribution,
+        canEditCustomer,
       }),
-    [recipes, units, bridge, responsiblesByOrder, responsiblesCatalog, coverageByOrder, canEditDistribution],
+    [
+      recipes,
+      units,
+      bridge,
+      responsiblesByOrder,
+      responsiblesCatalog,
+      coverageByOrder,
+      canEditDistribution,
+      canEditCustomer,
+    ],
   );
 
   /*
@@ -255,6 +273,7 @@ export function OrderTable({
         totalPages={totalPages}
         onParamsChange={handleParamsChange}
         status="idle"
+        toolbarActions={<OrderCustomerFilter params={visibleParams} value={customerFilter} />}
         texts={noMatches === undefined ? ORDER_TABLE_TEXTS : { ...ORDER_TABLE_TEXTS, empty: ORDER_NO_MATCHES_MESSAGE }}
         emptyAction={
           noMatches === undefined ? undefined : (

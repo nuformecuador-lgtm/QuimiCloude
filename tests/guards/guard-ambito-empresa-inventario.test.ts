@@ -246,9 +246,15 @@ const PUERTOS = [
     constante: 'presentationRepository',
     adaptadores: ['presentation-prisma.ts'],
   },
+  {
+    nombre: 'InventoryImportRepository',
+    port: 'inventory-import-repository.ts',
+    constante: 'inventoryImportRepository',
+    adaptadores: ['inventory-import-prisma.ts'],
+  },
 ] as const
 
-describe('QC-49 R13 — cada metodo de los dos puertos declara Y consume el ambito de empresa', () => {
+describe('QC-49 R13 — cada metodo de los puertos declara Y consume el ambito de empresa', () => {
   for (const puerto of PUERTOS) {
     const metodos = metodosDelPuerto(puerto.port, puerto.nombre)
     const cableado = cableadoDe(puerto.constante, puerto.nombre)

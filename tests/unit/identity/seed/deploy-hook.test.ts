@@ -48,26 +48,33 @@ describe('package.json — el build encadena el seed (R19, R20)', () => {
 
   const build = packageJson.scripts?.build ?? ''
 
-  it('scripts.build contiene los tres comandos, en orden: migrar, sembrar, compilar', () => {
+  // El build lleva `prisma generate` entre la migracion y el seed (b79a43c4; decision del
+  // 2026-10-08 en specs/QC-6-seed-roles-y-usuario-inicial/requirements.md): el seed necesita
+  // el cliente generado y Vercel cachea node_modules, asi que sin generar quedaria uno viejo.
+  it('scripts.build contiene los cuatro comandos, en orden: migrar, generar, sembrar, compilar', () => {
     const posMigrate = build.indexOf('prisma migrate deploy')
+    const posGenerate = build.indexOf('prisma generate')
     const posSeed = build.indexOf('scripts/seed.ts')
     const posBuild = build.indexOf('next build')
 
     expect(posMigrate, `"prisma migrate deploy" no aparece en scripts.build: ${build}`).toBeGreaterThanOrEqual(0)
+    expect(posGenerate, `"prisma generate" no aparece en scripts.build: ${build}`).toBeGreaterThanOrEqual(0)
     expect(posSeed, `"scripts/seed.ts" no aparece en scripts.build: ${build}`).toBeGreaterThanOrEqual(0)
     expect(posBuild, `"next build" no aparece en scripts.build: ${build}`).toBeGreaterThanOrEqual(0)
 
-    expect(posMigrate, 'la migracion debe ir antes del seed').toBeLessThan(posSeed)
+    expect(posMigrate, 'la migracion debe ir antes de generar el cliente').toBeLessThan(posGenerate)
+    expect(posGenerate, 'el cliente debe generarse antes del seed').toBeLessThan(posSeed)
     expect(posSeed, 'el seed debe ir antes de next build').toBeLessThan(posBuild)
   })
 
-  it('los tres comandos van unidos por && y no por ; ni ||, en ese orden', () => {
+  it('los cuatro comandos van unidos por && y no por ; ni ||, en ese orden', () => {
     const tramos = build.split('&&').map((tramo) => tramo.trim())
 
-    expect(tramos, `scripts.build partido por && deberia tener tres tramos: ${build}`).toHaveLength(3)
+    expect(tramos, `scripts.build partido por && deberia tener cuatro tramos: ${build}`).toHaveLength(4)
     expect(tramos[0]).toContain('prisma migrate deploy')
-    expect(tramos[1]).toContain('scripts/seed.ts')
-    expect(tramos[2]).toContain('next build')
+    expect(tramos[1]).toContain('prisma generate')
+    expect(tramos[2]).toContain('scripts/seed.ts')
+    expect(tramos[3]).toContain('next build')
   })
 
   it('scripts.build no usa ; ni || como separador entre los comandos (no cortarian ante un fallo)', () => {

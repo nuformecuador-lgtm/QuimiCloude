@@ -1,11 +1,11 @@
 // lib/modules/asignaciones/domain/finish-packing.ts
 /**
- * Terminar: `EN_EMPAQUE -> ENTREGADO`, con `finished_at` en la misma escritura que el cambio de
- * estado, solo si el actor es quien tiene el pedido en empaque. Sin comprobacion de asignacion:
+ * Terminar: `EN_EMPAQUE -> POR_ACONDICIONAR`, sin `finished_at`, solo si el actor es quien tiene
+ * el pedido en empaque. Sin comprobacion de asignacion:
  * cualquier actor con `empaque.modificar` puede terminar cualquier pedido vivo de su empresa, y
  * sin ningun puerto de inventario: los envases los consume `pedidos` dentro de Terminar.
  *
- * Devuelve el numero visible del pedido, leido ANTES de la transicion: una vez `ENTREGADO`, el
+ * Devuelve el numero visible del pedido, leido ANTES de la transicion: una vez `POR_ACONDICIONAR`, el
  * filtro de estado con el que se leyo ya no lo encontraria (mismo motivo que
  * `finish-assigned-order.ts`).
  */
@@ -22,8 +22,12 @@ import {
   PresentationWithoutContentError,
   RecipeNotFoundError,
   ValidationError,
+  type AsignacionesError,
 } from './errors';
+import { ExecutionAbortedError, isExecutionSuccess, type ExecutionWriteOutcome } from './execution-entry';
 
+import type { ExecutionLogRepository } from '../ports/execution-log-repository';
+import type { ExecutionTransaction } from '../ports/execution-transaction';
 import { formatOrderNumber, type OrderAssignmentTarget, type OrderCatalog } from '@/lib/modules/pedidos';
 
 const finishPackingSchema = z.strictObject({
@@ -32,6 +36,8 @@ const finishPackingSchema = z.strictObject({
 
 export type FinishPackingDeps = {
   readonly orders: OrderCatalog;
+  readonly log: ExecutionLogRepository;
+  readonly transaction: ExecutionTransaction;
   readonly now?: () => Date;
 };
 
@@ -68,18 +74,35 @@ export function createFinishPacking(
     const numberText = formatOrderNumber(summary.number);
 
     const now = deps.now?.() ?? new Date();
-    const result = await deps.orders.finishPackingAliveById(orderId, actor.companyId, actor.id, now);
-
-    // El `'ok'` de Terminar trae el lote por linea del reparto; esta pantalla solo
-    // confirma el numero del pedido, asi que no hace falta devolverlo mas alla de este metodo.
-    if (typeof result === 'object') return { numberText };
-    if (result === 'not_packer') throw new OrderPackingTakenError();
-    if (result === 'not_packable') throw new OrderNotPackableError();
-    if (result === 'recipe_not_found') throw new RecipeNotFoundError();
-    if (result === 'presentation_without_content') throw new PresentationWithoutContentError();
-    if (result === 'incompatible_units') throw new IncompatibleUnitsError();
-    if (result === 'order_without_unit') throw new OrderWithoutUnitError();
-    if (result === 'insufficient_material') throw new MaterialShortageError();
-    throw new OrderNotFoundError(); // 'not_found'
+    try {
+      await deps.transaction.run(async ({ packing, log }) => {
+        // El exito de Terminar es un objeto con los lotes dados de alta, no el literal `'ok'`.
+        const result = await packing.finishPackingAliveById(orderId, actor.companyId, actor.id, now);
+        if (!isExecutionSuccess(result)) throw new ExecutionAbortedError(result);
+        await log.append({
+          companyId: actor.companyId,
+          orderId,
+          userId: actor.id,
+          occurredAt: now,
+          action: 'pack_finish',
+          stepPosition: null,
+        });
+      });
+    } catch (error) {
+      if (error instanceof ExecutionAbortedError) throw finishPackingError(error.outcome);
+      throw error;
+    }
+    return { numberText };
   };
+}
+
+function finishPackingError(outcome: ExecutionWriteOutcome): AsignacionesError {
+  if (outcome === 'not_packer') return new OrderPackingTakenError();
+  if (outcome === 'not_packable') return new OrderNotPackableError();
+  if (outcome === 'recipe_not_found') return new RecipeNotFoundError();
+  if (outcome === 'presentation_without_content') return new PresentationWithoutContentError();
+  if (outcome === 'incompatible_units') return new IncompatibleUnitsError();
+  if (outcome === 'order_without_unit') return new OrderWithoutUnitError();
+  if (outcome === 'insufficient_material') return new MaterialShortageError();
+  return new OrderNotFoundError();
 }

@@ -59,6 +59,8 @@ export {
   OrderPackingTakenError,
   OrderNotPackableError,
   OrderProducedFrozenError,
+  OrderConditioningTakenError,
+  OrderNotConditionableError,
   OrderBlockedError,
   OrderWithoutDistributionError,
 } from './domain/errors';
@@ -207,3 +209,28 @@ export {
   type FinishPackingDeps,
   type FinishPackingResult,
 } from './domain/finish-packing';
+
+// ---------------------------------------------------------------------------------------
+// El registro de ejecucion. Bloque NUEVO al final: no reordena ni reformatea nada de lo de
+// arriba. Los puertos del registro y de la transaccion no salen por aqui: `lib/composition` los
+// importa por su ruta exacta, como el de asignacion.
+// ---------------------------------------------------------------------------------------
+export {
+  createCancelAssignedOrder,
+  type CancelAssignedOrderDeps,
+  type CancelAssignedOrderResult,
+} from './domain/cancel-assigned-order';
+export { createRecordStepMove, type RecordStepMoveDeps } from './domain/record-step-move';
+export type { ExecutionAction, NewExecutionEntry } from './domain/execution-entry';
+export type { StartedOrderExecution } from './domain/assigned-order-execution-view';
+export { NotCancellableError } from './domain/errors';
+
+// ---------------------------------------------------------------------------------------
+// El acondicionamiento: Comenzar y Terminar. Bloque NUEVO al final.
+// ---------------------------------------------------------------------------------------
+export { createStartConditioning, type StartConditioningDeps } from './domain/start-conditioning';
+export {
+  createFinishConditioning,
+  type FinishConditioningDeps,
+  type FinishConditioningResult,
+} from './domain/finish-conditioning';

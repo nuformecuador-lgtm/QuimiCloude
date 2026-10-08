@@ -38,6 +38,7 @@ import type { CostingBatch, PackagingCatalog, PresentationCatalog, ProductCatalo
 import type { RecipeCatalog, RecipeExecutionLine, RecipeRef } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitConversion, UnitRef } from '@/lib/modules/unidades';
 import { fakePackagingCatalog, packagingRef } from '../../helpers/packaging-catalog-double';
+import { fakeCustomerCatalog } from '../../helpers/customer-catalog-double';
 
 const EMPRESA_A = '33333333-3333-4333-8333-333333333333';
 const EMPRESA_B = '44444444-4444-4444-8444-444444444444';
@@ -75,6 +76,7 @@ function filaCreada(): OrderRow {
     updatedBy: ACTOR_A.id,
     presentationLines: [],
     unitId: null,
+    customerId: null,
   };
 }
 
@@ -191,6 +193,7 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
@@ -212,6 +215,7 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
     const repo2 = repositorioDePedidos();
     await expect(
       createCreateOrder({
+        customerCatalog: fakeCustomerCatalog(),
         unitOfWork: repo2.unitOfWork,
         recipes: cat.recipes,
         products: catalogoDeProductos().products,
@@ -226,6 +230,7 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
     const cat2 = catalogoDeRecetas();
     const repo3 = repositorioDePedidos();
     const errorInexistente = await createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo3.unitOfWork,
       recipes: cat2.recipes,
       products: catalogoDeProductos().products,
@@ -243,6 +248,7 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
@@ -261,6 +267,7 @@ describe('QC-50 R26 — crear un pedido con una receta de OTRA empresa se rechaz
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
@@ -283,6 +290,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
     const repo = repositorioDePedidos();
     const pres = catalogoDePresentaciones();
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
@@ -304,6 +312,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
     const repo = repositorioDePedidos();
     const pres = catalogoDePresentaciones();
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
@@ -328,6 +337,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
     const repo = repositorioDePedidos();
     const pres = catalogoDePresentaciones();
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
@@ -361,6 +371,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
@@ -385,6 +396,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
@@ -416,6 +428,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
@@ -446,6 +459,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
@@ -478,6 +492,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
       new Map([[OTRA_UNIDAD_INCOMPATIBLE, { id: OTRA_UNIDAD_INCOMPATIBLE, baseUnitId: null, factor: null }]]),
     );
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
@@ -507,6 +522,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
@@ -537,6 +553,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
     const cat = catalogoDeRecetas();
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       // `fakeUnitOfWork` por defecto explota si algo llama a `finishedGoods.receiveFromOrder`:
       // que el alta termine sin lanzar demuestra que no lo hizo.
       unitOfWork: repo.unitOfWork,
@@ -567,6 +584,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
     const pres = catalogoDePresentaciones('5.0000');
     const envases = catalogoDeEnvases('5.0000');
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
@@ -660,6 +678,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
     const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: prod.products,
@@ -692,6 +711,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
       const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
       const repo = repositorioDePedidos();
       const createOrder = createCreateOrder({
+        customerCatalog: fakeCustomerCatalog(),
         unitOfWork: repo.unitOfWork,
         recipes: cat.recipes,
         products: prod.products,
@@ -719,6 +739,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
       permissions: ['pedidos.consultar'],
     };
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: catalogos.unitOfWork,
       recipes: catalogos.recipes,
       products: catalogos.products,
@@ -741,6 +762,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
     const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: prod.products,
@@ -763,6 +785,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
     const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
     const repo = repositorioDePedidos();
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: prod.products,
@@ -810,6 +833,7 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
     const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
     const repo = repositorioConOrden('reserved');
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
@@ -829,6 +853,7 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
     const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
     const repo = repositorioConOrden('not_reserved');
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
@@ -851,6 +876,7 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
       }),
     };
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: unitOfWork as unknown as ReturnType<typeof repositorioDePedidos>['unitOfWork'],
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
@@ -872,6 +898,7 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
     const cat = catalogoDeRecetas();
     const repo = repositorioConOrden('not_reserved');
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
@@ -932,6 +959,7 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
       recipes: { findExecutionContentById: findExecutionContentByIdDeLaTransaccion },
     });
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork,
       recipes: recipesGlobal,
       products: catalogoDeProductos().products,
@@ -993,6 +1021,7 @@ describe('alta con version de receta', () => {
     });
     const run = vi.spyOn(unitOfWork, 'run');
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork,
       recipes,
       products: catalogoDeProductos(batches).products,
@@ -1111,7 +1140,7 @@ describe('alta con version de receta', () => {
   });
 
   it('R39: con version se exige el mismo permiso de hoy y sin el no se lee nada', async () => {
-    const createOrder = createCreateOrder({ ...catalogosQueExplotan(), now: () => AHORA });
+    const createOrder = createCreateOrder({ customerCatalog: fakeCustomerCatalog(), ...catalogosQueExplotan(), now: () => AHORA });
     const SIN_PERMISO: Actor = { id: 'u-1', companyId: EMPRESA_A, permissions: ['pedidos.consultar'] };
 
     await expect(createOrder(entrada(VERSION_DE_A), SIN_PERMISO)).rejects.toBeInstanceOf(UnauthorizedError);
@@ -1157,6 +1186,7 @@ describe('QC-138 — el alta bloquea con confirmacion (R1, R2, R3, R5, R6, R8)',
 
   function altaCon(repo: ReturnType<typeof repositorioQueBloquea>, prod = catalogoDeProductos()) {
     return createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork: repo.unitOfWork,
       recipes: catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]])).recipes,
       products: prod.products,
@@ -1267,7 +1297,7 @@ describe('QC-138 — el alta bloquea con confirmacion (R1, R2, R3, R5, R6, R8)',
 
   it('R37: sin pedidos.modificar -> unauthorized antes de leer nada', async () => {
     const catalogos = catalogosQueExplotan();
-    const createOrder = createCreateOrder({ ...catalogos, now: () => AHORA });
+    const createOrder = createCreateOrder({ customerCatalog: fakeCustomerCatalog(), ...catalogos, now: () => AHORA });
     const SIN_PERMISO: Actor = { id: 'u-1', companyId: EMPRESA_A, permissions: ['inventario.modificar'] };
 
     await expect(createOrder({ ...ENTRADA, confirmBlocked: true }, SIN_PERMISO)).rejects.toBeInstanceOf(
@@ -1296,6 +1326,7 @@ describe('QC-195 — el alta aparta los envases del reparto', () => {
       recipes: cat.recipes,
     });
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork,
       recipes: cat.recipes,
       products: catalogoDeProductos().products,
@@ -1368,6 +1399,7 @@ describe('QC-204 — el alta convierte la necesidad a la unidad del insumo', () 
       units: fakeScopeUnits([GRAMO, KILO, PIEZA]),
     });
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork,
       recipes: cat.recipes,
       products: prod.products,

@@ -11,6 +11,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createFinishPacking, createStartPacking, type FinishPackingDeps } from '@/lib/modules/pedidos/domain/order-packing';
+import * as transitions from '@/lib/modules/pedidos/domain/order-transitions';
 import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
 
 import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-packing-repository';
@@ -239,6 +240,33 @@ describe('createFinishPacking (T14, R17-R21)', () => {
       catalogos,
     };
   }
+
+  it('R5 (QC-215): Terminar comprueba EN_EMPAQUE -> POR_ACONDICIONAR, nunca hacia ENTREGADO ni TERMINADO', async () => {
+    const assertSpy = vi.spyOn(transitions, 'assertTransition');
+    try {
+      const { finishPackingAliveById } = montar({ lines: [] });
+
+      await finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA);
+
+      expect(assertSpy).toHaveBeenCalledExactlyOnceWith('EN_EMPAQUE', 'POR_ACONDICIONAR');
+    } finally {
+      assertSpy.mockRestore();
+    }
+  });
+
+  it('R6 (QC-215): si la matriz rechazara EN_EMPAQUE -> POR_ACONDICIONAR, Terminar falla sin abrir la unidad de trabajo', async () => {
+    const assertSpy = vi.spyOn(transitions, 'assertTransition').mockImplementation(() => {
+      throw new Error('transicion rechazada');
+    });
+    try {
+      const { finishPackingAliveById, finishPackingAlive } = montar({ lines: [] });
+
+      await expect(finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).rejects.toThrow('transicion rechazada');
+      expect(finishPackingAlive).not.toHaveBeenCalled();
+    } finally {
+      assertSpy.mockRestore();
+    }
+  });
 
   it('R22, R23, R24: not_packer/not_packable/not_found se devuelven tal cual, sin leer lineas', async () => {
     for (const kind of ['not_packer', 'not_packable', 'not_found'] as const) {

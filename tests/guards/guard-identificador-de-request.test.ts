@@ -176,6 +176,15 @@ export const E2E_ESPERADOS = [
   // nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue
   // INTACTO.
   'pedido-bloqueado.spec.ts',
+  // Alta el 2026-10-06 (QC-156) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja
+  // -el archivo se nombra, uno a uno-. Lo que ejercita: el alta de un pedido con cliente y su
+  // columna en el listado, el filtro por cliente, el cambio de cliente en un pedido CANCELADO sin
+  // cambiar su estado, y un rol con solo `pedidos.consultar` que no ve «Cliente» y recibe
+  // `unauthorized` del servidor. NO ejercita el cruce borde -> accion del identificador de
+  // peticion: el spec no lee ni afirma nada sobre el identificador ni sobre `reference`, asi que
+  // el diferimiento de QC-71 R21 sigue INTACTO.
+  'pedido-con-cliente.spec.ts',
   'pedidos.spec.ts',
   // Alta el 2026-09-23 (QC-122) por el MISMO motivo y en el MISMO sitio que las demas: esta lista
   // es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO se relaja
@@ -271,6 +280,14 @@ export const E2E_ESPERADOS = [
   // nada sobre el identificador de peticion ni sobre `reference`, asi que el diferimiento de
   // QC-71 R21 sigue INTACTO.
   'pasos-de-envasado.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre la importacion de inventario desde un .csv:
+  // vista previa, alta de la unidad que falta, confirmacion, lotes y archivo de errores. No lee ni
+  // afirma nada sobre el identificador de peticion.
+  'inventario-importar.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre retomar en el ultimo paso anotado tras recargar
+  // y cancelar con motivo desde la ejecucion. No lee ni afirma nada sobre el identificador de
+  // peticion.
+  'registro-ejecucion.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -443,6 +460,20 @@ export const MIGRACIONES_ESPERADAS = [
   '20261004170000_product_batches_require_product_unit',
   // Los pasos de envasado de la receta; no toca el identificador.
   '20261005120000_recipe_packing_steps',
+  // El registro de importaciones de inventario; no toca el identificador.
+  '20261006120000_inventory_imports',
+  // La existencia de antes y el total contado del asiento de ajuste; no toca el identificador.
+  '20261006140000_inventory_movements_adjustment_count',
+  // El cliente del pedido; no toca el identificador.
+  '20261006160000_orders_customer',
+  // El registro de ejecucion de los pedidos; no toca el identificador.
+  '20261006180000_order_execution_entries',
+  // El rol Administrador de acondicionamiento y su permiso; no toca el identificador.
+  '20261006234105_conditioning_role',
+  // Los estados de acondicionamiento y TERMINADO; no toca el identificador.
+  '20261007120000_order_conditioning_states',
+  // El indice de pedidos terminados; no toca el identificador.
+  '20261007120100_order_terminated_finished_index',
 ] as const
 
 export function hallazgosDeMigraciones(
@@ -501,14 +532,20 @@ export function hallazgosDeSchema(schemaSource: string): readonly string[] {
 // humana y su fila en `docs/dependencias.md`: de 37 a 38.
 // El 2026-10-05 entro `@anthropic-ai/sdk` -el cliente oficial para leer un PDF con Claude-, con
 // los cuatro checks, aprobacion humana y su fila en `docs/dependencias.md`: de 38 a 39.
+// El 2026-10-06 entraron `read-excel-file` y `papaparse` -leer la hoja y el CSV de la
+// importacion de inventario- y, como devDependency, `@types/papaparse`, con los cuatro checks,
+// aprobacion humana y su fila en `docs/dependencias.md`: de 39 a 41 y de 20 a 21.
+// El 2026-10-07 entro `nodemailer` -transporte SMTP temporal del correo- y, como devDependency,
+// `@types/nodemailer`, pedidas por el humano y con su fila en `docs/dependencias.md`: de 41 a 42
+// y de 21 a 22.
 //
 // Que este conteo sea un absoluto es fragil y conviene saberlo: no distingue «alguien colo una
 // libreria» de «entro una aprobada», asi que lo rompe cualquier feature posterior que anada una
 // legitima. La pregunta «toda dependencia declarada esta aprobada» ya la responde
 // `guard-dependencias-aprobadas.test.ts`, que compara contra el registro. Lo robusto aqui seria
 // comparar contra el merge-base de la propia rama en vez de contar absolutos.
-export const DEPENDENCIAS_ESPERADAS = 39
-export const DEV_DEPENDENCIAS_ESPERADAS = 20
+export const DEPENDENCIAS_ESPERADAS = 42
+export const DEV_DEPENDENCIAS_ESPERADAS = 22
 
 /** `crypto.randomUUID()` es un global: una libreria de identificadores o de criptografia sobra. */
 export const FRAGMENTOS_PROHIBIDOS = ['uuid', 'nanoid', 'cuid', 'crypto'] as const
@@ -621,6 +658,12 @@ export const SUPERFICIES_QUE_APLANAN: readonly SuperficieAplanada[] = [
       'el resultado de listProductsAction muere dentro del cargador de AsyncAutocomplete, cuyo ' +
       'canal `error` esta tipado `string`; el mensaje viaja como `cause` y se pinta abajo. Para ' +
       'no aplanar haria falta que ese contrato aceptara un ErrorState (Opcion A, descartada).',
+  },
+  {
+    archivo: 'app/(private)/pedidos/components/order-customer-picker.tsx',
+    idioma: 'throw-new-error',
+    ocurrencias: 1,
+    motivo: 'mismo canal `error: string` de AsyncAutocomplete que product-name-picker.',
   },
   {
     archivo: 'app/(private)/pedidos/components/order-form.tsx',

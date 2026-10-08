@@ -56,6 +56,7 @@ function fila(status: OrderStatus, cancellationReason: string | null = null): Or
     updatedBy: 'admin-0',
     presentationLines: [],
     unitId: null,
+    customerId: null,
   }
 }
 
@@ -224,6 +225,19 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
 
   it('no cancela un pedido POR_EMPACAR ni uno EN_EMPAQUE: el material ya se consumio (R29)', async () => {
     for (const status of ['POR_EMPACAR', 'EN_EMPAQUE'] as const) {
+      const d = dobles({ fila: fila(status) })
+
+      expect(
+        await codigoDelFallo(() => createCancelOrder(d)(ORDER_ID, { reason: 'sin stock' }, ADMIN)),
+        status,
+      ).toBe('not_cancellable')
+      expect(d.cancelAlive, status).not.toHaveBeenCalled()
+      expect(d.releaseForOrder, status).not.toHaveBeenCalled()
+    }
+  })
+
+  it('R18, R30 (QC-215): no cancela un POR_ACONDICIONAR, un EN_ACONDICIONAMIENTO ni un TERMINADO, sin escribir ni liberar', async () => {
+    for (const status of ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const) {
       const d = dobles({ fila: fila(status) })
 
       expect(

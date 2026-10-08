@@ -339,7 +339,7 @@ worktree, esa base tiene que estar sembrada con QC-6/QC-74 o `permisos.spec.ts` 
 mensaje explicito, eso si (`el rol 'Operador' no existe: correr el seed`). Es dato para el leader,
 no un defecto del codigo.
 
-**M3 — `menor`, prosa. `CHECKPOINTS.md > Permisos` quedo desfasado respecto de esta ficha.**
+**M3 — `menor`, prosa. `docs/checkpoints-proyecto.md > Permisos` quedo desfasado respecto de esta ficha.**
 `docs/architecture.md` se actualizo bien («las paginas exigen su permiso en el servidor, antes de
 leer o pintar datos»), pero `CHECKPOINTS.md` sigue diciendo «Paginas protegidas validan permisos en
 el servidor via `cookies()`». Se cumple en sustancia —`requirePagePermission` resuelve la sesion,

@@ -298,6 +298,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     presentationLines: [LINEA_ENVASE],
     unitId: UNIDAD.id,
     unitLabel: UNIDAD.symbol,
+    customer: null,
     ...overrides,
   };
 }

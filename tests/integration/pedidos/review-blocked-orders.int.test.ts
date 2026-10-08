@@ -55,6 +55,12 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
+import { countFromDelta } from '../../helpers/adjust-by-delta';
+import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+
+const customerCatalog = {
+  findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
+};
 
 const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
 
@@ -126,7 +132,7 @@ const units: UnitCatalog = {
   findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany,
 };
 
-const createOrder = createCreateOrder({ recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
+const createOrder = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
 const cancelOrder = createCancelOrder({ orders, unitOfWork, now: () => new Date() });
 const reviewBlockedOrders = createReviewBlockedOrders({ orders, recipes, products, units, packaging: packagingCatalog, unitOfWork });
 
@@ -642,7 +648,10 @@ describe('la fachada de inventario dispara la revision', () => {
       await crearLineaCompleta(recipeId, productId);
       const orderId = await crearBloqueado(fixture, recipeId, '10.0000');
 
-      await inventario.adjustBatchStock({ batchId, delta: '6', reason: 'conteo_fisico' }, almacenistaDe(fixture));
+      await inventario.adjustBatchStock(
+        { batchId, ...(await countFromDelta(batchId, '6', { companyId: fixture.companyId })), reason: 'conteo_fisico' },
+        almacenistaDe(fixture),
+      );
 
       expect((await filaDe(orderId)).status).toBe('PENDIENTE');
       expect(await movimientosDe(orderId)).toEqual([{ kind: 'reserve', quantity: '10.0000', createdBy: null }]);
@@ -660,7 +669,10 @@ describe('la fachada de inventario dispara la revision', () => {
       const orderId = await crearBloqueado(fixture, recipeId, '10.0000');
       await sumarLoteSinAvisar(fixture, productId, '50');
 
-      await inventario.adjustBatchStock({ batchId, delta: '-1', reason: 'merma' }, almacenistaDe(fixture));
+      await inventario.adjustBatchStock(
+        { batchId, ...(await countFromDelta(batchId, '-1', { companyId: fixture.companyId })), reason: 'merma' },
+        almacenistaDe(fixture),
+      );
 
       expect((await filaDe(orderId)).status).toBe('BLOQUEADO');
     } finally {
@@ -679,7 +691,10 @@ describe('la fachada de inventario dispara la revision', () => {
         actorDe(fixture),
       );
 
-      await inventario.adjustBatchStock({ batchId, delta: '-5', reason: 'merma' }, almacenistaDe(fixture));
+      await inventario.adjustBatchStock(
+        { batchId, ...(await countFromDelta(batchId, '-5', { companyId: fixture.companyId })), reason: 'merma' },
+        almacenistaDe(fixture),
+      );
 
       expect((await filaDe(pendiente.id)).status).toBe('PENDIENTE');
     } finally {

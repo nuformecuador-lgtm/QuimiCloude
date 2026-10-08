@@ -33,6 +33,10 @@ export async function writeMovement(
       reason: movement.reason,
       orderId: movement.orderId,
       orderPresentationLineId: movement.orderPresentationLineId,
+      // Sin ellos la columna queda NULL por omision: solo un ajuste los escribe.
+      ...(movement.previousStock != null || movement.countedStock != null
+        ? { stockBefore: movement.previousStock ?? null, countedStock: movement.countedStock ?? null }
+        : {}),
       createdBy: movement.createdBy,
       ...companyScopeColumns(scope),
       createdAt: now,
@@ -48,6 +52,8 @@ const MOVEMENT_SELECT = {
   orderId: true,
   createdBy: true,
   createdAt: true,
+  stockBefore: true,
+  countedStock: true,
 } satisfies Prisma.InventoryMovementSelect;
 
 type MovementRow = Prisma.InventoryMovementGetPayload<{ select: typeof MOVEMENT_SELECT }>;
@@ -79,6 +85,8 @@ function toInventoryHistoryEntry(row: MovementRow): BatchHistoryEntry {
     orderNumberText: row.orderId,
     authorName: row.createdBy,
     createdAt: row.createdAt.toISOString(),
+    previousStock: row.stockBefore === null ? null : row.stockBefore.toFixed(4),
+    countedStock: row.countedStock === null ? null : row.countedStock.toFixed(4),
   };
 }
 
@@ -92,6 +100,8 @@ function toReservationHistoryEntry(row: ReservationMovementRow): BatchHistoryEnt
     orderNumberText: row.orderId,
     authorName: row.createdBy,
     createdAt: row.createdAt.toISOString(),
+    previousStock: null,
+    countedStock: null,
   };
 }
 

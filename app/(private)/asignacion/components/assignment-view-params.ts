@@ -11,12 +11,15 @@ export const STATUS_PARAM = 'status';
 export const FIRST_PAGE = 1;
 
 /** El mismo formato que `/pedidos`, duplicado a proposito: esta ruta no importa el dominio de
- *  `pedidos` solo para reconocer siete palabras en una cadena de consulta. Orden de `ORDER_STATUS_FLOW`. */
+ *  `pedidos` solo para reconocer unas palabras en una cadena de consulta. Orden de `ORDER_STATUS_FLOW`. */
 export const ROUTE_ORDER_STATUS_VALUES = [
   'PENDIENTE',
   'EN_CURSO',
   'POR_EMPACAR',
   'EN_EMPAQUE',
+  'POR_ACONDICIONAR',
+  'EN_ACONDICIONAMIENTO',
+  'TERMINADO',
   'ENTREGADO',
   'CANCELADO',
   'BLOQUEADO',
@@ -108,13 +111,13 @@ export function assignmentViewHref(vista: AssignmentViewKind): string {
 
 /**
  * El filtro exacto que activa el orden y la columna de terminados: la lista de
- * estados aplicada tiene que ser, sin mas, `['ENTREGADO']`. Vacio significa «sin filtro» (todos
- * los estados) y nunca cuenta como exacto.
+ * estados aplicada tiene que ser, sin mas, `['ENTREGADO']` o `['TERMINADO']`. Vacio significa
+ * «sin filtro» (todos los estados) y nunca cuenta como exacto, ni tampoco los dos juntos.
  *
  * Vive junto a los demas parseos de la URL, no en `company-orders-columns.tsx`: ese modulo es
  * `'use client'` y tanto `page.tsx` como `CompanyOrdersSkeleton` (Server Components) necesitan
  * invocarla directamente, no solo pintarla como JSX.
  */
 export function isExactlyDelivered(statuses: readonly RouteOrderStatus[]): boolean {
-  return statuses.length === 1 && statuses[0] === 'ENTREGADO';
+  return statuses.length === 1 && (statuses[0] === 'ENTREGADO' || statuses[0] === 'TERMINADO');
 }

@@ -2,7 +2,7 @@
  * QC-77 — el aviso de base de desarrollo atrasada (R14, R15, R16).
  *
  * Por que existe: los tres desenlaces («al dia», «va N atras», «no se pudo consultar») estaban
- * medidos a mano una sola vez (`progress/qc77-mediciones/T12.md`). `docs/verification.md >
+ * medidos a mano una sola vez (`progress/qc77-mediciones/T12.md`). `docs/gate.md >
  * Cuando lo que verificas es el gate mismo` pide demostrar que cada validacion nueva **muerde**,
  * y probarlo una vez no es dejarlo probado: el dia que el formateo pierda el conteo, o que
  * alguien quite el `|| true` de `init.sh`, nada se pondria rojo.
@@ -131,15 +131,24 @@ describe('el aviso NO puede tumbar el gate (R15)', () => {
 
 // --------------------------------------------------------------- el bloque 6.c de init.sh
 
-/** Se lee el arbol, no se importa nada: el gate es un `.sh` y aqui se le trata como texto. */
+/**
+ * Se lee el arbol, no se importa nada: el gate es un `.sh` y aqui se le trata como texto.
+ *
+ * Desde el arnes v2 el bloque vive en `scripts/gate-proyecto.sh` (pasos propios del proyecto), y
+ * `init.sh` lo carga en su paso 6.c. Se comprueban las dos mitades: que `init.sh` lo carga ANTES
+ * de los tests, y que el bloque de `gate-proyecto.sh` sigue avisando sin fallar.
+ */
 function bloque6c(): string {
   const init = readFileSync(join(process.cwd(), 'init.sh'), 'utf8').replace(/\r\n/g, '\n')
-  const desde = init.indexOf('# 6.c')
-  const hasta = init.indexOf('if [ -f package.json ]', desde)
+  const carga = init.indexOf('. scripts/gate-proyecto.sh')
+  const tests = init.indexOf('if [ -f package.json ]', init.indexOf('# 6.c'))
+  expect(carga, 'init.sh ya no carga scripts/gate-proyecto.sh').toBeGreaterThan(-1)
+  expect(tests, 'init.sh carga scripts/gate-proyecto.sh DESPUES de los tests').toBeGreaterThan(carga)
 
+  const gate = readFileSync(join(process.cwd(), 'scripts', 'gate-proyecto.sh'), 'utf8').replace(/\r\n/g, '\n')
+  const desde = gate.indexOf('# 6.c')
   expect(desde).toBeGreaterThan(-1)
-  expect(hasta).toBeGreaterThan(desde)
-  return init.slice(desde, hasta)
+  return gate.slice(desde)
 }
 
 describe('el bloque 6.c de init.sh avisa, no falla (R15)', () => {
@@ -159,7 +168,7 @@ describe('el bloque 6.c de init.sh avisa, no falla (R15)', () => {
   })
 
   it('su unico `fail` es el de scripts/test-db.ts ausente', () => {
-    // R15 — que falte el script SI es una rotura del arnes (`docs/verification.md > El
+    // R15 — que falte el script SI es una rotura del arnes (`docs/gate.md > El
     // anti-patron: la validacion opcional`). Cualquier OTRO `fail` que aparezca en este
     // bloque seria el estado de una base local decidiendo el codigo de salida del gate.
     const fails = bloque6c()

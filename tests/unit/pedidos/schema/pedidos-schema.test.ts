@@ -139,7 +139,7 @@ const user = parseModel('User')
  *  tabla y las lleva a veintiuno: la decision [Q4] deroga la salida del 2026-09-07 (`design.md`
  *  seccion 0.6). El reparto por presentacion retira `presentationId` y `presentationContent`
  *  (pasan a `OrderPresentationLine`) y quedan diecinueve. QC-195 (P6) anade `packagingCost`, la parte de
- *  envases del importe, y son veinte. La lista sigue siendo cerrada: anadir o quitar cualquier otra columna pone este
+ *  envases del importe, y son veinte. QC-156 anade `customerId`, el cliente opcional, y son veintiuno. La lista sigue siendo cerrada: anadir o quitar cualquier otra columna pone este
  *  test rojo. */
 const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['id', 'id'],
@@ -161,7 +161,9 @@ const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['reservedAt', 'reserved_at'],
   ['finishedAt', 'finished_at'], // instante en que paso a ENTREGADO por Finalizar, opcional
   ['packedBy', 'packed_by'], // quien tiene el pedido en empaque, opcional
+  ['conditionedBy', 'conditioned_by'], // quien tiene o tuvo el pedido en acondicionamiento, opcional
   ['unitId', 'unit_id'], // la unidad en que se expresa quantity, opcional [Q4]
+  ['customerId', 'customer_id'], // QC-156 R1: el cliente del pedido, opcional
 ]
 
 /** Las CUATRO referencias que cruzan de modulo y por eso NO llevan `@relation` (R33). Fueron cuatro
@@ -226,16 +228,26 @@ describe('db/schema.prisma — modelo de pedido', () => {
     }
   })
 
-  it('Order no declara cliente, destinatario ni ninguna columna equivalente', () => {
-    // R3 y decision cerrada 8: no hay cliente ni destinatario en Order, y es DELIBERADO;
-    // sigue vigente hasta QC-156. La prohibicion de un catalogo de clientes que este mismo
-    // caso incluia queda derogada solo para Customer/customers por el modulo Clientes
-    // (QC-152/QC-153, 2026-09-24); el resto de nombres de catalogo sigue prohibido.
+  it('QC-156 R5: Order declara una sola referencia a cliente, customerId, y ningun otro modelo de cliente', () => {
+    // QC-156 derogo la prohibicion de QC-33 R3 (decision cerrada 8: «sin cliente ni
+    // destinatario»). Lo que queda es mas estricto que una ausencia: UNA sola columna que case
+    // con el patron, y es `customerId`, opcional, uuid, en `customer_id` y sin `@relation`
+    // (`Customer` es de `clientes`; la FK compuesta vive solo en la migracion).
     const CLIENTE = /client|customer|cliente|recipient|destinatar|buyer|receiver|contact|party/i
     const sospechosos = order.fields
       .filter((candidate) => CLIENTE.test(candidate.name))
       .map((candidate) => candidate.name)
-    expect(sospechosos).toEqual([])
+    expect(sospechosos).toEqual(['customerId'])
+
+    const customerId = field(order, 'customerId')
+    expect(customerId.type).toBe('String')
+    expect(customerId.isOptional).toBe(true)
+    expect(customerId.isList).toBe(false)
+    expect(customerId.attributes).toContain('@map("customer_id")')
+    expect(customerId.attributes).toContain('@db.Uuid')
+    expect(customerId.attributes).not.toMatch(/@relation|@default/)
+    // Ningun campo de Order apunta a un modelo de cliente como relacion.
+    expect(order.fields.filter((candidate) => candidate.type === 'Customer')).toEqual([])
 
     const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
       .map((match) => match[1])
@@ -379,14 +391,14 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(order.body).toMatch(/@@index\(\[recipeId\],\s*map:\s*"orders_recipe_id_idx"\)/)
   })
 
-  it('OrderStatus declara PENDIENTE, EN_CURSO, ENTREGADO, CANCELADO, POR_EMPACAR, EN_EMPAQUE, BLOQUEADO y OrderPriority BAJA, MEDIA, ALTA, CRITICA, en ese orden y sin ningun valor mas (R1)', () => {
+  it('OrderStatus declara PENDIENTE, EN_CURSO, ENTREGADO, CANCELADO, POR_EMPACAR, EN_EMPAQUE, BLOQUEADO, POR_ACONDICIONAR, EN_ACONDICIONAMIENTO, TERMINADO y OrderPriority BAJA, MEDIA, ALTA, CRITICA, en ese orden y sin ningun valor mas (R1)', () => {
     // R16 y decision cerrada 4: dos conjuntos CERRADOS del propio esquema, con esos valores
     // exactos. EL ORDEN DE DECLARACION DE LA PRIORIDAD ES SU ORDEN, de menor a mayor: Postgres
     // ordena un enum por declaracion, no alfabeticamente, asi que reordenar cambia el dato.
     //
     // `POR_EMPACAR` y `EN_EMPAQUE` van al FINAL y eso NO es indiferente: `ALTER TYPE ... ADD
     // VALUE` anade al final, y ponerlos en otra posicion obligaria a recrear el tipo. La lista
-    // sigue siendo cerrada: un septimo valor pone este test rojo.
+    // sigue siendo cerrada: un valor mas pone este test rojo.
     expect(parseEnum('OrderStatus')).toEqual([
       'PENDIENTE',
       'EN_CURSO',
@@ -395,6 +407,9 @@ describe('db/schema.prisma — modelo de pedido', () => {
       'POR_EMPACAR',
       'EN_EMPAQUE',
       'BLOQUEADO',
+      'POR_ACONDICIONAR',
+      'EN_ACONDICIONAMIENTO',
+      'TERMINADO',
     ])
     expect(parseEnum('OrderPriority')).toEqual(['BAJA', 'MEDIA', 'ALTA', 'CRITICA'])
 
@@ -681,7 +696,9 @@ describe('db/schema.prisma — modelo de pedido', () => {
       'orders_created_by_idx',
       'orders_updated_by_idx',
       'orders_packed_by_idx',
+      'orders_conditioned_by_idx',
       'orders_unit_id_idx',
+      'orders_company_id_customer_id_idx',
     ])
     // `finished_at` no gana `@@index` en el esquema: su indice parcial vive solo en la
     // migracion, como los de `list_query_indexes`.
@@ -712,7 +729,14 @@ describe('db/schema.prisma — modelo de pedido', () => {
       .filter((modelName): modelName is string => modelName !== undefined)
       .sort()
     expect(pedidosModels).toEqual(['Order', 'OrderPresentationLine'])
-    expect(modelNames.filter((name) => /cost|price|import/i.test(name))).toEqual([])
+    // `import` aqui es «importe». `InventoryImport` (QC-209, 2026-10-06) es el registro de una
+    // importacion de archivo, sin dinero: se exime solo ese nombre; el patron sigue entero.
+    const IMPORTACION_DE_ARCHIVO = new Set(['InventoryImport'])
+    expect(
+      modelNames.filter(
+        (name) => /cost|price|import/i.test(name) && !IMPORTACION_DE_ARCHIVO.has(name),
+      ),
+    ).toEqual([])
   })
 
   it('QC-195 R47: orders gana packagingCost, decimal(14,4) opcional y sin default, junto a ingredientsCost', () => {
@@ -751,6 +775,17 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(packedBy.attributes).not.toMatch(/@default\(/)
     expect(packedBy.attributes).not.toMatch(/@relation/)
     expect(order.body).toMatch(/@@index\(\[packedBy\],\s*map:\s*"orders_packed_by_idx"\)/)
+  })
+
+  it('R25: conditionedBy es uuid anulable, sin @relation y con su indice', () => {
+    const conditionedBy = field(order, 'conditionedBy')
+    expect(conditionedBy.type).toBe('String')
+    expect(conditionedBy.isOptional).toBe(true)
+    expect(conditionedBy.attributes).toContain('@db.Uuid')
+    expect(conditionedBy.attributes).toContain('@map("conditioned_by")')
+    expect(conditionedBy.attributes).not.toMatch(/@default\(/)
+    expect(conditionedBy.attributes).not.toMatch(/@relation/)
+    expect(order.body).toMatch(/@@index\(\[conditionedBy\],\s*map:\s*"orders_conditioned_by_idx"\)/)
   })
 
   it('no nace ninguna columna de moneda (R16)', () => {

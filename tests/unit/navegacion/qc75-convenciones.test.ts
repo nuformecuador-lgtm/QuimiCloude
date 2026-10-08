@@ -75,6 +75,7 @@ export const CODIGOS_QC74 = [
   'empaque.modificar',
   'empresas.consultar',
   'empresas.modificar',
+  'acondicionamiento.modificar',
 ] as const;
 
 /** Los modulos de negocio del ERP, en el orden en que cada uno entro al catalogo. */
@@ -147,8 +148,9 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
   it('los modulos son exactamente los de negocio mas dashboard y usuarios', () => {
     const modulos = [...new Set(catalogo.map((permiso) => permiso.module))].sort();
     // `dashboard` es una pantalla y no un modulo del ERP (solo lleva `consultar`); `usuarios`,
-    // `terminados`, `empaque` y `empresas` no son carpetas de `lib/modules/` -viven dentro de
-    // `identity`-. `empaque` ademas es solo de escritura: unicamente lleva `modificar`.
+    // `terminados`, `empaque`, `empresas` y `acondicionamiento` no son carpetas de `lib/modules/`
+    // -viven dentro de `identity`-. `empaque` y `acondicionamiento` ademas son solo de escritura:
+    // unicamente llevan `modificar`.
     const esperados = [
       ...new Set([
         ...MODULOS_DE_NEGOCIO,
@@ -157,6 +159,7 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
         'terminados',
         'empaque',
         'empresas',
+        'acondicionamiento',
       ]),
     ].sort();
     expect(modulos).toEqual(esperados);
@@ -333,7 +336,7 @@ describe('QC-75 R22 — esta ficha no anade backend', () => {
 
   // ANCLA ANTI-VACUIDAD. Sin esto, un rango roto —o una corrida desde `dev`— dejaria los tres
   // casos de abajo en verde sin haber mirado nada, que es el anti-patron de la «validacion
-  // opcional» de `docs/verification.md`. Aqui el rango se mide una vez y se afirma que trae
+  // opcional» de `docs/gate.md`. Aqui el rango se mide una vez y se afirma que trae
   // trabajo reconocible de QC-75 antes de sacar conclusiones de su contenido.
   it('el rango de la rama trae archivos y contiene el trabajo de QC-75', (ctx) => {
     if (archivos === null) {
@@ -575,7 +578,7 @@ describe('QC-75 decision cerrada nº 3 — el layout privado no dispara el 404',
   const rutaLayout = join(repoRoot, RUTA_LAYOUT_PRIVADO);
 
   // ANCLA ANTI-VACUIDAD. Sin esto, una ruta mal escrita —o el archivo movido— dejaria la regla en
-  // verde sin haber leido nada, que es el anti-patron de `docs/verification.md`.
+  // verde sin haber leido nada, que es el anti-patron de `docs/gate.md`.
   it('el layout privado existe y su fuente trae el armazon que se afirma', () => {
     expect(
       existsSync(rutaLayout),

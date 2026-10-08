@@ -1,6 +1,7 @@
 import { requirePermission, type Actor } from './actor';
 import { OrderWouldBlockError, ValidationError } from './errors';
 import { DEFAULT_ORDER_STATUS } from './order-classification';
+import { requireAliveCustomer } from './order-customer';
 import { createOrderSchema, type EditableOrderStatus } from './order-input';
 import { formatOrderNumber, type OrderNumber } from './order-number';
 import { orderRecipeIds, requireOrderRecipe } from './order-recipe';
@@ -10,6 +11,7 @@ import { packagingLinesOfInput, resolveDistribution } from './resolve-distributi
 import { resolveStoredOrderCost } from './resolve-ingredients-cost';
 import type { OrderScope } from './order-scope';
 
+import type { CustomerCatalog } from '@/lib/modules/clientes';
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
@@ -48,6 +50,8 @@ export type CreateOrderDeps = {
   readonly presentations: PresentationCatalog;
   /** Contrato PUBLICO de `inventario`: los envases del reparto y su presentacion fija. */
   readonly packaging: PackagingCatalog;
+  /** Contrato PUBLICO de `clientes`: comprueba que el cliente indicado esta vivo en la empresa. */
+  readonly customerCatalog: Pick<CustomerCatalog, 'findAliveRefById'>;
   /** La transaccion compartida con `inventario`: crea el pedido, aparta su material y fija
    *  `reserved_at`, las tres o ninguna. */
   readonly unitOfWork: OrderUnitOfWork;
@@ -114,6 +118,10 @@ export function createCreateOrder(
     );
     const effectiveId = requireOrderRecipe(refs, data.recipeId, data.recipeVersionId);
 
+    if (data.customerId !== null) {
+      await requireAliveCustomer(deps.customerCatalog, data.customerId, actor.companyId);
+    }
+
     const cost = await resolveStoredOrderCost(
       deps,
       effectiveId,
@@ -169,6 +177,7 @@ export function createCreateOrder(
           unitId: data.unitId,
           status: STATUS_DE_ALTA,
           presentationLines: distribution.lines,
+          customerId: data.customerId,
         },
         instant.getUTCFullYear(),
         actor.id,

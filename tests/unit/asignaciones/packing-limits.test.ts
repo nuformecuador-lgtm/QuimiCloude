@@ -55,11 +55,25 @@ describe('R44 — sin tabla ni registro de ejecucion propios', () => {
     }
   })
 
+  // Nota 2026-10-06 (QC-82): QC-82 hace que empezar y terminar empaque anoten en el registro de
+  // ejecucion dentro de la misma transaccion. En `start-packing.ts` y `finish-packing.ts` se admite
+  // SOLO el import del puerto `ExecutionLogRepository` desde `../ports/execution-log-repository` y
+  // su uso como tipo; cualquier otra mencion, y cualquier mencion en el resto de archivos, sigue roja.
   it('el dominio de empezar/terminar/listar empaque no importa ni menciona un puerto de registro de ejecucion', () => {
-    // El puerto se llamaria `ExecutionLog` o `execution-log` si existiera; no existe en el repo,
-    // asi que su ausencia en estos archivos es la unica forma de verificarla.
+    const conRegistroDeQc82 = new Set([
+      join(repoRoot, 'lib', 'modules', 'asignaciones', 'domain', 'start-packing.ts'),
+      join(repoRoot, 'lib', 'modules', 'asignaciones', 'domain', 'finish-packing.ts'),
+    ])
     for (const file of domainFiles) {
-      const source = readFileSync(file, 'utf8')
+      let source = readFileSync(file, 'utf8')
+      if (conRegistroDeQc82.has(file)) {
+        source = source
+          .replace(
+            /^import type \{ ExecutionLogRepository \} from '\.\.\/ports\/execution-log-repository';?\r?$/m,
+            '',
+          )
+          .replace(/\breadonly log: ExecutionLogRepository;/g, '')
+      }
       expect(source, file).not.toMatch(/ExecutionLog/)
       expect(source, file).not.toMatch(/execution-log/)
       expect(source, file).not.toMatch(/executionLog/)
@@ -67,23 +81,7 @@ describe('R44 — sin tabla ni registro de ejecucion propios', () => {
   })
 })
 
-describe('R45 — no modifica la ficha de QC-82', () => {
-  const qc82Dir = join(repoRoot, 'specs', 'QC-82-registro-de-ejecucion-de-receta')
-  const qc82Files = ['requirements.md', 'design.md', 'tasks.md'].map((name) => join(qc82Dir, name))
-
-  it('ningun archivo de QC-82 trae una nota de enmienda de esta ficha', () => {
-    for (const file of qc82Files) {
-      const source = readFileSync(file, 'utf8')
-      expect(source, file).not.toMatch(/Enmendado[^\n]*QC-168/)
-      expect(source, file).not.toMatch(/QC-168/)
-    }
-  })
-
-  it('ningun archivo de QC-82 menciona POR_EMPACAR ni EN_EMPAQUE por cuenta de esta ficha', () => {
-    for (const file of qc82Files) {
-      const source = readFileSync(file, 'utf8')
-      expect(source, file).not.toMatch(/POR_EMPACAR/)
-      expect(source, file).not.toMatch(/EN_EMPAQUE/)
-    }
-  })
-})
+// Nota 2026-10-06 (QC-82): R45 deja de barrer `specs/QC-82-registro-de-ejecucion-de-receta/`. Es
+// QC-82 quien enmienda su propia carpeta para incluir el registro de empezar/terminar empaque, asi
+// que mencionar QC-168, POR_EMPACAR o EN_EMPAQUE alli ya no indica que esta ficha la haya tocado.
+// Los dos casos que la barrian se retiran; R44 sigue vigilado arriba.

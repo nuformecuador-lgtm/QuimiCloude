@@ -90,7 +90,7 @@ llega a ejercitarse. Si alguien quitara el filtro de empresa de `:989`, ningún 
 Qué hace falta: un caso de integración en el que la empresa B llame a `receiveFinishedGoods` con el
 `presentationId` de la empresa A (y, si se quiere, también con su `recipeId`). Debe devolver
 `presentation_without_content` sin escribir producto, lote ni asiento en ninguna de las dos
-empresas. Lo exigen `CHECKPOINTS.md > Datos y seguridad` y `docs/architecture.md > Dominio` n.º 1.
+empresas. Lo exigen `docs/checkpoints-proyecto.md > Datos y seguridad` y `docs/architecture.md > Dominio` n.º 1.
 
 ### B3 — BLOQUEANTE: prefijo de migración duplicado con `dev`
 

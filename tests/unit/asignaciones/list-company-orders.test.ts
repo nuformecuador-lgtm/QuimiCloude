@@ -183,8 +183,8 @@ describe('QC-145 — listCompanyOrders: la entrada', () => {
   });
 });
 
-describe('QC-145 — listCompanyOrders: R22 sin filtro trae los siete estados', () => {
-  it('sin `statuses`, consulta con los siete estados en el orden del flujo (R41)', async () => {
+describe('QC-145 — listCompanyOrders: R22 sin filtro trae todos los estados', () => {
+  it('sin `statuses`, consulta con todos los estados en el orden del flujo, incluidos los de acondicionamiento (R41, R28)', async () => {
     const { deps, listAliveSummariesInCompany } = montar();
     const listCompanyOrders = createListCompanyOrders(deps);
 
@@ -192,7 +192,18 @@ describe('QC-145 — listCompanyOrders: R22 sin filtro trae los siete estados', 
 
     expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
       EMPRESA,
-      ['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR', 'EN_EMPAQUE', 'ENTREGADO', 'CANCELADO', 'BLOQUEADO'],
+      [
+        'PENDIENTE',
+        'EN_CURSO',
+        'POR_EMPACAR',
+        'EN_EMPAQUE',
+        'POR_ACONDICIONAR',
+        'EN_ACONDICIONAMIENTO',
+        'TERMINADO',
+        'ENTREGADO',
+        'CANCELADO',
+        'BLOQUEADO',
+      ],
       'work_queue',
       1,
       undefined,
@@ -244,6 +255,55 @@ describe('QC-145 — listCompanyOrders: R24/D16 el orden depende del filtro', ()
       1,
       undefined,
     );
+  });
+
+  it('R32: exactamente `TERMINADO` ordena como «Terminados»', async () => {
+    const { deps, listAliveSummariesInCompany } = montar();
+    const listCompanyOrders = createListCompanyOrders(deps);
+
+    await listCompanyOrders(ACTOR, { page: 1, statuses: ['TERMINADO', 'TERMINADO'] });
+
+    expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
+      EMPRESA,
+      ['TERMINADO'],
+      'finished_recent_first',
+      1,
+      undefined,
+    );
+  });
+
+  it('R32: TERMINADO junto a ENTREGADO, o junto a otro estado, usa el orden de la lista de trabajo', async () => {
+    const { deps, listAliveSummariesInCompany } = montar();
+    const listCompanyOrders = createListCompanyOrders(deps);
+
+    await listCompanyOrders(ACTOR, { page: 1, statuses: ['TERMINADO', 'ENTREGADO'] });
+    await listCompanyOrders(ACTOR, { page: 1, statuses: ['TERMINADO', 'EN_ACONDICIONAMIENTO'] });
+
+    expect(listAliveSummariesInCompany).toHaveBeenNthCalledWith(
+      1,
+      EMPRESA,
+      ['TERMINADO', 'ENTREGADO'],
+      'work_queue',
+      1,
+      undefined,
+    );
+    expect(listAliveSummariesInCompany).toHaveBeenNthCalledWith(
+      2,
+      EMPRESA,
+      ['TERMINADO', 'EN_ACONDICIONAMIENTO'],
+      'work_queue',
+      1,
+      undefined,
+    );
+  });
+
+  it('R32: exactamente un estado de acondicionamiento abierto usa el orden de la lista de trabajo', async () => {
+    const { deps, listAliveSummariesInCompany } = montar();
+    const listCompanyOrders = createListCompanyOrders(deps);
+
+    await listCompanyOrders(ACTOR, { page: 1, statuses: ['POR_ACONDICIONAR'] });
+
+    expect(listAliveSummariesInCompany).toHaveBeenCalledWith(EMPRESA, ['POR_ACONDICIONAR'], 'work_queue', 1, undefined);
   });
 
   it('un solo estado que no es ENTREGADO usa el orden de la lista de trabajo', async () => {
@@ -329,7 +389,18 @@ describe('QC-145 — listCompanyOrders: R27 paginacion delegada al catalogo', ()
 
     expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
       EMPRESA,
-      ['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR', 'EN_EMPAQUE', 'ENTREGADO', 'CANCELADO', 'BLOQUEADO'],
+      [
+        'PENDIENTE',
+        'EN_CURSO',
+        'POR_EMPACAR',
+        'EN_EMPAQUE',
+        'POR_ACONDICIONAR',
+        'EN_ACONDICIONAMIENTO',
+        'TERMINADO',
+        'ENTREGADO',
+        'CANCELADO',
+        'BLOQUEADO',
+      ],
       'work_queue',
       2,
       25,

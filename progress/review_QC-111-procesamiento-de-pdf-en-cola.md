@@ -139,7 +139,7 @@ hay dos conexiones compitiendo y el test no mediria nada. Tiene su entrada en
 En el nivel de la ruta, el caso «mismo mensaje dos veces» **no dobla `runDocumentJob`**: cablea el
 caso de uso REAL sobre un doble de repositorio que reproduce la semantica del `claim`, asi que «una
 sola llamada a la IA», «un solo `finish`» y «200 las dos veces» son afirmaciones sobre el dominio y
-no sobre un doble que ya las prometia. **El punto de `CHECKPOINTS.md > Datos y seguridad` sobre
+no sobre un doble que ya las prometia. **El punto de `docs/checkpoints-proyecto.md > Datos y seguridad` sobre
 webhooks idempotentes se cumple.**
 
 La alternativa descartada esta bien argumentada: una tabla de mensajes vistos haria dos afirmaciones

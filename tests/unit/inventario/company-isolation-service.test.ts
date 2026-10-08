@@ -178,7 +178,7 @@ function montar() {
       },
     ),
     // QC-92: sin caso en este archivo -es de otro modulo de reglas-, asi que dobles minimos.
-    adjustBatchStock: vi.fn<ProductRepository['adjustBatchStock']>(async () => null),
+    adjustBatchStock: vi.fn<ProductRepository['adjustBatchStock']>(async () => ({ kind: 'batch_not_found' })),
     findBatchesOfAliveProduct: vi.fn<ProductRepository['findBatchesOfAliveProduct']>(async () => []),
     findBatchMovements: vi.fn<ProductRepository['findBatchMovements']>(async () => null),
   } satisfies ProductRepository;

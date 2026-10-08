@@ -167,6 +167,18 @@ const ORDER_STATUS_BLOCKED_DOWN_STATEMENTS: readonly string[] = [
 ];
 const ORDERS_BLOCKED_INDEX_DOWN_STATEMENTS = plainStatementsOf(ORDERS_BLOCKED_INDEX_DOWN_SQL);
 
+// Las migraciones posteriores que tambien tocan `OrderStatus` se revierten antes, como en una
+// reversion real.
+const LATER_DOWNS: readonly string[] = [
+  '_order_terminated_finished_index',
+  '_order_conditioning_states',
+].flatMap((suffix) => {
+  const sql = readFileSync(join(locateMigrationDir(suffix, suffix), 'down.sql'), 'utf8');
+  if (!sql.includes('END $$;')) return plainStatementsOf(sql);
+  const block = extractAbortBlock(sql);
+  return [block, ...plainStatementsOf(sql.slice(sql.indexOf(block) + block.length))];
+});
+
 async function applyStatements(tx: Prisma.TransactionClient, statements: readonly string[]): Promise<void> {
   for (const statement of statements) {
     await tx.$executeRawUnsafe(statement);
@@ -277,8 +289,9 @@ describe('down.sql de order_status_blocked, con y sin pedidos BLOQUEADO', () => 
       expect(await tx.order.count({ where: { status: 'BLOQUEADO' } })).toBe(0);
       expect(await indexExists(tx, 'orders_blocked_company_created_idx')).toBe(true);
 
-      // Orden de una reversion real: primero el DOWN de la migracion posterior
-      // (orders_blocked_index), despues el de order_status_blocked.
+      // Orden de una reversion real: primero los DOWN de las migraciones posteriores, despues
+      // el de order_status_blocked.
+      await applyStatements(tx, LATER_DOWNS);
       await applyStatements(tx, ORDERS_BLOCKED_INDEX_DOWN_STATEMENTS);
       expect(await indexExists(tx, 'orders_blocked_company_created_idx')).toBe(false);
 

@@ -67,6 +67,8 @@ export const ERROR_MESSAGE_KEY = {
   order_packing_taken: 'errors.order_packing_taken',
   order_not_packable: 'errors.order_not_packable',
   order_produced_frozen: 'errors.order_produced_frozen',
+  order_conditioning_taken: 'errors.order_conditioning_taken',
+  order_not_conditionable: 'errors.order_not_conditionable',
   order_would_block: 'errors.order_would_block',
   order_blocked: 'errors.order_blocked',
   order_without_distribution: 'errors.order_without_distribution',
@@ -75,6 +77,8 @@ export const ERROR_MESSAGE_KEY = {
   order_without_unit: 'errors.order_without_unit',
   recipe_version_under_review: 'errors.recipe_version_under_review',
   order_unit_not_convertible: 'errors.order_unit_not_convertible',
+  batch_stock_changed: 'errors.batch_stock_changed',
+  adjustment_reason_not_allowed: 'errors.adjustment_reason_not_allowed',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -175,6 +179,9 @@ export const ERROR_MESSAGES_ES = {
   'errors.order_not_packable': 'El pedido no esta en un estado que admita esa accion de empaque.',
   'errors.order_produced_frozen':
     'Un pedido ya producido conserva sus responsables tal como estaban.',
+  'errors.order_conditioning_taken': 'Otra persona esta acondicionando este pedido.',
+  'errors.order_not_conditionable':
+    'El pedido no esta en un estado que admita esa accion de acondicionamiento.',
   'errors.order_would_block':
     'No hay material suficiente para este pedido: si lo guardas, quedara bloqueado hasta que entre inventario.',
   'errors.order_blocked': 'Falta material: el pedido esta bloqueado y no se puede iniciar.',
@@ -190,4 +197,8 @@ export const ERROR_MESSAGES_ES = {
     'La versión elegida está por revisar: ajústala antes de usarla en un pedido.',
   'errors.order_unit_not_convertible':
     'La unidad del pedido no se puede convertir a la de algún insumo de la receta: revisa los insumos marcados en la tabla o elige otra unidad.',
+  'errors.batch_stock_changed':
+    'La existencia del lote cambio mientras ajustabas: revisa la diferencia y confirma de nuevo.',
+  'errors.adjustment_reason_not_allowed':
+    'Un aumento de existencia solo admite los motivos conteo fisico o error de carga.',
 } as const satisfies Record<ErrorMessageKey, string>;

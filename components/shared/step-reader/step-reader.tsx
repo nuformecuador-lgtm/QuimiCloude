@@ -66,7 +66,31 @@ export type StepReaderProps = {
   readonly finishLabel?: string;
   /** Mientras la accion de terminar esta en curso: evita enviarla dos veces. */
   readonly finishBusy?: boolean;
+  /** Paso de entrada, desde 1. Fuera de rango se recorta al primero o al ultimo. */
+  readonly initialStepPosition?: number;
+  /** Se llama tras cambiar de paso; no se llama si el paso no cambia. */
+  readonly onStepChange?: (change: {
+    direction: 'advance' | 'go_back';
+    position: number;
+  }) => void;
 };
+
+/**
+ * Posicion de entrada, desde 1, recortada a los pasos que hay; `null` si no hay pasos. Exportada
+ * para que quien registra la posicion mande la misma que se ve.
+ */
+export function clampStepPosition(
+  position: number | null | undefined,
+  stepsCount: number,
+): number | null {
+  if (stepsCount === 0) return null;
+  if (position === null || position === undefined || !Number.isFinite(position)) return 1;
+  return Math.min(Math.max(Math.trunc(position), 1), stepsCount);
+}
+
+function initialIndexFor(position: number | undefined, total: number): number {
+  return (clampStepPosition(position, total) ?? 1) - 1;
+}
 
 /** Clave de un item marcado. El paso entra en la clave: marcar en el paso 2 no marca en el 1. */
 function itemKey(stepIndex: number, blockIndex: number, itemIndex: number): string {
@@ -169,10 +193,12 @@ export function StepReader({
   mode = 'lectura',
   finishLabel = TEXTS.finish,
   finishBusy = false,
+  initialStepPosition,
+  onStepChange,
 }: StepReaderProps) {
   const isEjecucion = mode === 'ejecucion';
   const baseId = useId();
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(() => initialIndexFor(initialStepPosition, steps.length));
   const [checkedItems, setCheckedItems] = useState<ReadonlySet<string>>(() => new Set<string>());
   const [arrival, setArrival] = useState(0);
   const [waitedArrival, setWaitedArrival] = useState<number | null>(null);
@@ -253,6 +279,9 @@ export function StepReader({
       setArrival((previous) => previous + 1);
     }
     setIndex(next);
+    if (next !== currentIndex) {
+      onStepChange?.({ direction: 'go_back', position: next + 1 });
+    }
   }
 
   function goNext() {
@@ -262,6 +291,9 @@ export function StepReader({
       setArrival((previous) => previous + 1);
     }
     setIndex(next);
+    if (next !== currentIndex) {
+      onStepChange?.({ direction: 'advance', position: next + 1 });
+    }
   }
 
   function finish() {

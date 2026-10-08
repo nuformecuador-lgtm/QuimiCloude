@@ -33,6 +33,8 @@ import { createCreateProduct } from '@/lib/modules/inventario/domain/create-prod
 import { ActionNotAllowedError, ValidationError } from '@/lib/modules/inventario/domain/errors';
 import { prisma } from '@/lib/shared/db/prisma';
 
+import { countFromDelta } from '../../helpers/adjust-by-delta';
+
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 
@@ -323,11 +325,17 @@ describe('QC-195 — el envase como producto de inventario', () => {
       const [batch] = await batchesOf(id);
       if (batch === undefined) throw new Error('sin lote');
       await expect(
-        ajusteDeLote({ batchId: batch.id, delta: '1.5', reason: 'conteo_fisico' }, f.actor),
+        ajusteDeLote(
+          { batchId: batch.id, ...(await countFromDelta(batch.id, '1.5', { companyId: f.companyId })), reason: 'conteo_fisico' },
+          f.actor,
+        ),
       ).rejects.toBeInstanceOf(ValidationError);
       expect((await batchesOf(id))[0]?.stock.toFixed(4)).toBe('10.0000');
 
-      const ok = await ajusteDeLote({ batchId: batch.id, delta: '-3', reason: 'conteo_fisico' }, f.actor);
+      const ok = await ajusteDeLote(
+        { batchId: batch.id, ...(await countFromDelta(batch.id, '-3', { companyId: f.companyId })), reason: 'conteo_fisico' },
+        f.actor,
+      );
       expect(ok.stock).toBe('7.0000');
     } finally {
       await dropFixture(f);

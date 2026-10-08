@@ -22,6 +22,9 @@ export {
   type UpdateCustomerInput,
 } from './domain/customer-input';
 export { type NewCustomer, type CustomerView } from './domain/customer-view';
+// Servicio de solo lectura para otros modulos; lo implementa un adaptador driven y lo ata
+// `lib/composition`.
+export type { CustomerCatalog, CustomerRef, CustomerRefSearch } from './domain/customer-catalog';
 
 // Las cinco factories de caso de uso. Los tipos `*Deps` viajan con ellas: quien las cablea es
 // `lib/composition`, y sin el tipo no podria declarar la dependencia.

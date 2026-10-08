@@ -117,6 +117,16 @@ export interface OrderWriteRepository {
    *  que el usuario deba ver en esa columna. */
   setReservedAt(id: string, reservedAt: Date | null, scope: OrderScope): Promise<void>;
 
+  /** Escribe SOLO `customer_id`, `updated_by` y `updated_at` del pedido vivo: ni el estado, ni el
+   *  coste, ni la cantidad, ni lo apartado. `customerId` `null` quita el cliente. */
+  setCustomerAlive(
+    id: string,
+    customerId: string | null,
+    actorId: string,
+    now: Date,
+    scope: OrderScope,
+  ): Promise<'ok' | 'not_found'>;
+
   /** `updateOrderPresentationLines`: escribe SOLO la unidad y el
    *  reparto, nunca `quantity`, la receta ni la prioridad -eso es `updateAlive`, del formulario
    *  general-. Reemplazo completo del conjunto de lineas, igual que `updateAlive`. */

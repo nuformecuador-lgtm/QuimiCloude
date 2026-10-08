@@ -461,10 +461,13 @@ describe.each(VIEWPORTS)('pantalla de usuarios en viewport %s (%i px)', (_nombre
         contenedor.contains(celda),
         `el correo de ${usuario.id} se sale del desplazador a ${ancho}px`,
       ).toBe(true);
-      expect(celda.textContent?.trim().length, `el correo de ${usuario.id}`).toBeGreaterThan(0);
-      // Y no se corta con puntos suspensivos ni se oculta: se alcanza desplazando la tabla.
+      // El recorte con puntos suspensivos es solo visual: el correo entero sigue en la celda.
+      expect(celda.textContent?.trim(), `el correo de ${usuario.id}`).toBe(usuario.email);
+      expect(clases(celda), `la celda de correo de ${usuario.id} a ${ancho}px`).toContain(
+        'text-ellipsis',
+      );
+      // Recortarse no es ocultarse: la celda nunca desaparece.
       for (const clase of clases(celda)) {
-        expect(clase, `la celda de correo ${clase} a ${ancho}px`).not.toBe('overflow-hidden');
         expect(clase, `la celda de correo ${clase} a ${ancho}px`).not.toBe('hidden');
       }
     }

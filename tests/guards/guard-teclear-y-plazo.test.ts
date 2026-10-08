@@ -8,7 +8,7 @@
 // Vive en `tests/guards/` a proposito. `./init.sh --rapido` selecciona por GRAFO DE IMPORTS, y
 // ningun grafo llega ni a `vitest.config.mts` ni a un archivo de test que nadie importa: sin
 // esta guardia las dos mitades se podrian deshacer sin que el gate dijera nada. Es el agujero
-// que describe `docs/verification.md > Las guardias van SIEMPRE`.
+// que describe `docs/gate.md > Las guardias van SIEMPRE`.
 //
 // Patron, helpers de lectura y normalizado de separadores de Windows: copiados de
 // `tests/guards/guard-editor-aislado.test.ts`.

@@ -40,6 +40,7 @@ import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventar
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
+import { fakeCustomerCatalog } from '../../helpers/customer-catalog-double';
 
 const EMPRESA = '33333333-3333-4333-8333-333333333333'
 const OTRA_EMPRESA = '44444444-4444-4444-8444-444444444444'
@@ -84,6 +85,7 @@ function filaConEmpresa(): OrderRow {
     companyId: EMPRESA,
     presentationLines: [],
     unitId: null,
+    customerId: null,
   }
   return row as OrderRow
 }
@@ -219,15 +221,16 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
       findRefs: vi.fn(async () => [{ id: PRESENTACION, name: 'Bidon 20L' }]),
     } as unknown as PresentationCatalog
 
-    const ficha = await createGetOrder({ orders, recipes, presentations, packaging: fakePackagingCatalog(), units })(PEDIDO, ACTOR)
+    const ficha = await createGetOrder({ customerCatalog: fakeCustomerCatalog(), orders, recipes, presentations, packaging: fakePackagingCatalog(), units })(PEDIDO, ACTOR)
     const lista = await createListOrders({
+      customerCatalog: fakeCustomerCatalog(),
       orders,
       recipes,
       presentations, packaging: fakePackagingCatalog(),
       units,
       log: { ignoredFields: vi.fn() },
     })({ page: 1 }, ACTOR)
-    const alta = await createCreateOrder({ recipes, products, units, presentations, packaging: fakePackagingCatalog(), unitOfWork })(
+    const alta = await createCreateOrder({ customerCatalog: fakeCustomerCatalog(), recipes, products, units, presentations, packaging: fakePackagingCatalog(), unitOfWork })(
       { recipeId: RECETA, quantity: '10.0000', unitId: UNIDAD },
       ACTOR,
     )

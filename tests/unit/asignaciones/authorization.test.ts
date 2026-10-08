@@ -584,10 +584,28 @@ describe('QC-168 — `getPackingOrder` (R13, R17)', () => {
   });
 });
 
+/**
+ * 2026-10-06 (QC-82): el empaque escribe dentro de la transaccion de ejecucion. Los dobles de la
+ * transaccion entregan el MISMO doble de empaque que miran las aserciones, y un registro que anota
+ * sin mas: lo que se comprueba aqui sigue siendo solo el permiso.
+ */
+function dentroDeLaTransaccion(packing: Record<string, unknown>): { log: unknown; transaction: unknown } {
+  const log = { append: vi.fn(async () => undefined), findLastStepPosition: vi.fn(async () => null) };
+  return {
+    log,
+    transaction: {
+      run: async (work: (writers: unknown) => Promise<unknown>) => work({ orders: {}, packing, log }),
+    },
+  };
+}
+
 describe('QC-168 — `startPacking` (R13, R18-R24)', () => {
   function montarDeps(): { deps: StartPackingDeps; startPackingAliveById: ReturnType<typeof vi.fn> } {
     const startPackingAliveById = vi.fn(async () => 'ok' as const);
-    const deps = { orders: { startPackingAliveById } } as unknown as StartPackingDeps;
+    const deps = {
+      orders: { startPackingAliveById },
+      ...dentroDeLaTransaccion({ startPackingAliveById }),
+    } as unknown as StartPackingDeps;
     return { deps, startPackingAliveById };
   }
 
@@ -633,6 +651,7 @@ describe('QC-168 — `finishPacking` (R13, R21-R24)', () => {
     const finishPackingAliveById = vi.fn(async () => ({ kind: 'ok' as const, finishedGoods: [] }));
     const deps = {
       orders: { findAliveById, listAliveSummariesByIds, finishPackingAliveById },
+      ...dentroDeLaTransaccion({ finishPackingAliveById }),
     } as unknown as FinishPackingDeps;
     return { deps, findAliveById, listAliveSummariesByIds, finishPackingAliveById };
   }

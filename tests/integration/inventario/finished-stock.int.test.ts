@@ -13,10 +13,10 @@ import { normalizeCompanyName } from '@/lib/modules/identity';
 import { createListFinishedStock } from '@/lib/modules/inventario/domain/list-finished-stock';
 import { listStockGroups } from '@/lib/modules/inventario/adapters/driven/persistence/finished-stock-prisma';
 import {
-  adjustBatchStock,
   findBatchesOfOrder,
   receiveFinishedGoods,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { adjustByDelta } from '../../helpers/adjust-by-delta';
 import { formatOrderNumber } from '@/lib/modules/pedidos';
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -198,7 +198,7 @@ async function sembrarLoteSinPedido(fixture: Fixture, productId: string, present
 }
 
 async function ajustar(fixture: Fixture, batchId: string, delta: string): Promise<void> {
-  await adjustBatchStock(batchId, delta, 'merma', fixture.empresa.userId, new Date(), fixture.scope);
+  await adjustByDelta(batchId, delta, 'merma', fixture.empresa.userId, new Date(), fixture.scope);
 }
 
 async function limpiar(fixture: Fixture): Promise<void> {

@@ -285,6 +285,12 @@ createListResponsibleCandidates(deps: { people: PeopleDirectory; now? })
    bloqueo vigente no. El service sigue rechazando a las inactivas al asignar
    (`user_not_assignable`) como segunda barrera.
 
+> **Enmienda 2026-10-08 (QC-177 D7).** El filtro de cuentas activas del paso 3 no venía en el spec
+> aprobado: lo añadió `0dbcd68f` (2026-09-28, user filter) fuera del flujo, junto con este paso. Se
+> conserva el comportamiento, pero `asignaciones` no nombra el estado de cuenta (QC-65 R19): la
+> llamada pasa el filtro con nombre `ACTIVE_ACCOUNTS_ONLY`, exportado por el contrato público de
+> `identity`. La lista cerrada de la guardia de alcance no cambia.
+
 **Cambio de comportamiento que se declara.** Hoy la lista de personas sale de `listUsersAction`,
 que exige `usuarios.consultar`, y sin ese permiso se degrada a vacía (QC-102). Con este caso de uso
 la lista depende solo de `asignaciones.modificar`, el permiso que ya decide si hay panel. Los

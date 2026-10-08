@@ -19,6 +19,7 @@ export {
   ROLE_OPERADOR,
   ROLE_EMPACADOR,
   ROLE_MAESTRO,
+  ROLE_ACONDICIONAMIENTO,
   SEED_ROLES,
 } from './domain/roles';
 // QC-74 T1 — el catalogo cerrado de permisos (R1, R2) y lo que el seed asigna a cada rol (R8, R9).
@@ -331,6 +332,7 @@ export {
 // `lib/composition`, el unico sitio que ata puerto -> implementacion (R47).
 // ---------------------------------------------------------------------------------------
 export type { PersonRef, PeopleDirectory, PeopleRefFilters } from './domain/people-directory';
+export { ACTIVE_ACCOUNTS_ONLY } from './domain/people-directory';
 export type { WorkGroupSnapshot, WorkGroupDirectory } from './domain/work-group-directory';
 
 // ---------------------------------------------------------------------------------------

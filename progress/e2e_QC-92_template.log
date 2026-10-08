@@ -1,6 +1,0 @@
-
-> quimicloude@0.1.0 db:test C:\Users\Cristian\Documents\trabajo\arc\labs\.worktrees\QC-92-ajuste-de-inventario
-> tsx scripts/test-db.ts "template"
-
-test-db: plantilla reutilizada: qct_tpl_5316b8e32d17 (las migraciones no han cambiado)
-✓ plantilla de esta rama: qct_tpl_5316b8e32d17 (34 migraciones)

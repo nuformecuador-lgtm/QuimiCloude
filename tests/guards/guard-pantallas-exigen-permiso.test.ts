@@ -244,6 +244,9 @@ function describir(infracciones: readonly Infraccion[]): string {
 // el alta y la edicion de una version de receta. Cada una llama a `requirePagePermission` UNA sola
 // vez -`recetas.consultar`-, mismo patron que `/produccion/formulas/[id]`: guardar lo autoriza el
 // caso de uso con `recetas.modificar`.
+//
+// TENSADA el 2026-10-06 (QC-209): de diecinueve a VEINTE, con `/inventario/importar`, que llama a
+// `requirePagePermission` UNA sola vez, con `inventario.modificar`.
 const RUTAS_ESPERADAS_HOY = [
   '/asignacion',
   '/asignacion/[id]',
@@ -254,6 +257,7 @@ const RUTAS_ESPERADAS_HOY = [
   '/configuracion/usuarios',
   '/dashboard',
   '/inventario',
+  '/inventario/importar',
   '/pedidos',
   '/produccion/formulas',
   '/produccion/formulas/[id]',
@@ -267,7 +271,7 @@ const RUTAS_ESPERADAS_HOY = [
 ].sort();
 
 describe('guardia — toda pantalla bajo app/(private)/ exige un permiso del catalogo (R6, R20)', () => {
-  it('el barrido encuentra exactamente las diecinueve pantallas privadas de hoy', () => {
+  it('el barrido encuentra exactamente las veinte pantallas privadas de hoy', () => {
     const rutas = [...listPrivatePages(repoRoot).map((pantalla) => pantalla.route)].sort();
 
     expect(rutas).toEqual(RUTAS_ESPERADAS_HOY);

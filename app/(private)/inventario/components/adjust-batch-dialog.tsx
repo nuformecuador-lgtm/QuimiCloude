@@ -29,11 +29,20 @@ import {
   type AdjustBatchStockFormState,
 } from '@/lib/modules/inventario/adapters/driving/batch-actions';
 import {
-  MOVEMENT_REASONS,
   PRODUCT_TYPES,
+  describeAdjustment,
+  isReasonAllowed,
+  reasonsFor,
+  type MovementReason,
   type ProductBatchView,
   type ProductType,
+  type StockAdjustmentReading,
 } from '@/lib/modules/inventario';
+import {
+  exactDecimalTitle,
+  formatDecimalDisplay,
+  trimDecimal,
+} from '@/lib/shared/ui/decimal-display';
 
 import { movementReasonLabel } from './batch-history';
 
@@ -41,7 +50,8 @@ const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base md:text-base';
 
 const BATCH_ID_FIELD = 'batchId';
-const DELTA_FIELD = 'delta';
+const COUNTED_STOCK_FIELD = 'countedStock';
+const SEEN_STOCK_FIELD = 'seenStock';
 const REASON_FIELD = 'reason';
 
 const DIALOG_TITLE = 'Ajustar existencia';
@@ -49,39 +59,44 @@ const CONFIRM_LABEL = 'Ajustar';
 const CONFIRM_PENDING_LABEL = 'Ajustando…';
 const CANCEL_LABEL = 'Cancelar';
 const ADJUST_SUCCESS = 'Existencia ajustada.';
-const ZERO_DELTA_MESSAGE = 'La cantidad no puede ser cero.';
+const RECORDED_STOCK_LABEL = 'Existencia registrada';
+const COUNTED_STOCK_LABEL = 'Total contado';
+const INCREASE_PREFIX = 'Aumento de';
+const DECREASE_PREFIX = 'Disminución de';
+const ZERO_DIFFERENCE_MESSAGE = 'El total contado es igual a la existencia registrada.';
+const INVALID_COUNT_MESSAGE = 'Escribe el total contado.';
 const MISSING_REASON_MESSAGE = 'Elegi un motivo.';
 const OVER_RESERVED_MESSAGE =
   'El lote queda sobre-reservado: hay pedidos sin cobertura completa.';
 const FINISHED_PRODUCT_NOTICE = 'Solo se admiten ajustes que restan.';
 const WHOLE_PACKAGES_MESSAGE = 'Escribe un número entero de envases.';
-const WHOLE_DELTA_PATTERN = /^-?\d{1,10}$/;
-
-/** Mismo patron que la action: el signo se conserva, hasta 4 decimales pasan. */
-const DECIMAL_DELTA_PATTERN = /^-?\d{1,10}(\.\d{1,4})?$/;
-
-/** Cero de cualquier forma decimal: `'0'`, `'0.0'`, `'-0.0000'`... todas son «no cambia nada». */
-const ZERO_DELTA_PATTERN = /^-?0+(\.0+)?$/;
+const WHOLE_COUNT_PATTERN = /^\d{1,10}$/;
 
 const INITIAL_STATE: AdjustBatchStockFormState = { status: 'idle' };
 
 /**
- * Deja en el campo solo lo que puede ser un decimal CON SIGNO: digitos, un signo menos al
- * principio y un punto, hasta 4 decimales -la escala de la columna-. La coma se convierte en
- * punto en vez de descartarse, igual que en `sanitizeCostInput` (`product-cost-amount.ts`): es el
- * separador del teclado en castellano y tirarla multiplicaria la cantidad por diez en silencio.
+ * Deja en el campo solo lo que puede ser un decimal sin signo: digitos y un punto, hasta 4
+ * decimales -la escala de la columna-. La coma se convierte en punto en vez de descartarse: es el
+ * separador del teclado en castellano y tirarla multiplicaria el total por diez en silencio.
  */
-function sanitizeDeltaInput(raw: string): string {
-  const negative = raw.trimStart().startsWith('-');
+function sanitizeCountedInput(raw: string): string {
   const onlyAmountCharacters = raw.replace(/,/g, '.').replace(/[^\d.]/g, '');
   const [whole = '', ...afterFirstDot] = onlyAmountCharacters.split('.');
 
   const hasDot = afterFirstDot.length > 0;
   const head = (whole === '' && hasDot ? '0' : whole).slice(0, 10);
-  const sign = negative ? '-' : '';
 
-  if (!hasDot) return `${sign}${head}`;
-  return `${sign}${head}.${afterFirstDot.join('').slice(0, 4)}`;
+  if (!hasDot) return head;
+  return `${head}.${afterFirstDot.join('').slice(0, 4)}`;
+}
+
+/** El motivo elegido sobrevive solo si el sentido nuevo lo admite; sin sentido, se conserva. */
+function keepAllowedReason(
+  reason: MovementReason | null,
+  reading: StockAdjustmentReading,
+): MovementReason | null {
+  if (reason === null || typeof reading === 'string') return reason;
+  return isReasonAllowed(reading.direction, reason) ? reason : null;
 }
 
 export type AdjustBatchDialogProps = {
@@ -101,9 +116,8 @@ export type AdjustBatchDialogProps = {
  * **Sin `canAdjust` el control no existe en el DOM**: el Operador, que solo tiene
  * `inventario.consultar`, no ve ni un boton deshabilitado. El defecto falla cerrado.
  *
- * La cantidad viaja **con signo** -lo que suma o lo que resta-, nunca el total nuevo del lote: eso
- * lo decide la action y el caso de uso, este componente solo evita el viaje redondo cuando la
- * cantidad es cero.
+ * Se escribe el total contado y viaja junto a la existencia que el usuario tenia delante: la
+ * diferencia que se muestra es solo informativa, la que se asienta la calcula el servidor.
  */
 export function AdjustBatchDialog({
   batch,
@@ -136,27 +150,48 @@ function AdjustBatchDialogContent({
   readonly onAdjusted?: () => void;
 }) {
   const fieldId = useId();
-  const deltaId = `${fieldId}-delta`;
+  const countedId = `${fieldId}-counted`;
+  const differenceId = `${fieldId}-difference`;
   const reasonLabelId = `${fieldId}-reason`;
   const errorId = `${fieldId}-error`;
   const zeroErrorId = `${fieldId}-zero-error`;
+  const countedErrorId = `${fieldId}-counted-error`;
   const reasonErrorId = `${fieldId}-reason-error`;
   const wholeErrorId = `${fieldId}-whole-error`;
 
   const router = useRouter();
   const [requestedOpen, setRequestedOpen] = useState(false);
   const [zeroError, setZeroError] = useState(false);
+  const [countedError, setCountedError] = useState(false);
   const [reasonError, setReasonError] = useState(false);
   const [wholeError, setWholeError] = useState(false);
-  const [delta, setDelta] = useState('');
+  const [counted, setCounted] = useState('');
+  const [seenStock, setSeenStock] = useState(batch.stock);
+  const [reason, setReason] = useState<MovementReason | null>(null);
   const [state, formAction, isPending] = useActionState(adjustBatchStockAction, INITIAL_STATE);
 
-  // El dialogo abierto se DERIVA del pedido del usuario y del resultado de la operacion, igual
-  // que en `delete-product-dialog.tsx`: evita el `setState` sincrono dentro de un efecto.
-  // Sobre-reservado es la unica excepcion: se queda abierto con el aviso a la vista hasta que el
-  // usuario lo cierra a proposito, en vez de desaparecer con el resto del exito.
-  const overReserved = state.status === 'success' && state.overReserved;
-  const open = requestedOpen && (state.status !== 'success' || overReserved);
+  // Al reabrir, el resultado de la vez anterior deja de pintarse sin tener que reiniciar la action.
+  const [dismissedState, setDismissedState] = useState<AdjustBatchStockFormState | null>(null);
+  const visibleState = state === dismissedState ? INITIAL_STATE : state;
+
+  // Ajuste durante el render, no en un efecto: la existencia nueva tiene que estar ya en el
+  // mismo render que pinta el rechazo, para que la diferencia y los motivos salgan recalculados.
+  const [handledState, setHandledState] = useState(state);
+  if (state !== handledState) {
+    setHandledState(state);
+    if (state.status === 'stock_changed') {
+      setSeenStock(state.currentStock);
+      setReason(keepAllowedReason(reason, describeAdjustment(state.currentStock, counted)));
+    }
+  }
+
+  const reading = describeAdjustment(seenStock, counted);
+  const adjustment = typeof reading === 'string' ? null : reading;
+  const availableReasons = adjustment === null ? [] : reasonsFor(adjustment.direction);
+
+  // Sobre-reservado se queda abierto con el aviso a la vista hasta que el usuario lo cierra.
+  const overReserved = visibleState.status === 'success' && visibleState.overReserved;
+  const open = requestedOpen && (visibleState.status !== 'success' || overReserved);
 
   useEffect(() => {
     if (state.status !== 'success') return;
@@ -165,35 +200,44 @@ function AdjustBatchDialogContent({
     onAdjusted?.();
   }, [state, router, onAdjusted]);
 
-  const error = state.status === 'error' ? state : undefined;
+  const error = visibleState.status === 'error' ? visibleState : undefined;
+  const stockChanged = visibleState.status === 'stock_changed' ? visibleState : undefined;
+
+  function handleCountedChange(raw: string) {
+    const next = sanitizeCountedInput(raw);
+    setCounted(next);
+    setReason(keepAllowedReason(reason, describeAdjustment(seenStock, next)));
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    const formData = new FormData(event.currentTarget);
-    const typedDelta = formData.get(DELTA_FIELD);
-    const reason = formData.get(REASON_FIELD);
+    const isZero = reading === 'zero';
+    const isInvalid = reading === 'invalid';
+    const isFractional = wholePackages && counted !== '' && !WHOLE_COUNT_PATTERN.test(counted);
+    const isMissingReason = adjustment !== null && reason === null;
 
-    const isZero =
-      typeof typedDelta === 'string' &&
-      DECIMAL_DELTA_PATTERN.test(typedDelta) &&
-      ZERO_DELTA_PATTERN.test(typedDelta);
-    const isMissingReason = typeof reason !== 'string' || reason.length === 0;
-    const isFractional =
-      wholePackages &&
-      typeof typedDelta === 'string' &&
-      typedDelta !== '' &&
-      !WHOLE_DELTA_PATTERN.test(typedDelta);
-
-    if (isZero || isMissingReason || isFractional) {
+    if (isZero || isInvalid || isFractional || isMissingReason) {
       event.preventDefault();
       setZeroError(isZero);
-      setReasonError(isMissingReason);
+      setCountedError(isInvalid);
       setWholeError(isFractional);
+      setReasonError(isMissingReason);
       return;
     }
     setZeroError(false);
-    setReasonError(false);
+    setCountedError(false);
     setWholeError(false);
+    setReasonError(false);
   }
+
+  const countedDescribedBy = [
+    adjustment === null ? '' : differenceId,
+    zeroError ? zeroErrorId : '',
+    countedError ? countedErrorId : '',
+    wholeError ? wholeErrorId : '',
+  ]
+    .join(' ')
+    .trim()
+    .replace(/\s+/g, ' ');
 
   return (
     <Dialog
@@ -201,10 +245,14 @@ function AdjustBatchDialogContent({
       onOpenChange={(next) => {
         setRequestedOpen(next);
         if (next) {
+          setDismissedState(state);
           setZeroError(false);
+          setCountedError(false);
           setReasonError(false);
           setWholeError(false);
-          setDelta('');
+          setCounted('');
+          setSeenStock(batch.stock);
+          setReason(null);
         }
       }}
     >
@@ -238,7 +286,18 @@ function AdjustBatchDialogContent({
             className="text-sm text-destructive"
             data-testid="adjust-batch-zero-error"
           >
-            {ZERO_DELTA_MESSAGE}
+            {ZERO_DIFFERENCE_MESSAGE}
+          </p>
+        ) : null}
+
+        {countedError ? (
+          <p
+            role="alert"
+            id={countedErrorId}
+            className="text-sm text-destructive"
+            data-testid="adjust-batch-counted-error"
+          >
+            {INVALID_COUNT_MESSAGE}
           </p>
         ) : null}
 
@@ -263,6 +322,17 @@ function AdjustBatchDialogContent({
             {MISSING_REASON_MESSAGE}
           </p>
         ) : null}
+
+        {stockChanged === undefined ? null : (
+          <p
+            role="alert"
+            className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
+            data-testid="adjust-batch-stock-changed"
+            data-code={stockChanged.code}
+          >
+            {stockChanged.message}
+          </p>
+        )}
 
         {overReserved ? (
           <p
@@ -297,49 +367,90 @@ function AdjustBatchDialogContent({
             defaultValue={batch.id}
             data-testid="adjust-batch-id"
           />
+          <input
+            type="hidden"
+            name={SEEN_STOCK_FIELD}
+            value={seenStock}
+            readOnly
+            data-testid="adjust-batch-seen-stock"
+          />
+
+          <dl className="flex flex-col gap-1">
+            <dt className="text-sm font-medium">{RECORDED_STOCK_LABEL}</dt>
+            <dd
+              title={exactDecimalTitle(seenStock)}
+              className="text-base"
+              data-testid="adjust-batch-recorded-stock"
+            >
+              {formatDecimalDisplay(seenStock)}
+            </dd>
+          </dl>
 
           <div className="flex flex-col gap-2">
-            <label htmlFor={deltaId} className="text-sm font-medium">
-              Cantidad
+            <label htmlFor={countedId} className="text-sm font-medium">
+              {COUNTED_STOCK_LABEL}
             </label>
             <Input
-              id={deltaId}
-              name={DELTA_FIELD}
+              id={countedId}
+              name={COUNTED_STOCK_FIELD}
               type="text"
               required
-              // `numeric` en iOS no trae el signo menos y el ajuste de envases puede restar. Sin
-              // `pattern`: la validacion nativa taparia el aviso propio de envases enteros.
-              inputMode={wholePackages ? 'text' : 'decimal'}
-              value={delta}
-              onChange={(event) => setDelta(sanitizeDeltaInput(event.currentTarget.value))}
+              // Sin `pattern`: la validacion nativa taparia los avisos propios del dialogo.
+              inputMode={wholePackages ? 'numeric' : 'decimal'}
+              autoComplete="off"
+              value={counted}
+              onChange={(event) => handleCountedChange(event.currentTarget.value)}
               className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
-              aria-describedby={
-                zeroError ? zeroErrorId : wholeError ? wholeErrorId : undefined
-              }
-              data-testid="adjust-batch-delta"
+              aria-invalid={zeroError || countedError || wholeError || undefined}
+              aria-describedby={countedDescribedBy === '' ? undefined : countedDescribedBy}
+              data-testid="adjust-batch-counted"
             />
+            {adjustment === null ? null : (
+              <p
+                id={differenceId}
+                aria-live="polite"
+                className="text-sm"
+                data-testid="adjust-batch-difference"
+                data-direction={adjustment.direction}
+              >
+                {adjustment.direction === 'increase' ? INCREASE_PREFIX : DECREASE_PREFIX}{' '}
+                {trimDecimal(adjustment.amount)}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">
             <span id={reasonLabelId} className="text-sm font-medium">
               Motivo
             </span>
-            <Select name={REASON_FIELD} items={MOVEMENT_REASONS.map((reason) => ({
-              label: movementReasonLabel(reason),
-              value: reason,
-            }))}>
+            <Select
+              name={REASON_FIELD}
+              value={reason}
+              onValueChange={(next, details) => {
+                // Base UI vacia el valor cuando su opcion deja de estar en la lista, incluso
+                // mientras el total esta a medio escribir; quien decide si el motivo sigue
+                // valiendo es `keepAllowedReason`.
+                if (next === null && details.reason === 'none') return;
+                setReason(next as MovementReason | null);
+              }}
+              disabled={adjustment === null}
+            >
               <SelectTrigger
                 aria-labelledby={reasonLabelId}
                 aria-describedby={reasonError ? reasonErrorId : undefined}
                 className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT}`}
                 data-testid="adjust-batch-reason"
               >
-                <SelectValue />
+                <SelectValue>
+                  {(value: MovementReason | null) =>
+                    value === null ? null : movementReasonLabel(value)
+                  }
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {MOVEMENT_REASONS.map((reason) => (
-                  <SelectItem key={reason} value={reason} data-testid="adjust-batch-reason-option">
-                    {movementReasonLabel(reason)}
+                {availableReasons.map((option) => (
+                  <SelectItem key={option} value={option} data-testid="adjust-batch-reason-option">
+                    {movementReasonLabel(option)}
                   </SelectItem>
                 ))}
               </SelectContent>

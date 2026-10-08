@@ -93,7 +93,7 @@ recomendó `QC-43 design.md > 3`.
   igual que las mutaciones.
 - La RLS de QC-33 sigue activa y forzada y **no autoriza nada** (R7): Prisma se conecta como dueño de
   las tablas. Es defensa en profundidad; el requisito lo cierra el test de servicio
-  (`CHECKPOINTS.md > Datos y seguridad`).
+  (`docs/checkpoints-proyecto.md > Datos y seguridad`).
 
 ### 2.2 El actor y los dos autores (R5, R6)
 

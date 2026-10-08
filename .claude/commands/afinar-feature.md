@@ -22,6 +22,12 @@ Para, di por qué y no escribas nada si:
 
 - La ficha **no existe en `feature_list.json`**. Las features nacen en el board y entran por F0
   (`docs/jira.md`). Créala allí primero.
+- La ficha tiene **assignee de otra persona**. No es tuya: quien la tiene es quien la acota
+  (`docs/equipo.md > Tomar una feature`).
+- La ficha **no está tomada por ti** (sin worktree en `.worktrees/<key>-<slug>/`). Lo que este
+  comando siembra es de la rama de la feature (`docs/equipo.md > Qué estado es de quién`):
+  tómala antes (`AGENTS.md > F1.0`) o para. Puedes conversar el alcance sin tomarla, pero no
+  escribes nada.
 - La ficha está en `spec_ready`, `in_progress` o `done`. **El spec ya existe y no se pisa.** Si
   hay que cambiar algo, es una revisión del spec por F1.2, no un sembrado.
 - Ya existe `specs/<key>-<slug>/requirements.md`. **No se sobrescribe.** Ofrece añadir filas a su
@@ -31,13 +37,15 @@ Para, di por qué y no escribas nada si:
 
 Lee lo necesario para saber qué está ya decidido. No asumas:
 
-- `feature_list.json`: la ficha entera — `description` (el único campo que escribe el humano),
-  `zone`, `complexity`, `depends_on`, `epic`.
+- `feature_list.json`: **solo esa ficha**, consultada por `key` (`docs/lectura.md`; el archivo
+  no se lee entero) — `description` (el único campo que escribe el humano), `zone`,
+  `complexity`, `depends_on`, `epic`, `assignee`.
 - `docs/architecture.md`: `> Dominio`, `> Preguntas abiertas del dominio` (las cuatro que son
   caras de meter después), el patrón de capas y `> Dependencias de terceros`.
 - `docs/conventions.md` y `CHECKPOINTS.md`.
-- `progress/current.md > Evaluaciones` y `> Deudas y cosas abiertas`. **Si la ficha ya tiene
-  encargos o preguntas abiertas anotadas ahí, son la entrada del paso 3: no las reinventes.**
+- `progress/features/<key>.md` (`> Evaluación`, `> Decisiones`, `> Preguntas abiertas`) y
+  `grep "<key>" progress/deudas.md`. **Si la ficha ya tiene encargos o preguntas abiertas
+  anotadas ahí, son la entrada del paso 3: no las reinventes.**
 - **Precedentes.** Las decisiones ya cerradas en los specs escritos (`specs/4-*`, `specs/10-*`,
   `specs/11-*`). **Búscalas por `grep -i "decisiones cerradas"`, no por un heading exacto: el
   formato ya diverge.** La 11 usa `## Decisiones cerradas (no reabrir)` con tabla; la 4 usa
@@ -46,6 +54,9 @@ Lee lo necesario para saber qué está ya decidido. No asumas:
   en inglés.
   Lo que ya se decidió una vez **no se vuelve a preguntar**: se propone como heredado, citando de
   qué feature viene, y solo se pregunta si esta feature tiene un motivo concreto para apartarse.
+- **Lo que ya existe.** Busca en el board, en `specs/` y en el código, como manda
+  `docs/specs.md > Antes de especificar: lo que ya existe`. **Si aparece algo, es la primera
+  pregunta del paso 3** y es bloqueante: no se siembra hasta que el humano decida.
 
 ## Paso 2 — Checklist de ejes de ambigüedad
 
@@ -83,11 +94,11 @@ aparecido en los specs de este repo, no de una lista genérica.
     `specs/11-*/tasks.md` existe por esto; sin ella, la 11 habría vuelto a montar shadcn y Vitest
     — que es exactamente el choque que sí ocurrió entre la 4 y la 10.
 12. **Permiso y rol**: ¿quién puede? La autorización se valida **en el service**
-    (`docs/architecture.md > Acceso a datos y autorizacion`) y `CHECKPOINTS.md` exige su test.
+    (`docs/architecture.md > Acceso a datos y autorizacion`) y `docs/checkpoints-proyecto.md > Datos y seguridad` exige su test.
 
 ### Verificación y coste (siempre)
 
-13. **¿Hace falta E2E?** `CHECKPOINTS.md` lo pide para flujos críticos (autenticación, permisos,
+13. **¿Hace falta E2E?** `CHECKPOINTS.md` lo pide para flujos críticos (`docs/checkpoints-proyecto.md > Flujos criticos`: autenticación, permisos,
     movimientos de inventario, importes, webhooks). Si se difiere, **se difiere aquí y con
     motivo**, no al final.
 14. **¿Librería o a mano?** Regla 7 de `CLAUDE.md` y la lección más cara del repo: la primera
@@ -140,15 +151,18 @@ ninguna aplica, salta al paso 6.
 Para cualquiera de las tres: redacta el valor nuevo, muéstralo, y **con un sí explícito
 escríbelo en el issue** con las herramientas MCP de `atlassian`. Recién entonces siembras.
 
+- **Antes de crear una ficha, búscala** en el board con la JQL de `docs/specs.md > Antes de
+  especificar: lo que ya existe`. Si ya existe, no se crea: «Lo que NO entra» cita la existente.
 - **Una ficha nueva se crea completa o no se crea:** en el proyecto que declara
-  `jira.project` en `feature_list.json` —no en uno elegido por contexto—, tipo `Tarea`,
+  `arnes.config.json > jira.project` —no en uno elegido por contexto—, tipo `Tarea`, sin
+  assignee,
   `parent` puesto a la épica del módulo, el link **«is blocked by»** hacia lo que la bloquea, y los labels del contrato
   (`sdd`, `slug:<kebab-case>`, `zone:<...>`, más `complexity:<...>` **solo si la acotación ya
   lo sabe**; si no, se deja fuera y lo asigna el leader en F1.0). Una ficha a medias es peor
   que ninguna: F0 la importa igual y aterriza en el backlog sin slug ni zona.
-  **No la siembras.** Nace `pending` en Backlog y se acota cuando le toque, con su propia
+  **No la siembras.** Nace en el estado de `pending` (según `jira.estados`) y se acota cuando le toque, con su propia
   corrida de este comando.
-- **Una ficha huérfana se mueve a *Cancelado*** (`status: cancelled`), con un comentario en el
+- **Una ficha huérfana se mueve al estado de `cancelled`** (según `jira.estados`), con un comentario en el
   issue que diga por qué y qué ficha la absorbe. **Nunca se borra.**
 - **Si el humano dice que no: no siembres.** Un spec construido sobre un alcance que la tarjeta
   contradice es la divergencia que `docs/jira.md` existe para evitar. Para y dilo.
@@ -164,7 +178,7 @@ El porqué, la tabla de los cuatro campos y el incidente que originó esta regla
 
 ## Paso 6 — Sembrar, tras el sí
 
-Crea `specs/<key>-<slug>/requirements.md` con esta estructura, que es la que ya usa
+Crea `specs/<key>-<slug>/requirements.md`, **en el worktree de la feature**, con esta estructura, que es la que ya usa
 `specs/11-layout-privado-con-sidebar/requirements.md`:
 
 > `# <key> — <slug> · requirements.md`
@@ -184,21 +198,23 @@ Crea `specs/<key>-<slug>/requirements.md` con esta estructura, que es la que ya 
 
 Después, en este orden:
 
-- **Refleja en `feature_list.json` lo que acabas de escribir en el board**, y solo eso: la ficha
+- **Refleja en `feature_list.json` (la copia local, en la raíz del worktree principal) lo que
+  acabas de escribir en el board**, y solo eso: la ficha
   acotada más las que el paso 5 creó o canceló. **No reimportes el board entero** — eso es F0, y
   un comando de acotación no tiene por qué reescribir fichas `in_progress` que no está tocando.
   Los campos se derivan como manda `docs/jira.md > El contrato de campos`: `name` del label
   `slug:`, `branch` como `feature/<key>-<slug>`, `spec_path` como `specs/<key>-<slug>`, `epic`
-  del `parent` y `epic_name` de su summary. Una ficha nueva entra con `status: "pending"`. Si el
+  del `parent` y `epic_name` de su summary. Una ficha nueva entra con `status: "pending"` y
+  `assignee: null`. Si el
   paso 5 no escribió nada en el board, aquí tampoco se escribe nada.
-- Añade **una línea** en `progress/current.md > Evaluaciones` apuntando al archivo. **No copies la
-  tabla**: una es la fuente, la otra enlaza.
+- Añade **una línea** en `progress/features/<key>.md > Decisiones` apuntando al archivo. **No
+  copies la tabla**: una es la fuente, la otra enlaza.
 - Si alguna respuesta cerró una de las cuatro preguntas abiertas del dominio, actualiza
   `docs/architecture.md > Preguntas abiertas del dominio`.
-- **No muevas de columna la ficha que estás acotando.** Sigue `pending` en Backlog y su `status`
+- **No muevas de estado la ficha que estás acotando.** Sigue `pending` y su `status`
   no cambia: quien lo mueve es el leader en F1.3. Los únicos empujones a Jira de este comando son
   los tres del paso 5: editar los cuatro campos, crear la ficha que falta y cancelar la huérfana.
-- Corre `./init.sh --rapido`.
+- Corre `./init.sh` (rápido por defecto) en el worktree de la feature y haz `git push`.
 
 Termina listando el archivo escrito y una línea de veredicto. No pegues el contenido completo en
 el chat.

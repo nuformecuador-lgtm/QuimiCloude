@@ -45,7 +45,7 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 70 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 74 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
       // 65 y no 60: entran `order_without_distribution`, `order_presentation_line_not_editable`,
       // `order_distribution_exceeds_quantity` y `order_without_unit` (QC-170) y
@@ -54,7 +54,9 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // solo entran personas con estado efectivo activo). 69 y no 68: entra `work_group_member_self`
       // (nadie puede meterse a si mismo en un grupo).
       // 70 y no 69: entra `order_unit_not_convertible` (QC-204).
-      expect(ERROR_CODES).toHaveLength(70)
+      // 72 y no 70: entran `batch_stock_changed` y `adjustment_reason_not_allowed`.
+      // 74 y no 72: entran `order_conditioning_taken` y `order_not_conditionable`.
+      expect(ERROR_CODES).toHaveLength(74)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -540,5 +542,32 @@ describe('QC-161 R41 — el nombre de usuario duplicado ya no se acota a la empr
     expect(errorMessage('duplicate_document')).toBe(
       'Ya existe un usuario con ese documento en la empresa.',
     )
+  })
+})
+
+describe('acondicionamiento — order_conditioning_taken y order_not_conditionable', () => {
+  it('R9, R13: order_conditioning_taken esta en el catalogo con su clave y su texto exactos', () => {
+    const codigos: readonly string[] = ERROR_CODES
+    expect(codigos).toContain('order_conditioning_taken')
+    expect(ERROR_MESSAGE_KEY.order_conditioning_taken).toBe('errors.order_conditioning_taken')
+    expect(errorMessage('order_conditioning_taken')).toBe('Otra persona esta acondicionando este pedido.')
+  })
+
+  it('R14: order_not_conditionable esta en el catalogo con su clave y su texto exactos', () => {
+    const codigos: readonly string[] = ERROR_CODES
+    expect(codigos).toContain('order_not_conditionable')
+    expect(ERROR_MESSAGE_KEY.order_not_conditionable).toBe('errors.order_not_conditionable')
+    expect(errorMessage('order_not_conditionable')).toBe(
+      'El pedido no esta en un estado que admita esa accion de acondicionamiento.',
+    )
+  })
+
+  it('R9, R14: sus textos no coinciden con los de empaque ni entre si', () => {
+    const tomado = errorMessage('order_conditioning_taken')
+    const noAcondicionable = errorMessage('order_not_conditionable')
+    expect(tomado).not.toBe(noAcondicionable)
+    expect(tomado).not.toBe(errorMessage('order_packing_taken'))
+    expect(noAcondicionable).not.toBe(errorMessage('order_not_packable'))
+    expect(noAcondicionable).not.toBe(errorMessage('invalid_transition'))
   })
 })

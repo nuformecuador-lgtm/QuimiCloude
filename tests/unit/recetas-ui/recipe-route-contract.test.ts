@@ -1281,6 +1281,11 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     expect(exportadas.sort()).toEqual(
       [
         'ASSIGNED_ORDERS_ROUTE',
+        // Alta el 2026-10-06: el nombre del parametro de consulta con el que la lista de pedidos
+        // asignados confirma una cancelacion (`?cancelado=<numero>`). No es una ruta ni una
+        // funcion de ruta ni apunta a ninguna URL del asistente de lectura. La lista sigue
+        // siendo CERRADA y por igualdad exacta.
+        'CANCELLED_ORDER_PARAM',
         'CREDENTIAL_SETUP_ROUTE',
         // Alta: la pantalla de clientes. No es una ruta ni una funcion de ruta del asistente de
         // lectura -no la marca el patron de arriba ni apunta a ninguna URL del asistente-.
@@ -1305,6 +1310,8 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'DELIVERED_ORDER_PRODUCT_PARAM',
         'FORGOT_PASSWORD_ROUTE',
         'FORMULAS_ROUTE',
+        // La pantalla de importar inventario: cuelga de /inventario, no del asistente de lectura.
+        'INVENTORY_IMPORT_ROUTE',
         'INVENTORY_ROUTE',
         'LOGIN_ROUTE',
         // No es una pantalla: el destino del login tras un corte de sesion, derivado de LOGIN_ROUTE.

@@ -29,7 +29,7 @@ ningún requisito habla de usuarios, permisos ni de la base de datos.
 
 Dos advertencias que valen para todo lo de abajo:
 
-- Varios requisitos son **sobre el propio gate**. `docs/verification.md > Cuando lo que verificas
+- Varios requisitos son **sobre el propio gate**. `docs/gate.md > Cuando lo que verificas
   es el gate mismo` avisa de que un check que no muerde es peor que uno que no existe, así que
   cada requisito de configuración lleva emparejado el requisito que exige demostrar que **falla**
   cuando debe fallar (R6, R11), no sólo que pasa.
