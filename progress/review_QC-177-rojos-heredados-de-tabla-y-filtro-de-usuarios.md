@@ -13,6 +13,7 @@ Revisado: `e19bac55..8603e94b` (commits `b2253536` y `8603e94b`) contra
 | `pnpm exec vitest run` sobre los 5 archivos del alcance + `list-responsible-candidates`, `data-table-scroll` y `product-display-name` | 8/8 archivos, 209 passed, 3 skipped. Los skips son previos (`ctx.skip` en `account-status-scope.test.ts:458/468`); el diff no añade ningún `.skip`, `.todo` ni `.only` |
 | `pnpm exec vitest run guard` | 53/53 archivos, 717 passed, 11 skipped |
 | `vitest related` sobre los archivos de producción | El barrel de `identity` arrastra casi toda la suite. Me fío de la salida del implementer: 3 rojos, todos en el baseline (QC-180, D33) |
+| `vitest related` (lo corrí yo, terminó después de la primera entrega) | 584 archivos: 8 fallan y 576 pasan; 11 tests fallan, 8786 pasan y 13 se saltan. 3 de los archivos rojos están en el baseline (`catalog-line.int`, `pantallas-exigen-permiso` y `recetas/module-contract`). Los otros 5 (`user-form`, `envase-en-inventario`, el caso «guardado rechazado» de `product-page`, `order-form-quote` y `order-form`) los volví a correr aislados: **5/5 en verde, 224 tests**. Fallan solo por la carga de la corrida masiva, no por el diff. No es hallazgo |
 | E2E | No corrido: la base local no tiene 3 migraciones de `dev` (lo indica el leader) |
 
 ## Checklist
