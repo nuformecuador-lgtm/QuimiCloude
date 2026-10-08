@@ -314,7 +314,7 @@ usan solo si además citan un estado de QC-215 en el nombre o van marcados «(QC
 | R16 | `tests/unit/asignaciones/start-conditioning.test.ts`; `tests/unit/asignaciones/finish-conditioning.test.ts` | «R16: entrada %s rechaza con invalid_input sin tocar ningun puerto» |
 | R17 | `tests/unit/identity/roles/acondicionamiento-rol.test.ts` (+ `tests/guards/guard-autorizacion-por-permiso.test.ts` en verde) | describe «R17 — solo el catalogo y los dos casos de uso del acondicionamiento nombran acondicionamiento.modificar»: «R17: el codigo solo aparece en el catalogo de permisos y en las dos rutas exactas abiertas»; «R17: cada caso de uso abierto exige el permiso con requirePermission, no lo nombra de pasada» |
 | R18 | `tests/unit/pedidos/order-cancellation.test.ts`; `tests/unit/pedidos/cancel-order.test.ts` | «R18: un pedido ${estado} es not_cancellable, sin cancelar ni liberar»; «R18, R30 (QC-215): no cancela un POR_ACONDICIONAR, un EN_ACONDICIONAMIENTO ni un TERMINADO, sin escribir ni liberar» |
-| R19 | `tests/unit/pedidos/delete-order.test.ts`; `tests/unit/pedidos/update-order.test.ts`; `tests/unit/pedidos/update-order-presentation-lines.test.ts` | «R19, R30 (QC-215): no borra un POR_ACONDICIONAR, un EN_ACONDICIONAMIENTO ni un TERMINADO, sin escribir ni liberar»; «R19, R30 (QC-215): POR_ACONDICIONAR, EN_ACONDICIONAMIENTO y TERMINADO -> `invalid_transition`, sin escribir»; «R19, R30 (QC-215): rechaza %s igual que EN_EMPAQUE, con not_editable, …» (ver la discrepancia not_editable / invalid_transition anotada arriba) |
+| R19 (texto D13) | `tests/unit/pedidos/delete-order.test.ts`; `tests/unit/pedidos/update-order.test.ts`; `tests/unit/pedidos/update-order-presentation-lines.test.ts` | Borrar -> `not_deletable`: «R19, R30 (QC-215): no borra un POR_ACONDICIONAR, un EN_ACONDICIONAMIENTO ni un TERMINADO, sin escribir ni liberar». Edición general -> `invalid_transition`: «R19, R30 (QC-215): POR_ACONDICIONAR, EN_ACONDICIONAMIENTO y TERMINADO -> `invalid_transition`, sin escribir». Edición acotada -> `order_presentation_line_not_editable`: «R19 (QC-215, D13): not_editable es el codigo order_presentation_line_not_editable, no invalid_transition»; «R19, R30 (QC-215, D13): rechaza %s como ENTREGADO, con not_editable (order_presentation_line_not_editable), sin escribir nada» |
 | R20 | `tests/unit/asignaciones/order-state.test.ts`; `tests/unit/asignaciones/list-order-responsibles.test.ts` | describe «QC-215 — los estados de acondicionamiento y TERMINADO congelan los responsables»: «R20, R30: asignar, quitar un grupo y desasignar sobre un ${status} rechazan con order_produced_frozen sin escribir»; «R20: los estados recorridos son todos, incluidos los de acondicionamiento y TERMINADO» |
 | R21 | `tests/unit/asignaciones/start-assigned-order.test.ts`; `tests/unit/asignaciones/finish-assigned-order.test.ts`; `tests/unit/asignaciones/get-assigned-order-execution.test.ts` | «R21, R30: ${estado} rechaza con el mismo error que EN_EMPAQUE, sin escribir»; «R21, R30 (QC-215): ${estado} rechaza con el mismo error que EN_EMPAQUE, sin escribir ni anotar»; «R21, R30: leer la ejecucion de un ${estado} rechaza con el mismo error que EN_EMPAQUE» |
 | R22 | `tests/unit/pedidos-ui/order-row-actions.test.tsx` | «R22: exactamente `ENTREGADO`, … `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO` y `TERMINADO` …»; «R22: %s es final y no acepta la edicion acotada de reparto»; «R22: con un pedido %s, editar, cancelar y eliminar deshabilitados, sin «Reparto y unidad» y con «Responsables» activa» |
@@ -331,6 +331,11 @@ usan solo si además citan un estado de QC-215 en el nombre o van marcados «(QC
 | R33 | `tests/unit/pedidos/order-catalog.test.ts`; `tests/unit/pedidos/qc145-estado-solo-planta.test.ts`; `tests/integration/pedidos/order-finished-at.int.test.ts` | «R33 (QC-215): ni a ENTREGADO ni a EN_CURSO escribe finishedAt»; «R33 (QC-215): order-prisma.ts tiene exactamente un bloque `data:` que nombra finishedAt, el de Terminar el acondicionamiento hacia TERMINADO»; describe «R33 (QC-215) — setAliveOrderStatus no escribe finished_at con ningun destino» |
 | R34 | E2E tocados: `e2e/empaque.spec.ts`, `e2e/envases-del-pedido.spec.ts`, `e2e/pasos-de-envasado.spec.ts`, `e2e/pedido-en-varias-presentaciones.spec.ts`, `e2e/pedidos-asignados.spec.ts`, `e2e/pedidos-terminados.spec.ts`, `e2e/producto-terminado.spec.ts` (+ esta tabla) | Aserciones ajustadas, sin spec nuevo. Ejecutados en T18: 7 specs, 30 passed |
 | R35 | `git diff --name-only origin/dev -- package.json pnpm-lock.yaml` | Salida vacía (exit 0); ver abajo |
+| R36 | `tests/unit/pedidos/set-order-customer.test.ts`; `tests/integration/pedidos/order-customer.int.test.ts` | describe «setOrderCustomer — los estados de cliente cerrado (QC-215 R36)»: «R36: en ${status}, %s da action_not_allowed sin tocar el catalogo, la unidad de trabajo ni la escritura»; «R36: un pedido que no existe sigue dando order_not_found, no action_not_allowed»; «R36: si el pedido pasa a %s entre la lectura y el candado, action_not_allowed sin escribir»; «QC-215 R36: en $status, mismo cliente, quitar y cliente nuevo dan action_not_allowed sin tocar ninguna fila» |
+| R37 | `tests/unit/pedidos/set-order-customer.test.ts`; `tests/integration/pedidos/order-customer.int.test.ts` | describe «setOrderCustomer — en los estados de cliente abierto (R14 enmendada, R15, QC-215 R37)»: «R37: CUSTOMER_EDITABLE_STATUSES son los ocho estados abiertos, sin ENTREGADO ni CANCELADO»; «R37 R15: en %s acepta el cambio; bloquea la fila y solo escribe setCustomerAlive(id, cliente, actor, ahora, scope)»; «R37: en %s tambien se quita el cliente, sin consultar el catalogo ni ninguna otra escritura»; «R14, R15, QC-215 R37: en $status, solo cambian customer_id, updated_by y updated_at; estado, finished_at, packed_by, conditioned_by y los libros no cambian» |
+| R38 | `tests/unit/pedidos/update-order.test.ts` | describe «QC-215 R38 — la edicion de solo cliente en un estado sin edicion general»: «R38: en %s, solo cambiar el cliente -> invalid_transition, sin consultar el catalogo de clientes ni escribir»; «R38 (control): en %s la misma entrada es de solo cliente y va por el atajo: solo setCustomerAlive» |
+| R39 | `tests/unit/pedidos-ui/order-row-actions.test.tsx`; `tests/unit/pedidos-ui/order-customer-dialog.test.tsx` | «R39: los diez estados del contrato quedan repartidos entre abiertos y cerrados»; «R39: con canEditCustomer aparece y esta habilitada en %s»; «R39: con canEditCustomer aparece deshabilitada en %s y pulsarla no emite»; «R39: sin canEditCustomer no aparece en %s»; «R39: solo se monta mientras esta abierto, y la accion lo abre en un pedido TERMINADO, cerrado a la edicion» |
+| R40 | `e2e/pedido-con-cliente.spec.ts` | «R40(c) — en un pedido CANCELADO la accion «Cliente» esta deshabilitada y el cliente no cambia (R39)». Ejecutado en T24: `8 passed (1.4m)` (Chromium y WebKit). Sin spec E2E nuevo |
 
 Salida real de R35:
 
@@ -353,16 +358,34 @@ asignados» y la revisión que desbloquea `BLOQUEADO`). Los e2e de R34 siguen si
    Duration  14.91s
 ```
 
+### Corrida de los tests unit de R19 y R36–R40 (T25)
+
+Mapa verificado con Grep: cada caso de R19 y R36–R40 existe con ese nombre en el archivo indicado.
+Ningún FALTA. Una sola invocación de `pnpm exec vitest run` con los 6 archivos unit (sin .int ni e2e):
+`delete-order.test.ts`, `update-order.test.ts`, `update-order-presentation-lines.test.ts`,
+`set-order-customer.test.ts`, `order-row-actions.test.tsx`, `order-customer-dialog.test.tsx`.
+
+```
+ Test Files  6 passed (6)
+      Tests  226 passed (226)
+   Duration  23.47s
+```
+
+`./init.sh` NO se corrió: el humano lo sustituyó por CI en el PR #170 (OOM en local). El
+`.int` de R36/R37 (`order-customer.int.test.ts`, 8 passed) y el E2E de R40 (8 passed) se
+corrieron en T21 y T24; ver «Bloque 7».
+
 ## Cierre (2026-10-08)
 
 - Por OOM, el humano sustituyó `./init.sh` por typecheck + lint + tests concretos por tanda; el
   gate completo lo corre CI en el PR #170. T19 está marcada con esa salvedad.
 - Cerrado: T18 (7 E2E en verde, 30 passed; ver «T18 — E2E»).
-- Abierto: R19 en reparto y unidad: el código devuelve `not_editable`
-  (`order_presentation_line_not_editable`), no `invalid_transition` como dice R19; design § 2.4 no
-  lo cambia. Hay que corregir el texto de R19 o el código.
-- Abierto: el cambio de cliente de QC-156 (su R14) se admite también en los 3 estados nuevos;
-  ningún spec lo cubre.
+- Resuelto por D13 (T20): la discrepancia de R19 en reparto y unidad. El texto de R19 se corrigió:
+  la edición acotada rechaza con `order_presentation_line_not_editable`; la general sigue con
+  `invalid_transition`. Ver la fila R19 del mapa.
+- Resuelto por D14 (T21–T24): el cambio de cliente en los estados nuevos. R37 lo admite en los ocho
+  estados abiertos (incluidos los de acondicionamiento y `TERMINADO`) y R36 lo rechaza en
+  `ENTREGADO`/`CANCELADO`. Ver las filas R36–R40 del mapa.
 - Ajeno: `tests/integration/proveedores/catalog-line.int.test.ts` (R32) falla en local (shape del
   error de Prisma); dev lo sacó del baseline en f2be3eb8 y la rama no tiene diff en `proveedores`.
 
@@ -418,3 +441,45 @@ Fecha: 2026-10-08. Sin commit. Grafo no usado (Grep/Read bastaron para 2 archivo
 - `pnpm exec vitest run guard`: `Test Files 55 passed (55)`, `Tests 742 passed | 11 skipped (753)` (incluida la guardia de ámbito de empresa).
 
 Veredicto: T20, T21 y T22 en verde y marcadas; quedan T23–T25 (UI, E2E, cierre).
+
+### Bloque 7 — UI (T23–T24)
+
+**Archivos:**
+- `app/(private)/pedidos/components/order-row-actions.tsx` (T23): mapa exhaustivo
+  `ORDER_STATUS_ACCEPTS_CUSTOMER_CHANGE: Record<OrderStatus, boolean>` (`false` solo en `ENTREGADO` y
+  `CANCELADO`); el item «Cliente» lleva `disabled: !ORDER_STATUS_ACCEPTS_CUSTOMER_CHANGE[status]`. No
+  se reutiliza `ORDER_STATUS_IS_FINAL`. Retirado el comentario «se puede cambiar en cualquier estado».
+- `tests/unit/pedidos-ui/order-row-actions.test.tsx` (T23): el bloque «la accion «Cliente»» pasa a
+  R39. Cubre el reparto de los diez estados, habilitada y emitiendo en los ocho abiertos (incluidos
+  `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO` y `TERMINADO`), `aria-disabled` y sin emitir en
+  `ENTREGADO`/`CANCELADO`, y ausente sin `canEditCustomer` en los diez.
+- `tests/unit/pedidos-ui/order-customer-dialog.test.tsx` (consecuencia de T23, fuera de la lista de
+  tasks): el caso «R32: … la accion lo abre en un pedido cerrado» usaba `CANCELADO`, que D14
+  deshabilita, y se puso rojo. Pasa a `TERMINADO` (cerrado a la edicion, abierto al cliente) y se
+  renombra a R39.
+- `e2e/pedido-con-cliente.spec.ts` (T24): el caso R40(c) cancela el pedido y luego afirma que
+  «Cliente» tiene `aria-disabled="true"`, que al pulsarla no se abre el dialogo, que la celda sigue
+  con el cliente original y que la fila en BD (cliente incluido) no cambia. Se quita la constante
+  `CUSTOMER_DIALOG_SUBMIT`, que ya no se usaba. No hay spec nuevo.
+
+**R → test:**
+
+| R | Test |
+|---|---|
+| R39 | `order-row-actions.test.tsx` «R39: los diez estados del contrato quedan repartidos…», «R39: con canEditCustomer aparece y esta habilitada en %s» (8), «R39: con canEditCustomer aparece deshabilitada en %s y pulsarla no emite» (2), «R39: sin canEditCustomer no aparece en %s» (10); `order-customer-dialog.test.tsx` «R39: … la accion lo abre en un pedido TERMINADO…» |
+| R40 | `e2e/pedido-con-cliente.spec.ts` «R40(c) — en un pedido CANCELADO la accion «Cliente» esta deshabilitada y el cliente no cambia (R39)» |
+
+**Salida real:**
+- `pnpm run typecheck`: `tsc --noEmit` sin errores.
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)`, todos ajenos (`order-service.test.ts`, etc.);
+  `eslint` sobre los 4 archivos tocados: `No issues found`.
+- `pnpm exec vitest related --run <order-row-actions.tsx> <order-row-actions.test.tsx> <order-customer-dialog.test.tsx>`:
+  `Test Files 1 failed | 41 passed (42)`, `Tests 1 failed | 719 passed (720)`. El rojo es
+  `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` («'/pedidos' se sirve con el permiso»),
+  que está en `tests/baseline-rojos.json`, así que es ajeno. Antes del ajuste de `order-customer-dialog.test.tsx`
+  había un segundo rojo, que sí venía de T23 y ya está corregido.
+- `pnpm exec vitest run order-customer-dialog.test.tsx order-row-actions.test.tsx`: `Test Files 2 passed (2)`, `Tests 56 passed (56)`.
+- `pnpm exec playwright test e2e/pedido-con-cliente.spec.ts --reporter=line`: `8 passed (1.4m)`
+  (4 casos × Chromium y WebKit), al primer intento.
+
+Veredicto: T23 y T24 en verde y marcadas. Queda T25 (cierre con `./init.sh`).

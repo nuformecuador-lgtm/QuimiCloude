@@ -167,18 +167,20 @@
   edición de solo cliente rechaza con `invalid_transition`, sin consultar el catálogo de clientes,
   en los estados sin edición general (`POR_EMPACAR`, `EN_EMPAQUE`, los de acondicionamiento,
   `TERMINADO`, `ENTREGADO`, `CANCELADO`). **Hecho cuando:** pasa. Depende de: —.
-- [ ] **T23.** `[P]` R39: `ORDER_STATUS_ACCEPTS_CUSTOMER_CHANGE` (`false` solo en `ENTREGADO` y
+- [x] **T23.** `[P]` R39: `ORDER_STATUS_ACCEPTS_CUSTOMER_CHANGE` (`false` solo en `ENTREGADO` y
   `CANCELADO`) y `disabled` en `app/(private)/pedidos/components/order-row-actions.tsx`. Test:
   `tests/unit/pedidos-ui/order-row-actions.test.tsx`, que cubre los diez estados (con «Cliente»
   habilitada en los de acondicionamiento y `TERMINADO`) y el caso sin `pedidos.modificar`. **Hecho
   cuando:** pasa. Depende de: —.
-- [ ] **T24.** R40: en `e2e/pedido-con-cliente.spec.ts`, el caso R40(c) pasa a afirmar que la acción
+- [x] **T24.** R40: en `e2e/pedido-con-cliente.spec.ts`, el caso R40(c) pasa a afirmar que la acción
   «Cliente» está deshabilitada en el `CANCELADO` y que su cliente no cambia. Ningún spec nuevo.
   **Hecho cuando:** `pnpm exec playwright test e2e/pedido-con-cliente.spec.ts` está en verde.
   Depende de: T21, T23.
-- [ ] **T25.** Ampliar el mapa `R<n> → test` de
+- [x] **T25.** Ampliar el mapa `R<n> → test` de
   `progress/impl_QC-215-estados-de-acondicionamiento.md` con R36–R40 y el R19 corregido. Después,
   `./init.sh`. **Hecho cuando:** está en verde. Depende de: T20–T24.
+  *Salvedad: `./init.sh` no se corrió en local (OOM); el humano lo sustituyó por CI en el PR #170.
+  Corridos los 6 unit del mapa de R19 y R36–R40: 226 passed.*
 
 ## Archivos esperados
 

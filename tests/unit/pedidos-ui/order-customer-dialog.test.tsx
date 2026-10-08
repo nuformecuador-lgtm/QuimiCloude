@@ -212,11 +212,11 @@ describe('dialogo «Cliente»', () => {
 });
 
 describe('montaje desde la fila', () => {
-  it('R32: solo se monta mientras esta abierto, y la accion lo abre en un pedido cerrado', async () => {
+  it('R39: solo se monta mientras esta abierto, y la accion lo abre en un pedido TERMINADO, cerrado a la edicion', async () => {
     const user = setupUser();
     render(
       <OrderRowSheetActions
-        order={pedido('CANCELADO')}
+        order={pedido('TERMINADO')}
         recipes={{ items: [], totalPages: 1 }}
         units={[]}
         bridge={null}

@@ -107,6 +107,21 @@ export function acceptsDistributionEdit(status: OrderStatus): boolean {
   return ORDER_STATUS_ACCEPTS_DISTRIBUTION_EDIT[status];
 }
 
+// No reutiliza `ORDER_STATUS_IS_FINAL`: los estados de acondicionamiento y `TERMINADO` cierran la
+// edicion pero siguen aceptando el cambio de cliente.
+const ORDER_STATUS_ACCEPTS_CUSTOMER_CHANGE: Readonly<Record<OrderStatus, boolean>> = {
+  PENDIENTE: true,
+  EN_CURSO: true,
+  POR_EMPACAR: true,
+  EN_EMPAQUE: true,
+  ENTREGADO: false,
+  CANCELADO: false,
+  BLOQUEADO: true,
+  POR_ACONDICIONAR: true,
+  EN_ACONDICIONAMIENTO: true,
+  TERMINADO: true,
+};
+
 export const ORDER_ACTION_DISTRIBUTION_TESTID = 'order-action-distribution';
 export const ORDER_ACTION_CUSTOMER_TESTID = 'order-action-customer';
 
@@ -183,13 +198,13 @@ export function OrderRowActions({
     },
   ];
 
-  // Sin `disabled`: el cliente se puede cambiar en cualquier estado.
   if (canEditCustomer) {
     items.push({
       key: 'customer',
       label: 'Cliente',
       icon: UserIcon,
       onSelect: () => onCustomer?.(order),
+      disabled: !ORDER_STATUS_ACCEPTS_CUSTOMER_CHANGE[order.status],
       testId: ORDER_ACTION_CUSTOMER_TESTID,
     });
   }

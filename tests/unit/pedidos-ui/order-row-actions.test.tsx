@@ -395,37 +395,61 @@ describe('QC-102 — la entrada propia «Responsables» (R24)', () => {
 });
 
 describe('la accion «Cliente»', () => {
-  it.each(ORDER_STATUS_VALUES)('R32: con canEditCustomer aparece y esta habilitada en %s', async (status) => {
-    render(<OrderRowActions order={pedido(status)} canEditCustomer />);
+  const CLIENTE_CERRADO = ['ENTREGADO', 'CANCELADO'] as const satisfies readonly OrderStatus[];
+  const CLIENTE_ABIERTO = ORDER_STATUS_VALUES.filter(
+    (status) => !(CLIENTE_CERRADO as readonly OrderStatus[]).includes(status),
+  );
+
+  it('R39: los diez estados del contrato quedan repartidos entre abiertos y cerrados', () => {
+    expect(ORDER_STATUS_VALUES).toHaveLength(10);
+    expect(CLIENTE_ABIERTO).toEqual([
+      'PENDIENTE',
+      'EN_CURSO',
+      'POR_EMPACAR',
+      'EN_EMPAQUE',
+      'BLOQUEADO',
+      'POR_ACONDICIONAR',
+      'EN_ACONDICIONAMIENTO',
+      'TERMINADO',
+    ]);
+  });
+
+  it.each(CLIENTE_ABIERTO)('R39: con canEditCustomer aparece y esta habilitada en %s', async (status) => {
+    const onCustomer = vi.fn();
+    render(<OrderRowActions order={pedido(status)} canEditCustomer onCustomer={onCustomer} />);
 
     abrirMenu();
 
     const item = await screen.findByTestId(ORDER_ACTION_CUSTOMER_TESTID);
     expect(item).not.toHaveAttribute('aria-disabled');
+    fireEvent.click(item);
+    expect(onCustomer).toHaveBeenCalledExactlyOnceWith(pedido(status));
   });
 
-  it('R32: cubre los diez estados del contrato', () => {
-    expect(ORDER_STATUS_VALUES).toHaveLength(10);
-  });
+  it.each(CLIENTE_CERRADO)(
+    'R39: con canEditCustomer aparece deshabilitada en %s y pulsarla no emite',
+    async (status) => {
+      const onCustomer = vi.fn(() => {
+        throw new Error('no se debe abrir el cambio de cliente de un pedido entregado o cancelado');
+      });
+      render(<OrderRowActions order={pedido(status)} canEditCustomer onCustomer={onCustomer} />);
 
-  it.each(ORDER_STATUS_VALUES)('R32: sin canEditCustomer no aparece en %s', async (status) => {
+      abrirMenu();
+
+      const item = await screen.findByTestId(ORDER_ACTION_CUSTOMER_TESTID);
+      expect(item).toHaveAttribute('aria-disabled', 'true');
+      fireEvent.click(item);
+      expect(onCustomer).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(ORDER_STATUS_VALUES)('R39: sin canEditCustomer no aparece en %s', async (status) => {
     render(<OrderRowActions order={pedido(status)} />);
 
     abrirMenu();
 
     await screen.findByTestId('order-action-edit');
     expect(screen.queryByTestId(ORDER_ACTION_CUSTOMER_TESTID)).toBeNull();
-  });
-
-  it('R32: pulsarla emite su enganche con la fila, tambien con el pedido cerrado', async () => {
-    const onCustomer = vi.fn();
-    const elPedido = pedido('ENTREGADO');
-    render(<OrderRowActions order={elPedido} canEditCustomer onCustomer={onCustomer} />);
-
-    abrirMenu();
-    fireEvent.click(await screen.findByTestId(ORDER_ACTION_CUSTOMER_TESTID));
-
-    expect(onCustomer).toHaveBeenCalledWith(elPedido);
   });
 
   it('va detras de «Responsables» y delante de «Reparto y unidad»', async () => {
