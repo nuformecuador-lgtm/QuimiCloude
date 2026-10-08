@@ -1,0 +1,84 @@
+# Despliegue a produccion: cada push a `prod` sube la punta a Vercel.
+#
+#   push a `prod`        -> despliegue de produccion
+#   workflow_dispatch    -> el mismo despliegue, a mano (para repetir uno que fallo)
+#
+# Por CLI y token, no con la integracion de Git de Vercel: la cuenta de Vercel tiene vinculada
+# otra cuenta de GitHub y el repo vive en otra, asi que Vercel no puede conectarse al repo.
+#
+# El build lo hace Vercel en remoto (`vercel deploy` sube el codigo y Vercel corre
+# `pnpm run build`, que aplica migraciones y seed solo en produccion: `scripts/build.mjs`). El
+# runner no instala dependencias ni construye nada: plan GRATUITO de GitHub, minutos contados.
+#
+# Secrets (Settings > Secrets and variables > Actions del repo): VERCEL_TOKEN (se crea en
+# vercel.com/account/tokens), VERCEL_ORG_ID y VERCEL_PROJECT_ID (los de `.vercel/project.json`).
+name: desplegar
+
+on:
+  push:
+    branches: [prod]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Un despliegue a la vez, y el que esta en curso NO se cancela: el build remoto aplica
+# migraciones sobre la base de produccion, y uno cortado a medias deja sin saber en que estado
+# quedo. El siguiente push espera su turno.
+concurrency:
+  group: desplegar-produccion
+  cancel-in-progress: false
+
+jobs:
+  desplegar:
+    name: desplegar
+    runs-on: ubuntu-latest
+    # El runner solo sube el codigo y espera a que Vercel termine el build remoto (migrate,
+    # generate, seed y `next build`). 15 min es techo de sobra para eso y corta un cuelgue de la
+    # CLI antes de que se coma los minutos del plan.
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Solo Node, sin pnpm ni `pnpm install`: la CLI va por `npx` y el build es remoto.
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Secrets de Vercel presentes
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          faltan=()
+          [ -n "$VERCEL_TOKEN" ] || faltan+=(VERCEL_TOKEN)
+          [ -n "$VERCEL_ORG_ID" ] || faltan+=(VERCEL_ORG_ID)
+          [ -n "$VERCEL_PROJECT_ID" ] || faltan+=(VERCEL_PROJECT_ID)
+          if [ "${#faltan[@]}" -gt 0 ]; then
+            echo "::error::Faltan secrets: ${faltan[*]}. Se crean en Settings > Secrets and variables > Actions del repo; el token sale de vercel.com/account/tokens y ORG/PROJECT de .vercel/project.json."
+            exit 1
+          fi
+
+      # Version fija: una CLI nueva publicada un dia cualquiera no cambia el despliegue sin que
+      # nadie lo decida. Se sube a mano, con su PR.
+      - name: vercel deploy --prod
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          # La CLI imprime la URL del despliegue en stdout y el progreso en stderr.
+          url=$(npx --yes vercel@63.1.0 deploy --prod --yes --token "$VERCEL_TOKEN")
+          echo "Desplegado: $url"
+          {
+            echo "## Despliegue a produccion"
+            echo
+            echo "$url"
+          } >> "$GITHUB_STEP_SUMMARY"
