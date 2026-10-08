@@ -75,8 +75,9 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           set -euo pipefail
-          # La CLI imprime la URL del despliegue en stdout y el progreso en stderr.
-          url=$(npx --yes vercel@63.1.0 deploy --prod --yes --token "$VERCEL_TOKEN")
+          # La CLI imprime la URL del despliegue en stdout y el progreso en stderr. El token lo lee
+          # de VERCEL_TOKEN en el entorno; por `--token` quedaria en la lista de procesos.
+          url=$(npx --yes vercel@63.1.0 deploy --prod --yes)
           echo "Desplegado: $url"
           {
             echo "## Despliegue a produccion"

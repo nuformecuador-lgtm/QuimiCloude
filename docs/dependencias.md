@@ -95,3 +95,15 @@
 | `tsx` | Ejecuta los scripts TypeScript de `scripts/` | heredada | 2026-09-01 | dev — Pendiente de auditoría |
 | `typescript` | Compilador (strict) | heredada | 2026-09-01 | dev — Pendiente de auditoría |
 | `vitest` | Runner de tests | heredada | 2026-09-01 | dev — Pendiente de auditoría |
+
+## Herramientas fuera de `package.json`
+
+- Herramientas de terceros que entran en el pipeline sin pasar por `package.json` (por `npx` en
+  CI, por ejemplo). La guardia no las ve: esta tabla es solo el acta.
+- La primera celda **no** va entre backticks sueltos, a propósito. La guardia cuenta como paquete
+  registrado toda fila cuya primera celda sea solo un nombre entre backticks, y uno que no esté en
+  `package.json` lo marcaría como fantasma.
+
+| Herramienta | Para qué | Estado | Fecha | Notas |
+| --- | --- | --- | --- | --- |
+| CLI de Vercel, `vercel@63.1.0` (por `npx`) | `.github/workflows/desplegar.yml`: `npx --yes vercel@63.1.0 deploy --prod` sube la punta de `prod` a Vercel, y el build es remoto. Lee el token de `VERCEL_TOKEN` en el entorno | **abierto**: falta la aprobación de la versión | 2026-10-08 | El humano eligió desplegar «con la CLI y un token» (`progress/features/QC-229.md > Decisiones`, 2026-10-08). La versión exacta no consta aprobada. Checks verificados contra el registro de npm el 2026-10-08: sin `deprecated`; `63.1.0` es `latest`, publicada el **2026-10-08** (07:20 UTC); **5.219.743** descargas semanales (2026-09-28 a 2026-10-04); licencia **Apache-2.0**; repositorio `github.com/vercel/vercel`, 5 maintainers. Versión fija: la guardia `tests/guards/guard-despliegue-produccion.test.ts` exige semver exacta. **Abierto:** `npx` resuelve las dependencias transitivas de la CLI sin lockfile, así que pueden cambiar entre dos despliegues con la misma versión. Además, la versión salió el mismo día en que se fijó (hubo tres releases ese día: `63.0.1`, `63.0.2` y `63.1.0`), y no lleva días en uso |

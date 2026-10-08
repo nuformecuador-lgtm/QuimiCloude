@@ -1,6 +1,7 @@
 // Guardia: el despliegue a produccion (`.github/workflows/desplegar.yml`) solo dispara en push a
 // `prod` y a mano, despliega con `--prod`, con una CLI de Vercel de version fija, con los tres
-// secrets y permisos minimos; y el build de package.json pasa por la guarda `scripts/build.mjs`.
+// secrets (comprobados antes de desplegar, y el token por entorno), permisos minimos y un solo
+// despliegue a la vez sin cancelar el que esta en curso; y el build de package.json pasa por la guarda `scripts/build.mjs`.
 //
 // Existe porque un descuido aqui no lo ve ningun otro test: un `pull_request` en el `on:`
 // desplegaria a produccion codigo sin revisar, un `vercel@latest` cambiaria el despliegue el dia
@@ -42,6 +43,18 @@ function bloque(yaml: string, clave: string): string[] {
   return lineas.slice(inicio + 1, fin).filter((l) => l.trim() !== '').map((l) => l.trim())
 }
 
+/** Los pasos del workflow, cada uno como su texto, partiendo por cada `- name:` / `- uses:`. */
+function pasos(yaml: string): string[] {
+  const trozos: string[] = []
+  for (const linea of yaml.split('\n')) {
+    if (/^\s*-\s+(name|uses):/.test(linea)) trozos.push(linea)
+    else if (trozos.length > 0) trozos[trozos.length - 1] += `\n${linea}`
+  }
+  return trozos
+}
+
+const SECRETS = ['VERCEL_TOKEN', 'VERCEL_ORG_ID', 'VERCEL_PROJECT_ID'] as const
+
 const yaml = sinComentarios(readFileSync(join(RAIZ, WORKFLOW), 'utf8'))
 
 describe(WORKFLOW, () => {
@@ -68,7 +81,7 @@ describe(WORKFLOW, () => {
   })
 
   it('lee los tres secrets de Vercel: sin uno, la CLI no sabe a que cuenta ni a que proyecto subir', () => {
-    for (const s of ['VERCEL_TOKEN', 'VERCEL_ORG_ID', 'VERCEL_PROJECT_ID']) {
+    for (const s of SECRETS) {
       expect(yaml, `falta secrets.${s}`).toMatch(new RegExp(`\\$\\{\\{\\s*secrets\\.${s}\\s*\\}\\}`))
     }
   })
@@ -76,6 +89,36 @@ describe(WORKFLOW, () => {
   it('permissions es solo `contents: read`: el despliegue no necesita escribir en el repo', () => {
     expect(bloque(yaml, 'permissions')).toEqual(['contents: read'])
     expect(yaml, 'ningun job amplia los permisos').not.toMatch(/^[ \t]+permissions:/m)
+  })
+
+  it('concurrency con grupo fijo y `cancel-in-progress: false` explicito: nunca dos `migrate deploy` a la vez ni uno cortado a medias', () => {
+    const conc = bloque(yaml, 'concurrency')
+    const grupo = conc.find((l) => l.startsWith('group:'))
+    expect(grupo, 'falta `concurrency.group`').toBeDefined()
+    expect(grupo, 'el grupo debe ser fijo: con `${{ }}` dos despliegues podrian caer en grupos distintos').toMatch(
+      /^group:\s*[\w.-]+$/,
+    )
+    expect(conc, 'hace falta `cancel-in-progress: false` escrito, no basta con omitirlo').toContain(
+      'cancel-in-progress: false',
+    )
+  })
+
+  it('antes de `vercel deploy`, un paso comprueba los tres secrets y sale con `exit 1` si falta alguno', () => {
+    const lista = pasos(yaml)
+    const despliegue = lista.findIndex((p) => /\bvercel@\S+\s+deploy\b/.test(p))
+    expect(despliegue, 'no se encontro el paso de `vercel deploy`').toBeGreaterThan(-1)
+    const comprobacion = lista.findIndex(
+      (p) =>
+        !/\bvercel@/.test(p) &&
+        /^\s*exit 1\s*$/m.test(p) &&
+        SECRETS.every((s) => new RegExp(`-n\\s+"\\$${s}"`).test(p)),
+    )
+    expect(comprobacion, 'falta el paso que comprueba con `-n` los tres secrets y hace `exit 1`').toBeGreaterThan(-1)
+    expect(comprobacion, 'la comprobacion de secrets debe ir antes del despliegue').toBeLessThan(despliegue)
+  })
+
+  it('el token no va por `--token`: la CLI lo lee de VERCEL_TOKEN y en la linea de comandos quedaria en la lista de procesos', () => {
+    expect(yaml).not.toMatch(/--token\b/)
   })
 
   it('no hay `vercel build` en el runner: el build es remoto, para no gastar minutos del plan', () => {

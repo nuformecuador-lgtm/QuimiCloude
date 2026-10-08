@@ -45,20 +45,36 @@ export function pasosDelBuild(env) {
   return { pasos: [...SIN_BASE], saltados: [...DE_BASE], motivo };
 }
 
-function main() {
-  const { pasos, motivo } = pasosDelBuild(process.env);
-  console.log(motivo);
+/**
+ * Corre los pasos del build en orden y para en el primero que falla.
+ * @param {Record<string, string | undefined>} env
+ * @param {(comando: string) => { status: number | null, error?: Error }} ejecutar
+ * @param {{ log: (linea: string) => void, error: (linea: string) => void }} salida
+ * @returns {number} el codigo de salida del build: 0 si todos los pasos salieron bien, el del
+ *   paso que fallo si no, y 1 si un paso no se pudo lanzar o salio sin codigo.
+ */
+export function ejecutarBuild(env, ejecutar, salida) {
+  const { pasos, motivo } = pasosDelBuild(env);
+  salida.log(motivo);
   for (const paso of pasos) {
-    console.log(`[build] ${paso}`);
-    // `shell: true`: en Windows los binarios de node_modules/.bin son `.cmd` y spawn sin shell
-    // no los encuentra.
-    const r = spawnSync(paso, { shell: true, stdio: 'inherit' });
+    salida.log(`[build] ${paso}`);
+    const r = ejecutar(paso);
     if (r.error) {
-      console.error(`[build] no se pudo lanzar \`${paso}\`: ${r.error.message}`);
-      process.exit(1);
+      salida.error(`[build] no se pudo lanzar \`${paso}\`: ${r.error.message}`);
+      return 1;
     }
-    if (r.status !== 0) process.exit(r.status ?? 1);
+    if (r.status !== 0) return r.status ?? 1;
   }
+  return 0;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  // `shell: true`: en Windows los binarios de node_modules/.bin son `.cmd` y spawn sin shell
+  // no los encuentra.
+  const codigo = ejecutarBuild(
+    process.env,
+    (paso) => spawnSync(paso, { shell: true, stdio: 'inherit' }),
+    { log: console.log, error: console.error },
+  );
+  process.exit(codigo);
+}
