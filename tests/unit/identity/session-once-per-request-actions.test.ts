@@ -301,6 +301,16 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
     },
   },
   {
+    // La accion captura los errores y devuelve un estado, asi que un `orderId` invalido no rompe
+    // la invocacion: lo que esta lista mide es cuantas veces se lee la sesion.
+    archivo: 'lib/modules/asignaciones/adapters/driving/execution-trace-actions.ts',
+    nombre: 'getExecutionTraceAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/asignaciones/adapters/driving/execution-trace-actions')
+      ).getExecutionTraceAction('no-es-un-uuid'),
+  },
+  {
     // La accion captura los errores y devuelve un estado, asi que una entrada invalida no rompe
     // el caso: lo que esta lista mide es cuantas veces se lee la sesion por invocacion.
     archivo: 'lib/modules/documentos/adapters/driving/document-upload-actions.ts',

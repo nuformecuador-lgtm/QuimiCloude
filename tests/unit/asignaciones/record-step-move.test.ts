@@ -58,7 +58,13 @@ function montar(options?: {
   const deps: RecordStepMoveDeps = {
     assignments: { listOrderIdsByUserInCompany } as unknown as OrderAssignmentRepository,
     orders: { findAliveById } as unknown as OrderCatalog,
-    log: { append, findLastStepPosition } satisfies ExecutionLogRepository,
+    log: {
+      append,
+      findLastStepPosition,
+      listExecutedOrderIds: vi.fn(async () => []),
+      listEntriesForOrders: vi.fn(async () => []),
+      listUserIdsWithEntries: vi.fn(async () => []),
+    } satisfies ExecutionLogRepository,
     now: () => AHORA,
   };
   return { deps, listOrderIdsByUserInCompany, findAliveById, append, findLastStepPosition };

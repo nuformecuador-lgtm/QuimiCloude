@@ -2,8 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { PERMISSIONS } from '@/lib/modules/identity';
-import { HIDDEN_DASHBOARD_NAV_ITEM } from '@/lib/shared/navigation/private-nav';
-import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
+import { PRIVATE_NAV_ITEMS, type NavLink } from '@/lib/shared/navigation/private-nav';
+import { DASHBOARD_ROUTE, executionTraceRoute } from '@/lib/shared/routes';
 
 /**
  * Contrato de la ruta del dashboard: R1, R6, R7, R8, R9, R10, R11 y R12
@@ -14,6 +14,12 @@ import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
  * invisible renderizando: si manana la pantalla empezase a leer cookies o a redirigir, ningun
  * assert de DOM se pondria rojo. Mismo patron que las guardias de
  * `tests/unit/private-layout.test.tsx`.
+ *
+ * Nota del 2026-10-08 (QC-167 T12, R20, R25): el area se rellena con la lista del recorrido y
+ * nace la pagina de detalle. R6, R7 y R8 siguen aplicandose enteros a `page.tsx` y
+ * `dashboard-content.tsx`, porque la consulta vive en la seccion y no en ellos; la seccion, la
+ * tabla y el detalle entran en las fuentes vigiladas por `100vh` / `hover`, y la ruta del detalle
+ * se deriva de `executionTraceRoute`.
  */
 
 const RAIZ = join(__dirname, '..', '..');
@@ -41,6 +47,28 @@ const BARREL_PATH = `app/(private)${DASHBOARD_ROUTE}/components/index.ts`;
 
 /** Las dos fuentes de la feature que renderizan algo. */
 const FUENTES_DE_LA_PANTALLA = [PAGE_PATH, CONTENT_PATH] as const;
+
+/**
+ * 2026-10-08: el segmento dinamico del detalle sale de `executionTraceRoute` con el nombre de
+ * parametro del App Router, nunca de un literal `recorrido`.
+ */
+const DETAIL_DIR = `app/(private)${executionTraceRoute('[id]')}`;
+const DETAIL_PAGE_PATH = `${DETAIL_DIR}/page.tsx`;
+const DETAIL_COMPONENT_PATH = `${DETAIL_DIR}/components/execution-trace-detail.tsx`;
+const SECTION_PATH = `app/(private)${DASHBOARD_ROUTE}/components/execution-trace-list-section.tsx`;
+const TABLE_PATH = `app/(private)${DASHBOARD_ROUTE}/components/execution-trace-table.tsx`;
+
+/**
+ * 2026-10-08: lo que vigila la regla multiplataforma. Amplia `FUENTES_DE_LA_PANTALLA` sin
+ * sustituirla: R6, R7 y R8 siguen midiendose solo sobre la pagina y el area.
+ */
+const FUENTES_MULTIPLATAFORMA = [
+  ...FUENTES_DE_LA_PANTALLA,
+  SECTION_PATH,
+  TABLE_PATH,
+  DETAIL_PAGE_PATH,
+  DETAIL_COMPONENT_PATH,
+] as const;
 
 /**
  * El **unico** import de `lib/modules/` que `page.tsx` tiene permitido (QC-75 R6, R10).
@@ -90,6 +118,19 @@ describe('contrato de la ruta del dashboard', () => {
     expect(existsSync(join(RAIZ, PAGE_PATH)), `deberia existir ${PAGE_PATH}`).toBe(true);
     expect(existsSync(join(RAIZ, CONTENT_PATH)), `deberia existir ${CONTENT_PATH}`).toBe(true);
     expect(existsSync(join(RAIZ, BARREL_PATH)), `deberia existir ${BARREL_PATH}`).toBe(true);
+  });
+
+  it('R20: la pagina del detalle vive en la ruta que declara executionTraceRoute', () => {
+    // Anadido el 2026-10-08 (QC-167 T12). Sin esto, renombrar la carpeta dejaria los enlaces de
+    // la lista apuntando a un 404 sin que nada se pusiera rojo.
+    expect(DETAIL_DIR.startsWith(`app/(private)${DASHBOARD_ROUTE}/`)).toBe(true);
+    expect(existsSync(join(RAIZ, DETAIL_PAGE_PATH)), `deberia existir ${DETAIL_PAGE_PATH}`).toBe(
+      true,
+    );
+    expect(
+      existsSync(join(RAIZ, DETAIL_COMPONENT_PATH)),
+      `deberia existir ${DETAIL_COMPONENT_PATH}`,
+    ).toBe(true);
   });
 
   it('la ubicacion de la ruta se deriva de DASHBOARD_ROUTE y la pagina no incrusta literales de ruta', () => {
@@ -212,7 +253,12 @@ describe('contrato de la ruta del dashboard', () => {
 
   it('el item Dashboard de la navegacion apunta a la misma constante que ubica la pantalla', () => {
     // El item esta oculto del menu temporalmente, pero conserva el destino para cuando vuelva.
-    expect(HIDDEN_DASHBOARD_NAV_ITEM.href).toBe(DASHBOARD_ROUTE);
+    // 2026-10-08 (QC-167): el humano pide volver a mostrar el item Dashboard. Vuelve la parte
+    // positiva original: un unico enlace del menu apunta a `DASHBOARD_ROUTE`.
+    const enlaces = PRIVATE_NAV_ITEMS.filter((item): item is NavLink => item.kind === 'link');
+    const alDashboard = enlaces.filter((enlace) => enlace.href === DASHBOARD_ROUTE);
+
+    expect(alDashboard).toHaveLength(1);
 
     // Parte negativa, con un matiz que no se puede simplificar: `page.tsx` **si** importa
     // `BRAND_LABEL` de `private-nav` para la metadata (R5), y eso es correcto — es leer una
@@ -233,11 +279,12 @@ describe('contrato de la ruta del dashboard', () => {
 
   it('no usa 100vh ni hover como unica via', () => {
     // R12 — regla multiplataforma: nada de alto de viewport fijo (iOS/Android), y nada que solo
-    // se revele al pasar el puntero. No hay controles interactivos en esta pantalla, asi que la
-    // guardia afirma que ninguna clase `hover:` acompana a una utilidad que oculte contenido.
+    // se revele al pasar el puntero: ninguna clase `hover:` acompana a una utilidad que oculte
+    // contenido. Ampliado el 2026-10-08 (QC-167 T12, R25): la lista del recorrido, su tabla y el
+    // detalle entran en las fuentes vigiladas; la regla no se afloja.
     const utilidadesQueOcultan = ['hidden', 'invisible', 'opacity-0', 'sr-only'];
 
-    for (const ruta of FUENTES_DE_LA_PANTALLA) {
+    for (const ruta of FUENTES_MULTIPLATAFORMA) {
       const codigo = fuenteSinComentarios(ruta);
 
       expect(codigo, `${ruta} no debe usar 100vh`).not.toContain('100vh');

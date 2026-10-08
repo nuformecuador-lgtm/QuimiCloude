@@ -7,20 +7,32 @@ import {
 import {
   createListAliveSummariesByIds,
   createListAliveSummariesInCompany,
+  createListSummariesByIdsIncludingDeleted,
   type OrderCatalog,
 } from '@/lib/modules/pedidos';
 import {
   listAliveOrderSummariesByIds,
   listAliveOrderSummariesInCompany,
+  listOrderHistoryByIdsIncludingDeleted,
+  listOrderNumbersByIdsIncludingDeleted,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 
-export function realOrderSummaries(): Pick<OrderCatalog, 'listAliveSummariesByIds' | 'listAliveSummariesInCompany'> {
+export function realOrderSummaries(): Pick<
+  OrderCatalog,
+  'listAliveSummariesByIds' | 'listAliveSummariesInCompany' | 'listSummariesByIdsIncludingDeleted'
+> {
   const deps = {
-    summaries: { listAliveByIds: listAliveOrderSummariesByIds, listAliveInCompany: listAliveOrderSummariesInCompany },
+    summaries: {
+      listAliveByIds: listAliveOrderSummariesByIds,
+      listAliveInCompany: listAliveOrderSummariesInCompany,
+      listNumbersByIdsIncludingDeleted: listOrderNumbersByIdsIncludingDeleted,
+      listHistoryByIdsIncludingDeleted: listOrderHistoryByIdsIncludingDeleted,
+    },
     packaging: { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches },
   };
   return {
     listAliveSummariesByIds: createListAliveSummariesByIds(deps),
     listAliveSummariesInCompany: createListAliveSummariesInCompany(deps),
+    listSummariesByIdsIncludingDeleted: createListSummariesByIdsIncludingDeleted(deps),
   };
 }

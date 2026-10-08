@@ -226,6 +226,26 @@ export type { StartedOrderExecution } from './domain/assigned-order-execution-vi
 export { NotCancellableError } from './domain/errors';
 
 // ---------------------------------------------------------------------------------------
+// El recorrido de ejecucion: la lista de pedidos ejecutados y el recorrido de uno. Bloque NUEVO
+// al final: no reordena ni reformatea nada de lo de arriba.
+// ---------------------------------------------------------------------------------------
+export {
+  createListExecutionTraces,
+  type ExecutionTraceList,
+  type ExecutionTraceListInput,
+  type ExecutionTracePerson,
+  type ExecutionTraceRow,
+  type ListExecutionTracesDeps,
+} from './domain/list-execution-traces';
+export {
+  createGetExecutionTrace,
+  type ExecutionTraceDetail,
+  type ExecutionTraceDetailStep,
+  type GetExecutionTraceDeps,
+} from './domain/get-execution-trace';
+export type { ExecutionTrace, TraceDuration, TraceStep } from './domain/execution-trace';
+
+// ---------------------------------------------------------------------------------------
 // El acondicionamiento: Comenzar y Terminar. Bloque NUEVO al final.
 // ---------------------------------------------------------------------------------------
 export { createStartConditioning, type StartConditioningDeps } from './domain/start-conditioning';

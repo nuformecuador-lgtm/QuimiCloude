@@ -20,12 +20,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { PERMISSIONS } from '@/lib/modules/identity';
-import {
-  HIDDEN_DASHBOARD_NAV_ITEM,
-  PRIVATE_NAV_ITEMS,
-  type NavItem,
-  type NavLink,
-} from '@/lib/shared/navigation/private-nav';
+import { PRIVATE_NAV_ITEMS, type NavItem, type NavLink } from '@/lib/shared/navigation/private-nav';
 
 /** Los codigos del catalogo cerrado de QC-74, como cadenas sueltas. */
 const CODIGOS_VALIDOS: readonly string[] = PERMISSIONS.map((permiso) => permiso.code);
@@ -105,16 +100,20 @@ describe('guardia — los permisos declarados en el menu existen en el catalogo 
   // no se afloja: sigue siendo la lista EXACTA, nunca un «al menos N».
   // El dashboard salio del menu temporalmente; su enlace se valida aparte para que volver a
   // ponerlo no reintroduzca un permiso fuera del catalogo.
-  it('ancla: el recorrido encuentra hoy los nueve enlaces reales del menu', () => {
+  // 2026-10-08 (QC-167): el humano pide volver a mostrar el item Dashboard. El ancla vuelve a
+  // diez y nombra `nav-dashboard`; su permiso lo valida ya el recorrido general, asi que el caso
+  // aparte del enlace oculto desaparece con la constante.
+  it('ancla: el recorrido encuentra hoy los diez enlaces reales del menu', () => {
     // Anti-vacuidad. Si el recorrido se rompiera —un grupo que deja de visitarse, un cambio de
     // forma en `PRIVATE_NAV_ITEMS`—, `findUndeclaredNavPermissions` devolveria [] sobre una lista
     // vacia y la guardia pasaria en verde sin comprobar nada. Esto lo convierte en rojo.
     const enlaces = flattenNavLinks(PRIVATE_NAV_ITEMS);
 
-    expect(enlaces).toHaveLength(9);
+    expect(enlaces).toHaveLength(10);
     expect(enlaces.map((enlace) => enlace.testId).sort()).toEqual([
       'nav-asignacion',
       'nav-clientes',
+      'nav-dashboard',
       'nav-inventario',
       'nav-pedidos',
       'nav-presentaciones',
@@ -123,10 +122,6 @@ describe('guardia — los permisos declarados en el menu existen en el catalogo 
       'nav-unidades',
       'nav-usuarios',
     ]);
-  });
-
-  it('el enlace oculto del dashboard declara un permiso del catalogo', () => {
-    expect(findUndeclaredNavPermissions([HIDDEN_DASHBOARD_NAV_ITEM], CODIGOS_VALIDOS)).toEqual([]);
   });
 
   it('el catalogo importado no esta vacio: la lista contra la que se compara es real', () => {

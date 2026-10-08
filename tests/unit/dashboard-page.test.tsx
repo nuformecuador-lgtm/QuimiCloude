@@ -2,6 +2,12 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 
 import PrivateLayout from '@/app/(private)/layout';
 import DashboardPage, { metadata } from '@/app/(private)/dashboard/page';
+import {
+  EXECUTION_TRACE_SECTION_TESTID,
+  EXECUTION_TRACE_SECTION_TITLE,
+  parseExecutionTraceListParams,
+  type ExecutionTraceListParams,
+} from '@/app/(private)/dashboard/components';
 import { PERMISSIONS } from '@/lib/modules/identity';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 
@@ -26,17 +32,32 @@ import {
  *
  * **R3 y R4 son tests en negativo a proposito**: «estar vacio» y «no anadir landmarks» es
  * justo lo que una feature posterior puede romper sin que nada se ponga rojo.
+ *
+ * Nota del 2026-10-08 (QC-167 T12, R25): el area deja de estar vacia; contiene la seccion del
+ * recorrido de ejecucion y nada mas. La seccion se SIMULA: la real llama a una Server Action que
+ * lee de la composicion y es un componente `async`, y lo que este archivo mide es la costura del
+ * area, no la lista (esa vive en `tests/ui/dashboard/`). R2 y R4 no cambian: la lista no anade
+ * `h1` ni landmarks.
  */
 
 type CookieStoreStub = {
   get: (name: string) => { name: string; value: string } | undefined;
 };
 
-const { usePathnameMock, logoutActionMock, cookiesMock, getSessionUserMock } = vi.hoisted(() => ({
+const {
+  usePathnameMock,
+  logoutActionMock,
+  cookiesMock,
+  getSessionUserMock,
+  listExecutionTracesActionMock,
+  seccionSimuladaMock,
+} = vi.hoisted(() => ({
   usePathnameMock: vi.fn<() => string>(),
   logoutActionMock: vi.fn<() => Promise<void>>(),
   cookiesMock: vi.fn<() => Promise<CookieStoreStub>>(),
   getSessionUserMock: vi.fn(),
+  listExecutionTracesActionMock: vi.fn(),
+  seccionSimuladaMock: vi.fn<(props: { params: unknown }) => void>(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -58,6 +79,36 @@ vi.mock('@/lib/composition', () => ({
     endSession: vi.fn<() => Promise<void>>(),
   },
 }));
+
+// 2026-10-08: la accion real importa `observabilidad` y `asignaciones` de la composicion, que este
+// mock no trae; se sustituye para que el modulo de la seccion cargue sin ella.
+vi.mock('@/lib/modules/asignaciones/adapters/driving/execution-trace-actions', () => ({
+  listExecutionTracesAction: listExecutionTracesActionMock,
+  getExecutionTraceAction: vi.fn(),
+}));
+
+// 2026-10-08: la seccion se simula con un componente sincrono que conserva su `data-testid` y su
+// titulo reales y anota con que parametros la monto el area.
+vi.mock(
+  '@/app/(private)/dashboard/components/execution-trace-list-section',
+  async (importOriginal) => {
+    const real =
+      await importOriginal<
+        typeof import('@/app/(private)/dashboard/components/execution-trace-list-section')
+      >();
+    return {
+      ...real,
+      ExecutionTraceListSection: (props: { params: ExecutionTraceListParams }) => {
+        seccionSimuladaMock(props);
+        return (
+          <div data-testid={real.EXECUTION_TRACE_SECTION_TESTID}>
+            <h2>{real.EXECUTION_TRACE_SECTION_TITLE}</h2>
+          </div>
+        );
+      },
+    };
+  },
+);
 
 /** Ruta que no coincide con ningun destino de la navegacion: nada arranca activo. */
 const RUTA_SIN_COINCIDENCIA = '/ruta-que-no-esta-en-la-navegacion';
@@ -81,12 +132,16 @@ const testId = {
   content: 'private-content',
   title: 'dashboard-title',
   dashboardContent: 'dashboard-content',
+  traceSection: EXECUTION_TRACE_SECTION_TESTID,
 } as const;
+
+/** Consulta de la URL del test: un filtro de persona para comprobar que llega a la seccion. */
+const SEARCH_PARAMS_DEL_TEST = { persona: 'u-test-7' } as const;
 
 /** Marcador del hijo neutro con el que se mide el armazon «solo» (linea base de R4). */
 const CHILD_TEST_ID = 'pantalla-de-prueba';
 
-/** Roles que delatarian contenido dentro del area que debe estar vacia (R3). */
+/** Roles que delatarian contenido del area fuera de la seccion del recorrido (R25). */
 const ROLES_DE_CONTENIDO = ['table', 'list', 'img', 'article', 'button', 'link'] as const;
 
 /** Landmarks que la pantalla no puede introducir por encima de los del layout (R4). */
@@ -97,7 +152,12 @@ async function renderDashboardEnLayout() {
   // `DashboardPage` es `async` desde QC-75 (exige `dashboard.consultar` antes de pintar), asi
   // que se INVOCA y se pasa su arbol ya resuelto: React no renderiza un componente `async` en el
   // cliente, que es donde jsdom monta el arbol.
-  return render(await PrivateLayout({ children: await DashboardPage() }));
+  // 2026-10-08: la pagina recibe `searchParams` como promesa, igual que en el App Router.
+  return render(
+    await PrivateLayout({
+      children: await DashboardPage({ searchParams: Promise.resolve(SEARCH_PARAMS_DEL_TEST) }),
+    }),
+  );
 }
 
 /** Monta el layout privado con un hijo neutro: la linea base contra la que compara R4. */
@@ -149,20 +209,32 @@ describe('pantalla de dashboard', () => {
     expect(encabezados[0]).toBe(screen.getByTestId(testId.title));
   });
 
-  it('el area de contenido se renderiza vacia: sin tarjetas, tablas, listas ni texto', async () => {
-    // R3 — test **en negativo**: la costura esta vacia a proposito y rellenarla debe romper algo.
+  it('R25: el area de contenido contiene la lista del recorrido y nada mas', async () => {
+    // Enmendado el 2026-10-08 (QC-167 T12, R25). Hasta entonces era R3 de QC-12, «el area se
+    // renderiza vacia»: la costura se rellena con la seccion del recorrido. Sigue siendo un test
+    // en negativo: cualquier cosa que entre en el area FUERA de esa seccion lo pone rojo.
     await renderDashboardEnLayout();
 
     const area = screen.getByTestId(testId.dashboardContent);
+    const seccion = within(area).getByTestId(testId.traceSection);
 
-    expect(area.children).toHaveLength(0);
-    expect(area.textContent).toBe('');
+    expect(area.children).toHaveLength(1);
+    expect(area.firstElementChild).toBe(seccion);
+    expect(area.textContent).toBe(seccion.textContent);
+    expect(within(seccion).getByRole('heading', { level: 2 })).toHaveTextContent(
+      EXECUTION_TRACE_SECTION_TITLE,
+    );
 
     for (const rol of ROLES_DE_CONTENIDO) {
-      expect(within(area).queryAllByRole(rol), `el area no debe contener rol «${rol}»`).toHaveLength(
-        0,
-      );
+      for (const elemento of within(area).queryAllByRole(rol)) {
+        expect(seccion, `rol «${rol}» fuera de la seccion del recorrido`).toContainElement(elemento);
+      }
     }
+
+    // El area le pasa a la seccion la consulta de la URL ya acotada, no la cruda.
+    expect(seccionSimuladaMock).toHaveBeenCalledWith({
+      params: parseExecutionTraceListParams(SEARCH_PARAMS_DEL_TEST),
+    });
   });
 
   it('no anade landmarks: el main sigue siendo unico y no aparece ninguna region nueva', async () => {
@@ -192,9 +264,10 @@ describe('pantalla de dashboard', () => {
     expect(titulo as string).toContain(BRAND_LABEL);
   });
 
-  it('renderiza titulo y area de contenido en viewport angosto y en ancho', async () => {
+  it('R12: renderiza titulo y un hijo en el area, en viewport angosto y en ancho', async () => {
     // R12 — el layout privado cambia de mecanismo en 768px; la pantalla debe presentarse igual
-    // a los dos lados del breakpoint.
+    // a los dos lados del breakpoint. Enmendado el 2026-10-08 (QC-167 T12, R25): el area ya no
+    // tiene cero hijos sino uno, la seccion del recorrido, a los dos anchos.
     for (const ancho of [NARROW_VIEWPORT, WIDE_VIEWPORT]) {
       setViewportWidth(ancho);
       await renderDashboardEnLayout();
@@ -204,7 +277,10 @@ describe('pantalla de dashboard', () => {
 
       expect(titulo, `titulo visible a ${ancho}px`).toBeVisible();
       expect(area, `area de contenido presente a ${ancho}px`).toBeInTheDocument();
-      expect(area.children, `area de contenido vacia a ${ancho}px`).toHaveLength(0);
+      expect(area.children, `un solo hijo en el area a ${ancho}px`).toHaveLength(1);
+      expect(area.firstElementChild, `la seccion del recorrido a ${ancho}px`).toBe(
+        screen.getByTestId(testId.traceSection),
+      );
       expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
 
       cleanup();
