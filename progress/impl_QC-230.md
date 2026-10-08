@@ -23,7 +23,8 @@ sdd: false (sin spec). Alcance: ficha Jira QC-230, según el encargo del leader.
 |---|---|
 | Rechaza `VERCEL_ENV=production` | seed-demo-guard › rechaza VERCEL_ENV=production aunque la base sea local |
 | Rechaza un host que no es local | seed-demo-guard › rechaza una DATABASE_URL que no apunta a una base local…; no confunde un host que solo empieza por localhost…; rechaza cuando falta DATABASE_URL… |
-| La bandera lo permite | seed-demo-guard › la bandera --forzar permite…; la variable SEED_DEMO_FORZAR=1 permite produccion…; cualquier otro valor… no fuerza |
+| La bandera lo permite (solo base no local) | seed-demo-guard › la bandera --forzar permite una base remota…; --forzar no anula VERCEL_ENV=production; rechaza dentro de CI, con o sin --forzar…; CI vacia, 0 o false no cuenta como CI; una variable de entorno no fuerza nada… |
+| Host efectivo `?host=` (H1) | seed-demo-guard › toma como host efectivo el parametro ?host= y rechaza uno remoto; admite ?host=localhost; admite un socket Unix local en ?host=; rechaza un parametro host repetido…; rechaza un parametro host vacio; databaseHost devuelve el host efectivo… |
 | Contraseñas del entorno, sin valor por defecto | seed-demo-guard › sin alguna variable falla nombrandolas todas…; el mensaje de error no incluye ningun valor… |
 | Idempotencia (unit) | seed-demo-run › es idempotente: la segunda corrida no escribe nada…; retoma un pedido que quedo a medias…; activa un usuario… |
 | Idempotencia (integración, base real) | seed-demo.int › dos corridas dejan los mismos conteos por tabla… |
@@ -53,3 +54,15 @@ sdd: false (sin spec). Alcance: ficha Jira QC-230, según el encargo del leader.
 4. **Clave de idempotencia del pedido.** Un pedido no tiene nombre: se reconoce por receta efectiva + cantidad. Un pedido creado a mano con la misma receta DEMO y la misma cantidad se tomaría por el de demo.
 
 Veredicto: hecho. Seed idempotente por los casos de uso, con guardas y tests en verde. Quedan abiertos ENTREGADO, el Administrador de demo y `must_change_credential`.
+
+## Correccion tras review (H1, H2)
+- H1: `databaseHost` toma como host efectivo el parametro `host` de la query si viene (Prisma lo
+  prioriza). Repetido (sin distinguir mayusculas) o vacio se rechaza; un socket Unix (`/...`) se admite.
+- H2: se elimina `SEED_DEMO_FORZAR` (codigo, `.env.example`, `docs/verification.md`). Solo fuerza la
+  bandera `--forzar`, y solo la regla de base local: `VERCEL_ENV=production` y `CI` (no vacia, ni `0`
+  ni `false`) se rechazan siempre. `seed-demo.int.test.ts` no pasa por la guarda: no le afecta.
+- Archivos: `scripts/seed-demo/guard.ts`, `scripts/seed-demo.ts` (comentario),
+  `tests/unit/scripts/seed-demo-guard.test.ts`, `.env.example`, `docs/verification.md`.
+- `pnpm exec vitest run tests/unit/scripts`: 3 archivos, 48 tests, todos verdes.
+- `pnpm run typecheck`: sin errores. `pnpm run lint`: 0 errores, 7 warnings previos en archivos no tocados.
+- Veredicto: H1 y H2 corregidos y cubiertos por test.

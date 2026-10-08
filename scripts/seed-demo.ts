@@ -4,7 +4,7 @@
  * Datos de demostracion`.
  *
  * Cascara fina, como `scripts/seed.ts`: carga el entorno, aplica las guardas (nunca en
- * produccion ni contra una base que no sea local, salvo `--forzar`), lee las contrasenas
+ * produccion ni en CI; contra una base que no sea local, solo con `--forzar`), lee las contrasenas
  * de demo del entorno y delega en `seed-demo/run.ts`. Prisma y la composicion se cargan
  * con `import()` DESPUES de `loadDotEnv()`.
  */

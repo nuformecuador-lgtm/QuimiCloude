@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import {
   DEMO_CREDENTIAL_ENV,
-  DEMO_SEED_FORCE_ENV,
   DEMO_SEED_FORCE_FLAG,
   databaseHost,
   evaluateDemoSeedGuard,
@@ -54,19 +53,68 @@ describe('seed de demo — guardas de entorno', () => {
     })
   })
 
-  it('la variable SEED_DEMO_FORZAR=1 permite produccion y lo marca como forzado', () => {
-    const env = { DATABASE_URL: LOCAL_URL, VERCEL_ENV: 'production', [DEMO_SEED_FORCE_ENV]: '1' }
-    expect(evaluateDemoSeedGuard({ argv: [], env })).toEqual({ allowed: true, forced: true })
+  it('--forzar no anula VERCEL_ENV=production', () => {
+    const env = { DATABASE_URL: REMOTE_URL, VERCEL_ENV: 'production' }
+    const verdict = evaluateDemoSeedGuard({ argv: [DEMO_SEED_FORCE_FLAG], env })
+    expect(verdict.allowed).toBe(false)
+    if (!verdict.allowed) expect(verdict.reason).toContain('VERCEL_ENV=production')
   })
 
-  it('cualquier otro valor de SEED_DEMO_FORZAR no fuerza nada', () => {
-    const env = { DATABASE_URL: REMOTE_URL, [DEMO_SEED_FORCE_ENV]: 'true' }
+  it('rechaza dentro de CI, con o sin --forzar y aunque la base sea local', () => {
+    for (const argv of [[], [DEMO_SEED_FORCE_FLAG]]) {
+      const verdict = evaluateDemoSeedGuard({ argv, env: { DATABASE_URL: LOCAL_URL, CI: 'true' } })
+      expect(verdict.allowed).toBe(false)
+      if (!verdict.allowed) expect(verdict.reason).toContain('CI')
+    }
+    expect(evaluateDemoSeedGuard({ argv: [DEMO_SEED_FORCE_FLAG], env: { DATABASE_URL: LOCAL_URL, CI: '1' } }).allowed).toBe(false)
+  })
+
+  it('CI vacia, 0 o false no cuenta como CI', () => {
+    for (const CI of ['', '0', 'false']) {
+      expect(evaluateDemoSeedGuard({ argv: [], env: { DATABASE_URL: LOCAL_URL, CI } }).allowed).toBe(true)
+    }
+  })
+
+  it('una variable de entorno no fuerza nada: solo la bandera de linea de comandos', () => {
+    const env = { DATABASE_URL: REMOTE_URL, SEED_DEMO_FORZAR: '1' }
     expect(evaluateDemoSeedGuard({ argv: [], env }).allowed).toBe(false)
   })
 
-  it('databaseHost devuelve el host en minusculas o null', () => {
-    expect(databaseHost('postgresql://u:p@LocalHost:5432/db')).toBe('localhost')
-    expect(databaseHost('::')).toBeNull()
+  it('toma como host efectivo el parametro ?host= y rechaza uno remoto', () => {
+    const env = { DATABASE_URL: 'postgresql://u:p@localhost:5433/db?host=remoto.invalid' }
+    const verdict = evaluateDemoSeedGuard({ argv: [], env })
+    expect(verdict.allowed).toBe(false)
+    if (!verdict.allowed) expect(verdict.reason).toContain('remoto.invalid')
+  })
+
+  it('admite ?host=localhost', () => {
+    const env = { DATABASE_URL: 'postgresql://u:p@localhost:5433/db?host=localhost' }
+    expect(evaluateDemoSeedGuard({ argv: [], env })).toEqual({ allowed: true, forced: false })
+  })
+
+  it('admite un socket Unix local en ?host=', () => {
+    const env = { DATABASE_URL: 'postgresql://u:p@localhost/db?host=/var/run/postgresql' }
+    expect(evaluateDemoSeedGuard({ argv: [], env })).toEqual({ allowed: true, forced: false })
+  })
+
+  it('rechaza un parametro host repetido aunque uno sea local', () => {
+    const env = { DATABASE_URL: 'postgresql://u:p@localhost:5433/db?host=localhost&host=remoto.invalid' }
+    expect(evaluateDemoSeedGuard({ argv: [], env }).allowed).toBe(false)
+    const mixto = { DATABASE_URL: 'postgresql://u:p@localhost:5433/db?host=localhost&HOST=remoto.invalid' }
+    expect(evaluateDemoSeedGuard({ argv: [], env: mixto }).allowed).toBe(false)
+  })
+
+  it('rechaza un parametro host vacio', () => {
+    for (const query of ['?host=', '?host=%20']) {
+      const env = { DATABASE_URL: `postgresql://u:p@localhost:5433/db${query}` }
+      expect(evaluateDemoSeedGuard({ argv: [], env }).allowed).toBe(false)
+    }
+  })
+
+  it('databaseHost devuelve el host efectivo en minusculas o un error', () => {
+    expect(databaseHost('postgresql://u:p@LocalHost:5432/db')).toEqual({ ok: true, host: 'localhost' })
+    expect(databaseHost('postgresql://u:p@localhost:5432/db?host=Remoto.Invalid')).toEqual({ ok: true, host: 'remoto.invalid' })
+    expect(databaseHost('::').ok).toBe(false)
   })
 })
 

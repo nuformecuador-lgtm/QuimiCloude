@@ -121,8 +121,10 @@ que se lee como un fallo de código.
   archivo versionado (nombres en `.env.example`):
   `SEED_DEMO_OPERADOR_PASSWORD=... SEED_DEMO_EMPACADOR_PASSWORD=... SEED_DEMO_ACONDICIONAMIENTO_PASSWORD=... pnpm db:seed:demo`.
   Si falta alguna, falla nombrándola. Deben cumplir la política de credenciales.
-- **Nunca en producción:** se niega con `VERCEL_ENV=production` y si `DATABASE_URL` no apunta a
-  `localhost` o `127.0.0.1`. Solo lo salta `--forzar` (o `SEED_DEMO_FORZAR=1`), y avisa.
+- **Nunca en producción:** se niega con `VERCEL_ENV=production`, dentro de CI (variable `CI`) y si
+  `DATABASE_URL` no apunta a `localhost`, `127.0.0.1` o un socket Unix (el parámetro `?host=`, si
+  viene, manda; repetido o vacío, se niega). Solo la regla de base local la salta la bandera
+  `--forzar` de la línea de comandos, y avisa; producción y CI no las salta nada.
 - **Idempotente:** cada cosa se busca por su nombre antes de crearla y un pedido a medias se
   retoma desde su estado. Una segunda corrida no crea nada.
 - **Qué crea**, todo ficticio y con el prefijo `DEMO` (lotes `DEMO-`, usuarios `demo.`):
