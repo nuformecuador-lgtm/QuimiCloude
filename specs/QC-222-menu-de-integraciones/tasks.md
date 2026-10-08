@@ -24,7 +24,7 @@ constantes de ruta. Esta rama todavía no la tiene: T0 la trae.
 > No hay T1: la tarea de añadir la primitiva `empty` de shadcn se eliminó en F1.4 (D11). Los
 > demás números no cambian.
 
-- [ ] **T0 — Sincronizar con `dev`**
+- [x] **T0 — Sincronizar con `dev`**
   - Depende de: nada.
   - Hacer: `git fetch origin dev && git merge origin/dev`. Volver a medir contra el árbol
     sincronizado los hallazgos 1, 8 y 10 de `design.md > 0` (líneas de los tests de §7.2 y §7.3).
@@ -45,7 +45,7 @@ constantes de ruta. Esta rama todavía no la tiene: T0 la trae.
     (escrito en esta task) cubre R1, R3, R4, R5 y R6 en verde. R2 queda en rojo hasta T4, porque
     lee las páginas.
 
-- [ ] **T3 [P] — Componente cascarón compartido**
+- [x] **T3 [P] — Componente cascarón compartido**
   - Depende de: T0.
   - Hacer: `app/(private)/integraciones/components/integration-placeholder.tsx` (Server Component,
     sin `'use client'`) con `INTEGRATION_EMPTY_MESSAGE` = «Próximamente podrás configurar esta
@@ -55,7 +55,7 @@ constantes de ruta. Esta rama todavía no la tiene: T0 la trae.
   - Hecho cuando: compila, no tiene botón, enlace, formulario ni campo, y no importa nada de
     `components/ui/`.
 
-- [ ] **T4 — Las tres páginas**
+- [x] **T4 — Las tres páginas**
   - Depende de: T2 y T3.
   - Hacer: `proveedor-ia/page.tsx`, `inventarios/page.tsx` y `whatsapp/page.tsx` con la forma de
     `design.md > 4.3`. El corte es la primera sentencia, y no llevan comentarios.
@@ -70,7 +70,7 @@ constantes de ruta. Esta rama todavía no la tiene: T0 la trae.
     (`guard-rutas-privadas-cubiertas`, `guard-pantallas-exigen-permiso` y
     `guard-nav-permisos-declarados`). Cubre R14.
 
-- [ ] **T6 — Enmiendas a los tests de QC-221**
+- [x] **T6 — Enmiendas a los tests de QC-221**
   - Depende de: T5.
   - Hacer: los tres cambios de `design.md > 7.3` en `tests/unit/integraciones/integration-routes.test.ts`
     y `tests/unit/integraciones/module-shape.test.ts`.
