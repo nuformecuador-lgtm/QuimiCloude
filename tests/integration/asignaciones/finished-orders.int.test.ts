@@ -87,6 +87,7 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
     findAliveById: findAliveOrderTargetById,
     listAliveSummariesByIds: summaryReaders.listAliveSummariesByIds,
     listAliveSummariesInCompany: summaryReaders.listAliveSummariesInCompany,
+    listSummariesByIdsIncludingDeleted: summaryReaders.listSummariesByIdsIncludingDeleted,
     transitionAliveById: transitionAliveByIdReal,
     // R27: las dos escrituras REALES de empaque, mismo patron que `setStatus` arriba -las dos
     // `UPDATE` condicionales de `order-prisma.ts` sobre el proxy de la `tx` del fixture-.

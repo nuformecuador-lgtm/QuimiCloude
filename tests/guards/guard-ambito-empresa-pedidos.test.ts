@@ -521,6 +521,13 @@ const METODOS_DELEGADOS_EN_DOMINIO: ReadonlyMap<string, RegExp> = new Map([
     'listAliveSummariesInCompany',
     /^createListAliveSummariesInCompany\s*\(\s*\{\s*summaries\s*:\s*orderSummaryReader\s*,\s*packaging\s*:\s*packagingCatalog\s*,?\s*\}\s*\)$/,
   ],
+  // QC-167: el filtro por numero se decide en `pedidos/domain`, sobre `OrderSummaryReader`. Quien
+  // toca la base son `listOrderNumbersByIdsIncludingDeleted` y `listOrderHistoryByIdsIncludingDeleted`
+  // (`order-catalog-prisma.ts`), que el barrido de mas abajo sigue exigiendo con `companyId`.
+  [
+    'listSummariesByIdsIncludingDeleted',
+    /^createListSummariesByIdsIncludingDeleted\s*\(\s*\{\s*summaries\s*:\s*orderSummaryReader\s*,?\s*\}\s*\)$/,
+  ],
 ])
 
 describe('QC-60 R18 — el punto unico es de verdad UNA definicion', () => {

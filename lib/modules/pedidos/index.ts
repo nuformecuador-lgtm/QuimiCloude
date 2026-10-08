@@ -7,6 +7,7 @@
 // Los adaptadores driving de QC-34 NO pasan por aqui: QC-35 importara `order-actions.ts` por su
 // ruta exacta (`docs/architecture.md`, excepcion de los driving; `design.md > 9`).
 export { formatOrderNumber } from './domain/order-number';
+export { orderNumberContains } from './domain/order-number';
 export type { OrderId, OrderNumber } from './domain/order-number';
 export {
   ORDER_PRIORITY_VALUES,
@@ -183,6 +184,9 @@ export type { StartPackingDeps, FinishPackingDeps } from './domain/order-packing
  *  linea ya resuelto. */
 export { createListAliveSummariesByIds, createListAliveSummariesInCompany } from './domain/list-order-summaries';
 export type { ListOrderSummariesDeps } from './domain/list-order-summaries';
+export { createListSummariesByIdsIncludingDeleted } from './domain/list-order-summaries';
+export type { ListHistorySummariesDeps } from './domain/list-order-summaries';
+export type { OrderHistorySummary } from './domain/order-catalog';
 
 /** La cobertura de varios pedidos a la vez, una consulta por pagina, para pintar «sin
  *  cobertura completa» sin N+1. */

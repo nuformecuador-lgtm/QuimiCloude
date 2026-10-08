@@ -777,6 +777,9 @@ function montarSobreBase(
       listAliveSummariesInCompany: async () => {
         throw new Error('QC-145: no lo usa `assignResponsibles`');
       },
+      listSummariesByIdsIncludingDeleted: async () => {
+        throw new Error('no lo usa `assignResponsibles`');
+      },
       transitionAliveById: async () => {
         throw new Error('QC-87: no lo usa `assignResponsibles`');
       },
