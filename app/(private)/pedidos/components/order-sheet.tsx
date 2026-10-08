@@ -17,6 +17,7 @@ import type { OrderCoverage } from '@/lib/modules/inventario';
 import { CancelOrderDialog } from './cancel-order-dialog';
 import { DeleteOrderDialog } from './delete-order-dialog';
 import { OrderCustomerDialog } from './order-customer-dialog';
+import { OrderDeliverySheet } from './order-delivery-sheet';
 import { OrderDistributionDialog, type OrderDistributionDraft } from './order-distribution-dialog';
 import { OrderForm, type OrderSheetSection } from './order-form';
 import {
@@ -224,6 +225,7 @@ export function OrderRowSheetActions({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [distributionOpen, setDistributionOpen] = useState(false);
   const [customerOpen, setCustomerOpen] = useState(false);
+  const [deliverOpen, setDeliverOpen] = useState(false);
   // Atado a la instancia de `order`: cuando llega el refresco trae otra y lo guardado se descarta.
   const [savedDistribution, setSavedDistribution] = useState<{
     readonly order: OrderSummary;
@@ -255,6 +257,7 @@ export function OrderRowSheetActions({
         canEditCustomer={canEditCustomer}
         onCustomer={() => setCustomerOpen(true)}
         canDeliver={canDeliver}
+        onDeliver={() => setDeliverOpen(true)}
       />
       <OrderSheet
         order={order}
@@ -286,6 +289,9 @@ export function OrderRowSheetActions({
       ) : null}
       {customerOpen ? (
         <OrderCustomerDialog order={order} open onOpenChange={setCustomerOpen} />
+      ) : null}
+      {deliverOpen ? (
+        <OrderDeliverySheet order={order} open onOpenChange={setDeliverOpen} />
       ) : null}
     </>
   );

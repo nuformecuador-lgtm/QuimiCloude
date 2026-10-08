@@ -373,3 +373,71 @@ ENTREGA registrada. `DeliverOrderResult` sin cambios.
 - `pnpm exec vitest related --run <archivos tocados>`: `Test Files  1 failed | 337 passed (338)`, `Tests  1 failed | 5347 passed | 2 skipped (5350)`. El rojo es `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` ('/pedidos', `loadFormCatalogs` en `app/(private)/pedidos/page.tsx:96`), que está en `tests/baseline-rojos.json`.
 
 B4 opción b lista: la clave se comprueba antes del cliente, el bloqueo y el estado, y se conserva la carrera P2002. Todo en verde salvo rojos ajenos (baseline y frontend en curso). Queda abierta para el humano la lectura literal de «el estado que dejó la primera».
+
+## F1-F4 — Frontend (frontend_dev, 2026-10-08)
+
+### Archivos
+- F1:
+  - `app/(private)/pedidos/components/order-row-actions.tsx`: `canDeliver`, `onDeliver`, `ORDER_STATUS_ACCEPTS_DELIVERY`, `acceptsDelivery`, `ORDER_ACTION_DELIVER_TESTID`.
+  - `order-list-section.tsx`: `canDeliver` con `entregas.modificar`, dentro del `Promise.all`. Una sola lectura de sesión para los dos permisos (`loadRowPermissions`), así el conteo de `order-list-section.test.tsx` R32 (2 lecturas) se queda igual.
+  - `order-table.tsx` y `order-columns.tsx`: pasan el prop.
+  - `order-sheet.tsx` (`OrderRowSheetActions`): monta `OrderDeliverySheet` solo mientras está abierto. **Desviación de tasks.md:** el sheet lo monta la celda de acciones, como los otros diálogos de la fila, y no `order-table.tsx`. `order-table.tsx` no guarda ningún pedido elegido.
+  - `tests/unit/pedidos-ui/order-row-actions.test.tsx`.
+- F2: `order-delivery-draft.ts` y `use-order-delivery-draft.ts` (nuevos, en el barrel), `tests/unit/pedidos-ui/order-delivery-draft.test.ts` (nuevo).
+- F3: `order-delivery-sheet.tsx` (nuevo, en el barrel) y `tests/unit/pedidos-ui/order-delivery-sheet.test.tsx` (nuevo).
+  - Validación con `checkDelivery`, sin aritmética de tope propia. «Faltan» sale de `line.remainingPackages`.
+  - Cerrar con la X, Escape o un clic fuera conserva el borrador (`disableEscapeDismissal={false}`, `disablePointerDismissal={false}`).
+  - **Desviación de §6.2:** el campo de envases NO se sanea a dígitos. Guarda el texto tal cual y muestra el aviso de R13. Sanear convertiría «2,5» en «25» sin decir nada, y R13 no podría darse nunca.
+- F4: `tests/unit/inventario/batch-history.test.tsx`, caso R38. `KIND_LABELS.delivery` ya venía de T0.
+- `app/(private)/pedidos/components/index.ts`: exporta todo lo nuevo. Lo exige `pedidos-convenciones` («nadie importa por ruta profunda»).
+
+### Censos enmendados
+- `tests/unit/inventario/batch-history.test.tsx`: la lista del caso «cada tipo de asiento tiene una etiqueta propia» gana `'delivery'`, con la nota «QC-223 2026-10-08».
+- Ningún otro censo se rompió. En verde, sin cambios:
+  - guardias (55 archivos);
+  - `pedidos-convenciones` y `order-route-contract`;
+  - `qc75-convenciones` y `guard-pantalla-pedidos-se-amplia`;
+  - los `*-convenciones` / `*route-contract` / `scope` / `a11y` / `viewport` del repo.
+
+### R → test
+- R4 → `order-row-actions.test.tsx`:
+  - «R4: con canDeliver aparece en TERMINADO, habilitada, y emite su enganche con la fila»;
+  - «R4: con canDeliver no aparece en %s» (9 estados);
+  - «R4: sin canDeliver no esta en el DOM en %s» (10 estados);
+  - «R4: va al final del menu»;
+  - «R4: los otros nueve estados…».
+
+  También `order-delivery-sheet.test.tsx` «R4: solo se monta al pulsar «Entregar» en la fila…».
+- R6 → `order-delivery-sheet.test.tsx` «R6: cada presentacion muestra su nombre, pedidos, entregados y faltan, sin listado de entregas».
+- R7 → «R7: lista los lotes de la fixture con codigo, envases disponibles, entrada y vencimiento si existe».
+- R8 → «R8: la presentacion completa sale como «Completa» y sin ningun campo de envases».
+- R9 → los tres casos «R9: …» del sheet, más `order-delivery-draft.test.ts` «R35, R9: …» y «R9: … dado de baja».
+- R11 → «R11: si la suma de una presentacion supera lo que falta…», más «R37: un borrador restaurado que supera lo que falta…».
+- R12 → «R12: si un lote supera sus envases disponibles…».
+- R13 → «R13: «%s» no es un entero no negativo…» (2.5, -1, 2,5, dos).
+- R14 → «R14: confirmar sin cliente…».
+- R15 → «R15: confirmar con todos los campos vacios…» y «… en cero…».
+- R33 → «R33: tras %s borra el borrador, cierra, avisa y refresca» (partial, completed, already_registered).
+- R34 → «R34: tras %s sigue abierto, muestra el mensaje, relee y conserva el borrador» (los dos códigos), más «R34, R37: si al releer un lote ya no se ofrece…».
+- R35:
+  - sheet: «R35: cerrar con %s conserva el borrador y al reabrir lo restaura con su clave» (la X, Escape) y «R35: restaura el cliente guardado…»;
+  - draft: «R35: escribe y lee por pedido, con su clave de entrega» y «R35: el borrador de un pedido no se lee desde otro».
+- R36 → sheet: «R36: «Cancelar» borra el borrador y cierra». Draft: «R36: borra el borrador del pedido y deja los de los demas».
+- R37 → sheet: «R37: al restaurar descarta los lotes que ya no se ofrecen, avisa y aplica R11 y R12…». Draft: «R37: descarta los envases…» y «R37: un lote retirado sin envases escritos no cuenta como ajuste».
+- `purpose="deliver"` → «el selector de cliente se monta con purpose="deliver"».
+- R38 → `batch-history.test.tsx` «R38 — un asiento de entrega se pinta como «Entrega a cliente», con la cantidad en negativo, el pedido, el autor y la fecha».
+
+### Verificación (salida real)
+- `pnpm run typecheck`: `tsc --noEmit`, sin errores.
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)` (los avisos previos de documentos y order-service).
+- `pnpm exec vitest run tests/unit/pedidos-ui/order-delivery-sheet.test.tsx`: `Test Files  1 passed (1)`, `Tests  33 passed (33)`.
+- `pnpm exec vitest run tests/unit/pedidos-ui/order-delivery-draft.test.ts`: `Tests  14 passed (14)`.
+- `pnpm exec vitest run tests/unit/inventario/batch-history.test.tsx tests/unit/pedidos-ui/order-row-actions.test.tsx`: `Test Files  2 passed (2)`, `Tests  84 passed (84)`.
+- `pnpm exec vitest related --run <archivos tocados>`: `Test Files  1 failed | 44 passed (45)`, `Tests  1 failed | 806 passed (807)`.
+  - El rojo es `pantallas-exigen-permiso.test.tsx` ('/pedidos', `loadFormCatalogs` en `page.tsx:96`), que está en la baseline.
+- `pnpm exec vitest run guard`: `Test Files  55 passed (55)`, `Tests  747 passed | 11 skipped (758)`.
+- `pnpm exec vitest run convenciones route-contract qc75 a11y viewport alcance scope pantallas data-table`: `Test Files  2 failed | 100 passed (102)`. Los dos rojos son ajenos a esta rama:
+  - el de baseline de arriba;
+  - `tests/unit/recetas/scope.test.ts`, que señala `app/(private)/pedidos/page.tsx`, un archivo que esta rama no toca.
+
+F1-F4 hechos: la acción, el borrador, el sheet y el R38 están en verde, salvo los rojos ajenos (baseline y `recetas/scope`). Hay dos desviaciones menores anotadas arriba para el reviewer.
