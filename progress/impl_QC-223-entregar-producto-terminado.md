@@ -300,3 +300,20 @@ B2 listo: salida física, lectura de lotes entregables y las tres guardias enmen
 
 ### Veredicto
 B5 listo: cableado real sin dobles y en verde contra Postgres, también con concurrencia. Queda abierto el bloqueo de la desviación 2 (tipo de `orderStatus` en `already_registered`), que tiene que decidir el humano.
+
+## Cierre de la tanda 2 (implementer, 2026-10-08)
+
+- B2, B3 y B5 marcadas [x]. B4 queda abierta: su código y sus tests están en verde, pero falta aplicar la
+  desviación 2 (reintento con la clave ya registrada responde `already_registered` sin revalidar el
+  estado). Está bloqueada porque `DeliverOrderResult.orderStatus` solo admite `'TERMINADO' | 'ENTREGADO'`;
+  hay tres opciones (a/b/c) en la sección del paso 2 para que decida el humano.
+- La desviación 1 está aceptada y documentada en design §4. Fixture `numberText` = `'2026-0000007'`.
+- FK compuesta `created_by` → `users(id, company_id)` editada en la migración, en el sitio. Ciclo
+  migrate/rollback/migrate limpio en QuimiCloude_QC223. Test «R31: una entrega registrada por un usuario de
+  otra empresa es rechazada por la base».
+- El predicado del índice parcial (`order_delivery_id IS NOT NULL`), validado por el humano, queda en
+  design §3.2 con nota fechada. R31 incluye la empresa del usuario («decisión del humano 2026-10-08»).
+- Comprobaciones del implementer: `pnpm run typecheck` sin errores; `pnpm exec vitest run guard`:
+  `Test Files 55 passed (55)`, `Tests 747 passed | 11 skipped (758)`.
+- Pendiente para TC: el caso R16 exige importar del barrel de `pedidos`, pero los casos de uso importan de
+  `./order-delivery` (evita un ciclo). TC debe aceptar esa ruta.

@@ -114,7 +114,7 @@ Archivos:
 - `pnpm exec vitest run guard` está en verde;
 - los tests nuevos están en verde contra Postgres.
 
-### [ ] B2 [P] — Salida física en `inventario`
+### [x] B2 [P] — Salida física en `inventario`
 Depende de: B1. Va en paralelo con B3.
 
 Archivos:
@@ -157,7 +157,7 @@ Archivos:
 **Hecho cuando:** los archivos están en verde y cada caso lleva su `R<n>`, las tres guardias
 enmendadas están en verde y el gate de la tanda también.
 
-### [ ] B3 [P] — Persistencia de la entrega en `pedidos`
+### [x] B3 [P] — Persistencia de la entrega en `pedidos`
 Depende de: B1. Va en paralelo con B2.
 
 Archivos:
@@ -207,7 +207,7 @@ Archivos:
 **Hecho cuando:** los archivos están en verde, cada caso lleva su `R<n>` y el gate de la tanda
 también.
 
-### [ ] B5 — Cableado real, actions e integración del caso de uso
+### [x] B5 — Cableado real, actions e integración del caso de uso
 Depende de: B2, B3, B4.
 
 Archivos:
