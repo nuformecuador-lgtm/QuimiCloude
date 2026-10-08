@@ -140,8 +140,10 @@ empresa; operación que mueve existencias idempotente y auditable).
   servidor DEBE aplicar exactamente una y responder `delivery_batch_insufficient` a la otra. En
   ningún caso la existencia de un lote DEBE quedar negativa.
 - **R29** [A] CUANDO llega una entrega cuya clave de entrega ya está registrada en la empresa, el
-  servidor NO DEBE escribir nada y DEBE responder que la entrega ya estaba registrada, con el mismo
-  estado del pedido que dejó la primera. *(Aprobado por el humano en F1.3, 2026-10-08.)*
+  servidor NO DEBE escribir nada y DEBE responder que la entrega ya estaba registrada, con el estado
+  actual del pedido de esa entrega. *(Aprobado por el humano en F1.3, 2026-10-08. Enmienda,
+  decisión del humano 2026-10-08: antes decía «con el mismo estado del pedido que dejó la primera»;
+  si una entrega parcial se reintenta después de que otra completó el pedido, responde `ENTREGADO`.)*
 - **R30** [A] SI cualquier paso de una entrega falla, ENTONCES NO DEBE quedar escrito nada de ella:
   ni entrega, ni línea, ni asiento, ni cambio de existencia, ni cambio de estado del pedido.
 - **R31** [A, D10] La base DEBE rechazar cada uno de estos casos:
