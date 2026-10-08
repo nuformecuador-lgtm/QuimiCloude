@@ -284,9 +284,8 @@ gate se pone rojo, con el cambio mínimo y anotado en «Excepciones».
 
 ## Pendiente
 
-- Cerrar el gate de A2+A3 (`./init.sh`).
-- ~~T18: correr los 7 E2E (de uno en uno) con una base migrada con M1/M2.~~ Hecho (ver «T18 — E2E»).
-- T19.
+- Ninguna task abierta (T1–T25). El gate de A2+A3 y el de T19/T25 los sustituye el `gate-completo`
+  de CI en el PR #170: el humano pidió no correr `./init.sh` en local por falta de memoria.
 
 ## Mapa R<n> → test (consolidado)
 
@@ -302,6 +301,7 @@ usan solo si además citan un estado de QC-215 en el nombre o van marcados «(QC
 | R4 | `tests/unit/pedidos/transition-order.test.ts` | «R4 (QC-215): rechaza ${hacia} como destino desde ${desde} con invalid_transition, SIN abrir la unidad de trabajo» |
 | R5 | `tests/unit/pedidos/order-packing.test.ts`; `tests/integration/pedidos/order-packing.int.test.ts`; `tests/integration/pedidos/finish-with-finished-goods.int.test.ts` | «R5 (QC-215): Terminar comprueba EN_EMPAQUE -> POR_ACONDICIONAR, nunca hacia ENTREGADO ni TERMINADO»; «R21, R5 (QC-215): Terminar sobre su EN_EMPAQUE deja POR_ACONDICIONAR sin finished_at y conserva packed_by, en una sola escritura»; «R5: un producto terminado nuevo nace con su lote … queda POR_ACONDICIONAR …» |
 | R6 | `tests/unit/pedidos/order-packing.test.ts` | «R6 (QC-215): si la matriz rechazara EN_EMPAQUE -> POR_ACONDICIONAR, Terminar falla sin abrir la unidad de trabajo» |
+| R6 | `tests/integration/pedidos/finish-with-finished-goods.int.test.ts` | casos de rechazo de Terminar el empaque que dejan el pedido en su estado previo, sin `finishedAt`, sin consumo y sin lotes: «R25: si el disponible de los envases no alcanza, Terminar rechaza con insufficient_material…», «R7, R18: una linea que ya no se puede convertir a la unidad del pedido rechaza con incompatible_units…», «un recipeId cambiado a mano a uno de otra empresa… rechaza con recipe_not_found…» y «una linea… sin contenido vigente, rechaza con presentation_without_content…» |
 | R7 | `tests/unit/asignaciones-ui/packed-order-notice.test.tsx` | «R7 - nombra el pedido empacado y nunca dice «entregado»»; «R7 - el texto sale de una funcion, no de un literal duplicado» |
 | R8 | `tests/unit/pedidos/order-conditioning.test.ts`; `tests/unit/asignaciones/start-conditioning.test.ts`; `tests/integration/pedidos/order-conditioning.int.test.ts` | «R8: comprueba POR_ACONDICIONAR -> EN_ACONDICIONAMIENTO y delega con la empresa como ultimo parametro»; «R8, R11: llama al catalogo una vez con el pedido, la empresa y el id del actor, y el instante»; «R8: sobre POR_ACONDICIONAR deja EN_ACONDICIONAMIENTO con el actor como quien acondiciona y autor, …» |
 | R9 | `tests/unit/asignaciones/start-conditioning.test.ts`; `tests/integration/pedidos/order-conditioning.int.test.ts` | «R9: already_mine es exito»; «R9: el mismo acondicionador sobre su EN_ACONDICIONAMIENTO es already_mine, sin escribir nada»; «R9: sobre un EN_ACONDICIONAMIENTO de otra persona es taken, sin escribir nada» |
@@ -345,7 +345,7 @@ $ git diff --name-only origin/dev -- package.json pnpm-lock.yaml
 ```
 
 Huecos: ningún R se queda sin test. R23 queda cubierto en sus cinco puntos (incluidos «Mis
-asignados» y la revisión que desbloquea `BLOQUEADO`). Los e2e de R34 siguen sin ejecutar.
+asignados» y la revisión que desbloquea `BLOQUEADO`). Los e2e de R34 se ejecutaron en T18: 30 passed (ver «T18 — E2E»).
 
 ### Corrida de los tests unit del mapa (T19)
 

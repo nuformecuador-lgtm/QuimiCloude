@@ -32,10 +32,11 @@ import { type OrderStatus, type OrderSummary } from '@/lib/modules/pedidos';
  * puerta al dato: de responsables no dice nada.
  *
  * **Un solo predicado para el estado final** (`isFinalOrderStatus`): con el pedido en
- * `ENTREGADO`, `CANCELADO`, `POR_EMPACAR`, `EN_EMPAQUE` o en cualquiera de los estados de
- * acondicionamiento (`POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO`, `TERMINADO`) los items de
- * editar/cancelar/borrar van `disabled` dentro del menu, sin ningun texto aparte que lo explique, y **no se monta ningun
- * dialogo**. La pantalla anticipa la regla; el backend la impide igual (`invalid_transition`,
+ * `ENTREGADO`, `CANCELADO`, `POR_EMPACAR`, `EN_EMPAQUE`, en cualquiera de los estados de
+ * acondicionamiento (`POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO`) o en `TERMINADO` (el estado
+ * que sigue a terminar el acondicionamiento) los items de editar/cancelar/borrar van `disabled`
+ * dentro del menu, sin ningun texto aparte que lo explique, y **no se monta ningun dialogo**.
+ * La pantalla anticipa la regla; el backend la impide igual (`invalid_transition`,
  * `not_cancellable`, `not_deletable`), asi que anticipar no es confiar.
  *
  * **`BLOQUEADO` NO es final** (QC-138): un pedido sin material se edita y se cancela como uno

@@ -30,10 +30,10 @@ const setOrderCustomerSchema = z.object({
 });
 
 /**
- * QC-215 (R36, R37, D14): los estados en los que se puede cambiar el cliente, todos menos los dos
- * finales (`ENTREGADO` y `CANCELADO`). Lista blanca, como `CANCELABLES`: un estado nuevo nace
- * cerrado y obliga a decidir. En `TERMINADO` la escritura solo toca `customer_id`, `updated_by`
- * y `updated_at`, compatible con sus `CHECK`.
+ * Los estados en los que se puede cambiar el cliente: todos menos los dos finales (`ENTREGADO`
+ * y `CANCELADO`). Lista blanca, como `CANCELABLES`: un estado nuevo nace cerrado y obliga a
+ * decidir. En `TERMINADO` la escritura solo toca `customer_id`, `updated_by` y `updated_at`,
+ * compatible con sus `CHECK`.
  */
 export const CUSTOMER_EDITABLE_STATUSES: readonly OrderStatus[] = [
   'PENDIENTE',
@@ -70,7 +70,7 @@ export function createSetOrderCustomer(
     const row = await deps.orders.findAliveById(id, scope);
     if (row === null) throw new OrderNotFoundError();
 
-    // R36: antes de comparar el cliente y de leer el catalogo, para que el pedido cerrado rechace
+    // Antes de comparar el cliente y de leer el catalogo, para que el pedido cerrado rechace
     // aunque la entrada no cambie nada.
     if (!CUSTOMER_EDITABLE_STATUSES.includes(row.status)) throw new ActionNotAllowedError();
 

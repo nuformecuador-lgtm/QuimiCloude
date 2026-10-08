@@ -293,9 +293,9 @@ export class RecipeVersionUnderReviewError extends PedidosError {
   }
 }
 
-/** QC-215 (R36, D14): una accion autorizada que el estado del pedido no admite. Hoy, cambiar el
- *  cliente de un pedido `ENTREGADO` o `CANCELADO`. Codigo compartido con `identity`, `inventario`
- *  y `recetas`. */
+/** Una accion autorizada que el estado del pedido no admite. Hoy, cambiar el cliente de un
+ *  pedido `ENTREGADO` o `CANCELADO`. Codigo compartido con `identity`, `inventario` y
+ *  `recetas`. */
 export class ActionNotAllowedError extends PedidosError {
   readonly code = 'action_not_allowed';
 
