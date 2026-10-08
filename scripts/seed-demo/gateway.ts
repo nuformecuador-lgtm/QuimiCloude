@@ -3,6 +3,11 @@
  * `lib/composition` (con su autorizacion, su validacion y sus invariantes); Prisma solo
  * se usa para LEER, siempre con la empresa en el `where`, y asi saber si algo ya existe.
  *
+ * Excepcion: `units`, `orders` y `order_assignments` NO se leen con Prisma. Sus modulos
+ * (`unidades`, `pedidos`, `asignaciones`) prohiben en su contrato que nadie fuera de sus
+ * adaptadores consulte esas tablas, tambien desde `scripts/`. Esas lecturas van por los
+ * casos de uso de consulta de `lib/composition`, con el Administrador base como actor.
+ *
  * El actor de cada caso de uso se construye con el mismo lector que usa la sesion
  * (`findActiveSessionUserById`): los permisos salen de la base, no de una lista copiada.
  *
@@ -58,11 +63,25 @@ export type PrismaDemoSeedGatewayOptions = {
 
 export function createPrismaDemoSeedGateway(options: PrismaDemoSeedGatewayOptions = {}): DemoSeedGateway {
   let companyId: string | null = null
+  let baseAdminId: string | null = null
   const actors = new Map<string, Actor>()
 
   const company = (): string => {
     if (companyId === null) throw new Error('el gateway de demo se uso antes de resolver la empresa')
     return companyId
+  }
+
+  /** El actor de las lecturas que no reciben uno: el Administrador base de la empresa. */
+  const reader = (): Promise<Actor> => {
+    if (baseAdminId === null) throw new Error('el gateway de demo se uso antes de resolver la empresa')
+    return actor(baseAdminId)
+  }
+
+  /** Las unidades que ve la empresa (las suyas mas las de sistema), con el mismo nombre. */
+  const unitsNamed = async (name: string) => {
+    const wanted = normalizeUnitName(name)
+    const catalog = await unidades.listUnits(undefined, await reader())
+    return catalog.filter((unit) => normalizeUnitName(unit.name) === wanted)
   }
 
   const actor = async (userId: string): Promise<Actor> => {
@@ -103,6 +122,7 @@ export function createPrismaDemoSeedGateway(options: PrismaDemoSeedGatewayOption
       if (admin === null) {
         throw new Error('la empresa del seed base no tiene ningun Administrador activo: corre `pnpm db:seed` antes')
       }
+      baseAdminId = admin.id
       return { companyId: row.id, baseAdminId: admin.id }
     },
 
@@ -113,12 +133,9 @@ export function createPrismaDemoSeedGateway(options: PrismaDemoSeedGatewayOption
     },
 
     async findSystemUnitId(name) {
-      const row = await prisma.unit.findFirst({
-        where: { companyId: null, nameNormalized: normalizeUnitName(name) },
-        select: { id: true },
-      })
-      if (row === null) throw new Error(`falta la unidad de sistema "${name}": aplica las migraciones antes`)
-      return row.id
+      const found = (await unitsNamed(name)).find((unit) => unit.isSystem)
+      if (found === undefined) throw new Error(`falta la unidad de sistema "${name}": aplica las migraciones antes`)
+      return found.id
     },
 
     async findUser(username) {
@@ -178,11 +195,8 @@ export function createPrismaDemoSeedGateway(options: PrismaDemoSeedGatewayOption
     },
 
     async findUnit(name) {
-      const row = await prisma.unit.findFirst({
-        where: { companyId: company(), nameNormalized: normalizeUnitName(name) },
-        select: { id: true },
-      })
-      return row?.id ?? null
+      const found = (await unitsNamed(name)).find((unit) => !unit.isSystem)
+      return found?.id ?? null
     },
 
     async createUnit(as, unit, baseUnitId) {
@@ -329,12 +343,16 @@ export function createPrismaDemoSeedGateway(options: PrismaDemoSeedGatewayOption
     },
 
     async findOrder(recipeId, quantity) {
-      const row = await prisma.order.findFirst({
-        where: { companyId: company(), recipeId, quantity: new Prisma.Decimal(quantity), deletedAt: null },
-        orderBy: { createdAt: 'asc' },
-        select: { id: true, status: true },
-      })
-      return row
+      // El listado no filtra por receta ni por cantidad: se recorre entero, del mas antiguo al
+      // mas nuevo, y gana el primero que coincide. Los borrados no salen nunca del listado.
+      const wanted = new Prisma.Decimal(quantity)
+      const as = await reader()
+      for (let page = 1; ; page += 1) {
+        const result = await pedidos.listOrders({ page, sort: { columnId: 'createdAt', direction: 'asc' } }, as)
+        const found = result.items.find((order) => order.recipeId === recipeId && wanted.equals(order.quantity))
+        if (found !== undefined) return { id: found.id, status: found.status }
+        if (page >= result.totalPages) return null
+      }
     },
 
     async createOrder(as, input) {
@@ -351,11 +369,11 @@ export function createPrismaDemoSeedGateway(options: PrismaDemoSeedGatewayOption
         },
         await actor(as),
       )
-      return { id: created.id, status: await orderStatus(created.id, company()) }
+      return { id: created.id, status: (await pedidos.getOrder(created.id, await reader())).status }
     },
 
     async hasResponsibles(orderId) {
-      return (await prisma.orderAssignment.count({ where: { orderId, companyId: company() } })) > 0
+      return (await asignaciones.listOrderResponsibles(await reader(), orderId)).length > 0
     },
 
     async assignResponsibles(as, orderId, userIds, workGroupIds) {
@@ -371,15 +389,9 @@ export function createPrismaDemoSeedGateway(options: PrismaDemoSeedGatewayOption
     },
 
     async findOrderStatus(orderId) {
-      return orderStatus(orderId, company())
+      return (await pedidos.getOrder(orderId, await reader())).status
     },
   }
-}
-
-async function orderStatus(orderId: string, companyId: string) {
-  const row = await prisma.order.findFirst({ where: { id: orderId, companyId }, select: { status: true } })
-  if (row === null) throw new Error(`el pedido ${orderId} no aparece en la empresa del seed`)
-  return row.status
 }
 
 async function applyOrderStep(

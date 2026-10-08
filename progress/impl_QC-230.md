@@ -80,3 +80,24 @@ Veredicto: hecho. Seed idempotente por los casos de uso, con guardas y tests en 
 - `pnpm exec vitest run tests/unit/scripts`: 3 archivos, 52 tests, todos verdes.
 - `pnpm run typecheck`: sin errores. `pnpm run lint`: 0 errores, 7 warnings previos en archivos no tocados.
 - Veredicto: H6 corregido y cubierto por test.
+
+## Correccion tras CI (contratos de modulo)
+- Rojo: `tests/unit/{asignaciones,pedidos,unidades}/module-contract.test.ts`. Barren `lib`, `app`,
+  `scripts`... y solo admiten que los adaptadores driven de cada modulo consulten `units`, `orders`
+  y `order_assignments` (pedidos R31, asignaciones R30). `scripts/seed-demo/gateway.ts` hacia
+  `prisma.unit`, `prisma.order` y `prisma.orderAssignment`.
+- Arreglo, solo en `scripts/seed-demo/gateway.ts`: esas lecturas van por casos de uso de
+  `lib/composition`, con el Administrador base como actor: `unidades.listUnits` (`isSystem`
+  distingue las de sistema), `pedidos.listOrders` (todas las paginas, por `createdAt` asc),
+  `pedidos.getOrder` y `asignaciones.listOrderResponsibles`. La interfaz `DemoSeedGateway` no cambia.
+- Los demas contratos (documentos, inventario, proveedores, recetas) no barren `scripts/`, o solo
+  miran `scripts/seed.ts`. La importacion de `identity/adapters/.../session-user-prisma` no la
+  prohibe ningun contrato ni guardia (`scripts/` queda fuera de `guard-arquitectura-modulos`), y la
+  composicion no publica otra forma de construir un actor fuera de una peticion: se mantiene.
+- 3 contratos: 58 passed. `vitest run module-contract`: 99 passed, 1 failed (recetas, en baseline,
+  por `app/(private)/pedidos/page.tsx`, que esta rama no toca). `tests/unit/scripts`: 52 passed.
+  `tests/unit`: 3 failed, 12365 passed, 123 skipped. Los 3 rojos estan en el baseline (recetas
+  module-contract y scope, navegacion/pantallas-exigen-permiso). typecheck limpio; lint 0 errores
+  y 7 warnings heredados. `seed-demo.int.test.ts`: 1 passed. `pnpm db:seed:demo` en la base local:
+  `0 creados` en todo.
+- Veredicto: los tres contratos en verde. El seed sigue siendo idempotente.
