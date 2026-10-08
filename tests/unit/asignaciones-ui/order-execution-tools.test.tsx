@@ -9,7 +9,7 @@ import {
   OrderExecutionTools,
   TOOL_NAME_FALLBACK,
 } from '@/app/(private)/asignacion/[id]/components';
-import type { AssignedOrderExecutionView, ExecutionToolView } from '@/lib/modules/asignaciones';
+import type { ExecutionToolView, StartedOrderExecution } from '@/lib/modules/asignaciones';
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-execution-actions', () => ({
   finishAssignedOrderAction: vi.fn(),
@@ -24,7 +24,7 @@ const TOOLS: readonly ExecutionToolView[] = [
   { productName: 'Balanza', quantity: 1 },
 ];
 
-function execution(tools: readonly ExecutionToolView[], orderQuantity = '250'): AssignedOrderExecutionView {
+function execution(tools: readonly ExecutionToolView[], orderQuantity = '250'): StartedOrderExecution {
   return {
     orderId: 'order-1',
     numberText: 'PED-0007',
@@ -37,6 +37,7 @@ function execution(tools: readonly ExecutionToolView[], orderQuantity = '250'): 
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    resumeStepPosition: null,
   };
 }
 

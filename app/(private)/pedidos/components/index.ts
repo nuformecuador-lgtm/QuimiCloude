@@ -42,6 +42,7 @@ export {
   CANCELLATION_REASON_COLUMN_ID,
   COVERAGE_COLUMN_ID,
   MISSING_VALUE_MARK,
+  ORDER_CUSTOMER_NAME_COLUMN_ID,
   ORDER_NUMBER_COLUMN_ID,
   PRESENTATION_NAME_COLUMN_ID,
   QUANTITY_COLUMN_ID,
@@ -51,6 +52,36 @@ export {
   type OrderColumnsDeps,
 } from './order-columns';
 export { OrderField, type OrderFieldProps } from './order-field';
+export {
+  ORDER_CUSTOMER_DELETED_SUFFIX,
+  ORDER_CUSTOMER_NONE_LABEL,
+  orderCustomerChoiceId,
+  orderCustomerChoiceLabel,
+  orderCustomerLabel,
+  type OrderCustomerChoice,
+} from './order-customer-label';
+export {
+  ORDER_CUSTOMER_DIALOG_DISMISS_TESTID,
+  ORDER_CUSTOMER_DIALOG_ERROR_TESTID,
+  ORDER_CUSTOMER_DIALOG_REMOVE_TESTID,
+  ORDER_CUSTOMER_DIALOG_SUBMIT_TESTID,
+  ORDER_CUSTOMER_DIALOG_TESTID,
+  ORDER_CUSTOMER_DIALOG_TOUCH_TARGET,
+  OrderCustomerDialog,
+  type OrderCustomerDialogProps,
+} from './order-customer-dialog';
+export {
+  ORDER_CUSTOMER_FILTER_TESTID,
+  OrderCustomerFilter,
+  withOrderCustomerFilter,
+  type OrderCustomerFilterProps,
+} from './order-customer-filter';
+export {
+  ORDER_CUSTOMER_PICKER_TESTID,
+  ORDER_CUSTOMER_PICKER_TOUCH_CLASSES,
+  OrderCustomerPicker,
+  type OrderCustomerPickerProps,
+} from './order-customer-picker';
 export { divideDecimal, multiplyDecimal, subtractDecimal } from './order-decimal';
 export {
   lineCoverage,
@@ -76,6 +107,7 @@ export {
 export {
   ORDER_BUSINESS_FIELDS,
   ORDER_CONFIRM_BLOCKED_FIELD,
+  ORDER_CUSTOMER_FIELD,
   ORDER_FORM_CANCEL_TESTID,
   ORDER_FORM_ERROR_TESTID,
   ORDER_FORM_SUBMIT_TESTID,
@@ -171,6 +203,10 @@ export {
   CREATED_AT_COLUMN_ID,
   CREATED_FROM_PARAM,
   CREATED_TO_PARAM,
+  CUSTOMER_COLUMN_ID,
+  CUSTOMER_NONE_PARAM_VALUE,
+  CUSTOMER_PARAM,
+  CUSTOMER_PRESENCE_COLUMN_ID,
   FILTER_SEPARATOR,
   FIRST_PAGE,
   ORDER_SEARCH_MAX_LENGTH,
@@ -192,6 +228,7 @@ export {
 export { OrderListSection } from './order-list-section';
 export { ORDER_SKELETON_COLUMN_COUNT, OrderListSkeleton } from './order-list-skeleton';
 export {
+  ORDER_ACTION_CUSTOMER_TESTID,
   ORDER_ACTION_DISTRIBUTION_TESTID,
   OrderRowActions,
   acceptsDistributionEdit,

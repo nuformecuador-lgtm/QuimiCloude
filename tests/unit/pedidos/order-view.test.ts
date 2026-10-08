@@ -26,6 +26,7 @@ const NEW_ORDER: NewOrder = {
   priority: 'ALTA',
   status: 'EN_CURSO',
   unitId: '33333333-3333-4333-8333-333333333333',
+  customerId: null,
   presentationLines: [],
 }
 
@@ -111,18 +112,24 @@ describe('pedidos — la salida de las consultas (R40, R46, R47)', () => {
     expect(enLaVista).toBe(true)
   })
 
-  it('los filtros del listado son solo estado, prioridad y fecha, y la busqueda ya se abrio (R11)', () => {
+  it('los filtros del listado son estado, prioridad, fecha y cliente, y la busqueda ya se abrio (R11, R23, R24, R26)', () => {
     // R38/R39 heredados, dichos sobre la forma NUEVA. QC-57 (R25) borro `OrderFilters`: estado
     // y prioridad dejaron de ser parametros propios del listado y son filtros `select` del
     // contrato generico. Lo que aquel tipo garantizaba lo garantiza ahora la lista blanca, y se
     // afirma sobre ella -no sobre un tipo que ya no existe-.
     expect(Object.keys(ORDER_QUERYABLE.filterable).sort()).toEqual([
       'createdAt',
+      'customerId',
+      'customerPresence',
       'priority',
       'status',
     ])
     expect(ORDER_QUERYABLE.filterable.status).toBe('select')
     expect(ORDER_QUERYABLE.filterable.priority).toBe('select')
+    // QC-156: el cliente filtra por id y «sin cliente» va en su propio campo; no ordena.
+    expect(ORDER_QUERYABLE.filterable.customerId).toBe('select')
+    expect(ORDER_QUERYABLE.filterable.customerPresence).toBe('select')
+    expect(ORDER_QUERYABLE.sortable).toEqual(['orderNumber', 'priority', 'status', 'createdAt', 'quantity'])
 
     // Nota fechada 2026-09-18: `orders` no tiene columna `name` propia, pero desde QC-68 la
     // busqueda casa por el nombre de la receta del pedido, resuelta antes de llegar al puerto.

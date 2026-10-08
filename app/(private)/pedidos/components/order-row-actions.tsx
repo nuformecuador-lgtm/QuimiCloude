@@ -1,6 +1,6 @@
 'use client';
 
-import { PackageIcon, PencilIcon, TrashIcon, UsersIcon, XCircleIcon } from 'lucide-react';
+import { PackageIcon, PencilIcon, TrashIcon, UserIcon, UsersIcon, XCircleIcon } from 'lucide-react';
 
 import { RowActionsMenu, type RowActionMenuItem } from '@/components/shared/row-actions-menu';
 import { type OrderStatus, type OrderSummary } from '@/lib/modules/pedidos';
@@ -107,6 +107,7 @@ export function acceptsDistributionEdit(status: OrderStatus): boolean {
 }
 
 export const ORDER_ACTION_DISTRIBUTION_TESTID = 'order-action-distribution';
+export const ORDER_ACTION_CUSTOMER_TESTID = 'order-action-customer';
 
 export type OrderRowActionsProps = {
   readonly order: OrderSummary;
@@ -124,6 +125,9 @@ export type OrderRowActionsProps = {
   /** Lo decide el servidor con el permiso de modificar pedidos; sin el, la accion no se pinta. */
   readonly canEditDistribution?: boolean;
   readonly onDistribution?: (order: OrderSummary) => void;
+  /** Lo decide el servidor con el permiso de modificar pedidos; sin el, la accion no se pinta. */
+  readonly canEditCustomer?: boolean;
+  readonly onCustomer?: (order: OrderSummary) => void;
 };
 
 export function OrderRowActions({
@@ -134,6 +138,8 @@ export function OrderRowActions({
   onResponsibles,
   canEditDistribution = false,
   onDistribution,
+  canEditCustomer = false,
+  onCustomer,
 }: OrderRowActionsProps) {
   const isFinal = isFinalOrderStatus(order.status);
   const showDistribution = canEditDistribution && acceptsDistributionEdit(order.status);
@@ -175,6 +181,17 @@ export function OrderRowActions({
       testId: 'order-action-responsibles',
     },
   ];
+
+  // Sin `disabled`: el cliente se puede cambiar en cualquier estado.
+  if (canEditCustomer) {
+    items.push({
+      key: 'customer',
+      label: 'Cliente',
+      icon: UserIcon,
+      onSelect: () => onCustomer?.(order),
+      testId: ORDER_ACTION_CUSTOMER_TESTID,
+    });
+  }
 
   if (showDistribution) {
     items.push({

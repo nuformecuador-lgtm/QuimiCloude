@@ -19,11 +19,12 @@ import {
   ORDER_EXECUTION_PRESENTATION_TESTID,
   ORDER_EXECUTION_RECIPE_MISSING_TESTID,
   ORDER_EXECUTION_SCREEN_TESTID,
+  ORDER_EXECUTION_STEP_POSITION_FIELD,
   ORDER_EXECUTION_TITLE_TESTID,
   ORDER_EXECUTION_TOOLS_TESTID,
   OrderExecutionScreen,
 } from '@/app/(private)/asignacion/[id]/components';
-import type { AssignedOrderExecutionView } from '@/lib/modules/asignaciones';
+import type { StartedOrderExecution } from '@/lib/modules/asignaciones';
 
 /**
  * El recorrido completo: R18, R19, R20, R21, R26. La confirmacion visible de R15 vive en la
@@ -36,6 +37,8 @@ const { finishAssignedOrderActionMock } = vi.hoisted(() => ({
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-execution-actions', () => ({
   finishAssignedOrderAction: finishAssignedOrderActionMock,
+  recordStepMoveAction: vi.fn(() => Promise.resolve({ status: 'success' })),
+  cancelAssignedOrderAction: vi.fn(),
 }));
 
 afterEach(() => {
@@ -52,7 +55,7 @@ const MILILITRO = {
   factor: '0.001',
 } as const;
 
-const EXECUTION: AssignedOrderExecutionView = {
+const EXECUTION: StartedOrderExecution = {
   orderId: 'order-1',
   numberText: 'PED-0007',
   status: 'EN_CURSO',
@@ -80,6 +83,7 @@ const EXECUTION: AssignedOrderExecutionView = {
   presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
   unitId: null,
   unitLabel: null,
+  resumeStepPosition: null,
 };
 
 function marcarTodo(): void {
@@ -91,12 +95,12 @@ function marcarTodo(): void {
 }
 
 // Un paso sin lista de verificacion: aisla la espera de tiempo del bloqueo por elementos.
-const EXECUTION_SIN_ELEMENTOS: AssignedOrderExecutionView = {
+const EXECUTION_SIN_ELEMENTOS: StartedOrderExecution = {
   ...EXECUTION,
   steps: [{ blocks: [{ kind: 'paragraph', spans: [{ text: 'Paso sin elementos pendientes' }] }] }],
 };
 
-const EXECUTION_DOS_PASOS: AssignedOrderExecutionView = {
+const EXECUTION_DOS_PASOS: StartedOrderExecution = {
   ...EXECUTION,
   steps: [
     { blocks: [{ kind: 'paragraph', spans: [{ text: 'Paso uno sin elementos' }] }] },
@@ -339,7 +343,12 @@ describe('pantalla de ejecucion — R18: el envio no lleva la espera y remontar 
 
       expect(finishAssignedOrderActionMock).toHaveBeenCalledTimes(1);
       const [, formData] = finishAssignedOrderActionMock.mock.calls[0] as [unknown, FormData];
-      expect([...formData.keys()]).toEqual([ORDER_EXECUTION_ORDER_ID_FIELD]);
+      // 2026-10-06: el envio suma la posicion del paso (QC-82). Lo que protege no cambia:
+      // no viaja nada de la espera.
+      expect([...formData.keys()]).toEqual([
+        ORDER_EXECUTION_ORDER_ID_FIELD,
+        ORDER_EXECUTION_STEP_POSITION_FIELD,
+      ]);
       expect(formData.get(ORDER_EXECUTION_ORDER_ID_FIELD)).toBe(EXECUTION_DOS_PASOS.orderId);
 
       unmount();

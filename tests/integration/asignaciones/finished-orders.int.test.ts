@@ -48,6 +48,7 @@ import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classificat
 
 import { NOW, actorOf, createOrder, createPerson, crearLinea, inRolledBackTransaction } from './use-case-fixture';
 import { realOrderSummaries } from '../../helpers/order-summaries';
+import { executionOnClient } from '../../helpers/execution-transaction-on-client';
 
 const summaryReaders = realOrderSummaries();
 
@@ -100,6 +101,7 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
     },
   };
   const assignments = createOrderAssignmentRepository(tx);
+  const execution = executionOnClient(tx, orders);
 
   return {
     orders,
@@ -136,11 +138,12 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
       orders,
       people: assignmentDirectoryPrisma,
       groups: assignmentDirectoryPrisma,
+      ...execution,
       now: () => NOW,
     }),
     // R27: Comenzar y Terminar, mismos `orders` y mismo reloj que el resto del fixture.
-    startPacking: createStartPacking({ orders, now: () => NOW }),
-    finishPacking: createFinishPacking({ orders, now: () => NOW }),
+    startPacking: createStartPacking({ orders, ...execution, now: () => NOW }),
+    finishPacking: createFinishPacking({ orders, ...execution, now: () => NOW }),
   };
 }
 
@@ -252,7 +255,7 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       // El Finalizar de QC-168 deja el pedido POR_EMPACAR, no ENTREGADO: el lote de producto
       // terminado que entra viene en la respuesta, pero `finished_at` lo escribe Terminar.
       // Finalizar exige `asignaciones.ejecutar`, que el Empacador no tiene.
-      await finishAssignedOrder({ ...actorEmpacador, permissions: PERMISOS_CON_EJECUCION }, { orderId: pedido });
+      await finishAssignedOrder({ ...actorEmpacador, permissions: PERMISOS_CON_EJECUCION }, { orderId: pedido, stepPosition: null });
 
       expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
     });
@@ -286,7 +289,7 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       };
 
       // Finalizar: EN_CURSO -> POR_EMPACAR. Todavia no aparece en «Terminados».
-      await finishAssignedOrder(actorOperario, { orderId: pedido });
+      await finishAssignedOrder(actorOperario, { orderId: pedido, stepPosition: null });
       expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
 
       // R10: Comenzar exige al menos una linea de reparto real, o el pedido queda

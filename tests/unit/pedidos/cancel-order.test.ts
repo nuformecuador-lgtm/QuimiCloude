@@ -56,6 +56,7 @@ function fila(status: OrderStatus, cancellationReason: string | null = null): Or
     updatedBy: 'admin-0',
     presentationLines: [],
     unitId: null,
+    customerId: null,
   }
 }
 

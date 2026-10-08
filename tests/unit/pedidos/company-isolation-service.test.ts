@@ -43,6 +43,7 @@ import { createUnassignResponsible } from '@/lib/modules/asignaciones/domain/una
 
 import type { Actor as AsignacionesActor } from '@/lib/modules/asignaciones/domain/actor'
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository'
+import type { CustomerCatalog } from '@/lib/modules/clientes'
 import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity'
 import type { OrderAssignmentTarget, OrderCatalog } from '@/lib/modules/pedidos'
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
@@ -62,6 +63,7 @@ import {
   fakeUnitOfWork,
 } from '@/tests/helpers/order-unit-of-work-double'
 import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
+import { fakeCustomerCatalog } from '../../helpers/customer-catalog-double';
 
 const EMPRESA_A = '33333333-3333-4333-8333-333333333333'
 const EMPRESA_B = '44444444-4444-4444-8444-444444444444'
@@ -112,6 +114,7 @@ function fila(id: string): OrderRow {
     updatedBy: 'u-0',
     presentationLines: [],
     unitId: UNIDAD,
+    customerId: null,
   }
 }
 
@@ -262,10 +265,10 @@ type Almacen = ReturnType<typeof almacen>
 function casosDeUso(a: Almacen) {
   const now = () => new Date('2026-09-15T10:00:00.000Z')
   return {
-    createOrder: createCreateOrder({ recipes: a.recipes, products: a.products, units: a.units, presentations: a.presentations, packaging: fakePackagingCatalog(), unitOfWork: a.unitOfWork, now }),
-    getOrder: createGetOrder({ orders: a.orders, recipes: a.recipes, presentations: a.presentations, packaging: fakePackagingCatalog(), units: a.units }),
-    listOrders: createListOrders({ orders: a.orders, recipes: a.recipes, presentations: a.presentations, packaging: fakePackagingCatalog(), units: a.units, log: a.log }),
-    updateOrder: createUpdateOrder({ orders: a.orders, recipes: a.recipes, products: a.products, units: a.units, presentations: a.presentations, packaging: fakePackagingCatalog(), unitOfWork: a.unitOfWork, now }),
+    createOrder: createCreateOrder({ customerCatalog: fakeCustomerCatalog(), recipes: a.recipes, products: a.products, units: a.units, presentations: a.presentations, packaging: fakePackagingCatalog(), unitOfWork: a.unitOfWork, now }),
+    getOrder: createGetOrder({ customerCatalog: fakeCustomerCatalog(), orders: a.orders, recipes: a.recipes, presentations: a.presentations, packaging: fakePackagingCatalog(), units: a.units }),
+    listOrders: createListOrders({ customerCatalog: fakeCustomerCatalog(), orders: a.orders, recipes: a.recipes, presentations: a.presentations, packaging: fakePackagingCatalog(), units: a.units, log: a.log }),
+    updateOrder: createUpdateOrder({ customerCatalog: fakeCustomerCatalog(), orders: a.orders, recipes: a.recipes, products: a.products, units: a.units, presentations: a.presentations, packaging: fakePackagingCatalog(), unitOfWork: a.unitOfWork, now }),
     cancelOrder: createCancelOrder({ orders: a.orders, unitOfWork: a.unitOfWork, now }),
     deleteOrder: createDeleteOrder({ orders: a.orders, unitOfWork: a.unitOfWork, now }),
   }
@@ -423,6 +426,7 @@ describe('QC-138 R38 — bloquear al crear o editar solo toca la empresa de quie
       units: a.units,
       presentations: a.presentations,
       packaging: fakePackagingCatalog(),
+      customerCatalog: fakeCustomerCatalog(),
       unitOfWork,
       now,
     }
@@ -555,6 +559,11 @@ describe('QC-60 R16, R28 — el PERMISO se exige ANTES que el ambito', () => {
       units: units as unknown as UnitCatalog,
       presentations: presentations as unknown as PresentationCatalog,
       packaging: packaging as unknown as PackagingCatalog,
+      customerCatalog: {
+        findRefsIncludingDeleted: explota('customerCatalog.findRefsIncludingDeleted'),
+        findAliveRefById: explota('customerCatalog.findAliveRefById'),
+        searchRefs: explota('customerCatalog.searchRefs'),
+      } as unknown as CustomerCatalog,
       log,
     }
     return {
@@ -624,6 +633,7 @@ describe('R8 / QC-195 R11: un envase de otra empresa se rechaza como inexistente
     const presentations = a.presentations
     const packaging = envasesDe(EMPRESA_B)
     const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       recipes: a.recipes,
       products: a.products,
       units: a.units,
@@ -644,6 +654,7 @@ describe('R8 / QC-195 R11: un envase de otra empresa se rechaza como inexistente
     const presentations = a.presentations
     const packaging = envasesDe(EMPRESA_B)
     const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
       orders: a.orders,
       recipes: a.recipes,
       products: a.products,

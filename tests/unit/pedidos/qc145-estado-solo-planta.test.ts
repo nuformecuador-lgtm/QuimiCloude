@@ -248,11 +248,15 @@ describe('R10 — EN_CURSO/ENTREGADO solo los escribe setAliveOrderStatus o Term
     ).toEqual([]);
   });
 
-  it('order-prisma.ts: la lista exacta de funciones con un bloque `data:` que fija `status:` es cancelAliveOrder, finishPackingAliveOrder, setAliveOrderStatus y startPackingAliveOrder', () => {
+  it('order-prisma.ts: la lista exacta de funciones con un bloque `data:` que fija `status:` es cancelAliveOrder, finishPackingAliveOrder, lockAndStartPackingAlive y setAliveOrderStatus', () => {
+    // 2026-10-06 (QC-82): la escritura de Comenzar empaque se mudo de `startPackingAliveOrder` a
+    // `lockAndStartPackingAlive`, que la exportada envuelve en su transaccion y que la fabrica
+    // `createOrderPackingRepository` reutiliza dentro de la de quien llama. Es el MISMO bloque
+    // `data:` cambiado de funcion, no una escritura nueva: la lista sigue cerrada en cuatro.
     const fuente = readFileSync(join(repoRoot, ORDER_PRISMA), 'utf8');
 
     expect(funcionesConStatusEnData(fuente)).toEqual(
-      ['cancelAliveOrder', 'finishPackingAliveOrder', 'setAliveOrderStatus', 'startPackingAliveOrder'].sort(),
+      ['cancelAliveOrder', 'finishPackingAliveOrder', 'lockAndStartPackingAlive', 'setAliveOrderStatus'].sort(),
     );
   });
 

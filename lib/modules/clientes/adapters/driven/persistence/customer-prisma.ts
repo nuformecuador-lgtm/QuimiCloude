@@ -14,8 +14,9 @@ import type { CustomerScope } from '../../../domain/customer-scope';
 import type { NewCustomer, CustomerView } from '../../../domain/customer-view';
 
 /**
- * Implementa `CustomerRepository` con Prisma. Junto con `company-scope.ts` es el UNICO archivo
- * del modulo que importa `@prisma/client`. Ninguna consulta nombra otro modelo.
+ * Implementa `CustomerRepository` con Prisma. Junto con `company-scope.ts` y
+ * `customer-catalog-prisma.ts` son los UNICOS archivos del modulo que importan `@prisma/client`.
+ * Ninguna consulta nombra otro modelo.
  *
  * `deleted_at IS NULL` va en el `where` de toda lectura y de toda escritura que exija que la
  * fila siga viva, nunca en un `if` posterior: el filtro es del puerto, y por eso ningun caso de
@@ -216,7 +217,7 @@ function customerFilterWhere(
  * un termino hecho solo de simbolos equivale a no buscar. Sin `mode: 'insensitive'`: las
  * columnas ya estan en minusculas y sin acentos.
  */
-function searchCondition(search: string): readonly Prisma.CustomerWhereInput[] | null {
+export function searchCondition(search: string): readonly Prisma.CustomerWhereInput[] | null {
   const words = search
     .split(/\s+/)
     .map((word) => normalizeCustomerText(word))

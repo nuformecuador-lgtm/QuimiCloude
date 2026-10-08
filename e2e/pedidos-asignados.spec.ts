@@ -557,6 +557,7 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
     const orphanCompanyIds = orphanCompanies.map((company) => company.id);
     if (orphanCompanyIds.length > 0) {
       await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+      await prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
       await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
       await prisma.recipe.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     }
@@ -639,6 +640,10 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
       () =>
         scopedCompanyId
           ? prisma.orderAssignment.deleteMany({ where: { companyId: scopedCompanyId } })
+          : Promise.resolve(),
+      () =>
+        scopedCompanyId
+          ? prisma.orderExecutionEntry.deleteMany({ where: { companyId: scopedCompanyId } })
           : Promise.resolve(),
       () =>
         scopedCompanyId

@@ -77,6 +77,7 @@ import {
 } from './helpers/confirm-dialog';
 import { addPackagingLine } from './helpers/order-distribution';
 import { batchStock, seedPackaging } from './helpers/packaging';
+import { exactProductNameCellText } from './helpers/product-name-cell';
 
 const FIXTURE_PREFIX = 'qc150_e2e_';
 
@@ -181,17 +182,6 @@ let empacadorUserId: string | null = null;
 /** Igualdad EXACTA de texto: un correlativo o un nombre no puede casar con el prefijo de otro. */
 function exactText(value: string): RegExp {
   return new RegExp(`^\\s*${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`);
-}
-
-/**
- * Igualdad del nombre de producto EN LA CELDA de la tabla, que puede llevar la unidad anadida
- * detras (`productDisplayName`, `product-columns.tsx > nameCell`): «nombre · simbolo». Se exige
- * el nombre completo y exacto al principio -sigue sin poder casar con el prefijo de otro-, con un
- * sufijo de unidad opcional, nunca un sufijo cualquiera.
- */
-function exactProductNameCellText(value: string): RegExp {
-  const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`^\\s*${escaped}(?:\\s*·\\s*\\S.*)?\\s*$`);
 }
 
 function ordersUrl(): string {
@@ -371,6 +361,7 @@ test.beforeAll(async () => {
     await prisma.inventoryMovement.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     // Todos los lotes de la empresa huerfana, del producto de formula y del terminado: sus
     // movimientos ya cayeron arriba, y sin lotes ningun producto queda restringido por ellos.
@@ -560,6 +551,8 @@ test.afterAll(async () => {
       scopedCompanyId
         ? prisma.orderPresentationLine.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
+    () =>
+      scopedCompanyId ? prisma.orderExecutionEntry.deleteMany({ where: { companyId: scopedCompanyId } }) : Promise.resolve(),
     () =>
       scopedCompanyId ? prisma.order.deleteMany({ where: { companyId: scopedCompanyId } }) : Promise.resolve(),
     // Todos los lotes primero, del producto de la receta y del terminado que Finalizar da de

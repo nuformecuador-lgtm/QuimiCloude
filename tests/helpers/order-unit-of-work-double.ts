@@ -186,6 +186,7 @@ export function fakeOrderRow(overrides: Partial<LockedOrderRow> = {}): LockedOrd
     updatedBy: 'admin-0',
     presentationLines: [],
     unitId: null,
+    customerId: null,
     reservedAt: new Date('2026-01-02T03:04:05.000Z'),
     packagingCost: null,
     ...overrides,

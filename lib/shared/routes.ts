@@ -266,6 +266,12 @@ export function packingOrderRoute(id: string): string {
 export const PACKED_ORDER_PARAM = 'empacado';
 
 /**
+ * Nombre del parametro de consulta con el que la lista de pedidos asignados anuncia que uno
+ * acaba de cancelarse: `?cancelado=<numero>`. El aviso se pinta en cualquier vista.
+ */
+export const CANCELLED_ORDER_PARAM = 'cancelado';
+
+/**
  * Pantalla de clientes.
  *
  * Vive aqui y no en `navigation/private-nav.ts` porque el middleware y la regla ruta->rol de

@@ -665,9 +665,9 @@ enum OrderPriority {
 /// Sin fecha de solicitud: es `createdAt`. El correlativo es un indice unico total, no parcial: un
 /// pedido dado de baja conserva su numero, y se mide DENTRO de la empresa: `(empresa, ano,
 /// secuencia)`. `orderYear` es el ano de `createdAt` en UTC, y lo exige el CHECK
-/// `orders_order_year_matches_created_at`. `recipeId`, `createdBy`, `updatedBy` y `companyId` van
-/// sin `@relation` porque apuntan a otros modulos; sus FK y CHECK estan escritos a mano y son drift:
-/// hay que borrar a mano su `DROP CONSTRAINT` de toda migracion generada.
+/// `orders_order_year_matches_created_at`. `recipeId`, `createdBy`, `updatedBy`, `companyId` y
+/// `customerId` van sin `@relation` porque apuntan a otros modulos; sus FK y CHECK estan escritos a
+/// mano y son drift: hay que borrar a mano su `DROP CONSTRAINT` de toda migracion generada.
 /// `orders_id_company_id_key` es la clave candidata a la que apunta la FK COMPUESTA de
 /// `order_assignments`: quitarla la rompe.
 /// Los indices de listado son parciales y viven en la migracion `list_query_indexes`.
@@ -716,6 +716,9 @@ model Order {
   /// `@relation`: `Unit` es de `unidades`, es drift. NULL solo en pedidos anteriores sin
   /// presentacion; la aplicacion la exige en el alta y en la edicion.
   unitId              String?       @map("unit_id") @db.Uuid
+  /// Cliente del pedido, opcional. Sin `@relation`: `Customer` es de `clientes`, es drift. FK
+  /// COMPUESTA `(company_id, customer_id)` a `customers_company_id_id_key`, escrita a mano.
+  customerId          String?       @map("customer_id") @db.Uuid
 
   presentationLines OrderPresentationLine[]
 
@@ -727,6 +730,7 @@ model Order {
   @@index([packedBy], map: "orders_packed_by_idx")
   @@index([conditionedBy], map: "orders_conditioned_by_idx")
   @@index([unitId], map: "orders_unit_id_idx")
+  @@index([companyId, customerId], map: "orders_company_id_customer_id_idx")
   @@map("orders")
 }
 
@@ -877,4 +881,37 @@ model Customer {
   @@index([createdBy], map: "customers_created_by_idx")
   @@index([updatedBy], map: "customers_updated_by_idx")
   @@map("customers")
+}
+
+enum OrderExecutionAction {
+  START
+  RESUME
+  ADVANCE
+  GO_BACK
+  CANCEL
+  FINISH
+  PACK_START
+  PACK_FINISH
+}
+
+/// Una fila por movimiento sobre la ejecucion de un pedido. Solo se inserta: no se edita ni se
+/// borra, y por eso no hay `created_at`, `updated_at` ni `deleted_at`. `occurredAt` no tiene
+/// default porque el caso de uso escribe el mismo instante que deja en el pedido. Sin
+/// `@relation`: las dos FK son compuestas con `company_id` y estan escritas a mano en la
+/// migracion, igual que sus tres CHECK; hay que borrar su `DROP CONSTRAINT` de toda migracion
+/// generada.
+/// @module asignaciones
+model OrderExecutionEntry {
+  id           String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String               @map("company_id") @db.Uuid
+  orderId      String               @map("order_id") @db.Uuid
+  userId       String               @map("user_id") @db.Uuid
+  action       OrderExecutionAction
+  stepPosition Int?                 @map("step_position")
+  reason       String?
+  occurredAt   DateTime             @map("occurred_at") @db.Timestamptz(6)
+
+  @@index([orderId, occurredAt(sort: Desc)], map: "order_execution_entries_order_id_occurred_at_idx")
+  @@index([userId], map: "order_execution_entries_user_id_idx")
+  @@map("order_execution_entries")
 }

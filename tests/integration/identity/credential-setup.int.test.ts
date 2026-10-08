@@ -31,10 +31,12 @@
  * solapen es una apuesta: si la primera confirma antes de que la segunda empiece, la segunda
  * sustituye su enlace y las dos salen bien —el invariante se cumple, pero el `23505` no se ha
  * ejercido y el test sale verde sin haber probado nada—. Asi que la carrera se FUERZA: una tercera
- * conexion bloquea con `SELECT … FOR UPDATE` el enlace vivo anterior, las dos emisiones se quedan
- * esperando en su paso 1 —lo que se comprueba leyendo `pg_stat_activity`, no durmiendo—, y al
- * soltar el bloqueo una gana, sustituye y confirma, y la otra choca contra el indice parcial. El
- * resultado es determinista: exactamente un `'superseded'`.
+ * conexion bloquea con `SELECT … FOR UPDATE` el enlace vivo anterior, y SOLO CUANDO EL BLOQUEO ESTA
+ * TOMADO se lanzan las dos emisiones (D34: lanzarlas a la vez que el bloqueo dejaba el orden al
+ * planificador y fallaba en el runner de 2 vCPU). Las dos se quedan esperando en su paso 1 —lo que
+ * se comprueba leyendo `pg_stat_activity`, no durmiendo—, y al soltar el bloqueo una gana, sustituye
+ * y confirma, y la otra choca contra el indice parcial. El resultado es determinista: exactamente
+ * un `'superseded'`.
  *
  * AISLAMIENTO: CONSTRUCCION PROPIA + LIMPIEZA PROPIA, como `user-crud.int.test.ts` y
  * `last-administrator.int.test.ts`. **Aqui NO se puede usar el `$transaction` + senal de rollback
@@ -626,6 +628,8 @@ describe('QC-79 T20 — el enlace de credencial contra Postgres real', () => {
         });
 
         const gate = createGate();
+        const sostenido = createGate();
+        let filasBloqueadas = -1;
         const digestA = createCredentialSetupSecret().digest;
         const digestB = createCredentialSetupSecret().digest;
 
@@ -633,16 +637,28 @@ describe('QC-79 T20 — el enlace de credencial contra Postgres real', () => {
         // esten encoladas. Sin esto la carrera seria una apuesta (ver cabecera).
         const bloqueo = prisma.$transaction(
           async (tx) => {
-            await tx.$queryRaw(Prisma.sql`
+            const filas = await tx.$queryRaw<ReadonlyArray<{ id: string }>>(Prisma.sql`
               SELECT "id" FROM "credential_setup_tokens"
                WHERE "user_id" = ${userId}::uuid
                  AND "consumed_at" IS NULL AND "superseded_at" IS NULL
                FOR UPDATE
             `);
+            filasBloqueadas = filas.length;
+            sostenido.open();
             await gate.opened;
           },
           { maxWait: 10_000, timeout: 10_000 },
         );
+
+        // D34: las emisiones NO se lanzan hasta que el bloqueo esta TOMADO. Lanzarlas a la vez que
+        // el `$transaction` del bloqueo dejaba el orden al planificador: si una emision llegaba a
+        // su paso 1 antes que el `FOR UPDATE`, ganaba sin esperar, confirmaba en milisegundos y
+        // nunca habia dos sesiones encoladas que contar (`waitForLockWaiters` agotaba su plazo).
+        // El `race` contra `bloqueo` hace que un fallo del bloqueo salga aqui y no como un cuelgue.
+        await Promise.race([sostenido.opened, bloqueo]);
+        // Y el bloqueo tiene que haber atrapado EXACTAMENTE el enlace anterior: con cero filas no
+        // habria nada sobre lo que encolarse.
+        expect(filasBloqueadas).toBe(1);
 
         const emitir = (adapter: LinkAdapter, digest: string) =>
           adapter.issueForPendingUser({
@@ -654,8 +670,13 @@ describe('QC-79 T20 — el enlace de credencial contra Postgres real', () => {
           });
 
         const carrera = Promise.all([emitir(adapterA, digestA), emitir(adapterB, digestB)]);
-        await waitForLockWaiters(2);
-        gate.open();
+        try {
+          await waitForLockWaiters(2);
+        } finally {
+          // Se suelta pase lo que pase: si la espera fallara, el bloqueo no debe quedarse colgado
+          // hasta su `timeout` reteniendo la fila que la limpieza del `finally` tiene que borrar.
+          gate.open();
+        }
         await bloqueo;
 
         const [resultadoA, resultadoB] = await carrera;

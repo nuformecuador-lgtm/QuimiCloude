@@ -290,6 +290,16 @@ export class OrderBlockedError extends AsignacionesError {
   }
 }
 
+/** Cancelar un pedido cuyo estado ya no admite cancelacion. Mismo `code` que
+ *  `NotCancellableError` de `pedidos`. */
+export class NotCancellableError extends AsignacionesError {
+  readonly code = 'not_cancellable';
+
+  constructor(diagnostic?: string) {
+    super('not_cancellable', diagnostic);
+  }
+}
+
 /** Comenzar sobre un pedido `POR_EMPACAR` sin ninguna linea de reparto. Mismo `code` que
  *  `OrderWithoutDistributionError` de `pedidos`. */
 export class OrderWithoutDistributionError extends AsignacionesError {

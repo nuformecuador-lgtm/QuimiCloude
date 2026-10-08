@@ -219,7 +219,7 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       sortable: true,
       width: 500,
       hideText: false,
-      cell: (product) => product.name
+      cell: (product) => productDisplayName(product.name, productUnitLabel(product, units)),
     },
     {
       id: 'stock',

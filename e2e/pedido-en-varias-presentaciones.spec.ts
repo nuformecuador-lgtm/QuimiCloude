@@ -379,6 +379,7 @@ test.beforeAll(async () => {
     await prisma.inventoryMovement.deleteMany({ where: inOrphans });
     await prisma.orderAssignment.deleteMany({ where: inOrphans });
     await prisma.orderPresentationLine.deleteMany({ where: inOrphans });
+    await prisma.orderExecutionEntry.deleteMany({ where: inOrphans });
     await prisma.order.deleteMany({ where: inOrphans });
     await prisma.productBatch.deleteMany({ where: inOrphans });
     // El producto terminado restringe el borrado de la receta; el ingrediente, al reves.
@@ -524,6 +525,7 @@ test.afterAll(async () => {
     () => (byCompany ? prisma.orderAssignment.deleteMany({ where: byCompany }) : Promise.resolve()),
     () =>
       byCompany ? prisma.orderPresentationLine.deleteMany({ where: byCompany }) : Promise.resolve(),
+    () => (byCompany ? prisma.orderExecutionEntry.deleteMany({ where: byCompany }) : Promise.resolve()),
     () => (byCompany ? prisma.order.deleteMany({ where: byCompany }) : Promise.resolve()),
     () => (byCompany ? prisma.productBatch.deleteMany({ where: byCompany }) : Promise.resolve()),
     () =>
