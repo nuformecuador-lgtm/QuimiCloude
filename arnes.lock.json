@@ -23,16 +23,16 @@
     "AGENTS.md": "7099a09f88b4922c7036b7947a2a29dd1e960d3704da20d49a9dbd64e0dc5172",
     "CHECKPOINTS.md": "2182749c4481e05cbe32ee3778ec71b9ce4827e8644489edacd81d24254bfd1e",
     "CLAUDE.md": "0010f3f28083d176abada26206f3c4e373b2d172fde1544996b641e09c7b42a3",
-    "arnes.manifest": "db392eacb32940def7ad1aef7ff62630e68f0fba6189e3be9d7ecf222affc9fd",
+    "arnes.manifest": "1287bd28e63b7f98fc6a8a6df63a0302d0d9d75a498ff6cc42925c4c2a2b8f21",
     "docs/equipo.md": "b165f10adeaecd30eb94a08c2f21e9b4dca4d8d4360b5ea13a7eddeccbc38e9d",
-    "docs/gate.md": "9314647f406d44e7d85d38d1fd5ada5ab518658c25b3236521fd0986210ba705",
+    "docs/gate.md": "c7501bc17c89643fd8effc28c374132cf3556432817a33336adb85a1fd2e0838",
     "docs/grafo-de-codigo.md": "9279062f42d0b6c80c9be190841ef432454faa7b465cb789ff198b529cfa83dc",
     "docs/guia-de-uso.md": "bfadc8777e8d97118d6e919b449e27975eeb43cfcd5926e41d5cee2d73ec6115",
     "docs/jira.md": "f62c349d502ef828e409d88cc92f4b12de855ec392cb0fb35505fd14abb65d7f",
     "docs/lectura.md": "7ec10c5958f1f5547a9fee3bee042b5d3530cebe82985d27e2b1bc37c6d06df8",
     "docs/specs.md": "73392ff7fdee8c288d035ad308c6484d170e2564665bacc354dd2267a4df6c48",
     "docs/worktrees.md": "ad47b4ebea9fcefff1c99c504da47eafe0a150f1c046abb18bed3e6c48325a13",
-    "init.sh": "f07321c06f438fef87c8e31f385808c3786f61584b280655f38ffb8337caffe0",
+    "init.sh": "95ebc32d9c8c67159eb023d4d3cbaaba19d6ef65ddccf6f3c96ef251d7c77883",
     "progress/README.md": "c072d602a087642db725af1b25ced07ee7a4e798d9d525e5f869b61195562667",
     "progress/features/_plantilla.md": "bad3821f02739f3e41d2d2a06c90329495639dcdc2cb719237673ae8f100cdf9",
     "progress/sesion.local.example.md": "4fcd2375c8005b2427240950756fe330a73bfb772d763cd7f3959c2349ccaf25",
@@ -47,7 +47,9 @@
     "tests/guards/guard-dependencias-aprobadas.test.ts": "22568afc7962c5c5eb647372c8e5d1f4e4c8118dce937c4281ce38ec50731210",
     "tests/guards/guard-modelos-de-agentes.test.ts": "f992813344b14abf8a7c4b7905a20f370f07c95a3cf85e1cb37fe250c9e21bb9",
     "tests/guards/guard-validador-equipo.test.ts": "22b030466bd0795afc140a94b6f49dd15cc1ef0a273fd509da7d6a88fb411ef4",
-    "tests/guards/guard-validador-ve-worktrees-hermanos.test.ts": "94073a3c997456073b4421902021e7fd9683060a5552a0c3da8c126a174b4abd"
+    "tests/guards/guard-validador-ve-worktrees-hermanos.test.ts": "94073a3c997456073b4421902021e7fd9683060a5552a0c3da8c126a174b4abd",
+    "scripts/unir-informes-vitest.mjs": "1d9a20f90a5732a45768541220d1e664c8bffb3038f87b70f70113d44f76b85b",
+    "tests/guards/guard-unir-informes-vitest.test.ts": "5c6aa29de5039484239f67d851054b25a21d994c81f59c2406c2979b695cac0d"
   },
   "subidos": [
     {
@@ -58,6 +60,17 @@
         "scripts/arnes-sync.mjs"
       ],
       "fecha": "2026-10-07"
+    },
+    {
+      "pr": "https://github.com/singularis-co/harness_config/pull/7",
+      "archivos": [
+        "arnes.manifest",
+        "docs/gate.md",
+        "init.sh",
+        "scripts/unir-informes-vitest.mjs",
+        "tests/guards/guard-unir-informes-vitest.test.ts"
+      ],
+      "fecha": "2026-10-08"
     }
   ]
 }
