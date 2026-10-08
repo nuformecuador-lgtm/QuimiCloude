@@ -12,7 +12,7 @@
 
 ## Bloque A — Contratos de dominio (backend)
 
-- [ ] **T1 [P] — `orderNumberContains` en `pedidos`.** En `domain/order-number.ts`, al lado de
+- [x] **T1 [P] — `orderNumberContains` en `pedidos`.** En `domain/order-number.ts`, al lado de
   `formatOrderNumber` y exportada por el barril (`design.md > 3.3`, punto 1).
   **Hecho cuando:** test unitario con los ejemplos de R6, uno por caso: `42` casa con
   `{2026, 42}`, `{2026, 142}` y `{2026, 4200}` y no con `{2026, 43}`; `0000042` casa con
@@ -23,7 +23,7 @@
   dígito), aunque `-` sea subcadena de todos; y una secuencia de ocho dígitos se compara contra su
   forma sin truncar (la de `formatOrderNumber`). Cubre **R6**.
 
-- [ ] **T2 [P] — `listSummariesByIdsIncludingDeleted` en el contrato de `pedidos`.** Tipo
+- [x] **T2 [P] — `listSummariesByIdsIncludingDeleted` en el contrato de `pedidos`.** Tipo
   `OrderHistorySummary` y método nuevo en `OrderCatalog`; `listNumbersByIdsIncludingDeleted` y
   `listHistoryByIdsIncludingDeleted` en `ports/order-summary-reader.ts`; factoría
   `createListSummariesByIdsIncludingDeleted` en `domain/list-order-summaries.ts`; dos funciones en
@@ -42,7 +42,7 @@
   guardia de ámbito siguen verdes, y `listAliveSummariesByIds` sigue excluyendo los dados de baja.
   Cubre **R1, R4, R6, R9, R10, R18, R23, R24** (lado `pedidos`).
 
-- [ ] **T3 [P] — `buildExecutionTrace` (puro).** `domain/execution-trace.ts` y el tipo
+- [x] **T3 [P] — `buildExecutionTrace` (puro).** `domain/execution-trace.ts` y el tipo
   `ExecutionEntryRecord` en `domain/execution-entry.ts` (`design.md > 3.4`).
   **Hecho cuando:** tests unitarios de: tramos (la última sin tramo); **una sola** `duration`, sin
   campos de ejecución ni de empaque; `closed` con `ENTREGADO` y última `pack_finish`, medida de la
@@ -56,7 +56,7 @@
 
 ## Bloque B — Registro y casos de uso (backend)
 
-- [ ] **T4 — Lecturas del registro.** Tres métodos en `ports/execution-log-repository.ts` y su
+- [x] **T4 — Lecturas del registro.** Tres métodos en `ports/execution-log-repository.ts` y su
   implementación en `execution-log-prisma.ts`, con el mapa inverso del enum derivado del existente
   (`design.md > 3.1`, `> 3.2`). *Depende de T3 (tipo de lectura).*
   **Hecho cuando:** (a) unit: el mapa ida-y-vuelta da las ocho acciones; (b) `.int`: los tres métodos
