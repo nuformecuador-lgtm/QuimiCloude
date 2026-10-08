@@ -83,3 +83,7 @@ gate se pone rojo, con el cambio mínimo y anotado en «Excepciones».
   y 2 de colisión (`module-contract`, `order-row-actions.test.tsx`).
 - Tras las dos excepciones de arriba: `module-contract.test.ts` 9/9, `order-row-actions.test.tsx` 20/20.
 - Veredicto: A1 hecha.
+- Gate A1 (commit 310665e6): `./init.sh` OK (typecheck, lint 0 errores, guardias 52/52). Releído
+  `test:rapido` tras el commit (18 archivos del diff): 334 archivos verdes, 5 rojos y los 5 están en
+  `tests/baseline-rojos.json` (unidades-viewport, usuarios-viewport, product-page,
+  pantallas-exigen-permiso, recipe-page): `vitest related` no aplica los `--exclude`. Nada propio.
