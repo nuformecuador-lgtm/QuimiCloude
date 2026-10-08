@@ -271,3 +271,81 @@ gate se pone rojo, con el cambio mínimo y anotado en «Excepciones».
 - Cerrar el gate de A2+A3 (`./init.sh`).
 - T18: correr los 7 E2E (de uno en uno) con una base migrada con M1/M2.
 - T19.
+
+## Mapa R<n> → test (consolidado)
+
+Verificado con Grep en T19. Cada caso existe, nombra el R en su nombre o en su `describe` y es de
+QC-215. Los casos que llevan números de otros specs (p. ej. QC-145 «R41, R2, R28» o QC-87 «R35») se
+usan solo si además citan un estado de QC-215 en el nombre o van marcados «(QC-215)».
+
+| R | Archivo(s) de test | Caso que lo cubre |
+|---|---|---|
+| R1 | `tests/unit/pedidos/order-transitions.test.ts`; `tests/unit/pedidos/schema/order-conditioning-states-migration.test.ts` | «R1: los tres estados nuevos van detras de los siete de antes, que conservan su orden»; «R1, R30: los tres valores son los ultimos del esquema, detras de BLOQUEADO» |
+| R2 | `tests/unit/pedidos/order-transitions.test.ts` | «R2: el orden del flujo pone el acondicionamiento y TERMINADO entre el empaque y la entrega» |
+| R3 | `tests/unit/pedidos/order-transitions.test.ts` | «R3: la matriz es de 10x10 y hay exactamente 12 pares permitidos»; «R3: cada estado del acondicionamiento solo se alcanza desde el anterior»; «EN_EMPAQUE solo se alcanza desde POR_EMPACAR, y ENTREGADO solo desde TERMINADO (R1, R3)» |
+| R4 | `tests/unit/pedidos/transition-order.test.ts` | «R4 (QC-215): rechaza ${hacia} como destino desde ${desde} con invalid_transition, SIN abrir la unidad de trabajo» |
+| R5 | `tests/unit/pedidos/order-packing.test.ts`; `tests/integration/pedidos/order-packing.int.test.ts`; `tests/integration/pedidos/finish-with-finished-goods.int.test.ts` | «R5 (QC-215): Terminar comprueba EN_EMPAQUE -> POR_ACONDICIONAR, nunca hacia ENTREGADO ni TERMINADO»; «R21, R5 (QC-215): Terminar sobre su EN_EMPAQUE deja POR_ACONDICIONAR sin finished_at y conserva packed_by, en una sola escritura»; «R5: un producto terminado nuevo nace con su lote … queda POR_ACONDICIONAR …» |
+| R6 | `tests/unit/pedidos/order-packing.test.ts` | «R6 (QC-215): si la matriz rechazara EN_EMPAQUE -> POR_ACONDICIONAR, Terminar falla sin abrir la unidad de trabajo» |
+| R7 | `tests/unit/asignaciones-ui/packed-order-notice.test.tsx` | «R7 - nombra el pedido empacado y nunca dice «entregado»»; «R7 - el texto sale de una funcion, no de un literal duplicado» |
+| R8 | `tests/unit/pedidos/order-conditioning.test.ts`; `tests/unit/asignaciones/start-conditioning.test.ts`; `tests/integration/pedidos/order-conditioning.int.test.ts` | «R8: comprueba POR_ACONDICIONAR -> EN_ACONDICIONAMIENTO y delega con la empresa como ultimo parametro»; «R8, R11: llama al catalogo una vez con el pedido, la empresa y el id del actor, y el instante»; «R8: sobre POR_ACONDICIONAR deja EN_ACONDICIONAMIENTO con el actor como quien acondiciona y autor, …» |
+| R9 | `tests/unit/asignaciones/start-conditioning.test.ts`; `tests/integration/pedidos/order-conditioning.int.test.ts` | «R9: already_mine es exito»; «R9: el mismo acondicionador sobre su EN_ACONDICIONAMIENTO es already_mine, sin escribir nada»; «R9: sobre un EN_ACONDICIONAMIENTO de otra persona es taken, sin escribir nada» |
+| R10 | `tests/unit/asignaciones/start-conditioning.test.ts`; `tests/integration/pedidos/order-conditioning.int.test.ts` | «R9, R10: taken rechaza con order_conditioning_taken»; «R10: dos Comenzar reales a la vez sobre el mismo POR_ACONDICIONAR dejan a uno ok y al otro taken» |
+| R11 | `tests/unit/asignaciones/start-conditioning.test.ts` | «R11, R15: un actor con los permisos de semilla del Administrador de acondicionamiento comienza»; «R8, R11: llama al catalogo una vez …» |
+| R12 | `tests/unit/pedidos/order-conditioning.test.ts`; `tests/unit/asignaciones/finish-conditioning.test.ts`; `tests/integration/pedidos/order-conditioning.int.test.ts` | «R12: comprueba EN_ACONDICIONAMIENTO -> TERMINADO y delega con la empresa como ultimo parametro»; «R12: devuelve el numero visible leido ANTES de transicionar, …»; «R12: quien acondiciona deja TERMINADO con finished_at = now, …» |
+| R13 | `tests/unit/asignaciones/finish-conditioning.test.ts`; `tests/integration/pedidos/order-conditioning.int.test.ts` | «R13: not_conditioner rechaza con order_conditioning_taken»; «R13: otra persona con el permiso recibe not_conditioner y el pedido sigue EN_ACONDICIONAMIENTO sin finished_at» |
+| R14 | `tests/unit/asignaciones/start-conditioning.test.ts`; `tests/unit/asignaciones/finish-conditioning.test.ts`; `tests/integration/pedidos/order-conditioning.int.test.ts` | «R14: not_conditionable rechaza con order_not_conditionable»; «R14: pedido inexistente, de baja o de otra empresa rechaza con order_not_found sin transicionar»; «R14: un pedido inexistente, dado de baja o de otra empresa es not_found» |
+| R15 | `tests/unit/asignaciones/start-conditioning.test.ts`; `tests/unit/asignaciones/finish-conditioning.test.ts`; `tests/unit/composition/asignaciones-facade.test.ts` | «R15: actor %s rechaza con unauthorized sin tocar ningun puerto»; «R15: actor %s con entrada invalida sigue dando unauthorized: autorizar va antes de validar»; «R15: los permisos de semilla del Administrador y del Empacador no incluyen el permiso»; «R15: `startConditioning` / `finishConditioning` rechaza sin `acondicionamiento.modificar` sin llegar a la base» |
+| R16 | `tests/unit/asignaciones/start-conditioning.test.ts`; `tests/unit/asignaciones/finish-conditioning.test.ts` | «R16: entrada %s rechaza con invalid_input sin tocar ningun puerto» |
+| R17 | `tests/unit/identity/roles/acondicionamiento-rol.test.ts` (+ `tests/guards/guard-autorizacion-por-permiso.test.ts` en verde) | describe «R17 — solo el catalogo y los dos casos de uso del acondicionamiento nombran acondicionamiento.modificar»: «R17: el codigo solo aparece en el catalogo de permisos y en las dos rutas exactas abiertas»; «R17: cada caso de uso abierto exige el permiso con requirePermission, no lo nombra de pasada» |
+| R18 | `tests/unit/pedidos/order-cancellation.test.ts`; `tests/unit/pedidos/cancel-order.test.ts` | «R18: un pedido ${estado} es not_cancellable, sin cancelar ni liberar»; «R18, R30 (QC-215): no cancela un POR_ACONDICIONAR, un EN_ACONDICIONAMIENTO ni un TERMINADO, sin escribir ni liberar» |
+| R19 | `tests/unit/pedidos/delete-order.test.ts`; `tests/unit/pedidos/update-order.test.ts`; `tests/unit/pedidos/update-order-presentation-lines.test.ts` | «R19, R30 (QC-215): no borra un POR_ACONDICIONAR, un EN_ACONDICIONAMIENTO ni un TERMINADO, sin escribir ni liberar»; «R19, R30 (QC-215): POR_ACONDICIONAR, EN_ACONDICIONAMIENTO y TERMINADO -> `invalid_transition`, sin escribir»; «R19, R30 (QC-215): rechaza %s igual que EN_EMPAQUE, con not_editable, …» (ver la discrepancia not_editable / invalid_transition anotada arriba) |
+| R20 | `tests/unit/asignaciones/order-state.test.ts`; `tests/unit/asignaciones/list-order-responsibles.test.ts` | describe «QC-215 — los estados de acondicionamiento y TERMINADO congelan los responsables»: «R20, R30: asignar, quitar un grupo y desasignar sobre un ${status} rechazan con order_produced_frozen sin escribir»; «R20: los estados recorridos son todos, incluidos los de acondicionamiento y TERMINADO» |
+| R21 | `tests/unit/asignaciones/start-assigned-order.test.ts`; `tests/unit/asignaciones/finish-assigned-order.test.ts`; `tests/unit/asignaciones/get-assigned-order-execution.test.ts` | «R21, R30: ${estado} rechaza con el mismo error que EN_EMPAQUE, sin escribir»; «R21, R30 (QC-215): ${estado} rechaza con el mismo error que EN_EMPAQUE, sin escribir ni anotar»; «R21, R30: leer la ejecucion de un ${estado} rechaza con el mismo error que EN_EMPAQUE» |
+| R22 | `tests/unit/pedidos-ui/order-row-actions.test.tsx` | «R22: exactamente `ENTREGADO`, … `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO` y `TERMINADO` …»; «R22: %s es final y no acepta la edicion acotada de reparto»; «R22: con un pedido %s, editar, cancelar y eliminar deshabilitados, sin «Reparto y unidad» y con «Responsables» activa» |
+| R23 | `tests/unit/asignaciones/list-packing-orders.test.ts`; `tests/unit/asignaciones/get-packing-order.test.ts`; `tests/unit/pedidos/expire-stale-orders.test.ts`; `tests/unit/asignaciones/start-packing.test.ts`; `tests/unit/asignaciones/finish-packing.test.ts`; `tests/integration/pedidos/order-packing.int.test.ts`; `tests/unit/asignaciones/list-assigned-orders.test.ts`; `tests/unit/pedidos/review-blocked-orders.test.ts` | «R23: el filtro que viaja al catalogo no incluye POR_ACONDICIONAR, EN_ACONDICIONAMIENTO ni TERMINADO»; «R23: un pedido %s responde `order_not_found` sin leer recibos ni pasos»; «R23: un candidato %s bajo el candado no se cancela ni se libera»; «R23, R30: el catalogo clasifica ${estado} como not_packable -> order_not_packable, …»; «R23, R30: un pedido ${status} que el catalogo clasifica not_packable -> order_not_packable, …»; «R23, R30 (QC-215): Comenzar / Terminar el empaque sobre POR_ACONDICIONAR, … es not_packable, …»; «R23 - los estados de acondicionamiento (POR_ACONDICIONAR, EN_ACONDICIONAMIENTO, TERMINADO) no entran en el filtro de estados de trabajo» («Mis asignados»); «R23 - solo desbloquea BLOQUEADO: un pedido POR_ACONDICIONAR, EN_ACONDICIONAMIENTO o TERMINADO no se toca, ni al leerlo ni bajo el candado» (revisión de `BLOQUEADO`) |
+| R24 | `tests/integration/pedidos/order-conditioning-constraints.int.test.ts`; `tests/unit/pedidos/schema/order-conditioning-states-migration.test.ts` | «R24: acepta la fila valida de cada estado de acondicionamiento»; «R24: rechaza deleted_at no nulo, packed_by nulo o finished_at no nulo, con SQLSTATE 23514»; «R24, R30: amplia quien empaca y el borrado a los estados nuevos» |
+| R25 | `tests/integration/pedidos/order-conditioning-constraints.int.test.ts`; `tests/unit/pedidos/schema/order-conditioning-states-migration.test.ts`; `tests/unit/pedidos/schema/pedidos-schema.test.ts` | «R25: exige quien acondiciona en EN_ACONDICIONAMIENTO y en TERMINADO»; «R25: rechaza a quien acondiciona de OTRA empresa con SQLSTATE 23503»; «R25: anade conditioned_by con su indice y la FK compuesta contra la empresa»; «R25: conditionedBy es uuid anulable, sin @relation y con su indice» |
+| R26 | `tests/unit/pedidos/schema/order-conditioning-states-migration.test.ts`; `tests/integration/pedidos/order-conditioning-constraints.int.test.ts` | «R26: las tres primeras sentencias anaden los valores, idempotentes y en orden»; «R26: la migracion no modifica ninguna fila de orders»; «R26: ninguna fila de orders incumple las reglas nuevas» |
+| R27 | `tests/unit/pedidos/schema/order-conditioning-states-migration.test.ts`; `tests/integration/pedidos/order-conditioning-states-rollback.int.test.ts` | «R27: la primera sentencia aborta si hay pedidos en un estado nuevo»; «R27: recrea OrderStatus con los valores de antes, sacados del esquema»; «R27: un pedido POR_ACONDICIONAR aborta el DOWN entero y deja el esquema intacto»; «R27: sin pedidos en los estados nuevos, revierte entero y deja el enum, la columna y los CHECK de antes» |
+| R28 | `tests/unit/asignaciones-ui/company-orders-columns.test.tsx`; `tests/unit/asignaciones-ui/assignment-view-params.test.ts`; `tests/unit/asignaciones/list-company-orders.test.ts` | describe «R28, R32 - «Todos» pinta y filtra los estados de acondicionamiento y TERMINADO»; describe «R28, R32 - el filtro de estado de «Todos» acepta los estados nuevos en la URL»; «sin `statuses`, consulta con todos los estados en el orden del flujo, incluidos los de acondicionamiento (R41, R28)» |
+| R29 | `tests/unit/pedidos-ui/order-columns.test.tsx` | «R29, R32: la celda pinta %s como «%s», con su valor en `data-status` y la variante %s»; «R29, R32: el filtro de estado ofrece los tres estados nuevos, en el orden del flujo, entre «En empaque» y «Entregado»»; «R29: el filtro de estado acepta %s en la URL» |
+| R30 | `tests/integration/pedidos/order-conditioning-constraints.int.test.ts`; `tests/unit/pedidos/schema/order-conditioning-states-migration.test.ts`; `tests/unit/pedidos/order-transitions.test.ts` | «R30: acepta TERMINADO con finished_at, quien empaca y quien acondiciona»; «R30: rechaza TERMINADO sin finished_at, sin quien empaca, sin quien acondiciona o borrado»; «R30: crea el gemelo de orders_company_finished_idx para TERMINADO»; «R3, R19, R30: POR_ACONDICIONAR, EN_ACONDICIONAMIENTO y TERMINADO no admiten «quedarse igual»» (+ los casos «R18/R19/R20/R21/R23, R30» de las filas anteriores) |
+| R31 | `tests/unit/asignaciones/list-finished-orders.test.ts`; `tests/integration/asignaciones/finished-orders.int.test.ts` | «R31: consulta el catalogo con la empresa del actor, solo TERMINADO -nunca ENTREGADO- y el orden de terminados»; «R31: la lista de estados que pide es exactamente TERMINADO, sin ENTREGADO ni estados de acondicionamiento»; «R31: un ENTREGADO antiguo, con o sin `finished_at`, NO aparece en «Terminados»» |
+| R32 | `tests/unit/asignaciones/list-company-orders.test.ts`; `tests/unit/asignaciones-ui/assignment-view-params.test.ts`; `tests/unit/asignaciones-ui/asignacion-page.test.tsx`; `tests/unit/pedidos-ui/order-columns.test.tsx` | «R32: exactamente `TERMINADO` ordena como «Terminados»»; «R32 - ["TERMINADO"] tambien cuenta como exacto»; describe «R32 — el skeleton de «Todos» suma la columna de fecha con el filtro exacto»; «R29, R32: la celda pinta %s …» |
+| R33 | `tests/unit/pedidos/order-catalog.test.ts`; `tests/unit/pedidos/qc145-estado-solo-planta.test.ts`; `tests/integration/pedidos/order-finished-at.int.test.ts` | «R33 (QC-215): ni a ENTREGADO ni a EN_CURSO escribe finishedAt»; «R33 (QC-215): order-prisma.ts tiene exactamente un bloque `data:` que nombra finishedAt, el de Terminar el acondicionamiento hacia TERMINADO»; describe «R33 (QC-215) — setAliveOrderStatus no escribe finished_at con ningun destino» |
+| R34 | E2E tocados: `e2e/empaque.spec.ts`, `e2e/envases-del-pedido.spec.ts`, `e2e/pasos-de-envasado.spec.ts`, `e2e/pedido-en-varias-presentaciones.spec.ts`, `e2e/pedidos-asignados.spec.ts`, `e2e/pedidos-terminados.spec.ts`, `e2e/producto-terminado.spec.ts` (+ esta tabla) | Aserciones ajustadas, sin spec nuevo. **Ejecución PENDIENTE:** la base compartida no tiene M1/M2 aplicadas (T18) |
+| R35 | `git diff --name-only origin/dev -- package.json pnpm-lock.yaml` | Salida vacía (exit 0); ver abajo |
+
+Salida real de R35:
+
+```
+$ git diff --name-only origin/dev -- package.json pnpm-lock.yaml
+(sin salida; exit=0)
+```
+
+Huecos: ningún R se queda sin test. R23 queda cubierto en sus cinco puntos (incluidos «Mis
+asignados» y la revisión que desbloquea `BLOQUEADO`). Los e2e de R34 siguen sin ejecutar.
+
+### Corrida de los tests unit del mapa (T19)
+
+`pnpm exec vitest run` con los 37 archivos unit y de guardia del mapa, en una sola invocación (sin
+.int ni e2e):
+
+```
+ Test Files  37 passed (37)
+      Tests  1117 passed (1117)
+   Duration  14.91s
+```
+
+## Cierre (2026-10-08)
+
+- Por OOM, el humano sustituyó `./init.sh` por typecheck + lint + tests concretos por tanda; el
+  gate completo lo corre CI en el PR #170. T19 está marcada con esa salvedad.
+- Abierto: T18 (E2E sin ejecutar: la base compartida no tiene M1/M2; migrarla es decisión del leader).
+- Abierto: R19 en reparto y unidad: el código devuelve `not_editable`
+  (`order_presentation_line_not_editable`), no `invalid_transition` como dice R19; design § 2.4 no
+  lo cambia. Hay que corregir el texto de R19 o el código.
+- Abierto: el cambio de cliente de QC-156 (su R14) se admite también en los 3 estados nuevos;
+  ningún spec lo cubre.
+- Ajeno: `tests/integration/proveedores/catalog-line.int.test.ts` (R32) falla en local (shape del
+  error de Prisma); dev lo sacó del baseline en f2be3eb8 y la rama no tiene diff en `proveedores`.

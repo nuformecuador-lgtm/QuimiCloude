@@ -133,7 +133,7 @@
   `e2e/producto-terminado.spec.ts`, `e2e/pedidos-terminados.spec.ts` y
   `e2e/pedidos-asignados.spec.ts`. Ningún spec nuevo. **Hecho cuando:**
   `pnpm exec playwright test <cada spec tocado>` está en verde. Depende de: T6, T14, T16.
-- [ ] **T19.** Mapa `R<n> → test` en `progress/impl_QC-215-estados-de-acondicionamiento.md`,
+- [x] **T19.** Mapa `R<n> → test` en `progress/impl_QC-215-estados-de-acondicionamiento.md`,
   sin que falte ningún R1–R35. R35: `package.json` no aparece en el diff. Después, `./init.sh`.
   **Hecho cuando:** está en verde. Depende de: todo.
 
