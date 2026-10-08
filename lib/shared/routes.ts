@@ -257,6 +257,11 @@ export function packingOrderRoute(id: string): string {
   return `${ASSIGNED_ORDERS_ROUTE}/empaque/${id}`;
 }
 
+/** Detalle del pedido para quien acondiciona; como `packingOrderRoute`, sin fila propia. */
+export function conditioningOrderRoute(id: string): string {
+  return `${ASSIGNED_ORDERS_ROUTE}/acondicionamiento/${id}`;
+}
+
 /**
  * Nombre del parametro de consulta con el que Terminar anuncia, al volver a la pestaña «Por
  * empacar», que un pedido acaba de quedar `ENTREGADO`: `?vista=por_empacar&empacado=<numero>`.
