@@ -186,6 +186,8 @@ export type OrderRowSheetActionsProps = {
   readonly canEditDistribution?: boolean;
   /** Si el actor puede cambiar el cliente; lo resuelve el servidor. */
   readonly canEditCustomer?: boolean;
+  /** Si el actor puede entregar pedidos; lo resuelve el servidor. */
+  readonly canDeliver?: boolean;
 };
 
 /**
@@ -215,6 +217,7 @@ export function OrderRowSheetActions({
   coverage,
   canEditDistribution = false,
   canEditCustomer = false,
+  canDeliver = false,
 }: OrderRowSheetActionsProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -251,6 +254,7 @@ export function OrderRowSheetActions({
         onDistribution={() => setDistributionOpen(true)}
         canEditCustomer={canEditCustomer}
         onCustomer={() => setCustomerOpen(true)}
+        canDeliver={canDeliver}
       />
       <OrderSheet
         order={order}

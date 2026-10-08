@@ -6,7 +6,7 @@ import {
   listResponsibleCandidatesAction,
   listResponsiblesForOrdersAction,
 } from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions';
-import { assertPermission } from '@/lib/modules/identity';
+import { assertPermission, type PermissionCode, type SessionUser } from '@/lib/modules/identity';
 import { listWorkGroupsAction } from '@/lib/modules/identity/adapters/driving/work-group-actions';
 import { withFilter } from '@/components/shared/data-table';
 import {
@@ -113,15 +113,22 @@ const PERMISSION_DENIED = new Error('permiso denegado');
  * Presentacion, no autorizacion: decide si se pintan las ediciones del pedido. Cada Server Action
  * vuelve a exigir el permiso.
  */
-async function hasOrderModifyPermission(): Promise<boolean> {
-  const user = await identity.getSessionUser();
+function hasPermission(user: SessionUser | null, code: PermissionCode): boolean {
   try {
-    assertPermission(user, 'pedidos.modificar', () => PERMISSION_DENIED);
+    assertPermission(user, code, () => PERMISSION_DENIED);
     return true;
   } catch (error) {
     if (error !== PERMISSION_DENIED) throw error;
     return false;
   }
+}
+
+async function loadRowPermissions() {
+  const user = await identity.getSessionUser();
+  return {
+    canModifyOrders: hasPermission(user, 'pedidos.modificar'),
+    canDeliver: hasPermission(user, 'entregas.modificar'),
+  };
 }
 
 /**
@@ -310,12 +317,12 @@ export async function OrderListSection({
     Las tres lecturas de aqui si van en paralelo entre si: ninguna depende de otra, y esperarlas
     en fila solo sumaria latencia.
   */
-  const [responsiblesByOrder, responsiblesCatalog, coverageByOrder, canModifyOrders] =
+  const [responsiblesByOrder, responsiblesCatalog, coverageByOrder, { canModifyOrders, canDeliver }] =
     await Promise.all([
       loadResponsibles(items.map((order) => order.id)),
       loadResponsiblesCatalog(),
       loadCoverage(items.map((order) => order.id)),
-      hasOrderModifyPermission(),
+      loadRowPermissions(),
     ]);
   const canEditDistribution = canModifyOrders;
   const canEditCustomer = canModifyOrders;
@@ -341,6 +348,7 @@ export async function OrderListSection({
         coverageByOrder={coverageByOrder}
         canEditDistribution={canEditDistribution}
         canEditCustomer={canEditCustomer}
+        canDeliver={canDeliver}
         customerFilter={customerFilter}
       />
     </div>

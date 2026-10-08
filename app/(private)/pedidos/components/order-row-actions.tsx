@@ -1,6 +1,14 @@
 'use client';
 
-import { PackageIcon, PencilIcon, TrashIcon, UserIcon, UsersIcon, XCircleIcon } from 'lucide-react';
+import {
+  PackageIcon,
+  PencilIcon,
+  TrashIcon,
+  TruckIcon,
+  UserIcon,
+  UsersIcon,
+  XCircleIcon,
+} from 'lucide-react';
 
 import { RowActionsMenu, type RowActionMenuItem } from '@/components/shared/row-actions-menu';
 import { type OrderStatus, type OrderSummary } from '@/lib/modules/pedidos';
@@ -123,7 +131,25 @@ const ORDER_STATUS_ACCEPTS_CUSTOMER_CHANGE: Readonly<Record<OrderStatus, boolean
   TERMINADO: true,
 };
 
+const ORDER_STATUS_ACCEPTS_DELIVERY: Readonly<Record<OrderStatus, boolean>> = {
+  PENDIENTE: false,
+  EN_CURSO: false,
+  POR_EMPACAR: false,
+  EN_EMPAQUE: false,
+  ENTREGADO: false,
+  CANCELADO: false,
+  BLOQUEADO: false,
+  POR_ACONDICIONAR: false,
+  EN_ACONDICIONAMIENTO: false,
+  TERMINADO: true,
+};
+
+export function acceptsDelivery(status: OrderStatus): boolean {
+  return ORDER_STATUS_ACCEPTS_DELIVERY[status];
+}
+
 export const ORDER_ACTION_DISTRIBUTION_TESTID = 'order-action-distribution';
+export const ORDER_ACTION_DELIVER_TESTID = 'order-action-deliver';
 export const ORDER_ACTION_CUSTOMER_TESTID = 'order-action-customer';
 
 export type OrderRowActionsProps = {
@@ -145,6 +171,9 @@ export type OrderRowActionsProps = {
   /** Lo decide el servidor con el permiso de modificar pedidos; sin el, la accion no se pinta. */
   readonly canEditCustomer?: boolean;
   readonly onCustomer?: (order: OrderSummary) => void;
+  /** Lo decide el servidor con el permiso de entregas; sin el, la accion no se pinta. */
+  readonly canDeliver?: boolean;
+  readonly onDeliver?: (order: OrderSummary) => void;
 };
 
 export function OrderRowActions({
@@ -157,6 +186,8 @@ export function OrderRowActions({
   onDistribution,
   canEditCustomer = false,
   onCustomer,
+  canDeliver = false,
+  onDeliver,
 }: OrderRowActionsProps) {
   const isFinal = isFinalOrderStatus(order.status);
   const showDistribution = canEditDistribution && acceptsDistributionEdit(order.status);
@@ -217,6 +248,16 @@ export function OrderRowActions({
       icon: PackageIcon,
       onSelect: () => onDistribution?.(order),
       testId: ORDER_ACTION_DISTRIBUTION_TESTID,
+    });
+  }
+
+  if (canDeliver && acceptsDelivery(order.status)) {
+    items.push({
+      key: 'deliver',
+      label: 'Entregar',
+      icon: TruckIcon,
+      onSelect: () => onDeliver?.(order),
+      testId: ORDER_ACTION_DELIVER_TESTID,
     });
   }
 
