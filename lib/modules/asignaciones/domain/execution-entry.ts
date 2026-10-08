@@ -28,6 +28,17 @@ export type NewExecutionEntry =
   | (Base & { readonly action: 'cancel'; readonly stepPosition: number | null; readonly reason: string })
   | (Base & { readonly action: PackingAction; readonly stepPosition: null });
 
+/** Una anotacion leida del registro. `id` desempata dos anotaciones con el mismo instante. */
+export type ExecutionEntryRecord = {
+  readonly id: string;
+  readonly orderId: string;
+  readonly userId: string;
+  readonly action: ExecutionAction;
+  readonly stepPosition: number | null;
+  readonly reason: string | null;
+  readonly occurredAt: Date;
+};
+
 /** Lo que devuelven las escrituras de `pedidos` que corren dentro de la transaccion de ejecucion. */
 export type ExecutionWriteOutcome = string | { readonly kind: string };
 

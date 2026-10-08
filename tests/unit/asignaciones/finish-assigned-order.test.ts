@@ -138,7 +138,13 @@ function montar(options?: {
     if (options?.appendFalla === true) throw new Error('la base no acepto la anotacion');
     anotaciones.push({ entry, dentroDeRun });
   });
-  const log: ExecutionLogRepository = { append, findLastStepPosition: vi.fn(async () => null) };
+  const log: ExecutionLogRepository = {
+    append,
+    findLastStepPosition: vi.fn(async () => null),
+    listExecutedOrderIds: vi.fn(async () => []),
+    listEntriesForOrders: vi.fn(async () => []),
+    listUserIdsWithEntries: vi.fn(async () => []),
+  };
   const writers = {
     orders: { transitionAliveById, cancelAliveById: vi.fn() },
     packing: { startPackingAliveById: vi.fn(), finishPackingAliveById: vi.fn() },
