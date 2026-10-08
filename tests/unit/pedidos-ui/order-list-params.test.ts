@@ -14,6 +14,10 @@ import {
   CREATED_AT_COLUMN_ID,
   CREATED_FROM_PARAM,
   CREATED_TO_PARAM,
+  CUSTOMER_COLUMN_ID,
+  CUSTOMER_NONE_PARAM_VALUE,
+  CUSTOMER_PARAM,
+  CUSTOMER_PRESENCE_COLUMN_ID,
   ORDER_SEARCH_MAX_LENGTH,
   PAGE_PARAM,
   PAGE_SIZE_PARAM,
@@ -301,5 +305,81 @@ describe('withSearchResetsPage reinicia la pagina solo si el termino cambia (R2)
     const siguiente: DataTableParams = { ...base, page: 5, sort: { columnId: 'createdAt', direction: 'asc' } };
 
     expect(withSearchResetsPage(base, siguiente)).toEqual(siguiente);
+  });
+});
+
+describe('el filtro de cliente vive en un solo parametro `customer`', () => {
+  const UUID = '0b7c1d2e-3f40-4a5b-8c6d-7e8f9a0b1c2d';
+  const OTRO_UUID = '1c8d2e3f-4051-4b6c-9d7e-8f9a0b1c2d3e';
+  const base: DataTableParams = {
+    page: 2,
+    pageSize: DEFAULT_PAGE_SIZE,
+    sort: { columnId: 'createdAt', direction: 'desc' },
+    filters: { [STATUS_COLUMN_ID]: { kind: 'select', values: [ORDER_STATUS_VALUES[0]] } },
+    search: 'sosa',
+  };
+
+  it('R34: un uuid valido entra como customerId', () => {
+    expect(parseOrderListParams({ [CUSTOMER_PARAM]: UUID }).filters).toEqual({
+      [CUSTOMER_COLUMN_ID]: { kind: 'select', values: [UUID] },
+    });
+  });
+
+  it('R34: `none` entra como customerPresence', () => {
+    expect(parseOrderListParams({ [CUSTOMER_PARAM]: CUSTOMER_NONE_PARAM_VALUE }).filters).toEqual({
+      [CUSTOMER_PRESENCE_COLUMN_ID]: { kind: 'select', values: ['none'] },
+    });
+  });
+
+  it('R24: otro valor o vacio no entra en ninguno de los dos filtros', () => {
+    for (const crudo of ['', 'cliente-1', `${UUID},${OTRO_UUID}`, 'NONE', ' none', '123']) {
+      expect(
+        parseOrderListParams({ [CUSTOMER_PARAM]: crudo }).filters,
+        `«${crudo}» no es un filtro de cliente`,
+      ).toEqual({});
+    }
+  });
+
+  it('R34: del parametro repetido se toma el primero', () => {
+    expect(parseOrderListParams({ [CUSTOMER_PARAM]: [UUID, CUSTOMER_NONE_PARAM_VALUE] }).filters).toEqual({
+      [CUSTOMER_COLUMN_ID]: { kind: 'select', values: [UUID] },
+    });
+    expect(parseOrderListParams({ [CUSTOMER_PARAM]: [CUSTOMER_NONE_PARAM_VALUE, UUID] }).filters).toEqual({
+      [CUSTOMER_PRESENCE_COLUMN_ID]: { kind: 'select', values: ['none'] },
+    });
+  });
+
+  it('R34: parse(build(p)) devuelve p con el filtro por cliente y con «sin cliente»', () => {
+    const conCliente: DataTableParams = {
+      ...base,
+      filters: { ...base.filters, [CUSTOMER_COLUMN_ID]: { kind: 'select', values: [UUID] } },
+    };
+    const sinCliente: DataTableParams = {
+      ...base,
+      filters: { ...base.filters, [CUSTOMER_PRESENCE_COLUMN_ID]: { kind: 'select', values: ['none'] } },
+    };
+
+    for (const params of [conCliente, sinCliente]) {
+      const url = new URLSearchParams(buildOrderListQuery(params));
+      expect(parseOrderListParams(Object.fromEntries(url))).toEqual(params);
+    }
+    expect(new URLSearchParams(buildOrderListQuery(sinCliente)).get(CUSTOMER_PARAM)).toBe('none');
+  });
+
+  it('R34: con los dos filtros a la vez la direccion lleva el uuid', () => {
+    const ambos: DataTableParams = {
+      ...base,
+      filters: {
+        [CUSTOMER_COLUMN_ID]: { kind: 'select', values: [UUID] },
+        [CUSTOMER_PRESENCE_COLUMN_ID]: { kind: 'select', values: ['none'] },
+      },
+    };
+
+    const url = new URLSearchParams(buildOrderListQuery(ambos));
+    expect(url.getAll(CUSTOMER_PARAM)).toEqual([UUID]);
+  });
+
+  it('sin filtro de cliente la direccion no lleva el parametro', () => {
+    expect(new URLSearchParams(buildOrderListQuery(base)).has(CUSTOMER_PARAM)).toBe(false);
   });
 });

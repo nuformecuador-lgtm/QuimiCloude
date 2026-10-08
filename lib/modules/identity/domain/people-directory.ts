@@ -59,6 +59,9 @@ export type PeopleRefFilters = {
   readonly accountStatus?: readonly UserAccountStatus[];
 };
 
+/** Solo cuentas efectivamente activas: el filtro con nombre que usan otros modulos. */
+export const ACTIVE_ACCOUNTS_ONLY: PeopleRefFilters = { accountStatus: ['active'] };
+
 export interface PeopleDirectory {
   /**
    * Las personas VIVAS de esa empresa cuyo identificador se pide, para el camino de ESCRITURA.

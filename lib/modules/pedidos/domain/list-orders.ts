@@ -3,6 +3,12 @@ import { ValidationError } from './errors';
 import { toOrderView } from './get-order';
 import { createListQuerySchema, sanitizeListQuery } from './list-query';
 import { ORDER_PRIORITY_VALUES, ORDER_STATUS_VALUES } from './order-classification';
+import {
+  isCustomerIdShape,
+  ORDER_CUSTOMER_FILTER_FIELD,
+  ORDER_CUSTOMER_PRESENCE_FILTER_FIELD,
+  ORDER_CUSTOMER_PRESENCE_VALUES,
+} from './order-customer';
 import { ORDER_QUERYABLE } from './order-queryable';
 import type { OrderScope } from './order-scope';
 
@@ -10,11 +16,18 @@ import type { ListFilterValue, ListQuery } from './list-query';
 import type { OrderSummary } from './order-view';
 import type { Page } from './page';
 
+import type { CustomerCatalog } from '@/lib/modules/clientes';
 import type { PackagingCatalog, PresentationCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
-import { findPackagingNames, orderPackagingIds, orderPresentationIds, unitLabelOf } from './get-order';
+import {
+  findOrderCustomers,
+  findPackagingNames,
+  orderPackagingIds,
+  orderPresentationIds,
+  unitLabelOf,
+} from './get-order';
 
 import type { ListQueryLog } from '../ports/list-query-log';
 import type { OrderRepository } from '../ports/order-repository';
@@ -30,6 +43,8 @@ export type ListOrdersDeps = {
   readonly packaging: PackagingCatalog;
   /** Contrato PUBLICO de `unidades`: resuelve la etiqueta de unidad de la pagina. */
   readonly units: UnitCatalog;
+  /** Contrato PUBLICO de `clientes`: los clientes de la pagina, una llamada por pagina. */
+  readonly customerCatalog: Pick<CustomerCatalog, 'findRefsIncludingDeleted'>;
   readonly log: ListQueryLog;
 };
 
@@ -46,7 +61,16 @@ const listQuerySchema = createListQuerySchema();
 const CLOSED_SELECT_VALUES: Readonly<Record<string, readonly string[]>> = {
   status: ORDER_STATUS_VALUES,
   priority: ORDER_PRIORITY_VALUES,
+  [ORDER_CUSTOMER_PRESENCE_FILTER_FIELD]: ORDER_CUSTOMER_PRESENCE_VALUES,
 };
+
+/** Los valores que admite cada `select`: un conjunto cerrado, o la forma de uuid en el del
+ *  cliente, cuyos valores no se conocen aqui pero uno sin forma no puede existir en la base. */
+function selectValueRule(field: string): ((candidate: string) => boolean) | undefined {
+  if (field === ORDER_CUSTOMER_FILTER_FIELD) return isCustomerIdShape;
+  const allowed = CLOSED_SELECT_VALUES[field];
+  return allowed === undefined ? undefined : (candidate) => allowed.includes(candidate);
+}
 
 /**
  * Poda los valores de un `select` que no pertenecen al conjunto cerrado del campo (R5, R25).
@@ -63,10 +87,10 @@ function pruneClosedSelect(
   field: string,
   value: ListFilterValue,
 ): { readonly value: ListFilterValue | null; readonly pruned: boolean } {
-  const allowed = CLOSED_SELECT_VALUES[field];
-  if (allowed === undefined || value.kind !== 'select') return { value, pruned: false };
+  const isAllowed = selectValueRule(field);
+  if (isAllowed === undefined || value.kind !== 'select') return { value, pruned: false };
 
-  const kept = value.values.filter((candidate) => allowed.includes(candidate));
+  const kept = value.values.filter(isAllowed);
   if (kept.length === value.values.length) return { value, pruned: false };
   return {
     value: kept.length === 0 ? null : { kind: 'select', values: kept },
@@ -187,8 +211,12 @@ export function createListOrders(
     // Los envases de la pagina, deduplicados: una sola llamada.
     const packagingNames = await findPackagingNames(deps.packaging, orderPackagingIds(page.items), actor.companyId);
 
+    const orderCustomers = await findOrderCustomers(deps.customerCatalog, page.items, actor.companyId);
+
     return {
-      items: page.items.map((row) => toOrderView(row, recipesById, presentationNames, unitLabels, packagingNames)),
+      items: page.items.map((row) =>
+        toOrderView(row, recipesById, presentationNames, unitLabels, packagingNames, orderCustomers),
+      ),
       total: page.total,
       page: page.page,
       pageSize: page.pageSize,

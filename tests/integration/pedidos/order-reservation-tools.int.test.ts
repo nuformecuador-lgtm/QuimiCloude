@@ -55,6 +55,11 @@ import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedid
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
+import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+
+const customerCatalog = {
+  findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
+};
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -104,9 +109,9 @@ const units: UnitCatalog = {
 };
 
 const packaging: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
-const createOrder = createCreateOrder({ recipes, products, packaging, units, presentations, unitOfWork, now: () => new Date() });
+const createOrder = createCreateOrder({ customerCatalog, recipes, products, packaging, units, presentations, unitOfWork, now: () => new Date() });
 const reviewBlockedOrders = createReviewBlockedOrders({ orders, recipes, products, packaging, units, unitOfWork });
-const updateOrder = createUpdateOrder({ orders, recipes, products, packaging, units, presentations, unitOfWork });
+const updateOrder = createUpdateOrder({ customerCatalog, orders, recipes, products, packaging, units, presentations, unitOfWork });
 const transitionAliveById: OrderCatalog['transitionAliveById'] = createTransitionOrder({ unitOfWork });
 
 // ---------------------------------------------------------------------------

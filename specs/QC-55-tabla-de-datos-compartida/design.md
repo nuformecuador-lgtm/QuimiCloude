@@ -136,6 +136,18 @@ Genérico en `TRow` (R4): el componente **no importa ningún tipo de dominio**. 
 permite que QC-56 migre la columna de acciones de `product-table.tsx`, que hoy pinta dos botones.
 Si el humano cierra la pregunta 4 de otra forma, cambia esta línea y su test.
 
+> **Enmienda 2026-10-08 (QC-177 D4).** El contrato de columna incorpora tres campos que entraron
+> sin spec en `a543c84d` (PR #131) y `3018853a`:
+> - `width`: ancho de la columna;
+> - `hideText`: cómo se comporta el texto de celdas y cabecera. Ausente o `true` = una sola línea
+>   recortada con puntos suspensivos (`overflow-hidden text-ellipsis`); `false` = el texto salta de
+>   línea dentro del ancho, sin recortarse;
+> - `defaultPinned`: lado en que la columna arranca fijada. Implica que es fijable: una columna con
+>   `pinnable: false` no lo declara.
+>
+> El truncado por defecto queda aceptado por el humano (QC-177 D4). Lo cubre
+> `tests/unit/shared/data-table-scroll.test.tsx`.
+
 ### 3.3 Props del componente
 
 ```ts

@@ -6,11 +6,9 @@
  * asignacion se pinta o no, no un permiso de lectura nuevo. La lista de personas depende SOLO de
  * ese permiso; no vuelve a comprobar `usuarios.consultar` ni degrada a vacio si falta.
  *
- * Devuelve las personas vivas de la empresa que pueden ser responsables (`canBeResponsible`),
- * con cuenta EFECTIVAMENTE activa (`accountStatus: ['active']` en los filtros abiertos del
- * directorio). El filtro es de estados efectivos, no de la columna: lo aplica el puerto con
- * `effectiveAccountStatus`. El rechazo de `assignResponsibles` al asignar queda como segunda
- * barrera.
+ * Devuelve las personas vivas de la empresa que pueden ser responsables (`canBeResponsible`).
+ * Solo entran cuentas activas: el filtro lo define y lo aplica `identity`. El rechazo de
+ * `assignResponsibles` al asignar queda como segunda barrera.
  *
  * Dominio PURO: `zod` y tipos del propio modulo o del contrato publico de `identity`. Sin
  * `next/*`, sin `@prisma/client`, sin adaptadores y sin `@/lib/shared/**`.
@@ -21,7 +19,7 @@ import { requirePermission, type Actor } from './actor';
 import { ValidationError } from './errors';
 import { canBeResponsible } from './responsible-eligibility';
 
-import type { PeopleDirectory } from '@/lib/modules/identity';
+import { ACTIVE_ACCOUNTS_ONLY, type PeopleDirectory } from '@/lib/modules/identity';
 
 /**
  * Tope de personas devueltas. Mismo numero que `MAX_PAGE_SIZE` (`lib/shared/pagination.ts`);
@@ -54,9 +52,12 @@ export function createListResponsibleCandidates(
     if (!parsed.success) throw new ValidationError();
 
     const now = deps.now?.() ?? new Date();
-    const people = await deps.people.listAliveInCompany(actor.companyId, now, MAX_CANDIDATES, {
-      accountStatus: ['active'],
-    });
+    const people = await deps.people.listAliveInCompany(
+      actor.companyId,
+      now,
+      MAX_CANDIDATES,
+      ACTIVE_ACCOUNTS_ONLY,
+    );
 
     return people
       .filter((person) => canBeResponsible(person))

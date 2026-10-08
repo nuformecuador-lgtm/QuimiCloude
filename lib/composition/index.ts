@@ -261,12 +261,15 @@ import {
   createFindCoverage,
   createFinishPacking,
   createGetOrder,
+  createGetOrderCustomerFilterOption,
   createListAliveSummariesByIds,
   createListAliveSummariesInCompany,
   createListOrders,
   createQuoteOrderCost,
   createQuoteOrderPresentationAvailability,
   createReviewBlockedOrders,
+  createSearchOrderCustomers,
+  createSetOrderCustomer,
   createStartPacking,
   createTransitionOrder,
   createUpdateOrder,
@@ -333,6 +336,7 @@ import {
 import { readMailTransportFromEnv } from '@/lib/modules/identity/adapters/driven/config/mail-config-env';
 import { sendCredentialSetupLink as sendCredentialSetupLinkToOutbox } from '@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-outbox';
 import { sendCredentialSetupLink as sendCredentialSetupLinkWithResend } from '@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-resend';
+import { sendCredentialSetupLink as sendCredentialSetupLinkWithSmtp } from '@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-smtp';
 import {
   applyCredentialAndActivate,
   issueForPendingUser,
@@ -500,6 +504,12 @@ import {
 } from '@/lib/modules/clientes/adapters/driven/persistence/customer-prisma';
 import type { ListQueryLog as ClientesListQueryLog } from '@/lib/modules/clientes/ports/list-query-log';
 import type { CustomerRepository } from '@/lib/modules/clientes/ports/customer-repository';
+import type { CustomerCatalog } from '@/lib/modules/clientes';
+import {
+  findAliveCustomerRefById,
+  findCustomerRefsIncludingDeleted,
+  searchCustomerRefs,
+} from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
 
 const breachedCredentialList: BreachedCredentialList = { includes: isBreachedCredential };
 // QC-19: una sola instancia de la politica, la misma que se expone en la fachada y la que
@@ -647,14 +657,21 @@ const credentialSetupLinkRepository: CredentialSetupLinkRepository = {
  * un valor equivocado tumbaria tests que no tienen nada que ver con el correo.
  *
  * `resend` es el valor POR DEFECTO (sin la variable, el transporte real); `outbox` es el buzon en
- * disco que hace posible el E2E de R41 y que se niega a arrancar en produccion. Los dos cumplen el
- * MISMO puerto, asi que cambiar de uno a otro es esta linea y nada mas.
+ * disco que hace posible el E2E de R41 y que se niega a arrancar en produccion; `smtp` es el envio
+ * TEMPORAL por `nodemailer` con una cuenta de Gmail u Outlook. Los tres cumplen el MISMO puerto,
+ * asi que cambiar de uno a otro es esta funcion y nada mas.
  */
 const credentialSetupMailer: CredentialSetupMailer = {
-  sendCredentialSetupLink: (input) =>
-    readMailTransportFromEnv() === 'outbox'
-      ? sendCredentialSetupLinkToOutbox(input)
-      : sendCredentialSetupLinkWithResend(input),
+  sendCredentialSetupLink: (input) => {
+    switch (readMailTransportFromEnv()) {
+      case 'outbox':
+        return sendCredentialSetupLinkToOutbox(input);
+      case 'smtp':
+        return sendCredentialSetupLinkWithSmtp(input);
+      case 'resend':
+        return sendCredentialSetupLinkWithResend(input);
+    }
+  },
 };
 
 /**
@@ -1335,6 +1352,8 @@ const reviewBlockedOrders = createReviewBlockedOrders({
  * `updateOrder` son los dos que si costean y aparta, asi que son los dos que reciben tambien
  * `products` y `unitOfWork`.
  */
+const customerCatalog = buildCustomerCatalog();
+
 export const pedidos = {
   createOrder: createCreateOrder({
     recipes: recipeCatalog,
@@ -1343,6 +1362,7 @@ export const pedidos = {
     presentations: presentationCatalog,
     packaging: packagingCatalog,
     unitOfWork: orderUnitOfWork,
+    customerCatalog,
   }),
   getOrder: createGetOrder({
     orders: orderRepository,
@@ -1351,6 +1371,7 @@ export const pedidos = {
     packaging: packagingCatalog,
     // La unidad vuelve al pedido: `getOrder` vuelve a necesitar `units`.
     units: unitCatalog,
+    customerCatalog,
   }),
   listOrders: createListOrders({
     orders: orderRepository,
@@ -1360,6 +1381,7 @@ export const pedidos = {
     // Mismo motivo que `getOrder`, una llamada por pagina.
     units: unitCatalog,
     log: pedidosListQueryLog,
+    customerCatalog,
   }),
   updateOrder: createUpdateOrder({
     orders: orderRepository,
@@ -1369,6 +1391,7 @@ export const pedidos = {
     presentations: presentationCatalog,
     packaging: packagingCatalog,
     unitOfWork: orderUnitOfWork,
+    customerCatalog,
   }),
   cancelOrder: createCancelOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
   deleteOrder: createDeleteOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
@@ -1401,6 +1424,14 @@ export const pedidos = {
     presentations: presentationCatalog,
     units: unitCatalog,
   }),
+  // El cliente se cambia sin catalogos de recetas, inventario ni unidades: no recalcula ni aparta.
+  setOrderCustomer: createSetOrderCustomer({
+    orders: orderRepository,
+    customerCatalog,
+    unitOfWork: orderUnitOfWork,
+  }),
+  searchOrderCustomers: createSearchOrderCustomers({ customerCatalog }),
+  getOrderCustomerFilterOption: createGetOrderCustomerFilterOption({ customerCatalog }),
 } as const;
 
 // ---------------------------------------------------------------------------------------
@@ -2038,3 +2069,14 @@ export const clientes = {
   getCustomer: createGetCustomer({ customers: customerRepository }),
   listCustomers: createListCustomers({ customers: customerRepository, log: clientesListQueryLog }),
 } as const;
+
+/** Servicio de lectura que `clientes` ofrece a `pedidos`. El ambito interno de `clientes` se
+ *  construye aqui, a partir de la empresa que ya resolvio el caso de uso que llama. Es una
+ *  declaracion de funcion para que `pedidos`, evaluado mas arriba, pueda usarla. */
+function buildCustomerCatalog(): CustomerCatalog {
+  return {
+    findRefsIncludingDeleted: (ids, companyId) => findCustomerRefsIncludingDeleted(ids, { companyId }),
+    findAliveRefById: (id, companyId) => findAliveCustomerRefById(id, { companyId }),
+    searchRefs: (query, companyId) => searchCustomerRefs(query, { companyId }),
+  };
+}

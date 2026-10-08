@@ -389,7 +389,12 @@ describe.each(VIEWPORTS)('pantalla de unidades en viewport %s (%i px)', (_nombre
     // Es la columna que mas ancho pide: la frase entera, con factor y unidad de la que deriva. Si
     // alguna vez saliera del contenedor —una celda en portal, un tooltip fijo—, el desbordamiento
     // dejaria de ser el de la tabla y pasaria a ser el del documento.
-    for (const unidad of [KILOGRAMO, UNIDAD_LARGA]) {
+    const frases = [
+      { unidad: KILOGRAMO, frase: `1 kg = 1000 ${GRAMO.symbol}` },
+      { unidad: UNIDAD_LARGA, frase: `1 ${UNIDAD_LARGA.name} = 1000000 ${GRAMO.symbol}` },
+    ] as const;
+
+    for (const { unidad, frase } of frases) {
       const fila = screen.getByTestId(`data-table-row-${unidad.id}`);
       const celda = within(fila).getByTestId(`data-table-cell-${EQUIVALENCE_COLUMN_ID}`);
 
@@ -398,11 +403,14 @@ describe.each(VIEWPORTS)('pantalla de unidades en viewport %s (%i px)', (_nombre
         contenedor.contains(celda),
         `la equivalencia de ${unidad.id} se sale del desplazador a ${ancho}px`,
       ).toBe(true);
-      // La frase esta compuesta de verdad: la celda no esta vacia ni se quedo sin pintar (R17).
-      expect(celda.textContent?.trim().length, `la equivalencia de ${unidad.id}`).toBeGreaterThan(0);
-      // Y no se corta con puntos suspensivos ni se oculta: se alcanza desplazando la tabla.
+      // El recorte con puntos suspensivos es solo visual: la frase entera, con el factor y la
+      // unidad base, sigue en la celda.
+      expect(celda.textContent?.trim(), `la equivalencia de ${unidad.id}`).toBe(frase);
+      expect(clases(celda), `la celda de equivalencia de ${unidad.id} a ${ancho}px`).toContain(
+        'text-ellipsis',
+      );
+      // Recortarse no es ocultarse: la celda nunca desaparece.
       for (const clase of clases(celda)) {
-        expect(clase, `la celda de equivalencia ${clase} a ${ancho}px`).not.toBe('overflow-hidden');
         expect(clase, `la celda de equivalencia ${clase} a ${ancho}px`).not.toBe('hidden');
       }
     }

@@ -134,6 +134,12 @@ export const createOrderSchema = z.object({
   recipeVersionId: z
     .preprocess((value) => (value === '' ? null : value), z.string().uuid().nullable())
     .default(null),
+  // Sin `.uuid()`: un id sin forma tiene que acabar en `customer_not_found`, no en
+  // `invalid_input`. Ausente o vacio es un pedido sin cliente.
+  customerId: z
+    .string()
+    .optional()
+    .transform((value) => (value === undefined || value.trim() === '' ? null : value)),
 });
 
 /**

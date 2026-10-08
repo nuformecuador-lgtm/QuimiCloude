@@ -100,7 +100,7 @@ const DRIVING = [
 ] as const;
 
 /**
- * LA EXCEPCION, NOMBRADA Y ACOTADA. Estos DOS archivos —y solo estos dos— SI escriben en consola,
+ * LA EXCEPCION, NOMBRADA Y ACOTADA. Estos archivos —y solo estos— SI escriben en consola,
  * y lo hacen a proposito:
  *
  * `design.md > 7.2` lo exige con estas palabras para el adaptador del proveedor: «**Un fallo se
@@ -121,6 +121,10 @@ const DRIVING = [
 const EXCEPCIONES_DE_REGISTRO = [
   'lib/modules/identity/adapters/driven/mail/credential-setup-mailer-resend.ts',
   'lib/modules/identity/adapters/driven/mail/credential-setup-mailer-outbox.ts',
+  // Transporte `smtp` TEMPORAL (`nodemailer`): mismo motivo que el de `resend` —un envio que
+  // falla en silencio deja al administrador sin saber por que no llego el correo— y misma
+  // restriccion: solo registra el codigo del error o los nombres de las variables que faltan.
+  'lib/modules/identity/adapters/driven/mail/credential-setup-mailer-smtp.ts',
 ] as const;
 
 /** La UNICA superficie de interfaz que aporta la ficha (R17, R40). */

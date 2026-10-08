@@ -243,6 +243,12 @@ Notas que evitan un error fácil:
 - La columna de acciones es una **columna normal con `pinnable: false`**, el patrón que QC-45 fijó
   y QC-39 heredó. No se añade nada a la tabla compartida (R9).
 
+> **Enmienda 2026-10-08 (QC-177 D4).** La celda de correo puede recortarse con puntos suspensivos
+> (`overflow-hidden text-ellipsis`): es el contrato por defecto de la tabla compartida para una
+> columna sin `hideText`, que entró en `3018853a` fuera del flujo y el humano aceptó. El correo
+> completo sigue en el DOM de la celda; el truncado es solo visual. R21 (desbordamiento contenido
+> en la tabla, sin scroll del documento, celda dentro del desplazador y visible) no cambia.
+
 ## 8. Alta y edición (R22–R28)
 
 **Panel lateral** (`sheet`), un solo componente para los dos modos, exactamente como `unit-sheet`:

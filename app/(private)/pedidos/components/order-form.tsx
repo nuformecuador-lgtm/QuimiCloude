@@ -55,6 +55,8 @@ import { trimDecimal } from '@/lib/shared/ui/decimal-display';
 import { BlockedOrderDialog } from './blocked-order-dialog';
 import { compatibleUnitIds } from './compatible-unit-ids';
 import { OrderCostQuote } from './order-cost-quote';
+import type { OrderCustomerChoice } from './order-customer-label';
+import { OrderCustomerPicker } from './order-customer-picker';
 import {
   ORDER_DISTRIBUTION_PACKAGES_FIELD,
   ORDER_DISTRIBUTION_PACKAGING_FIELD,
@@ -235,7 +237,14 @@ const FIELD_MESSAGES: Readonly<Record<OrderFieldName, string>> = {
 const FIELD_LABELS = {
   quantity: 'Cantidad',
   priority: 'Prioridad',
+  customer: 'Cliente',
 } as const;
+
+/** Nombre del campo del `FormData` con el id del cliente; vacio = sin cliente. */
+export const ORDER_CUSTOMER_FIELD = 'customerId';
+
+const CUSTOMER_PLACEHOLDER = 'Busca un cliente por su nombre';
+const CUSTOMER_EMPTY_LABEL = 'Ningún cliente coincide con la búsqueda.';
 
 /**
  * Donde se pinta cada `code` estable de `pedidos/domain/errors.ts` (`design.md > 8`). Los codigos
@@ -406,7 +415,11 @@ export function OrderForm({
 }: OrderFormProps) {
   const fieldId = useId();
   const formErrorId = `${fieldId}-form-error`;
+  const customerFieldId = `${fieldId}-customer`;
   const isEdit = order !== undefined;
+  const [customer, setCustomer] = useState<OrderCustomerChoice | null>(
+    order?.customer ? { kind: 'customer', customer: order.customer } : null,
+  );
 
   /**
    * QC-102 T14 — La seccion de responsables, DENTRO de este mismo panel (R23). Cuando el panel se
@@ -766,6 +779,21 @@ export function OrderForm({
               onChange={chooseVersion}
               error={fieldErrors.recipeVersionId}
             />
+
+            <div className="flex flex-col gap-2">
+              <label htmlFor={customerFieldId} className="text-sm font-medium">
+                {FIELD_LABELS.customer}
+              </label>
+              <OrderCustomerPicker
+                purpose="assign"
+                name={ORDER_CUSTOMER_FIELD}
+                id={customerFieldId}
+                value={customer}
+                onChange={setCustomer}
+                placeholder={CUSTOMER_PLACEHOLDER}
+                emptyMessage={CUSTOMER_EMPTY_LABEL}
+              />
+            </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
 

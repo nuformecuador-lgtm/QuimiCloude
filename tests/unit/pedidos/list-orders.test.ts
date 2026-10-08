@@ -36,6 +36,7 @@ import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { Page } from '@/lib/modules/pedidos/domain/page'
 import type { ListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { CustomerRef } from '@/lib/modules/clientes'
 import type { PresentationCatalog, PresentationRef } from '@/lib/modules/inventario'
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
 import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades'
@@ -80,6 +81,7 @@ function fila(overrides: Partial<OrderRow> & { readonly id: string }): OrderRow 
     updatedBy: 'admin-0',
     presentationLines: [],
     unitId: null,
+    customerId: null,
     ...overrides,
   }
 }
@@ -96,6 +98,7 @@ function dobles(opciones: {
   idsQueCasan?: readonly string[] | null
   presentaciones?: readonly PresentationRef[]
   unidades?: readonly UnitRef[]
+  clientes?: readonly CustomerRef[]
 }) {
   // Los parametros van TIPADOS -y no `vi.fn(async () => ...)`- porque lo que este archivo
   // afirma es lo que se LE PASO a cada doble: sin ellos, TypeScript infiere una tupla vacia y
@@ -144,10 +147,17 @@ function dobles(opciones: {
     (opciones.unidades ?? []).filter((ref) => ids.includes(ref.id)),
   )
 
+  // QC-156 R21: una sola llamada al catalogo de clientes por pagina, y ninguna sin clientes.
+  const findCustomerRefs = vi.fn(async (ids: readonly string[]) =>
+    (opciones.clientes ?? []).filter((ref) => ids.includes(ref.id)),
+  )
+
   const log: ListQueryLog = { ignoredFields: vi.fn<ListQueryLog['ignoredFields']>() }
 
   return {
     orders,
+    customerCatalog: { findRefsIncludingDeleted: findCustomerRefs },
+    findCustomerRefs,
     recipes: { findRefsIncludingDeleted, findIdsMatchingName } as unknown as RecipeCatalog,
     presentations: { findRefs } as unknown as PresentationCatalog,
     packaging: fakePackagingCatalog(),
