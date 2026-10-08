@@ -242,13 +242,23 @@ async function borrarOtraEmpresa(otra: {
   await prisma.company.deleteMany({ where: { id: otra.companyId } });
 }
 
-type OrderStatusValue = 'PENDIENTE' | 'EN_CURSO' | 'POR_EMPACAR' | 'EN_EMPAQUE' | 'ENTREGADO' | 'CANCELADO';
+type OrderStatusValue =
+  | 'PENDIENTE'
+  | 'EN_CURSO'
+  | 'POR_EMPACAR'
+  | 'EN_EMPAQUE'
+  | 'ENTREGADO'
+  | 'CANCELADO'
+  | 'POR_ACONDICIONAR'
+  | 'EN_ACONDICIONAMIENTO'
+  | 'TERMINADO';
 
 async function createOrder(
   fixture: Fixture,
   overrides: {
     readonly status: OrderStatusValue;
     readonly packedBy?: string | null;
+    readonly conditionedBy?: string | null;
     readonly finishedAt?: Date | null;
     readonly deletedAt?: Date | null;
     readonly companyId?: string;
@@ -263,6 +273,7 @@ async function createOrder(
       quantity: new Prisma.Decimal('10'),
       status: overrides.status,
       packedBy: overrides.packedBy ?? null,
+      conditionedBy: overrides.conditionedBy ?? null,
       finishedAt: overrides.finishedAt ?? null,
       deletedAt: overrides.deletedAt ?? null,
       ...(overrides.status === 'CANCELADO' ? { cancellationReason: 'motivo de prueba' } : {}),
@@ -270,6 +281,26 @@ async function createOrder(
     select: { id: true },
   });
   return order.id;
+}
+
+/** Un pedido en cada estado de acondicionamiento y en TERMINADO, con las columnas que exigen
+ *  las restricciones de la base. */
+async function crearPedidosDeAcondicionamiento(fixture: Fixture): Promise<Record<string, string>> {
+  const quien = fixture.packerId;
+  return {
+    POR_ACONDICIONAR: await createOrder(fixture, { status: 'POR_ACONDICIONAR', packedBy: quien }),
+    EN_ACONDICIONAMIENTO: await createOrder(fixture, {
+      status: 'EN_ACONDICIONAMIENTO',
+      packedBy: quien,
+      conditionedBy: quien,
+    }),
+    TERMINADO: await createOrder(fixture, {
+      status: 'TERMINADO',
+      packedBy: quien,
+      conditionedBy: quien,
+      finishedAt: new Date(),
+    }),
+  };
 }
 
 async function readOrder(
@@ -397,6 +428,21 @@ describe('startPackingAliveById — R10, R18, R19, R20, R23, R24, R25', () => {
     }
   });
 
+  it('R23, R30 (QC-215): Comenzar sobre POR_ACONDICIONAR, EN_ACONDICIONAMIENTO o TERMINADO es not_packable, sin escribir', async () => {
+    const fixture = await crearFixture();
+    const pedidos = await crearPedidosDeAcondicionamiento(fixture);
+    try {
+      for (const [estado, pedido] of Object.entries(pedidos)) {
+        const antes = await readOrder(pedido);
+        const resultado = await startPackingAliveById(pedido, fixture.companyId, fixture.otherPackerId, new Date());
+        expect(resultado, estado).toBe('not_packable');
+        expect(await readOrder(pedido), estado).toEqual(antes);
+      }
+    } finally {
+      await borrarFixture(fixture, Object.values(pedidos));
+    }
+  });
+
   it('R24: Comenzar sobre un pedido inexistente, dado de baja o de otra empresa es not_found', async () => {
     const fixture = await crearFixture();
     const otra = await crearOtraEmpresa();
@@ -476,6 +522,24 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
         const resultado = await finishPackingAliveById(pedido, fixture.companyId, fixture.packerId, new Date());
         expect(resultado, estado).toBe('not_packable');
       }
+    } finally {
+      await borrarFixture(fixture, Object.values(pedidos));
+    }
+  });
+
+  it('R23, R30 (QC-215): Terminar el empaque sobre POR_ACONDICIONAR, EN_ACONDICIONAMIENTO o TERMINADO es not_packable, sin escribir ni mover inventario', async () => {
+    const fixture = await crearFixture();
+    const pedidos = await crearPedidosDeAcondicionamiento(fixture);
+    try {
+      const movimientos = await movementCountDe(fixture.companyId);
+      for (const [estado, pedido] of Object.entries(pedidos)) {
+        const antes = await readOrder(pedido);
+        // El propio empacador: aun siendo quien empaco, el estado ya no admite Terminar.
+        const resultado = await finishPackingAliveById(pedido, fixture.companyId, fixture.packerId, new Date());
+        expect(resultado, estado).toBe('not_packable');
+        expect(await readOrder(pedido), estado).toEqual(antes);
+      }
+      expect(await movementCountDe(fixture.companyId)).toBe(movimientos);
     } finally {
       await borrarFixture(fixture, Object.values(pedidos));
     }

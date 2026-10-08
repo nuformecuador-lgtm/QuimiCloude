@@ -287,6 +287,25 @@ describe('startAssignedOrder — R11: POR_EMPACAR y EN_EMPAQUE no se pueden abri
   });
 });
 
+describe('startAssignedOrder — QC-215: los estados de acondicionamiento y TERMINADO no se pueden abrir', () => {
+  for (const estado of ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const) {
+    it(`R21, R30: ${estado} rechaza con el mismo error que EN_EMPAQUE, sin escribir`, async () => {
+      const empaque = montar({ ordenDeEstados: ['EN_EMPAQUE'] });
+      const errorEmpaque = await createStartAssignedOrder(empaque.deps)(ACTOR, { orderId: PEDIDO }).catch(
+        (e: unknown) => e,
+      );
+      const { deps, transitionAliveById, append } = montar({ ordenDeEstados: [estado] });
+
+      const error = await createStartAssignedOrder(deps)(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(OrderProducedFrozenError);
+      expect((error as OrderProducedFrozenError).code).toBe((errorEmpaque as OrderProducedFrozenError).code);
+      expect(transitionAliveById).not.toHaveBeenCalled();
+      expect(append).not.toHaveBeenCalled();
+    });
+  }
+});
+
 describe('startAssignedOrder — R14: ENTREGADO y CANCELADO no admiten reapertura', () => {
   it('ENTREGADO rechaza con `order_delivered_frozen` sin escribir', async () => {
     const { deps, transitionAliveById } = montar({ ordenDeEstados: ['ENTREGADO'] });

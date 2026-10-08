@@ -1,0 +1,209 @@
+// tests/unit/asignaciones/finish-conditioning.test.ts
+import { describe, expect, it, vi } from 'vitest';
+
+import {
+  ROLE_ACONDICIONAMIENTO,
+  ROLE_ADMINISTRADOR,
+  ROLE_EMPACADOR,
+  SEED_ROLE_PERMISSIONS,
+} from '@/lib/modules/identity';
+
+import {
+  createFinishConditioning,
+  type FinishConditioningDeps,
+} from '@/lib/modules/asignaciones/domain/finish-conditioning';
+import {
+  OrderConditioningTakenError,
+  OrderNotConditionableError,
+  OrderNotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from '@/lib/modules/asignaciones/domain/errors';
+
+import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
+import type { OrderCatalog } from '@/lib/modules/pedidos';
+
+function uuid(seed: string): string {
+  return `${seed.repeat(8)}-${seed.repeat(4)}-4${seed.repeat(3)}-8${seed.repeat(3)}-${seed.repeat(12)}`;
+}
+
+const EMPRESA = uuid('3');
+const ANA = uuid('1');
+const PEDIDO = uuid('7');
+const AHORA = new Date('2026-10-08T12:00:00.000Z');
+
+const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['acondicionamiento.modificar'] };
+
+type Resultado = 'ok' | 'not_conditioner' | 'not_conditionable' | 'not_found';
+
+function montar(
+  resultado: Resultado,
+  options?: {
+    readonly target?: { readonly id: string; readonly status: string } | null;
+    readonly summaryItems?: readonly unknown[];
+  },
+): {
+  readonly deps: FinishConditioningDeps;
+  readonly findAliveById: ReturnType<typeof vi.fn>;
+  readonly listAliveSummariesByIds: ReturnType<typeof vi.fn>;
+  readonly finishConditioningAliveById: ReturnType<typeof vi.fn>;
+} {
+  const findAliveById = vi.fn(async () =>
+    options?.target === undefined ? { id: PEDIDO, status: 'EN_ACONDICIONAMIENTO' } : options.target,
+  );
+  const listAliveSummariesByIds = vi.fn(async () => ({
+    items: options?.summaryItems ?? [{ id: PEDIDO, number: { year: 2026, sequence: 7 } }],
+    total: 1,
+    page: 1,
+    pageSize: 1,
+  }));
+  const finishConditioningAliveById = vi.fn(async () => resultado);
+  const deps = {
+    orders: { findAliveById, listAliveSummariesByIds, finishConditioningAliveById } as unknown as OrderCatalog,
+    now: () => AHORA,
+  } satisfies FinishConditioningDeps;
+  return { deps, findAliveById, listAliveSummariesByIds, finishConditioningAliveById };
+}
+
+/** Un catalogo que falla en cuanto se lee cualquiera de sus miembros. */
+function catalogoIntocable(): OrderCatalog {
+  return new Proxy({} as OrderCatalog, {
+    get(_target, prop) {
+      throw new Error(`se toco el puerto: ${String(prop)}`);
+    },
+  });
+}
+
+function depsIntocables(): FinishConditioningDeps {
+  return {
+    orders: catalogoIntocable(),
+    now: () => {
+      throw new Error('se pidio la hora');
+    },
+  };
+}
+
+describe('finishConditioning — autorizacion', () => {
+  const actoresSinPermiso: ReadonlyArray<readonly [string, Actor | null | undefined]> = [
+    ['nulo', null],
+    ['ausente', undefined],
+    [
+      'con los permisos de semilla del Administrador',
+      { id: ANA, companyId: EMPRESA, permissions: SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]! },
+    ],
+    [
+      'con los permisos de semilla del Empacador',
+      { id: ANA, companyId: EMPRESA, permissions: SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]! },
+    ],
+    ['con el conjunto vacio', { id: ANA, companyId: EMPRESA, permissions: [] }],
+  ];
+
+  it.each(actoresSinPermiso)(
+    'R15: actor %s rechaza con unauthorized sin tocar ningun puerto',
+    async (_nombre, actor) => {
+      const finishConditioning = createFinishConditioning(depsIntocables());
+      await expect(finishConditioning(actor, { orderId: PEDIDO })).rejects.toBeInstanceOf(UnauthorizedError);
+    },
+  );
+
+  it.each(actoresSinPermiso)(
+    'R15: actor %s con entrada invalida sigue dando unauthorized: autorizar va antes de validar',
+    async (_nombre, actor) => {
+      const finishConditioning = createFinishConditioning(depsIntocables());
+      await expect(finishConditioning(actor, { orderId: 'no-es-uuid', extra: 1 })).rejects.toBeInstanceOf(
+        UnauthorizedError,
+      );
+    },
+  );
+
+  it('R15: un actor con los permisos de semilla del Administrador de acondicionamiento termina', async () => {
+    const { deps, finishConditioningAliveById } = montar('ok');
+    const actor: Actor = { id: ANA, companyId: EMPRESA, permissions: SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO]! };
+
+    await expect(createFinishConditioning(deps)(actor, { orderId: PEDIDO })).resolves.toEqual({
+      numberText: '2026-0000007',
+    });
+    expect(finishConditioningAliveById).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('finishConditioning — validacion de la entrada', () => {
+  const entradasInvalidas: ReadonlyArray<readonly [string, unknown]> = [
+    ['nula', null],
+    ['no objeto', 'texto'],
+    ['vacia', {}],
+    ['orderId no uuid', { orderId: 'no-es-uuid' }],
+    ['orderId numerico', { orderId: 7 }],
+    ['con una clave de mas', { orderId: PEDIDO, companyId: EMPRESA }],
+  ];
+
+  it.each(entradasInvalidas)('R16: entrada %s rechaza con invalid_input sin tocar ningun puerto', async (_n, entrada) => {
+    const finishConditioning = createFinishConditioning({ ...depsIntocables(), now: () => AHORA });
+    const error = await finishConditioning(ACTOR, entrada).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ValidationError);
+    expect((error as ValidationError).code).toBe('invalid_input');
+  });
+});
+
+describe('finishConditioning — lectura del numero y traduccion del resultado', () => {
+  it('R12: devuelve el numero visible leido ANTES de transicionar, con el estado actual del pedido', async () => {
+    const { deps, findAliveById, listAliveSummariesByIds, finishConditioningAliveById } = montar('ok');
+
+    const result = await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(result).toEqual({ numberText: '2026-0000007' });
+    expect(findAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA);
+    expect(listAliveSummariesByIds).toHaveBeenCalledWith(EMPRESA, [PEDIDO], ['EN_ACONDICIONAMIENTO'], 1, 1);
+    expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, AHORA);
+    expect(listAliveSummariesByIds.mock.invocationCallOrder[0]!).toBeLessThan(
+      finishConditioningAliveById.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it('R13: not_conditioner rechaza con order_conditioning_taken', async () => {
+    const { deps } = montar('not_conditioner');
+    const error = await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(OrderConditioningTakenError);
+    expect((error as OrderConditioningTakenError).code).toBe('order_conditioning_taken');
+  });
+
+  it('R14: not_conditionable rechaza con order_not_conditionable', async () => {
+    const { deps } = montar('not_conditionable', { target: { id: PEDIDO, status: 'POR_ACONDICIONAR' } });
+    const error = await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(OrderNotConditionableError);
+    expect((error as OrderNotConditionableError).code).toBe('order_not_conditionable');
+  });
+
+  it('R14: not_found del catalogo rechaza con order_not_found', async () => {
+    const { deps } = montar('not_found');
+    const error = await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(OrderNotFoundError);
+    expect((error as OrderNotFoundError).code).toBe('order_not_found');
+  });
+
+  it('R14: pedido inexistente, de baja o de otra empresa rechaza con order_not_found sin transicionar', async () => {
+    const { deps, listAliveSummariesByIds, finishConditioningAliveById } = montar('ok', { target: null });
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      OrderNotFoundError,
+    );
+    expect(listAliveSummariesByIds).not.toHaveBeenCalled();
+    expect(finishConditioningAliveById).not.toHaveBeenCalled();
+  });
+
+  it('R14: si el resumen no aparece rechaza con order_not_found sin transicionar', async () => {
+    const { deps, finishConditioningAliveById } = montar('ok', { summaryItems: [] });
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      OrderNotFoundError,
+    );
+    expect(finishConditioningAliveById).not.toHaveBeenCalled();
+  });
+
+  it('R14: la empresa sale del actor, nunca de la entrada', async () => {
+    const { deps, findAliveById, finishConditioningAliveById } = montar('ok');
+    const otro: Actor = { ...ACTOR, companyId: uuid('9') };
+
+    await createFinishConditioning(deps)(otro, { orderId: PEDIDO });
+    expect(findAliveById).toHaveBeenCalledWith(PEDIDO, uuid('9'));
+    expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, uuid('9'), ANA, AHORA);
+  });
+});

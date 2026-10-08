@@ -255,6 +255,19 @@ describe("updateOrderPresentationLines — R11-R14, [D3']: ventana de estados ed
     },
   );
 
+  it.each<OrderStatus>(['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'])(
+    'R19, R30 (QC-215): rechaza %s igual que EN_EMPAQUE, con not_editable, sin escribir la unidad ni las lineas',
+    async (status) => {
+      const { orders, updatePresentationLinesAlive } = ordersDoble(filaBloqueada({ status }));
+      const update = montar({ orders });
+
+      await expect(
+        update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ packagingProductId: ENVASE_A, packages: 1 }] }),
+      ).resolves.toBe('not_editable');
+      expect(updatePresentationLinesAlive).not.toHaveBeenCalled();
+    },
+  );
+
   it('not_found: la fila no existe, esta de baja o es de otra empresa', async () => {
     const { orders, updatePresentationLinesAlive } = ordersDoble(null);
     const update = montar({ orders });

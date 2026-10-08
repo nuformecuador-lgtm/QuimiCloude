@@ -168,7 +168,49 @@ gate se pone rojo, con el cambio mínimo y anotado en «Excepciones».
   `list-finished-orders.ts` → `TERMINADO` + el recorrido de acondicionamiento en el test (C3/T16).
 - Veredicto: C1 hecha salvo ese rojo, que depende de C3.
 
+### C2 — Casos de uso de `asignaciones` (+ backend de T16) (2026-10-08)
+
+- T8: parche `qc215-c2-catalogo-errores.patch` aplicado limpio (conteo 72 → 74, igual tras el merge
+  de dev). `OrderConditioningTakenError` y `OrderNotConditionableError` en
+  `asignaciones/domain/errors.ts`, exportados en `asignaciones/index.ts`.
+- T9: `asignaciones/domain/start-conditioning.ts` y `finish-conditioning.ts` (permiso → zod →
+  puertos; Terminar lee el número antes y devuelve `{ numberText }`; tabla de traducción del
+  design § 3). Exportados al final de `asignaciones/index.ts`; cableados en `lib/composition/index.ts`
+  como `asignaciones.startConditioning`/`finishConditioning` (alias `create*ConditioningOrder`
+  porque `pedidos` exporta el mismo nombre). Sin Server Action ni ruta.
+- T10: `acondicionamiento-rol.test.ts` abre exactamente las dos rutas; anti-cegado = el barrido ve
+  catálogo + las dos y ninguna más; caso nuevo: las dos exigen `requirePermission(actor, '…')`.
+- T11/T17: `order-state.ts` (solo la tabla del JSDoc: 3 filas). Tests: `order-state` (tabla de
+  10 estados + asignar/quitar grupo/desasignar en los 3), `start-/finish-assigned-order` y
+  `get-assigned-order-execution` (mismo error que `EN_EMPAQUE`), `start-/finish-packing` unit y
+  `order-packing.int` (Comenzar/Terminar el empaque sobre los 3 → `not_packable`, sin escribir).
+- T5/T17: tests `transition-order` (4 destinos reservados sin abrir la unidad), `delete-order`,
+  `cancel-order`, `update-order`, `update-order-presentation-lines` con los 3 estados.
+- T16 backend: `list-finished-orders.ts` → `['TERMINADO']`. `list-finished-orders.test.ts` y
+  `finished-orders.int.test.ts` reescritos sobre `TERMINADO` (helper `terminado()`); la cadena R27
+  recorre Finalizar → empaque → acondicionamiento; POR_ACONDICIONAR, EN_ACONDICIONAMIENTO y ENTREGADO
+  antiguo no aparecen. Se quitó el caso «ENTREGADO sin fecha sale como Sin fecha» (ya no aplica).
+- Censo de la fachada: `tests/unit/composition/asignaciones-facade.test.ts` (+2 operaciones, +2 casos R15).
+- R → test: R8–R16 → `start-conditioning.test.ts`, `finish-conditioning.test.ts` (+R9, R13, R14 en
+  `catalogo.test.ts`; R15 en `asignaciones-facade.test.ts`); R17 → `acondicionamiento-rol.test.ts` +
+  guardia de autorización; R4 → `transition-order.test.ts`; R18 → `cancel-order.test.ts`; R19 →
+  `delete-order`, `update-order`, `update-order-presentation-lines`; R20 → `order-state.test.ts`;
+  R21 → `start-/finish-assigned-order`, `get-assigned-order-execution`; R23 → `start-/finish-packing`,
+  `order-packing.int`; R30 → los mismos con `TERMINADO`; R31 → `list-finished-orders.test.ts`,
+  `finished-orders.int`; R27 (QC-145) → `finished-orders.int` (verde de nuevo).
+- **Discrepancia a revisar (no resuelta):** R19 dice que la edición acotada de reparto y unidad
+  rechaza con `invalid_transition`; el código (lista blanca, design § 2.4 «ninguno») devuelve
+  `not_editable` → `order_presentation_line_not_editable`, igual que con `EN_EMPAQUE`. El test
+  afirma el comportamiento real («igual que EN_EMPAQUE»).
+- Verificación: typecheck verde; lint 0 errores (7 warnings ajenos); guardias 55/55 (742 verdes, 11
+  skipped); unit de la tanda (`tests/unit/asignaciones`, `errores`, `identity/roles`, `composition`,
+  5 de `pedidos`) 83 archivos, 1621 verdes, 4 skipped; `.int` `finished-orders` + `order-packing`
+  22/22; `vitest related` sobre la producción tocada: 671/674 archivos, 3 rojos ajenos
+  (`recetas/module-contract` y `pantallas-exigen-permiso`, en baseline; `proveedores/catalog-line.int`
+  R32, sin diff contra origin/dev, no está en baseline).
+- Veredicto: C2 hecha.
+
 ## Pendiente
 
 - Cerrar el gate de A2+A3 (`./init.sh`).
-- C1, C2 (aplicar antes el parche del catálogo de errores), C3, C4 + T19.
+- C3 (T16 frontend, T13 tests), C4 + T19.

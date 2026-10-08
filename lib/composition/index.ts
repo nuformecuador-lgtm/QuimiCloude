@@ -408,6 +408,8 @@ import {
   createUnassignResponsible,
   createCancelAssignedOrder,
   createRecordStepMove,
+  createStartConditioning as createStartConditioningOrder,
+  createFinishConditioning as createFinishConditioningOrder,
 } from '@/lib/modules/asignaciones';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
@@ -1755,6 +1757,14 @@ export const asignaciones = {
     assignments: orderAssignmentRepository,
     orders: orderCatalog,
     log: executionLogRepository,
+    now: () => new Date(),
+  }),
+  startConditioning: createStartConditioningOrder({
+    orders: orderCatalog,
+    now: () => new Date(),
+  }),
+  finishConditioning: createFinishConditioningOrder({
+    orders: orderCatalog,
     now: () => new Date(),
   }),
 } as const;

@@ -877,6 +877,40 @@ describe('QC-145 R8 — un pedido ENTREGADO, CANCELADO, POR_EMPACAR o EN_EMPAQUE
       expect(repo.updateAlive, status).not.toHaveBeenCalled();
     }
   });
+
+  it('R19, R30 (QC-215): POR_ACONDICIONAR, EN_ACONDICIONAMIENTO y TERMINADO -> `invalid_transition`, sin escribir', async () => {
+    for (const status of ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const) {
+      const cat = catalogoDeRecetas();
+      const repo = repositorioConEstado(status);
+      const pres = catalogoDePresentaciones();
+      const updateOrder = createUpdateOrder({
+        customerCatalog: fakeCustomerCatalog(),
+        orders: repo.orders,
+        unitOfWork: repo.unitOfWork,
+        recipes: cat.recipes,
+        products: catalogoDeProductos().products,
+        units: catalogoDeUnidades().units,
+        presentations: pres.presentations,
+        packaging: fakePackagingCatalog(),
+        now: () => AHORA,
+      });
+
+      expect(
+        await codigoDelFallo(() =>
+          updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A }, ACTOR_A),
+        ),
+        status,
+      ).toBe('invalid_transition');
+      // Tambien con un `status` en la entrada que pida quedarse igual.
+      expect(
+        await codigoDelFallo(() =>
+          updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status }, ACTOR_A),
+        ),
+        status,
+      ).toBe('invalid_transition');
+      expect(repo.updateAlive, status).not.toHaveBeenCalled();
+    }
+  });
 });
 
 // T5 — la edicion RECALCULA el importe de los ingredientes con la receta del DATO ENTRANTE.

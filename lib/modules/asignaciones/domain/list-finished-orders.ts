@@ -1,6 +1,6 @@
 // lib/modules/asignaciones/domain/list-finished-orders.ts
 /**
- * Los pedidos `ENTREGADO` de la empresa: la fecha de terminado los ordena y la composicion de
+ * Los pedidos `TERMINADO` de la empresa: la fecha de terminado los ordena y la composicion de
  * responsables no descarta al actor, porque aqui no hay un «yo» al que restar de la lista.
  */
 import { z } from 'zod';
@@ -42,7 +42,7 @@ export function createListFinishedOrders(
 
     const ordersPage = await deps.orders.listAliveSummariesInCompany(
       actor.companyId,
-      ['ENTREGADO'],
+      ['TERMINADO'],
       'finished_recent_first',
       page,
       pageSize,

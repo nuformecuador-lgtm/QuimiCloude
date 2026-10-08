@@ -46,7 +46,7 @@
   R3). Tests: `tests/unit/pedidos/order-transitions.test.ts` (los 100 pares) y
   `tests/unit/pedidos/module-contract.test.ts` (enum = dominio). **Hecho cuando:** R1, R2 y R3
   están en verde y `typecheck` señala todos los `Record<OrderStatus, …>` pendientes. Depende de: T1.
-- [ ] **T5.** `transition-order.ts` rechaza los destinos de R4; `delete-order.ts` amplía
+- [x] **T5.** `transition-order.ts` rechaza los destinos de R4; `delete-order.ts` amplía
   `NO_BORRABLES`. Tests: `transition-order.test.ts`, `delete-order.test.ts`,
   `cancel-order.test.ts` y `update-order.test.ts` (R18, R19 con los estados nuevos). **Hecho
   cuando:** R4, R18 y R19 están en verde. Depende de: T4.
@@ -72,10 +72,10 @@
 
 ## Bloque 3 — Casos de uso de `asignaciones`
 
-- [ ] **T8.** Dos códigos en `lib/modules/errores/domain/error-codes.ts` y `error-catalog.ts`; dos
+- [x] **T8.** Dos códigos en `lib/modules/errores/domain/error-codes.ts` y `error-catalog.ts`; dos
   errores en `lib/modules/asignaciones/domain/errors.ts`. Test: `tests/unit/errores/catalogo.test.ts`.
   **Hecho cuando:** el catálogo cerrado los contiene con texto. Depende de: —.
-- [ ] **T9.** `start-conditioning.ts` y `finish-conditioning.ts`, exportados en
+- [x] **T9.** `start-conditioning.ts` y `finish-conditioning.ts`, exportados en
   `lib/modules/asignaciones/index.ts` y cableados en `asignaciones` de `lib/composition/index.ts`.
   Tests:
   - `tests/unit/asignaciones/start-conditioning.test.ts`;
@@ -84,10 +84,10 @@
   Cubren R8–R16. R15 se prueba con actores `SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]`,
   `[ROLE_EMPACADOR]` y `null`, con puertos que fallan si se tocan. **Hecho cuando:** pasan.
   Depende de: T7, T8.
-- [ ] **T10.** Relajar QC-216 R17 en `tests/unit/identity/roles/acondicionamiento-rol.test.ts`:
+- [x] **T10.** Relajar QC-216 R17 en `tests/unit/identity/roles/acondicionamiento-rol.test.ts`:
   abrir las dos rutas exactas de T9 y mantener el anti-cegado. **Hecho cuando:** R17 está en verde
   y la guardia de autorización por permiso también. Depende de: T9.
-- [ ] **T11.** `order-state.ts` con los estados nuevos (`order_produced_frozen`). Tests:
+- [x] **T11.** `order-state.ts` con los estados nuevos (`order_produced_frozen`). Tests:
   - `tests/unit/asignaciones/order-state.test.ts` (R20);
   - `tests/unit/asignaciones/start-assigned-order.test.ts` y `finish-assigned-order.test.ts` (R21);
   - `tests/unit/asignaciones/list-packing-orders.test.ts`, `get-packing-order.test.ts`,
@@ -122,7 +122,7 @@
   - T12 y T13 ampliados.
 
   **Hecho cuando:** R31 y R32 están en verde. Depende de: T15, T12.
-- [ ] **T17.** `TERMINADO` cerrado en la aplicación (R30). T5 y T11 ampliados con `TERMINADO`.
+- [x] **T17.** `TERMINADO` cerrado en la aplicación (R30). T5 y T11 ampliados con `TERMINADO`.
   Depende de: T15.
 
 ## Bloque 6 — E2E existentes y cierre
