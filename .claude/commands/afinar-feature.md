@@ -160,9 +160,9 @@ escríbelo en el issue** con las herramientas MCP de `atlassian`. Recién entonc
   (`sdd`, `slug:<kebab-case>`, `zone:<...>`, más `complexity:<...>` **solo si la acotación ya
   lo sabe**; si no, se deja fuera y lo asigna el leader en F1.0). Una ficha a medias es peor
   que ninguna: F0 la importa igual y aterriza en el backlog sin slug ni zona.
-  **No la siembras.** Nace `pending` en Backlog y se acota cuando le toque, con su propia
+  **No la siembras.** Nace en el estado de `pending` (según `jira.estados`) y se acota cuando le toque, con su propia
   corrida de este comando.
-- **Una ficha huérfana se mueve a *Cancelado*** (`status: cancelled`), con un comentario en el
+- **Una ficha huérfana se mueve al estado de `cancelled`** (según `jira.estados`), con un comentario en el
   issue que diga por qué y qué ficha la absorbe. **Nunca se borra.**
 - **Si el humano dice que no: no siembres.** Un spec construido sobre un alcance que la tarjeta
   contradice es la divergencia que `docs/jira.md` existe para evitar. Para y dilo.
@@ -211,7 +211,7 @@ Después, en este orden:
   copies la tabla**: una es la fuente, la otra enlaza.
 - Si alguna respuesta cerró una de las cuatro preguntas abiertas del dominio, actualiza
   `docs/architecture.md > Preguntas abiertas del dominio`.
-- **No muevas de columna la ficha que estás acotando.** Sigue `pending` en Backlog y su `status`
+- **No muevas de estado la ficha que estás acotando.** Sigue `pending` y su `status`
   no cambia: quien lo mueve es el leader en F1.3. Los únicos empujones a Jira de este comando son
   los tres del paso 5: editar los cuatro campos, crear la ficha que falta y cancelar la huérfana.
 - Corre `./init.sh` (rápido por defecto) en el worktree de la feature y haz `git push`.

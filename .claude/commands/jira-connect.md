@@ -192,7 +192,7 @@ siempre A.2, la app o el boton.
 - **No comparte credenciales.** Si alguien propone reusar el token de otro, di que no y por que:
   un token hereda **todos** los permisos de su dueno —el del creador del sitio es admin de la
   organizacion—, todos los empujones del ciclo quedarian firmados por la misma cuenta (que es
-  justo la autoria que la columna *Spec en revision* existe para registrar), el assignee dejaria
+  justo la autoria que la transicion del estado de `spec_ready` al de `in_progress` existe para registrar), el assignee dejaria
   de distinguir quien tiene cada feature, y revocarlo el dia que haga falta tumba al dueno
   tambien.
 - **No versiona la identidad.** `.arnes.local.json` es de cada persona y de cada maquina.

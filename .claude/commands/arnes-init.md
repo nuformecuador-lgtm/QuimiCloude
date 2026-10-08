@@ -53,7 +53,9 @@ máximo 4 preguntas por tanda, y pon siempre como primera opción lo que el repo
 5. **Dependencias:** ¿las actuales están aprobadas? ¿Quién aprueba las nuevas?
 6. **Equipo y board:**
    - sitio y proyecto de Jira;
-   - columnas del board;
+   - estados del board: el nombre de cada uno en Jira y a qué estado del arnés traduce
+     (`pending`, `spec_ready`, `in_progress`, `done`, `cancelled`). Se leen del board, no se
+     suponen (`docs/jira.md > Los estados del board`);
    - ramas de integración y producción;
    - cupo por persona y zona (por defecto 2/3/3).
 7. **CI:** ¿GitHub Actions disponible? ¿Plan gratuito (minutos limitados, sin protección de
@@ -68,7 +70,7 @@ En modo revisión, por cada doc del perfil:
 ## 3. Escribe
 
 - **`arnes.config.json`:** `arnes_version` (la de `arnes.config.example.json` si existe),
-  `jira`, `ramas`, `cupos_por_persona` y `perfil` (`max_dias_sin_revisar`, `docs`).
+  `jira` (`site`, `project`, `estados`), `ramas`, `cupos_por_persona` y `perfil` (`max_dias_sin_revisar`, `docs`).
 - **Los docs del perfil:** en montaje, desde las plantillas `docs/*.md` que traen
   `<!-- PLANTILLA -->`. En revisión, edita solo lo que cambió.
   - La primera línea de cada doc es `<!-- perfil: revisado=<hoy AAAA-MM-DD> por=<nombre de

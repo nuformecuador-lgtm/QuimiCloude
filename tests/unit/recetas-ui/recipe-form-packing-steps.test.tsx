@@ -333,32 +333,57 @@ describe('QC-211 R7 — sección «Pasos de envasado» en el formulario de fórm
   });
 });
 
+/**
+ * Paso vacío tal como lo deja «Añadir paso»: un párrafo sin fragmentos.
+ *
+ * Los dos casos de R8 lo CARGAN con la fórmula en vez de pulsar «Añadir» (2026-10-07). En CI el
+ * caso de envasado falló una vez sin rastro: `findBy` agotó sus 5 s (`asyncUtilTimeout`) sin que
+ * el error llegara a pintarse, con el test en 5068 ms y el resto del archivo en ~100 ms. No era
+ * lentitud -la validación es síncrona y el clic va envuelto en `act`, así que el error está o no
+ * está en cuanto el clic vuelve-; era que el envío no tomó el camino del error. Cargar el paso
+ * vacío quita del recorrido el clic de «Añadir» y el editor que nace después del montaje, que
+ * R8 no necesita (añadir lo cubre el caso de R7 de arriba). Y las comprobaciones son síncronas y
+ * van en orden de diagnóstico: si vuelve a fallar, falla al instante y diciendo por dónde.
+ */
+const EMPTY_STEP: RecipeStepView = { blocks: [{ kind: 'paragraph', spans: [] }] };
+
 describe('QC-211 R8 — los errores no cruzan de sección', () => {
   it('R8: un paso de envasado vacío pinta su error en ese paso de envasado y no en el paso del operador con el mismo índice', async () => {
     const user = setupUser();
-    renderEdit(recipeDetail({ packingSteps: [paragraph('Etiquetar')] }));
+    renderEdit(
+      recipeDetail({
+        steps: [paragraph('Pesar'), paragraph('Mezclar')],
+        packingSteps: [paragraph('Etiquetar'), EMPTY_STEP],
+      }),
+    );
+    expect(screen.getAllByTestId('recipe-packing-step-row')).toHaveLength(2);
 
-    await user.click(screen.getByTestId('recipe-packing-step-add'));
     await user.click(screen.getByTestId('recipe-form-submit'));
 
-    expect(await screen.findByTestId('recipe-packing-step-field-error-1')).toBeInTheDocument();
+    expect(updateRecipeActionMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId('recipe-packing-step-field-error-1')).toBeInTheDocument();
     expect(screen.queryByTestId('recipe-packing-step-field-error-0')).toBeNull();
     expect(screen.queryByTestId('recipe-step-field-error-0')).toBeNull();
     expect(screen.queryByTestId('recipe-step-field-error-1')).toBeNull();
-    expect(updateRecipeActionMock).not.toHaveBeenCalled();
   });
 
   it('R8: un paso del operador vacío pinta su error en ese paso y en ningún paso de envasado', async () => {
     const user = setupUser();
-    renderEdit(recipeDetail({ packingSteps: [paragraph('Etiquetar'), paragraph('Sellar')] }));
+    renderEdit(
+      recipeDetail({
+        steps: [paragraph('Mezclar'), EMPTY_STEP],
+        packingSteps: [paragraph('Etiquetar'), paragraph('Sellar')],
+      }),
+    );
+    expect(screen.getAllByTestId('recipe-step-row')).toHaveLength(2);
 
-    await user.click(screen.getByTestId('recipe-step-add'));
     await user.click(screen.getByTestId('recipe-form-submit'));
 
-    expect(await screen.findByTestId('recipe-step-field-error-1')).toBeInTheDocument();
+    expect(updateRecipeActionMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId('recipe-step-field-error-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('recipe-step-field-error-0')).toBeNull();
     expect(screen.queryByTestId('recipe-packing-step-field-error-0')).toBeNull();
     expect(screen.queryByTestId('recipe-packing-step-field-error-1')).toBeNull();
-    expect(updateRecipeActionMock).not.toHaveBeenCalled();
   });
 
   it('R8: sin pasos de envasado se envía la clave propia vacía', async () => {
