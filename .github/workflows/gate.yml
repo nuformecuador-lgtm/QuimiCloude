@@ -44,13 +44,20 @@ env:
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/quimicloude
   DIRECT_URL: postgresql://postgres:postgres@localhost:5432/quimicloude
   NO_COLOR: '1'
+  # `tsc --noEmit` ya pide ~2.1 GB sobre `dev` (medido el 2026-10-07) y ~2.5 GB con un PR
+  # mediano encima; en el runner de 2 vCPU el heap por defecto de Node se queda corto y el
+  # typecheck muere con "JavaScript heap out of memory" (PRs #160 y #162). 4 GB cabe en los
+  # 7 GB del runner y es solo un techo: no reserva memoria.
+  NODE_OPTIONS: --max-old-space-size=4096
 
 jobs:
   gate-completo:
     name: gate-completo
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 45 y no 30: la suite en un solo job ya tarda 26-29 min en el runner de 2 vCPU y los
+    # reintentos se cortaban a los 30 (2026-10-07). Lo baja de verdad el sharding (#164).
+    timeout-minutes: 45
 
     services:
       postgres:
