@@ -34,8 +34,15 @@
  */
 import { afterAll, describe, expect, it } from 'vitest';
 
+import { createListRoles } from '@/lib/modules/identity';
 import { listAllRoles } from '@/lib/modules/identity/adapters/driven/persistence/role-catalog-prisma';
-import { ROLE_ADMINISTRADOR, ROLE_EMPACADOR, ROLE_MAESTRO, ROLE_OPERADOR } from '@/lib/modules/identity/domain/roles';
+import {
+  ROLE_ACONDICIONAMIENTO,
+  ROLE_ADMINISTRADOR,
+  ROLE_EMPACADOR,
+  ROLE_MAESTRO,
+  ROLE_OPERADOR,
+} from '@/lib/modules/identity/domain/roles';
 import { prisma } from '@/lib/shared/db/prisma';
 
 /** El orden que la BASE considera correcto entre lo que el catalogo devuelve, preguntado a la base.
@@ -122,5 +129,30 @@ describe('QC-94 — la secuencia la ordena la BASE por nombre ascendente (R10)',
     const segunda = await listAllRoles();
 
     expect(segunda).toEqual(primera);
+  });
+});
+
+describe('QC-216 — el rol de acondicionamiento llega al selector de usuarios', () => {
+  const listRoles = createListRoles({ roles: { listAll: listAllRoles } });
+
+  for (const permiso of ['usuarios.consultar', 'usuarios.modificar'] as const) {
+    it(`R18 — con solo ${permiso}, la consulta de roles incluye el rol de acondicionamiento y sigue sin Administrador ni Maestro`, async () => {
+      expect(await prisma.role.count({ where: { name: ROLE_ACONDICIONAMIENTO } })).toBe(1);
+
+      const roles = await listRoles({ id: 'actor-r18', companyId: 'empresa-r18', permissions: [permiso] });
+      const nombres = roles.map((rol) => rol.name);
+
+      expect(nombres).toContain(ROLE_ACONDICIONAMIENTO);
+      expect(nombres).not.toContain(ROLE_ADMINISTRADOR);
+      expect(nombres).not.toContain(ROLE_MAESTRO);
+      const encontrado = roles.find((rol) => rol.name === ROLE_ACONDICIONAMIENTO);
+      expect(encontrado!.id.length).toBeGreaterThan(0);
+    });
+  }
+
+  it('R18 — sin usuarios.consultar ni usuarios.modificar la consulta se rechaza (simetrico)', async () => {
+    await expect(
+      listRoles({ id: 'actor-r18', companyId: 'empresa-r18', permissions: ['asignaciones.consultar', 'acondicionamiento.modificar'] }),
+    ).rejects.toThrow();
   });
 });
