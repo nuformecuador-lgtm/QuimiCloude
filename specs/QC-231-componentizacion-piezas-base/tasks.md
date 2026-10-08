@@ -9,6 +9,12 @@
 **Comentarios.** No se cita `QC-<n>` ni `R<n>` en producción. Al tocar una línea se limpian sus
 comentarios (`docs/conventions.md > Comentarios`).
 
+**Archivos que no se tocan.** Los 14 archivos D11 (`requirements.md > Archivos D11`) **no se
+tocan**, porque chocan con QC-217 y QC-223. Si una task parece necesitar uno, esa parte pasa a QC-232
+y se anota en el impl.
+
+**Dependencia.** QC-230 es `depends_on` (D14).
+
 ## Tanda 0 — Congelar el «antes» (bloquea todo lo demás)
 
 - [ ] **T0. Paridad del árbol accesible** (R1, R2, R16-R18, R20, D9).
@@ -104,24 +110,41 @@ comentarios (`docs/conventions.md > Comentarios`).
 - [ ] **T9a [P]. `inventario`**, incluidos `importar/` y producto terminado.
 - [ ] **T9b [P]. `produccion/formulas`**: la lista, las 4 páginas con `RecipeListError` e
   `importar/`.
-- [ ] **T9c [P]. `pedidos`**, incluido `OrderRecipeImage` → `EntityImage` (R29). Incluye la
-  enmienda de `guard-pantalla-pedidos-se-amplia.test.ts` (R32).
+- [ ] **T9c [P]. `pedidos`, limitado por D11.**
+  - **Qué se hace:**
+    - `order-list-empty`, `order-list-error` y `order-list-skeleton` delegan en `EmptyState`,
+      `ErrorState` y `TableSkeleton` **sin cambiar su firma ni sus exports**;
+    - `OrderRecipeImage` delega en `EntityImage size="fill"` (R29);
+    - en el resto de archivos de pedidos que no son D11 entran la talla táctil, `ErrorAlert`,
+      `Spinner` y `EMPTY_MARK`.
+  - **Qué no se toca:** ni `order-table`, ni `order-list-section`, ni `order-columns`, ni
+    `order-sheet`, ni el barrel, ni `page.tsx`, ni la guardia de anclas de pedidos.
 - [ ] **T9d [P]. `clientes`.**
 - [ ] **T9e [P]. `proveedores`** (la vitrina) y `proveedores/[id]`, con el catálogo, `importar/` y
   los errores previos de la página.
 - [ ] **T9f [P]. `configuracion/unidades`.**
 - [ ] **T9g [P]. `configuracion/presentaciones`.**
 - [ ] **T9h [P]. `configuracion/usuarios`**: usuarios y grupos. `UserStatusBadge` y
-  `WorkGroupRowActions` se quedan como están (pregunta abierta 2).
-- [ ] **T9i [P]. `asignacion`.** Se hace:
-  - la talla táctil y `ErrorAlert` en las pantallas de ejecución, empaque y acondicionamiento;
-  - `ErrorState` en lugar de `AssignedOrdersError` en las 6 secciones;
-  - `EMPTY_MARK` y `formatCivilDate` en las columnas.
-
-  **No** se tocan los vacíos ni los esqueletos de las 5 listas (D7, R33).
+  `WorkGroupRowActions` se quedan como están (D13).
+- [ ] **T9i [P]. `asignacion`, limitado por D7 y D11.**
+  - **Qué se hace:**
+    - `AssignedOrdersError` delega en `ErrorState` **sin cambiar su firma**, y las secciones no se
+      tocan;
+    - la talla táctil y `ErrorAlert` en las pantallas de ejecución y de empaque, en los triggers y
+      en `packing-orders-list-section`;
+    - `EMPTY_MARK` y `formatCivilDate` en las columnas que no son D11.
+  - **Qué no se toca:** ni los vacíos ni los esqueletos de las 5 listas, ni los archivos D11 de
+    QC-217.
 - [ ] **T9j [P]. `dashboard`**: lista y detalle de recorridos.
 - [ ] **T9k [P]. `(public)/login`** (R27). Su paridad pasa con la única excepción declarada, en
   un commit aparte que cita D10.
+- [ ] **T9l [P]. `establecer-contrasena`** (R27, D12).
+  - **Antes de empezar:** pedir al leader que compruebe el choque con QC-96, que tiene la rama sin
+    publicar (`design.md > 16`). Si choca, la task pasa a QC-232 y se anota.
+  - **Qué se hace:** solo `components/submit-button.tsx`, que delega en el `SubmitButton`
+    compartido, con la misma firma y el testid `set-credential-submit`.
+  - **Hecho cuando:** `set-credential-form.test.tsx` y `scope.test.ts` están en verde **sin
+    tocarlos**, y el diff de la ruta tiene un solo archivo.
 
 ## Tanda 4 — `components/shared` (depende de T1, T2, T4 y T5; [P] con la tanda 3)
 
@@ -139,7 +162,7 @@ comentarios (`docs/conventions.md > Comentarios`).
   - **Hecho cuando:** los tres están en verde contra el código migrado. La muestra nueva prueba que
     un `<Button>` sin `touch` ni `touchTarget` **sigue fallando**.
 - [ ] **T13. Enmienda de `migracion-listas-alcance.test.ts:228`** (R32), y la línea fechada en
-  `specs/QC-56-…/requirements.md` y en `specs/QC-102-…/requirements.md` (`design.md > 14`).
+  `specs/QC-56-…/requirements.md` (`design.md > 14`). La de QC-102 pasa a QC-232 (D11).
 - [ ] **T14. `tests/guards/guard-piezas-base.test.ts`** (R6, R7, R12, R21, R25, R29, R31, R33).
   - **Qué comprueba:** recorre `app/`, `components/` y `hooks/` y busca:
     - constantes con el par táctil;
@@ -149,8 +172,12 @@ comentarios (`docs/conventions.md > Comentarios`).
     - constantes que valgan `—`;
     - los símbolos borrados.
 
-    Lleva sus exclusiones (establecer, los vacíos y esqueletos de asignación, y `ITEM_TOUCH_TARGET` y
-    compañía, cuyo valor es distinto). Por diff contra `origin/dev`, con `skip` ruidoso fuera de la
+    Lleva sus exclusiones:
+    - `establecer-contrasena`;
+    - los vacíos y esqueletos de asignación;
+    - **los archivos D11**;
+    - los locales que se conservan por D11;
+    - `ITEM_TOUCH_TARGET` y compañía, cuyo valor es distinto. Por diff contra `origin/dev`, con `skip` ruidoso fuera de la
     rama, comprueba que no se tocan los archivos de R33.
   - **Hecho cuando:** está en verde y tiene una muestra que muerde por cada regla.
 
@@ -162,8 +189,8 @@ comentarios (`docs/conventions.md > Comentarios`).
   - las excepciones de D4;
   - los sitios de R12 que conservan la comparación sin pintar.
 - [ ] **T16. Capturas «después»** (R3) en `_trabajo/marca/capturas-despues/`, con el seed demo de
-  QC-230. Son las mismas pantallas y estados que en `capturas-antes/`. **Bloqueada mientras QC-230
-  no esté mergeada** (pregunta abierta 3).
+  QC-230. Son las mismas pantallas y estados que en `capturas-antes/`. QC-230 es `depends_on` (D14):
+  esta task **espera a que QC-230 esté mergeada en `dev`** y a sincronizar con `dev`.
   - **Hecho cuando:** cada captura «antes» tiene su pareja, y la tabla de parejas queda lista para
     el reviewer.
 
@@ -216,6 +243,9 @@ comentarios (`docs/conventions.md > Comentarios`).
 - `app/(public)/login/components/login-form.tsx`
 - `app/(public)/login/components/index.ts`
 
+### `app/(public)/establecer-contrasena` (solo este archivo, D12; antes, comprobar QC-96)
+- `app/(public)/establecer-contrasena/[token]/components/submit-button.tsx`
+
 ### `inventario`
 - `app/(private)/inventario/page.tsx`
 - `app/(private)/inventario/components/index.ts`
@@ -231,7 +261,6 @@ comentarios (`docs/conventions.md > Comentarios`).
 - `app/(private)/inventario/components/product-batch-date-field.tsx`
 - `app/(private)/inventario/components/delete-product-dialog.tsx`
 - `app/(private)/inventario/components/product-field.tsx`
-- `app/(private)/inventario/components/batch-history.tsx`
 - `app/(private)/inventario/components/product-batches-sheet.tsx`
 - `app/(private)/inventario/components/adjust-batch-dialog.tsx`
 - `app/(private)/inventario/components/product-form.tsx`
@@ -277,15 +306,10 @@ comentarios (`docs/conventions.md > Comentarios`).
 - `app/(private)/produccion/formulas/importar/[documentoId]/components/formula-import-summary.tsx`
 - `app/(private)/produccion/formulas/importar/[documentoId]/components/formula-import-review.tsx`
 
-### `pedidos`
-- `app/(private)/pedidos/page.tsx`
-- `app/(private)/pedidos/components/index.ts`
-- `app/(private)/pedidos/components/order-list-section.tsx`
-- `app/(private)/pedidos/components/order-table.tsx`
+### `pedidos` (sin los archivos D11)
 - `app/(private)/pedidos/components/order-list-skeleton.tsx`
 - `app/(private)/pedidos/components/order-list-empty.tsx`
 - `app/(private)/pedidos/components/order-list-error.tsx`
-- `app/(private)/pedidos/components/order-columns.tsx`
 - `app/(private)/pedidos/components/order-recipe-image.tsx`
 - `app/(private)/pedidos/components/order-form.tsx`
 - `app/(private)/pedidos/components/order-ingredients-table.tsx`
@@ -296,7 +320,6 @@ comentarios (`docs/conventions.md > Comentarios`).
 - `app/(private)/pedidos/components/order-distribution-field.tsx`
 - `app/(private)/pedidos/components/packaging-select.tsx`
 - `app/(private)/pedidos/components/order-distribution-dialog.tsx`
-- `app/(private)/pedidos/components/order-sheet.tsx`
 - `app/(private)/pedidos/components/order-customer-picker.tsx`
 - `app/(private)/pedidos/components/order-responsibles.tsx`
 - `app/(private)/pedidos/components/order-customer-dialog.tsx`
@@ -397,22 +420,13 @@ comentarios (`docs/conventions.md > Comentarios`).
 - `app/(private)/configuracion/usuarios/components/work-group-form.tsx`
 - `app/(private)/configuracion/usuarios/components/delete-work-group-dialog.tsx`
 
-### `asignacion` (sin los vacíos ni los esqueletos de las 5 listas: D7)
-- `app/(private)/asignacion/components/index.ts`
+### `asignacion` (sin los vacíos ni los esqueletos de las 5 listas, D7, y sin los archivos D11)
 - `app/(private)/asignacion/components/assigned-orders-error.tsx`
-- `app/(private)/asignacion/components/assigned-orders-list-section.tsx`
-- `app/(private)/asignacion/components/company-orders-list-section.tsx`
-- `app/(private)/asignacion/components/finished-orders-list-section.tsx`
-- `app/(private)/asignacion/components/conditioning-orders-list-section.tsx`
-- `app/(private)/asignacion/components/conditioned-orders-list-section.tsx`
 - `app/(private)/asignacion/components/packing-orders-list-section.tsx`
 - `app/(private)/asignacion/components/assigned-orders-columns.tsx`
 - `app/(private)/asignacion/components/company-orders-columns.tsx`
 - `app/(private)/asignacion/components/finished-orders-columns.tsx`
-- `app/(private)/asignacion/components/conditioning-orders-columns.tsx`
 - `app/(private)/asignacion/components/packing-orders-columns.tsx`
-- `app/(private)/asignacion/components/order-distribution-full.tsx`
-- `app/(private)/asignacion/components/assignment-view-tabs.tsx`
 - `app/(private)/asignacion/components/assigned-order-start-trigger.tsx`
 - `app/(private)/asignacion/components/assigned-order-enter-trigger.tsx`
 - `app/(private)/asignacion/[id]/components/order-execution-lines.tsx`
@@ -420,7 +434,6 @@ comentarios (`docs/conventions.md > Comentarios`).
 - `app/(private)/asignacion/[id]/components/order-execution-screen.tsx`
 - `app/(private)/asignacion/[id]/components/order-cancel-dialog.tsx`
 - `app/(private)/asignacion/empaque/[id]/components/packing-order-screen.tsx`
-- `app/(private)/asignacion/acondicionamiento/[id]/components/conditioning-order-screen.tsx`
 
 ### `dashboard`
 - `app/(private)/dashboard/components/execution-trace-list-section.tsx`
@@ -462,7 +475,6 @@ comentarios (`docs/conventions.md > Comentarios`).
 - `tests/unit/recetas-ui/recipe-route-contract.test.ts`
 - `tests/unit/inventario/importar/importar-route-contract.test.ts`
 - `tests/unit/shared/migracion-listas-alcance.test.ts`
-- `tests/guards/guard-pantalla-pedidos-se-amplia.test.ts`
 - `tests/unit/clientes-ui/customer-list-skeleton.test.tsx`
 - `tests/unit/clientes-ui/customer-list-error.test.tsx`
 - `tests/unit/clientes-ui/customer-list-empty.test.tsx`
@@ -480,10 +492,6 @@ comentarios (`docs/conventions.md > Comentarios`).
 - `tests/unit/configuracion-ui/presentation-columns.test.tsx`
 - `tests/unit/configuracion-ui/unidades-convenciones.test.ts`
 - `tests/unit/configuracion-ui/usuarios-convenciones.test.ts`
-- `tests/unit/pedidos-ui/order-list-skeleton.test.tsx`
-- `tests/unit/pedidos-ui/order-list-section.test.tsx`
-- `tests/unit/pedidos-ui/order-table.test.tsx`
-- `tests/unit/pedidos-ui/order-columns.test.tsx`
 - `tests/unit/pedidos-ui/order-form-quote.test.tsx`
 - `tests/unit/pedidos-ui/use-order-cost-quote.test.ts`
 - `tests/unit/inventario/product-page.test.tsx`
@@ -495,17 +503,10 @@ comentarios (`docs/conventions.md > Comentarios`).
 - `tests/unit/proveedores-ui/supplier-showcase-page.test.tsx`
 - `tests/unit/proveedores-ui/supplier-route-contract.test.ts`
 - `tests/unit/proveedores-ui/catalog-columns.test.tsx`
-- `tests/unit/asignaciones-ui/assigned-orders-states.test.tsx`
-- `tests/unit/asignaciones-ui/a11y-tactil.test.tsx`
 - `tests/unit/asignaciones-ui/assigned-orders-columns.test.tsx`
-- `tests/unit/asignaciones-ui/packing-orders-list-section.test.tsx`
-- `tests/unit/asignaciones-ui/finished-orders-list-section.test.tsx`
-- `tests/unit/asignaciones-ui/conditioning-orders-list-section.test.tsx`
-- `tests/unit/asignaciones-ui/company-orders-list-section.test.tsx`
 - `tests/unit/shared-ui/responsible-avatars.test.tsx`
 - `tests/unit/shared/data-table-viewport.test.tsx`
 - `tests/unit/shared/data-table-filter-date.test.tsx`
 
 ### Specs enmendados
 - `specs/QC-56-migrar-listas-a-tabla-compartida/requirements.md`
-- `specs/QC-102-responsables-en-la-pantalla-de-pedidos/requirements.md`

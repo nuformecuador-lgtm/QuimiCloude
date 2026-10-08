@@ -24,6 +24,21 @@ verifiqué con Grep sobre el worktree.
 | `credential-field` / `credential-requirements` (QC-21) | `components/shared/` | **Fuera** (D3) |
 | shadcn `Spinner`, `Empty`, `Alert` | no están en `components/ui/` | Ver alternativa A5 (§17) |
 
+**Choque con otras features (D11).** Hay 14 archivos en vuelo en QC-217 y QC-223, que son de otra
+persona. Esta rama no los toca, y la lista exacta está en `requirements.md > Archivos D11`. Tiene
+tres consecuencias:
+
+- **Las piezas se crean igual.** Ninguna de ellas necesita tocar un archivo D11.
+- **Donde un barrel D11 exporta un componente que habría que borrar, el componente se queda.** Pasa
+  a delegar en la pieza compartida y conserva su firma. Son cinco:
+  - `order-list-empty`, `order-list-error` y `order-list-skeleton`;
+  - `OrderRecipeImage`;
+  - `AssignedOrdersError`.
+
+  Los borra QC-232.
+- **La guardia de anclas de pedidos de QC-102 no se enmienda,** porque el barrel de pedidos no
+  cambia.
+
 ## 1. Principio
 
 Es una refactorización **de cero cambio** (D2). Cada pieza compartida reproduce **el marcado exacto**
@@ -269,7 +284,7 @@ Patrón, con inventario como ejemplo.
 |---|---|---|
 | `inventario` (productos y producto terminado) | `product-list-empty`, `product-list-error`, `product-table-skeleton` | `states` en `ProductTable` / `FinishedStockTable` |
 | `produccion/formulas` | `recipe-list-empty`, `recipe-list-error`, `recipe-table-skeleton` | `states` en `RecipeTable`. Las 4 páginas de formulario usan `ErrorState` (R20) |
-| `pedidos` | `order-list-empty`, `order-list-error`, `order-list-skeleton` | `states` en `OrderTable` |
+| `pedidos` | **Ninguno (D11).** `order-table.tsx`, `order-list-section.tsx` y el barrel son archivos D11 | `order-list-empty`, `order-list-error` y `order-list-skeleton` se quedan, con la misma firma, y delegan en `EmptyState`, `ErrorState` y `TableSkeleton`. Adoptar `states` y borrarlos es de QC-232 |
 | `clientes` | `customer-list-empty`, `customer-list-error`, `customer-list-skeleton` | `states` en `CustomerTable`, con reintento `href` (`retryHref`) |
 | `proveedores/[id]` | `catalog-list-empty`, `catalog-list-error`, `catalog-table-skeleton` | `states` en `CatalogTable`. Los errores previos de página (`page.tsx:97, 109`) usan `ErrorState` |
 | `configuracion/unidades` | `unit-list-empty`, `unit-list-error`, `unit-list-skeleton` | `states` en `UnitTable` |
@@ -283,7 +298,7 @@ Patrón, con inventario como ejemplo.
 |---|---|
 | Vitrina de proveedores (`supplier-list-empty`, `supplier-list-error`) | `EmptyState` / `ErrorState` directos. **`SupplierShowcaseSkeleton` se queda**: es distinto |
 | `RecipeListError` en `formulas/[id]`, `nueva`, `versiones/nueva`, `versiones/[versionId]` | `ErrorState`, con los mismos testids `recipe-list-error*`, que vigila `e2e/errores.spec.ts:221-225` |
-| `AssignedOrdersError` en las 6 secciones de asignación | `ErrorState`, con los testids `assigned-orders-error*` y `assigned-orders-retry`. Los vacíos y esqueletos de asignación **no se tocan** (D7) |
+| `AssignedOrdersError` | **Se conserva** (D11), porque lo exporta `asignacion/components/index.ts`. Su cuerpo pasa a ser `<ErrorState …/>` con los testids `assigned-orders-error*` y `assigned-orders-retry`. Las 6 secciones **no se tocan**. Sustituirlo en las secciones y borrarlo es de QC-232. Los vacíos y esqueletos de asignación tampoco se tocan (D7) |
 
 ## 6. `Spinner` (R22)
 
@@ -323,8 +338,8 @@ export function formatCivilDate(instant: Date): string {
 Es **UTC**, como las 7 copias: servidor y navegador tienen husos distintos
 (`customer-columns.tsx:50-51`).
 
-**Sitios de `formatCivilDate` (7):**
-- `order-columns.tsx:124`;
+**Sitios de `formatCivilDate` (6).** `order-columns.tsx:124` es un archivo D11 y lo adopta
+QC-232.
 - `customer-columns.tsx:52`;
 - `catalog-columns.tsx:108`;
 - `recipe-columns.tsx:39`;
@@ -346,13 +361,18 @@ Es un fragmento, así que no añade ningún elemento (R24). Las celdas que hoy e
 `<span data-testid>` conservan su `span` y llaman a `formatCivilDate`.
 
 **`EMPTY_MARK`.** Va en `lib/shared/ui/empty-mark.ts` (`export const EMPTY_MARK = '—'`). Sustituye a
-las 18 constantes que hoy valen `—`:
-- `MISSING_VALUE_MARK`, en 9 archivos;
+15 de las 18 constantes que hoy valen `—`:
+- `MISSING_VALUE_MARK`, en 7 archivos;
 - `EMPTY_CELL`, en 4;
-- `MISSING_NAME_MARK`, en 2;
+- `MISSING_NAME_MARK`, en 1;
 - `MISSING_RESPONSIBLES_MARK`, `MISSING_PERSON_MARK` y `NO_EQUIVALENCE_LABEL`, en 1 cada una.
 
 Todas usan el mismo carácter U+2014, verificado con Grep. Las de `e2e/` no se tocan.
+
+Tres están en archivos D11 y las adopta QC-232: `order-columns.tsx:101`,
+`conditioning-orders-columns.tsx:17` y `order-distribution-full.tsx:25`. Mientras tanto,
+`MISSING_VALUE_MARK` de `order-columns.tsx` sigue exportada, y los tests que la importan de ahí no
+cambian.
 
 ## 8. `SubmitButton` (R26, R27)
 
@@ -375,12 +395,35 @@ y se borra `app/(public)/login/components/submit-button.tsx`. Hay que mirar dos 
 - **Medida.** El botón ya mide 44 px por `[data-login='screen'] [data-slot='button']`
   (`globals.css:307-308`). `min-h-11` no cambia la medida, y `min-w-11` no se nota en un botón
   `w-full`.
-- **Clases.** El conjunto de clases sí gana `min-h-11 min-w-11`. Es el **único cambio de clases
-  aceptado** de la feature. Lo pide el issue: un `SubmitButton` único con talla táctil (D10). Se
-  apunta como excepción declarada en el snapshot de paridad del login, y la captura demuestra que
-  no se ve.
+- **Clases.** El conjunto de clases sí gana `min-h-11 min-w-11`. Es la primera parte de la
+  **única** excepción de clases de la feature (R1). Lo pide el issue: un `SubmitButton` único con
+  talla táctil (D10). Se apunta como excepción declarada en el snapshot de paridad del login, y la
+  captura demuestra que no se ve.
 
-**`establecer-contrasena`.** No se toca (D3, pregunta abierta 1).
+**`establecer-contrasena` (D12).** Solo cambia
+`app/(public)/establecer-contrasena/[token]/components/submit-button.tsx`, y conserva su nombre, sus
+props (`label`, `pendingLabel`) y su export:
+
+```tsx
+export function SubmitButton({ label, pendingLabel }: SubmitButtonProps) {
+  return <SharedSubmitButton label={label} pendingLabel={pendingLabel} testId="set-credential-submit" className="w-full" />;
+}
+```
+
+D12 autorizaba tocar también el import, pero no hace falta: `set-credential-form.tsx`, el barrel de
+la ruta y `tests/unit/identity/credencial/scope.test.ts:137`, que cita la ruta del archivo, se quedan
+como están.
+
+- **Clases.** Hoy el botón lleva `min-h-11 w-full`. Con la talla táctil gana `min-w-11`, que no se
+  ve en un botón `w-full`. Es la segunda parte de la excepción declarada de R1.
+- **Test que lo cubre.** `tests/unit/identity-ui/set-credential-form.test.tsx` no se toca y sigue
+  localizando `set-credential-submit`.
+
+**Riesgo con QC-96.** QC-96 (recuperar contraseña) es de otra persona, tiene la rama **sin
+publicar** y reutiliza esta página, así que puede tocar este archivo. `archivos-en-vuelo` no lo ve.
+Antes de editar el archivo, el implementer le pide al leader que confirme el estado de QC-96 y su
+diff, o que pregunte a su dueño. Si hay choque, el cambio de establecer contraseña pasa a QC-232 y se
+anota.
 
 ## 9. `EntityImage` con `size` (R28, R29)
 
@@ -399,10 +442,12 @@ type EntityImageProps = {
   - el `img` con `key={path ?? ''}` y `className="h-full w-full object-contain"`, sin `width`,
     `height` ni `style`.
 - **`thumbnail`** no cambia.
-- `order-form.tsx:756` pasa a `<EntityImage size="fill" path={recipeImageUrl} name={recipeName} testId={ORDER_RECIPE_IMAGE_TESTID} emptyAlt="Sin receta elegida" />`.
-- `ORDER_RECIPE_IMAGE_TESTID` se traslada a `order-form.tsx` o a su archivo de textos, y el barrel
-  de pedidos lo sigue exportando. Así se conserva el ancla de la guardia y se borran solo
-  `OrderRecipeImage` y `OrderRecipeImageProps` (R32).
+- **`OrderRecipeImage` se conserva (D11).** El barrel de pedidos, que es un archivo D11, lo exporta.
+  Su cuerpo pasa a ser
+  `<EntityImage size="fill" path={imageUrl} name={name} testId={ORDER_RECIPE_IMAGE_TESTID} emptyAlt="Sin receta elegida" />`,
+  con la misma firma y los mismos exports.
+- `order-form.tsx` no cambia por esto.
+- Borrar el componente es de QC-232, que también enmendará entonces la guardia de anclas de QC-102.
 
 ## 10. Limpieza (R31)
 
@@ -414,13 +459,13 @@ type EntityImageProps = {
   - `data-table-viewport.test.tsx:10`;
   - `data-table-filter-date.test.tsx:10`;
   - `product-page.test.tsx:9`.
-- **`MISSING_VALUE_MARK` y `EMPTY_CELL`:** desaparecen (§7). Los tests que los importaban pasan a
-  importar `EMPTY_MARK`.
+- **`MISSING_VALUE_MARK` y `EMPTY_CELL`:** desaparecen (§7), salvo en `order-columns.tsx`, que es un
+  archivo D11. Los tests que los importaban de los archivos migrados pasan a importar `EMPTY_MARK`.
 - **`IMAGE_COLUMN_LABEL` y `ACTIONS_COLUMN_LABEL`:** se quitan del barrel
   `inventario/components/index.ts:31, 34`. Siguen exportadas desde `product-columns.tsx` porque las
   usa `finished-stock-columns.tsx`. La reexportación de `recipe-columns.tsx:18-19` sigue si algo
   la importa; si no, se quita el `export`.
-- **`UserStatusBadge` y `WorkGroupRowActions`:** **fuera** (pregunta abierta 2).
+- **`UserStatusBadge` y `WorkGroupRowActions`:** **fuera** (D13). Se rehacen en QC-227 y QC-232.
 
 ## 11. Multiplataforma
 
@@ -442,8 +487,13 @@ librerías nuevas.
      muestra de `ErrorAlert` por forma de §3.
    - Los snapshots se commitean en T0 y **no se regeneran**. El reviewer comprueba con
      `git log --follow` que no cambian después del commit de T0.
-   - **Única excepción declarada:** el `min-h-11 min-w-11` del `SubmitButton` del login (§8). Se
-     aplica como un cambio a mano del snapshot, en su propio commit, citando D10.
+   - **Única excepción declarada:** las clases de la talla táctil de los dos `SubmitButton`
+     públicos, el del login y el de establecer contraseña (§8). Se aplica como un cambio a mano del
+     snapshot, en su propio commit, citando D10 y D12.
+   - **Pantallas con archivos D11.** Las paridades de pedidos y de asignación renderizan esos
+     archivos **sin modificarlos**. Su snapshot vale igual, porque los locales que se conservan
+     delegan en las piezas compartidas y tienen que dar el mismo árbol. Ningún test depende de editar
+     un archivo D11.
 2. **Tests existentes.** Pasan sin cambiar lo que afirman (R4). La lista de los que se tocan, y por
    qué, está en §13.
 3. **E2E en CI.** Corren los specs de `e2e/` que visitan las pantallas tocadas y **no se editan**,
@@ -453,7 +503,7 @@ librerías nuevas.
    - Se hacen las mismas pantallas y estados que `_trabajo/marca/capturas-antes/`, con el seed demo
      de QC-230, en `_trabajo/marca/capturas-despues/`. Esa carpeta no se versiona.
    - El reviewer compara las parejas y lo deja escrito en `progress/review_QC-231-….md`.
-   - Depende de QC-230 (pregunta abierta 3).
+   - Depende de QC-230, que es `depends_on` (D14) y se mergea antes del cierre.
 
 ## 13. Tests que se tocan
 
@@ -461,11 +511,11 @@ librerías nuevas.
 |---|---|---|
 | `tests/unit/inventario/product-route-contract.test.ts`, `tests/unit/recetas-ui/recipe-route-contract.test.ts`, `tests/unit/inventario/importar/importar-route-contract.test.ts` | Aceptan `touch` y `touchTarget` | Enmienda (R8) |
 | `tests/unit/shared/migracion-listas-alcance.test.ts:228` | R30 de QC-56 enmendado: la lista ya no conserva sus estados | Enmienda (R32) |
-| `tests/guards/guard-pantalla-pedidos-se-amplia.test.ts:180-190` | Se quitan las anclas `OrderListEmpty`, `OrderListError`, `OrderListSkeleton`, `OrderRecipeImage` y `OrderRecipeImageProps` | Enmienda (R32) |
-| Los que importan vacíos, errores o esqueletos locales: `customer-list-{empty,error,skeleton,section}`, `work-group-list-{empty,error,skeleton}`, `user-list-{empty,section}`, `unit-page`, `unit-columns`, `presentation-page`, `presentation-columns`, `work-group-columns`, `order-list-{skeleton,section}`, `order-table`, `order-columns`, `product-page`, `recipe-page`, `recipe-version-pages`, `recipe-form`, `supplier-detail-page`, `supplier-showcase-page`, `supplier-route-contract`, `unidades-convenciones`, `usuarios-convenciones`, `assigned-orders-states`, `asignaciones-ui/a11y-tactil` y las 4 `*-orders-list-section` de asignación | Cambia el import o se renderiza por la sección o la tabla. Mismas aserciones y testids | Repunte (R4) |
-| `assigned-orders-columns`, `customer-columns`, `catalog-columns`, `finished-stock-table`, `order-columns`, `order-form-quote`, `use-order-cost-quote`, `responsible-avatars` | `MISSING_VALUE_MARK` / `EMPTY_CELL` pasan a `EMPTY_MARK` | Repunte (R4) |
+| Los que importan vacíos, errores o esqueletos locales que se borran: `customer-list-{empty,error,skeleton,section}`, `work-group-list-{empty,error,skeleton}`, `user-list-{empty,section}`, `unit-page`, `unit-columns`, `presentation-page`, `presentation-columns`, `work-group-columns`, `product-page`, `recipe-page`, `recipe-version-pages`, `recipe-form`, `supplier-detail-page`, `supplier-showcase-page`, `supplier-route-contract`, `unidades-convenciones` y `usuarios-convenciones` | Cambia el import o se renderiza por la sección o la tabla. Mismas aserciones y testids | Repunte (R4) |
+| `assigned-orders-columns`, `customer-columns`, `catalog-columns`, `finished-stock-table`, `responsible-avatars` y, **solo si** importan la marca de un archivo migrado, `order-form-quote` y `use-order-cost-quote` | `MISSING_VALUE_MARK` / `EMPTY_CELL` pasan a `EMPTY_MARK` | Repunte (R4) |
 | `data-table-viewport`, `data-table-filter-date`, `product-page` | `formatDateLocalISO` desde `lib/shared/ui/date-civil` | Repunte (R4) |
-| `tests/unit/identity-ui/set-credential-form.test.tsx` | **No se toca** (D3) | — |
+| **No se tocan (D11):** `order-list-skeleton`, `order-list-section`, `order-table`, `order-columns`, `assigned-orders-states`, `asignaciones-ui/a11y-tactil`, las `*-orders-list-section` de asignación y `guard-pantalla-pedidos-se-amplia` | Los locales de pedidos y `AssignedOrdersError` conservan su firma y sus testids, así que estos tests siguen en verde sin cambios | — |
+| `tests/unit/identity-ui/set-credential-form.test.tsx` y `tests/unit/identity/credencial/scope.test.ts` | **No se tocan** (D3, D12) | — |
 
 Los tests de convenciones por ruta que enumeran archivos (`*-convenciones.test.ts`,
 `*-route-contract.test.ts`) se ajustan **solo** para quitar de sus listas los archivos borrados.
@@ -475,7 +525,7 @@ Los tests de convenciones por ruta que enumeran archivos (`*-convenciones.test.t
 | Spec | Qué | Dónde se anota |
 |---|---|---|
 | QC-56 | D12 y R30 quedan **sin efecto** para el vacío, el error y el esqueleto: los pinta la `DataTable` (QC-231 D4). D15 sigue igual | Una línea fechada (2026-10-08) en `specs/QC-56-migrar-listas-a-tabla-compartida/requirements.md`, bajo D12 y R30 |
-| QC-102 R41 (guardia de anclas de pedidos) | Desaparecen las anclas de vacío, error, esqueleto y `OrderRecipeImage` | Una línea fechada en `specs/QC-102-responsables-en-la-pantalla-de-pedidos/requirements.md` y un comentario en la guardia (sin citar fichas en producción; en tests sí vale) |
+| QC-102 R41 (guardia de anclas de pedidos) | **Sin enmienda en QC-231** (D11): el barrel de pedidos no cambia. La enmienda pasa a QC-232 | — |
 | QC-55 | **Sin enmienda.** Su contrato no cambia; `states` es aditivo | — |
 | QC-21, QC-79 y QC-30 | **Sin enmienda** (D3 y D10) | — |
 
@@ -490,6 +540,15 @@ Ninguno nuevo. No cambia ningún Server Action ni ningún caso de uso.
 - **Rama larga frente a otras ramas.** Bloquea a QC-232 y QC-233, así que no deberían correr en
   paralelo. El leader lo valida con `archivos-en-vuelo`.
 - **`tailwind-merge`.** Ver §2.
+- **QC-96 con la rama sin publicar.** Puede tocar `app/(public)/establecer-contrasena/**`.
+  `archivos-en-vuelo` no lo ve, porque solo lee ramas publicadas. Antes de tocar
+  `establecer-contrasena/[token]/components/submit-button.tsx` (T9l), el implementer pide al leader
+  que compruebe el choque, y si lo hay ese cambio pasa a QC-232 (§8).
+- **Choque con QC-217 y QC-223 (D11).** Los 14 archivos D11 no se tocan, y la guardia
+  `guard-piezas-base` lo comprueba por diff (R33). Si QC-217 o QC-223 se mergean antes del cierre,
+  el leader sincroniza con `dev` y la paridad de pedidos y de asignación se vuelve a comprobar
+  **sin** regenerar los snapshots. Si sus cambios alteran esas pantallas, se regenera solo la
+  paridad de esas pantallas, sobre el `dev` nuevo y antes de la tanda 3, y se anota.
 
 ## 17. Alternativas descartadas
 
@@ -524,7 +583,13 @@ lo tiene, se usa).
 
 **A6. Borrar `UserStatusBadge` y `WorkGroupRowActions` ya.**
 - **Por qué no:** obliga a reescribir 4 tests que los renderizan sueltos, para que QC-227 y QC-232
-  los vuelvan a rehacer (pregunta abierta 2).
+  los vuelvan a rehacer (D13).
+
+**A7. Ante el choque de D11, coordinar con QC-217 y QC-223 y tocar igual sus archivos.**
+- **Por qué no:** la regla 1 de `CLAUDE.md` prohíbe tomar una feature que choca en archivos con otra
+  en vuelo.
+- **Qué se hace en su lugar:** los locales que exportan esos barrels se quedan con su firma y delegan
+  en las piezas, y QC-232 completa la adopción.
 
 ## 18. Mapa R → test previsto
 
@@ -540,10 +605,10 @@ lo tiene, se usa).
 | R13, R14 | `tests/unit/shared-ui/error-state.test.tsx`, `tests/unit/shared-ui/empty-state.test.tsx` |
 | R15 | `tests/unit/shared-ui/table-skeleton.test.tsx` |
 | R16-R19 | `tests/unit/shared/data-table-states-sustituyen.test.tsx`. Los de QC-55 siguen sin tocar para R19 |
-| R20 | Paridad de la vitrina, de las páginas de formulario de recetas y de las secciones de asignación |
+| R20 | Paridad de la vitrina, de las páginas de formulario de recetas, de pedidos (los locales delegan) y de asignación (`AssignedOrdersError` delega) |
 | R22 | `tests/unit/shared-ui/spinner.test.tsx` y la paridad |
 | R23, R24 | `tests/unit/shared-ui/date-cell.test.tsx`: `formatCivilDate` frente a `toISOString` en instantes cerca de medianoche UTC |
-| R26, R27 | `tests/unit/shared-ui/submit-button.test.tsx`, `e2e/login-skin.spec.ts:78` (sin editar) |
-| R28 | `tests/unit/shared-ui/entity-image-size.test.tsx` |
+| R26, R27 | `tests/unit/shared-ui/submit-button.test.tsx`, `login-paridad`, `tests/unit/identity-ui/set-credential-form.test.tsx` (sin editar) y `e2e/login-skin.spec.ts:78` (sin editar) |
+| R28, R29 | `tests/unit/shared-ui/entity-image-size.test.tsx` y `order-form-image-paridad` |
 | R30 | `tests/guards/guard-dependencias-aprobadas.test.ts` (sin cambios) y `guard-piezas-base` |
-| R32 | `migracion-listas-alcance.test.ts` y `guard-pantalla-pedidos-se-amplia.test.ts` enmendados |
+| R32 | `migracion-listas-alcance.test.ts`, enmendado |
