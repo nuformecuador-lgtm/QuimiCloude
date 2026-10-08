@@ -507,3 +507,35 @@ F1-F4 hechos: la acción, el borrador, el sheet y el R38 están en verde, salvo 
   - El rojo es `tests/unit/recetas/scope.test.ts` (`app/(private)/pedidos/page.tsx`), el mismo de baseline que ya estaba.
 
 Veredicto: TI en verde en Chromium y WebKit, sin filas sobrantes; los censos están enmendados.
+
+## TC — Barrido de censos y guardias (backend_dev, 2026-10-08)
+
+### Archivos creados
+- `tests/unit/pedidos/order-delivery-append-only.test.ts` (R32): barrido de `lib/` y `app/` (sin comentarios) contra `orderDelivery|orderDeliveryLine|inventoryMovement .update|updateMany|delete|deleteMany|upsert`, `UPDATE`/`DELETE FROM` crudo sobre `order_deliveries`/`order_delivery_lines`, y exports `update|edit|delete|remove|cancel|annul|void|revert|undo…Deliver…`. Caso sintético con 8 infracciones que da rojo, y caso de lecturas/INSERT/prosa que no lo da.
+
+### Archivos modificados
+- `tests/unit/pedidos/order-delivery.test.ts`: caso R16 (`it.each` sobre el sheet, `deliver-order.ts` y `get-order-delivery.ts`). Rutas aceptadas, con el motivo en un comentario: el sheet desde `@/lib/modules/pedidos`; los dos casos de uso desde `./order-delivery` (el barrel crearía un ciclo; decisión del humano). Exige además que no haya resta propia (`ordered… -`, `- …delivered…`, `.packages -`, `Math.max(0,`), con un caso sintético que el detector caza.
+- `tests/unit/pedidos/deliver-order.test.ts`: R29 enmendado (nota «QC-223 2026-10-08»): parcial registrada → otra entrega completa → reintento de la clave de la parcial = `already_registered` con `ENTREGADO`, sin `run`, `create`, despacho, líneas ni `setStatus` nuevos.
+- `tests/integration/pedidos/order-delivery.int.test.ts`: el mismo caso contra Postgres; `escritoPorEntregas` igual antes y después del reintento (`{ entregas: 2, lineas: 4, asientos: 4 }`), pedido `ENTREGADO`, existencias sin cambio.
+
+### Censos (design §8)
+Ningún censo quedó rojo por esta rama en TC, así que **no hay enmiendas nuevas**. Las de §8 ya entraron en T0/B1/B3/B4/B5/TI (anotadas arriba). Corridos:
+- `tests/unit/composition/*` (4 fachadas; no hay fachada de `pedidos`), `pedidos` e `inventario` `module-contract` y `scope`, los dos `company-scope` unit y los dos `.int`, `identity/permissions`, `identity-seed.int`, `session-once-per-request-actions` y `-render`, `pedidos-schema`, `inventario-schema`, `qc121-alcance`, `qc91-alcance`, `tests/unit/navegacion/*`, `app-sidebar`:
+  `Test Files  1 failed | 27 passed (28)`, `Tests  1 failed | 548 passed | 3 skipped (552)`. El rojo es `navegacion/pantallas-exigen-permiso.test.tsx > '/pedidos' se sirve con el permiso` (baseline).
+- Rutas (`lib/shared/routes.ts`), `DataTable`, pantallas privadas: la rama no toca `routes.ts` ni usa `DataTable`; `guard-rutas-privadas-cubiertas` y `guard-contrato-listados` verdes dentro de `vitest run guard`.
+- E2E (`E2E_ESPERADOS`, `guard-identificador-de-request.test.ts`, `e2e/`): sin tocar, lo lleva el frontend_dev.
+- QC-215 R33, primera frase: ningún test la afirma como barrido. Los que citan «R33 (QC-215)» (`order-finished-at.int.test.ts:199`, `order-packing.int.test.ts:570`, `order-catalog.test.ts:430`, `qc145-estado-solo-planta.test.ts:180`, `asignaciones/order-state.test.ts:228`) miran `finishedAt` o la clasificación de estados. Sin enmienda.
+- `vitest related --run` sobre las 40 fuentes de `lib/`, `app/` y `db/schema.prisma` de la rama: `Test Files  5 failed | 698 passed (703)`. Rojos: `recetas/module-contract` y `navegacion/pantallas-exigen-permiso` (baseline), `proveedores/catalog-line.int` R32 (locale), y dos que bajo carga fallaron y en verde por separado: `pedidos/order-delivery.int` R5 y `identity/session-once-per-request-render` (2 corridas aisladas: `Tests  19 passed (19)`; `tests/integration/pedidos` + `inventario` juntos: `Test Files  85 passed (85)`, `Tests  790 passed | 1 skipped (791)`).
+
+### R → test (TC)
+- R16 → `order-delivery.test.ts` «R16: $ruta importa la regla de $desde y no resta envases por su cuenta» + «R16: el detector caza una resta propia…».
+- R29 → `deliver-order.test.ts` y `order-delivery.int.test.ts` «R29: parcial registrada, otra entrega completa el pedido y … already_registered con ENTREGADO, sin escribir nada».
+- R32 → `order-delivery-append-only.test.ts` (3 casos).
+
+### Verificación (salida real)
+- `pnpm run typecheck`: `tsc --noEmit`, sin errores.
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)` (los mismos previos, en `confirm-catalog-import.test.ts` y `order-service.test.ts`).
+- `pnpm exec vitest related --run` (los 4 archivos tocados): `Test Files  4 passed (4)`, `Tests  83 passed (83)`.
+- `pnpm exec vitest run guard`: `Test Files  55 passed (55)`, `Tests  747 passed | 11 skipped (758)`.
+
+Veredicto: TC en verde; censos sin rojos propios, R16, R29 (enmendado) y R32 cubiertos.

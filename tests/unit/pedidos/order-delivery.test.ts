@@ -1,6 +1,9 @@
 // La regla pura de la entrega: lo que falta por linea y el tope por linea y por lote. La misma
 // funcion la llaman el sheet, con los lotes que leyo, y el servidor, con `batches: null`.
 
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -138,5 +141,70 @@ describe('checkDelivery (R16, R11, R12, R15, R18, R20, R26, R27)', () => {
 
   it('R16: el tope de asignaciones por entrega es 200', () => {
     expect(DELIVERY_MAX_ALLOCATIONS).toBe(200)
+  })
+})
+
+// QC-223 2026-10-08 (TC): el sheet y el servidor no calculan el tope por su cuenta.
+//
+// Rutas de import aceptadas (decision del humano, 2026-10-08):
+// - el sheet importa del barrel `@/lib/modules/pedidos`, como cualquier consumidor de fuera del
+//   modulo;
+// - `deliver-order.ts` y `get-order-delivery.ts` importan de `./order-delivery`, porque el barrel de
+//   `pedidos` reexporta esos mismos casos de uso e importarlo desde ellos crearia un ciclo.
+describe('una sola funcion pura en el sheet y en el servidor (R16)', () => {
+  const RAIZ = join(__dirname, '..', '..', '..')
+  const FUENTES = [
+    { ruta: 'app/(private)/pedidos/components/order-delivery-sheet.tsx', desde: '@/lib/modules/pedidos' },
+    { ruta: 'lib/modules/pedidos/domain/deliver-order.ts', desde: './order-delivery' },
+    { ruta: 'lib/modules/pedidos/domain/get-order-delivery.ts', desde: './order-delivery' },
+  ] as const
+
+  function soloCodigo(texto: string): string {
+    return texto
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .split('\n')
+      .map((linea) => linea.replace(/\/\/.*$/, ''))
+      .join('\n')
+  }
+
+  /** Origen de cada import que trae `checkDelivery` o `remainingPackages`. */
+  function origenesDeLaRegla(codigo: string): string[] {
+    const origenes: string[] = []
+    for (const m of codigo.matchAll(/import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*'([^']+)'/g)) {
+      const nombres = (m[1] ?? '').split(',').map((n) => n.trim().replace(/^type\s+/, '').split(/\s+as\s+/)[0])
+      if (nombres.some((n) => n === 'checkDelivery' || n === 'remainingPackages')) origenes.push(m[2] ?? '')
+    }
+    return origenes
+  }
+
+  /** Restas de envases pedidos menos entregados escritas a mano. */
+  const ARITMETICA_PROPIA = [
+    /\b\w*ordered\w*\s*-(?!-)/i,
+    /-(?!-)\s*[\w.]*delivered\w*/i,
+    /\.packages\s*-(?!-)/,
+    /Math\.max\(\s*0\s*,/,
+  ]
+  const aritmeticaPropia = (codigo: string): RegExp[] => ARITMETICA_PROPIA.filter((r) => r.test(codigo))
+
+  it.each(FUENTES)('R16: $ruta importa la regla de $desde y no resta envases por su cuenta', ({ ruta, desde }) => {
+    const codigo = soloCodigo(readFileSync(join(RAIZ, ruta), 'utf8'))
+
+    const origenes = origenesDeLaRegla(codigo)
+    expect(origenes.length, `${ruta} tiene que importar checkDelivery o remainingPackages`).toBeGreaterThan(0)
+    expect(new Set(origenes)).toEqual(new Set([desde]))
+    expect(aritmeticaPropia(codigo), `${ruta} calcula el tope por su cuenta`).toEqual([])
+  })
+
+  it('R16: el detector caza una resta propia y un import de otra ruta (caso sintetico)', () => {
+    const sintetico = soloCodigo(
+      [
+        "import { checkDelivery } from '@/lib/modules/pedidos/domain/order-delivery'",
+        'const falta = line.orderedPackages - line.deliveredPackages',
+      ].join('\n'),
+    )
+
+    expect(origenesDeLaRegla(sintetico)).toEqual(['@/lib/modules/pedidos/domain/order-delivery'])
+    expect(aritmeticaPropia(sintetico).length).toBeGreaterThan(0)
+    expect(aritmeticaPropia(soloCodigo('const x = Math.max(0, pedidos - hechos)')).length).toBeGreaterThan(0)
   })
 })

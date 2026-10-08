@@ -337,6 +337,47 @@ describe('deliverOrder contra Postgres', () => {
     }
   });
 
+  // QC-223 2026-10-08: R29 enmendado por el humano; responde con el estado ACTUAL del pedido.
+  it('R29: parcial registrada, otra entrega completa el pedido y reintentar la clave de la parcial es already_registered con ENTREGADO, sin escribir nada', async () => {
+    const e = await crearEscenario();
+    try {
+      const parcial = {
+        orderId: e.orderId,
+        deliveryKey: randomUUID(),
+        customerId: e.customerId,
+        allocations: [{ presentationLineId: e.lineId, batchId: e.batchId, packages: 2 }],
+      };
+      const resto = {
+        orderId: e.orderId,
+        deliveryKey: randomUUID(),
+        customerId: e.customerId,
+        allocations: [
+          { presentationLineId: e.lineId, batchId: e.batchId, packages: 2 },
+          { presentationLineId: e.lineId, batchId: e.secondBatchId, packages: 1 },
+          { presentationLineId: e.smallLineId, batchId: e.smallBatchId, packages: 3 },
+        ],
+      };
+
+      expect(await pedidos.deliverOrder(parcial, e.a.actor)).toEqual({ status: 'delivered', orderStatus: 'TERMINADO' });
+      expect(await pedidos.deliverOrder(resto, e.a.actor)).toEqual({ status: 'delivered', orderStatus: 'ENTREGADO' });
+      const escritoAntes = await escritoPorEntregas(e.a.companyId);
+
+      expect(await pedidos.deliverOrder(parcial, e.a.actor)).toEqual({
+        status: 'already_registered',
+        orderStatus: 'ENTREGADO',
+      });
+
+      expect(escritoAntes).toEqual({ entregas: 2, lineas: 4, asientos: 4 });
+      expect(await escritoPorEntregas(e.a.companyId)).toEqual(escritoAntes);
+      expect((await pedido(e.orderId)).status).toBe('ENTREGADO');
+      expect(await stockDeLote(e.batchId)).toBe('0.0000');
+      expect(await stockDeLote(e.secondBatchId)).toBe('4.0000');
+      expect(await stockDeLote(e.smallBatchId)).toBe('3.0000');
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+
   it('R30: si el segundo lote no alcanza no queda nada escrito, ni siquiera la salida del primero', async () => {
     const e = await crearEscenario();
     try {

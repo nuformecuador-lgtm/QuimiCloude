@@ -557,6 +557,69 @@ describe('deliverOrder — clave de entrega ya registrada (R29)', () => {
     expect(m.tx.deliveries.create).toHaveBeenCalledTimes(1)
   })
 
+  // QC-223 2026-10-08: R29 enmendado por el humano; el reintento responde con el estado ACTUAL del
+  // pedido de la entrega, no con el que dejo la primera.
+  it('R29: parcial registrada, otra entrega completa el pedido y el reintento de la parcial es already_registered con ENTREGADO, sin escribir nada', async () => {
+    const SEGUNDA_CLAVE = 'b0000000-0000-4000-8000-0000000000b2'
+    const claves = new Map<string, RegisteredOrderDelivery>()
+    const entregados = new Map(ENTREGADOS)
+    let estado: OrderStatus = 'TERMINADO'
+    let siguiente = 0
+    const m = montar({ claves })
+    m.tx.orders.lockAliveById.mockImplementation(async () => pedidoTerminado({ status: estado }))
+    m.findAliveById.mockImplementation(async () => pedidoTerminado({ status: estado }))
+    m.tx.deliveries.sumDeliveredPackages.mockImplementation(async () => new Map(entregados))
+    m.tx.deliveries.create.mockImplementation(async (nueva: { deliveryKey: string; orderId: string }) => {
+      siguiente += 1
+      const id = `99999999-9999-4999-8999-00000000000${String(siguiente)}`
+      claves.set(`${EMPRESA}:${nueva.deliveryKey}`, { id, orderId: nueva.orderId })
+      return { kind: 'created', id }
+    })
+    m.tx.deliveries.addLines.mockImplementation(
+      async (_id: string, lineas: readonly { presentationLineId: string; packages: number }[]) => {
+        for (const l of lineas) entregados.set(l.presentationLineId, (entregados.get(l.presentationLineId) ?? 0) + l.packages)
+      },
+    )
+    m.tx.orders.setStatus.mockImplementation(async (_id: string, _de: OrderStatus, a: OrderStatus) => {
+      estado = a
+      return 'ok'
+    })
+    const entregar = createDeliverOrder(m.deps)
+
+    await expect(entregar(deliverInput(), ENTREGADOR)).resolves.toEqual({ status: 'delivered', orderStatus: 'TERMINADO' })
+    await expect(
+      entregar(
+        deliverInput({
+          deliveryKey: SEGUNDA_CLAVE,
+          allocations: [{ presentationLineId: PENDING_LINE_ID, batchId: NEWER_BATCH_ID, packages: 1 }],
+        }),
+        ENTREGADOR,
+      ),
+    ).resolves.toEqual({ status: 'delivered', orderStatus: 'ENTREGADO' })
+
+    const llamadas = {
+      run: m.run.mock.calls.length,
+      create: m.tx.deliveries.create.mock.calls.length,
+      despacho: m.tx.finishedGoods.dispatchForDelivery.mock.calls.length,
+      lineas: m.tx.deliveries.addLines.mock.calls.length,
+      estado: m.tx.orders.setStatus.mock.calls.length,
+    }
+
+    await expect(entregar(deliverInput(), ENTREGADOR)).resolves.toEqual({
+      status: 'already_registered',
+      orderStatus: 'ENTREGADO',
+    })
+    expect({
+      run: m.run.mock.calls.length,
+      create: m.tx.deliveries.create.mock.calls.length,
+      despacho: m.tx.finishedGoods.dispatchForDelivery.mock.calls.length,
+      lineas: m.tx.deliveries.addLines.mock.calls.length,
+      estado: m.tx.orders.setStatus.mock.calls.length,
+    }).toEqual(llamadas)
+    expect(claves.size).toBe(2)
+    expect(entregados.get(PENDING_LINE_ID)).toBe(10)
+  })
+
   it('R29: si otra peticion inserta la clave entre la lectura y el INSERT, duplicate_key vuelve a leer la entrega y responde con su pedido', async () => {
     const m = montar({ creada: { kind: 'duplicate_key' }, leido: pedidoTerminado() })
 
