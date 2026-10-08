@@ -28,6 +28,7 @@ const RESUMEN = {
   unitId: 'unidad-1',
   finishedAt: null,
   packedBy: null,
+  conditionedBy: null,
 };
 
 const RESUMEN_EN_EMPAQUE = { ...RESUMEN, status: 'EN_EMPAQUE', packedBy: BETO };

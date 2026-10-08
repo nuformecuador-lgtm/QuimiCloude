@@ -25,6 +25,9 @@ import {
   AssignmentViewTabs,
   CompanyOrdersListSection,
   CompanyOrdersSkeleton,
+  ConditionedOrdersListSection,
+  ConditioningOrdersListSection,
+  ConditioningOrdersSkeleton,
   FinishedOrdersListSection,
   FinishedOrdersSkeleton,
   PackedOrderNotice,
@@ -136,6 +139,24 @@ export default async function AsignacionPage({
       {vista === 'por_empacar' ? (
         <Suspense fallback={<PackingOrdersSkeleton rows={genericListParams.pageSize} />}>
           <PackingOrdersListSection params={genericListParams} />
+        </Suspense>
+      ) : null}
+      {vista === 'por_acondicionar' ? (
+        <Suspense
+          fallback={
+            <ConditioningOrdersSkeleton rows={genericListParams.pageSize} list="por_acondicionar" />
+          }
+        >
+          <ConditioningOrdersListSection params={genericListParams} />
+        </Suspense>
+      ) : null}
+      {vista === 'acondicionados' ? (
+        <Suspense
+          fallback={
+            <ConditioningOrdersSkeleton rows={genericListParams.pageSize} list="acondicionados" />
+          }
+        >
+          <ConditionedOrdersListSection params={genericListParams} />
         </Suspense>
       ) : null}
     </div>

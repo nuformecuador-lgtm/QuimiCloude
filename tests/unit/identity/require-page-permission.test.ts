@@ -4,6 +4,9 @@ import { resolve } from 'node:path';
 import {
   PERMISSIONS,
   ROLE_ACONDICIONAMIENTO,
+  ROLE_ADMINISTRADOR,
+  ROLE_EMPACADOR,
+  ROLE_OPERADOR,
   SEED_ROLE_PERMISSIONS,
   type PermissionCode,
 } from '@/lib/modules/identity';
@@ -199,4 +202,27 @@ describe('requirePagePermission con los permisos del Administrador de acondicion
     expect(notFoundMock).toHaveBeenCalledTimes(1);
     expect(redirectMock).not.toHaveBeenCalled();
   });
+
+  const DETALLE = 'app/(private)/asignacion/acondicionamiento/[id]/page.tsx';
+
+  it('R18: /asignacion/acondicionamiento/<id> deja pasar al rol, sin redirigir ni responder 404', async () => {
+    getSessionUserMock.mockResolvedValue(usuario(PERMISOS_DEL_ROL));
+
+    await expect(requirePagePermission(codigoQueExige(DETALLE))).resolves.toBeUndefined();
+
+    expect(notFoundMock).not.toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it.each([ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR])(
+    'R18: /asignacion/acondicionamiento/<id> responde «no encontrado» con los permisos sembrados de %s',
+    async (rol) => {
+      getSessionUserMock.mockResolvedValue(usuario(SEED_ROLE_PERMISSIONS[rol] ?? []));
+
+      await expect(requirePagePermission(codigoQueExige(DETALLE))).rejects.toThrow('NEXT_NOT_FOUND');
+
+      expect(notFoundMock).toHaveBeenCalledTimes(1);
+      expect(redirectMock).not.toHaveBeenCalled();
+    },
+  );
 });
