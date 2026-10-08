@@ -38,6 +38,11 @@ los `--chart-*` (ver Preguntas abiertas).
 | D9 | Dependencias | **Ninguna dependencia nueva entra en esta feature.** `next-themes` fue propuesta con estado `excepcion` (18 meses sin publicar) y el humano la **rechazó**: prefiere pagar el script anti-parpadeo propio antes que meter una librería que lleva año y medio sin release en una superficie que este repo ya sabe resolver. La regla 7 de `CLAUDE.md` pide no reinventar lo que resuelve una librería *mantenida*, y el humano decidió que esta no lo está lo suficiente | humano, 2026-09-02 (revisión del spec) | R28 |
 | D10 | Contraste del acento en modo claro | Se acepta `3,75:1` para `--primary-foreground` sobre `--primary`. Un botón es **componente de UI**, y AA le exige `3:1`, no `4.5:1`. No se añade requisito que exija AA de texto sobre el acento ni se retoca el naranja del diseño | humano, 2026-09-02 (revisión del spec) | R25 (que deliberadamente **no** incluye ese par) |
 
+> **ENMIENDA DEL 2026-10-08 (QC-226).** D6 y D7 quedan sustituidas por la paleta «Verde
+> Petróleo» de QC-226 D2: la base agua y el acento naranja salen; los valores son los de
+> `tokens.css` del kit, en los dos modos. D10 queda sin objeto: el par
+> `--primary-foreground`/`--primary` es ahora un par de texto y QC-226 R5 le exige `4.5:1`.
+
 ## Requisitos (EARS)
 
 ### Esquema de color
@@ -53,20 +58,39 @@ del modo claro con exactamente los valores de `design-input-tokens.md > 3`: `--b
 **R2.** El sistema DEBE definir en `.dark` de `app/globals.css`, en notación `oklch`, los mismos
 26 tokens de R1 con los valores del modo oscuro de `design-input-tokens.md > 3`.
 
+> **ENMIENDA DEL 2026-10-08 (QC-226).** R1 y R2: los valores de `design-input-tokens.md > 3`
+> quedan sustituidos por los de `tokens.css` del kit (QC-226 D2, R1, R2), que además declara
+> `--chart-*`, los tokens de estado y `--sidebar-muted-foreground`.
+
 **R3.** El sistema NO DEBE conservar ningún token de color acromático heredado de `shadcn init`
 (croma `0` con luminosidad distinta de `1`) en `:root` ni en `.dark`, salvo los `--chart-*`
 (R6). El blanco puro `oklch(1 0 0)` sí es un valor del diseño y está permitido.
 
+> **ENMIENDA DEL 2026-10-08 (QC-226).** La regla sigue para los 26 tokens de R1, ahora con los
+> valores de QC-226 D2. La excepción de los `--chart-*` queda sin objeto: QC-226 D2 les da
+> valores de la paleta (R6, enmendado).
+
 **R4.** El sistema DEBE usar para `--primary` y `--sidebar-primary` el **mismo** hue (`50.5`) en
 los dos modos, con luminosidad `0.623` en claro y `0.750` en oscuro.
 
+> **ENMIENDA DEL 2026-10-08 (QC-226).** El hue y las luminosidades del acento naranja quedan
+> sustituidos: `--primary` y `--sidebar-primary` toman los valores petróleo de QC-226 D2 (R1, R2).
+
 **R5.** El sistema DEBE mantener `--radius` en `0.625rem`.
+
+> **ENMIENDA DEL 2026-10-08 (QC-226).** `--radius` pasa a `0.5rem` (QC-226 D3, R4).
 
 **R6.** El sistema NO DEBE modificar los valores de `--chart-1` … `--chart-5` en ninguno de los
 dos bloques.
 
+> **ENMIENDA DEL 2026-10-08 (QC-226).** R6 queda sustituido: `--chart-1` … `--chart-5` toman los
+> valores de `tokens.css` en los dos modos (QC-226 D2, R1, R2).
+
 **R25.** El sistema DEBE alcanzar un contraste WCAG de al menos `4.5:1`, en los dos modos, en
 los pares `--foreground` sobre `--background` y `--sidebar-foreground` sobre `--sidebar`.
+
+> **ENMIENDA DEL 2026-10-08 (QC-226).** El contraste se mide ahora sobre la paleta de QC-226 D2,
+> con la lista de pares de QC-226 R5: trece de texto a `4.5:1` y dos de interfaz a `3:1`.
 
 ### Elección de modo
 
@@ -131,6 +155,10 @@ del sistema operativo, el sistema DEBE reflejar el cambio sin recargar la págin
 **R18.** El sistema DEBE renderizar la barra lateral como panel flotante con radio de `22 px`,
 margen exterior de `18 px` y un degradado de fondo a `166°` con las cuatro paradas de
 `design-input-tokens.md > 4`, una definición por modo.
+
+> **ENMIENDA DEL 2026-10-08 (QC-226).** Las cuatro paradas del degradado quedan sustituidas por
+> las de QC-226 D5 (R9), una definición por modo. Las medidas de R18–R20 siguen: radio de 22 px,
+> margen de 18 px, ángulo de 166°, 272/78 px de ancho e ítems de al menos 44 px (QC-226 R10).
 
 **R19.** El sistema DEBE usar `272 px` como ancho de la barra lateral expandida y `78 px` como
 ancho en modo icono, en viewport ancho.

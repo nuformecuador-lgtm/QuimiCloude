@@ -257,6 +257,11 @@ export function packingOrderRoute(id: string): string {
   return `${ASSIGNED_ORDERS_ROUTE}/empaque/${id}`;
 }
 
+/** Detalle del pedido para quien acondiciona; como `packingOrderRoute`, sin fila propia. */
+export function conditioningOrderRoute(id: string): string {
+  return `${ASSIGNED_ORDERS_ROUTE}/acondicionamiento/${id}`;
+}
+
 /** Ya cae bajo el prefijo privado de `DASHBOARD_ROUTE`: la comparacion es por segmentos. */
 export function executionTraceRoute(orderId: string): string {
   return `${DASHBOARD_ROUTE}/recorrido/${orderId}`;

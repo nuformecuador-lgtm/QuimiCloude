@@ -47,6 +47,7 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
     unitId: null,
     finishedAt: null,
     packedBy: null,
+    conditionedBy: null,
     ...overrides,
   };
 }

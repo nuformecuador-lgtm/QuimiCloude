@@ -215,3 +215,20 @@ T9, sin `./init.sh` (no cierra en Windows: `scripts/test-rapido.mjs --exclude`).
   `components/ui/**`, `lib/modules/**`, `lib/composition/**`, `db/**`, `middleware.ts`, `route-guard-middleware.ts`,
   `package.json` ni `e2e/permisos.spec.ts`. Todo lo tocado está en `tasks.md > Archivos esperados`.
 - Gate final: check `gate-completo` de CI (lo lleva el leader).
+
+## Sync con dev (F2.3, 2026-10-08)
+
+- `git merge origin/dev` (e5adaa90, 37 commits). Sin migraciones nuevas.
+- Conflicto único: `tests/guards/guard-pantallas-exigen-permiso.test.ts` (lo resolvió backend_dev).
+  `RUTAS_ESPERADAS_HOY` ya traía la unión (25): `/asignacion/acondicionamiento/[id]` de dev + las 3 de
+  `/integraciones/*`. Se mantienen los dos comentarios de tensado encadenados (veintiuna -> VEINTIDOS
+  por dev; veintidos -> VEINTICINCO por QC-222) y el título del `it` dice «veinticinco». Nada relajado.
+- Auto-merge revisado: dev no añadió items de nav ni enlaces (solo quitó `BRAND_SHORT_LABEL`/`BRAND_TAGLINE`
+  y añadió `conditioningOrderRoute`, sin fila en el menú). Anclas de QC-222 intactas y válidas:
+  `PRIVATE_NAV_ITEMS` 11, enlaces del recorrido 13, grupo de integraciones 3. `E2E_ESPERADOS` = 51 y
+  coincide 1:1 con `e2e/*.spec.ts` (dev sumó `acondicionamiento.spec.ts` y `brand-assets.spec.ts`).
+- `pnpm exec vitest run guard`: 58 files passed, 760 passed | 11 skipped.
+- `vitest related --run` sobre el diff contra origin/dev: 3 failed | 327 passed (330 files);
+  3 failed | 5030 passed | 45 skipped. Los 3 rojos (`recetas/module-contract`, `recetas/scope`,
+  `navegacion/pantallas-exigen-permiso`) están en `tests/baseline-rojos.json`.
+- `pnpm run typecheck`: exit 0. `pnpm run lint`: exit 0, 0 errors, 7 warnings (preexistentes).

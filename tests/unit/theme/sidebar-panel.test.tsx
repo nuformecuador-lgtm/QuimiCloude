@@ -86,17 +86,17 @@ afterEach(() => {
 });
 
 describe('panel flotante de la barra lateral', () => {
-  it('pinta el panel flotante con radio 22px y el degradado de 166 grados de cada modo', () => {
-    // R18
+  it('R9: pinta el panel flotante con radio 22px y el degradado de 166 grados de cada modo', () => {
+    // R18 de QC-29. ENMIENDA QC-226 (D5): las paradas pasan a las de la opcion A «Profundidad».
     const css = readGlobalsCss();
 
     const rootGradientMatch = css.match(
-      /:root\s*\{\s*--sidebar-panel-gradient:\s*linear-gradient\(166deg,\s*#ffffff 0%,\s*#f6fcfb 34%,\s*#ecf7f5 68%,\s*#dfefed 100%\)\s*;\s*\}/,
+      /:root\s*\{\s*--sidebar-panel-gradient:\s*linear-gradient\(166deg,\s*#0A4A47 0%,\s*#003634 38%,\s*#002828 70%,\s*#021E1E 100%\)\s*;\s*\}/,
     );
     expect(rootGradientMatch).not.toBeNull();
 
     const darkGradientMatch = css.match(
-      /\.dark\s*\{\s*--sidebar-panel-gradient:\s*linear-gradient\(166deg,\s*#1b3b39 0%,\s*#133032 34%,\s*#0f2426 68%,\s*#091a1c 100%\)\s*;\s*\}/,
+      /\.dark\s*\{\s*--sidebar-panel-gradient:\s*linear-gradient\(166deg,\s*#0B2F2F 0%,\s*#062222 42%,\s*#031515 100%\)\s*;\s*\}/,
     );
     expect(darkGradientMatch).not.toBeNull();
 
@@ -105,6 +105,22 @@ describe('panel flotante de la barra lateral', () => {
       /\[data-slot='sidebar-inner'\],\s*\n\[data-slot='sidebar'\]\[data-mobile='true'\]\s*\{\s*\n\s*border-radius:\s*22px;\s*\n\s*background-image:\s*var\(--sidebar-panel-gradient\);/,
     );
     expect(panelRuleMatch).not.toBeNull();
+  });
+
+  it('R9: el degradado del panel es estatico, sin animacion ni transicion', () => {
+    const css = readGlobalsCss();
+
+    const reglaDelPanel = css.match(
+      /\[data-slot='sidebar-inner'\],\s*\n\[data-slot='sidebar'\]\[data-mobile='true'\]\s*\{[^}]*\}/,
+    )?.[0];
+    expect(reglaDelPanel).toBeDefined();
+    expect(reglaDelPanel).not.toMatch(/\b(animation|transition)\b/);
+
+    const declaraciones = [...css.matchAll(/--sidebar-panel-gradient:[^;]*;/g)].map((m) => m[0]);
+    expect(declaraciones).toHaveLength(2);
+    for (const declaracion of declaraciones) {
+      expect(declaracion).not.toMatch(/\b(animation|transition)\b/);
+    }
   });
 
   it('usa 272px de ancho expandido y 78px en modo icono', async () => {

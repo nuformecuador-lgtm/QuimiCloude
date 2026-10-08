@@ -55,6 +55,15 @@ export function hallazgosDeVersionDeNext(
 // Lista cerrada y no un rango de git: `git diff origin/dev...HEAD` esta vacio en `dev` y la guardia
 // fallaria alli. Un `.spec.ts` nuevo se nombra aqui a mano.
 export const E2E_ESPERADOS = [
+  // Alta el 2026-10-08 por el MISMO motivo y en el MISMO sitio que las demas: la lista es CERRADA
+  // y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el archivo
+  // se nombra, uno a uno-. Lo que ejercita: el Administrador de acondicionamiento ve en
+  // `/asignacion` la pestana «Por acondicionar» con sus pedidos, abre el detalle de solo lectura y
+  // en «Terminados» ve solo lo que acondiciono el; Administrador, Operador y Empacador no ven la
+  // pestana, ni pidiendola por la direccion, y el detalle les responde 404. NO ejercita el cruce
+  // borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
+  // identificador ni sobre `reference`, asi que ese diferimiento sigue INTACTO.
+  'acondicionamiento.spec.ts',
   'aislamiento-inventario.spec.ts',
   // Alta por el MISMO motivo y en el MISMO sitio que las demas: esta lista es CERRADA y su punto
   // de extension por diseno es darse de alta en ella. El ancla NO se relaja -el archivo se nombra,
@@ -99,6 +108,10 @@ export const E2E_ESPERADOS = [
   // afirma nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71
   // R21 sigue INTACTO.
   'ajuste-de-inventario.spec.ts',
+  // Alta el 2026-10-08 (QC-226) por el MISMO motivo que las demas. Lo que ejercita: sin sesion,
+  // el manifest, los iconos y la imagen OG responden 2xx sin redirigir, y el <head> de /login los
+  // enlaza. No lee ni afirma nada sobre el identificador de peticion.
+  'brand-assets.spec.ts',
   // QC-101 T10 / R17: la E2E del cierre de TODAS las sesiones de otra persona desde la pantalla.
   // Alta por el MISMO motivo y en el MISMO sitio que las de QC-49, QC-67, QC-79, QC-85 y QC-102:
   // esta lista es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO
