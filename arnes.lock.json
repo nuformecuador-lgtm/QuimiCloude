@@ -23,9 +23,9 @@
     "AGENTS.md": "930605da100d1041d47ccf988b0aca07ed75a4cb91a6ca2dc13e43c94c3170e4",
     "CHECKPOINTS.md": "2182749c4481e05cbe32ee3778ec71b9ce4827e8644489edacd81d24254bfd1e",
     "CLAUDE.md": "0010f3f28083d176abada26206f3c4e373b2d172fde1544996b641e09c7b42a3",
-    "arnes.manifest": "9bdaddea036e93cf1f0e734247fe34d8e9bd4c4f7693e65a0481ebf3c225b8e7",
+    "arnes.manifest": "0c349cec3d870a6529e858d32e049e0d88a7676a7d21ef426b3ab8df04e13e7d",
     "docs/equipo.md": "7fbf0b7020a5767c98ab76122b5a44d20af680dccc3363371d49ed3b9ffa10e8",
-    "docs/gate.md": "6d944286b5cc6c6ef1f8ef0884d33b77b06056e10742d09d77e39de949337a95",
+    "docs/gate.md": "7bb32fed14618233c2c2b2abef09799a5822cf19d851e1957cd2410c58af284e",
     "docs/grafo-de-codigo.md": "9279062f42d0b6c80c9be190841ef432454faa7b465cb789ff198b529cfa83dc",
     "docs/guia-de-uso.md": "822f70e227c76e25588f4984d112bc6486815f283e4b359aeca1530221a26951",
     "docs/jira.md": "617aeb6cf6bd0a78be5e7d4baa45d9e4df0e8fe15d74cd3ebf2758539fce3e39",
@@ -41,7 +41,7 @@
     "scripts/arnes-sync.sh": "2b5b1232c776605f7562c6a72637686be99974ade1396bd3b3f71dd0446b86e5",
     "scripts/check-perfil.mjs": "94538d2fc5460ae80e8b7656149c45650ac9336d9639492dad1a763980ca26d5",
     "scripts/comparar-baseline-rojos.mjs": "d8e663b6b1132c02896cf6891b0ca8369f12d23e10c70f5db62c38e32b174168",
-    "scripts/test-rapido.mjs": "a6c2e42716acefaceda3f8eb87937520bd5087015ad8e94bad69407ea844318c",
+    "scripts/test-rapido.mjs": "26ede75bb5336f8f94bc41ee55ef4c8059332dd812003219e069da6a1ba98b74",
     "scripts/validate-features.mjs": "8c6c2ce9739a672fce6733ab4127cf1ca346215ef6756d9f68d4ad7cbaabc39a",
     "scripts/wt.sh": "19d1d0ebe5efe3ee5e547c9a9279c1366b183dd10935ff566ec952c83b3799c5",
     "tests/guards/guard-dependencias-aprobadas.test.ts": "22568afc7962c5c5eb647372c8e5d1f4e4c8118dce937c4281ce38ec50731210",
@@ -52,7 +52,8 @@
     "tests/guards/guard-unir-informes-vitest.test.ts": "5c6aa29de5039484239f67d851054b25a21d994c81f59c2406c2979b695cac0d",
     "tests/guards/guard-validador-estados.test.ts": "d321137caef74bdd7edfd146f08d37a1b241797064d0b74083b8f3c449d45f9b",
     "tests/guards/guard-archivos-en-vuelo-sin-ruido.test.ts": "1e0eb9c14970dd0cc06c32d6dc6ada9ef33e0b83161ffb2af34d3f41b8ea0114",
-    "tests/guards/guard-validador-ve-ramas-remotas.test.ts": "d48c6890f97cf227b2d71f83ec165a44d3577e050a05f5b11cc3ecf25ecb6f90"
+    "tests/guards/guard-validador-ve-ramas-remotas.test.ts": "d48c6890f97cf227b2d71f83ec165a44d3577e050a05f5b11cc3ecf25ecb6f90",
+    "tests/guards/guard-test-rapido-rojos-heredados.test.ts": "9b7bc186db608192ac5d9d03eb8690f2b89dbe7f638759e68b1a576b2ba3fbb6"
   },
   "subidos": [
     {
@@ -120,6 +121,16 @@
         "AGENTS.md",
         "docs/gate.md",
         "scripts/check-perfil.mjs"
+      ],
+      "fecha": "2026-10-08"
+    },
+    {
+      "pr": "https://github.com/singularis-co/harness_config/pull/12",
+      "archivos": [
+        "arnes.manifest",
+        "docs/gate.md",
+        "scripts/test-rapido.mjs",
+        "tests/guards/guard-test-rapido-rojos-heredados.test.ts"
       ],
       "fecha": "2026-10-08"
     }

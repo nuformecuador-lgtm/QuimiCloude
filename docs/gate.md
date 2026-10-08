@@ -104,6 +104,9 @@ rojo que no estuviera ya en `tests/baseline-rojos.json`** (lo compara
 `scripts/comparar-baseline-rojos.mjs`).
 
 - **La comparación es por archivo, no por conteo.**
+- **El rápido aplica la misma regla** (`scripts/test-rapido.mjs`): lee el informe JSON de su
+  corrida y solo da por bueno un rojo si todos sus archivos rojos están en el baseline. No se
+  apoya en `--exclude`, porque `vitest related` lo ignora.
 - **Cada entrada del baseline necesita `motivo` y `desde`**; el comparador falla si faltan.
 - **Un archivo del baseline que ya pasa** genera aviso, no rojo, y **solo si esa corrida lo
   ejecutó**. Nunca se calcula como `baseline − rojos`.
