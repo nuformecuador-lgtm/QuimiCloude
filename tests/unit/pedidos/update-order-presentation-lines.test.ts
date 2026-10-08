@@ -15,6 +15,7 @@ import {
   REPARTO_EDITABLE_STATUSES,
   type UpdateOrderPresentationLinesDeps,
 } from '@/lib/modules/pedidos/domain/update-order-presentation-lines';
+import { OrderPresentationLineNotEditableError } from '@/lib/modules/pedidos/domain/errors';
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
@@ -255,16 +256,32 @@ describe("updateOrderPresentationLines — R11-R14, [D3']: ventana de estados ed
     },
   );
 
+  // QC-215 R19 (texto corregido por D13): la edicion acotada de un pedido de acondicionamiento o
+  // `TERMINADO` rechaza con `order_presentation_line_not_editable`, como `ENTREGADO`, y NO con
+  // `invalid_transition`. El dominio devuelve `not_editable`; el adaptador driving lo traduce a
+  // `OrderPresentationLineNotEditableError` (`order-actions-distribution.test.ts`).
+  it('R19 (QC-215, D13): not_editable es el codigo order_presentation_line_not_editable, no invalid_transition', () => {
+    expect(new OrderPresentationLineNotEditableError().code).toBe('order_presentation_line_not_editable');
+  });
+
   it.each<OrderStatus>(['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'])(
-    'R19, R30 (QC-215): rechaza %s igual que EN_EMPAQUE, con not_editable, sin escribir la unidad ni las lineas',
+    'R19, R30 (QC-215, D13): rechaza %s como ENTREGADO, con not_editable (order_presentation_line_not_editable), sin escribir nada',
     async (status) => {
-      const { orders, updatePresentationLinesAlive } = ordersDoble(filaBloqueada({ status }));
-      const update = montar({ orders });
+      const { orders, updatePresentationLinesAlive, setStatus, setIngredientsCost, setReservedAt } = ordersDoble(
+        filaBloqueada({ status }),
+      );
+      const syncForOrder = vi.fn(async (): Promise<ReservationOutcome> => ({ kind: 'reserved' }));
+      const update = montar({ orders, reservations: fakeMaterialReservations({ syncForOrder }) });
 
       await expect(
         update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ packagingProductId: ENVASE_A, packages: 1 }] }),
       ).resolves.toBe('not_editable');
+      expect(REPARTO_EDITABLE_STATUSES).not.toContain(status);
       expect(updatePresentationLinesAlive).not.toHaveBeenCalled();
+      expect(setStatus).not.toHaveBeenCalled();
+      expect(setIngredientsCost).not.toHaveBeenCalled();
+      expect(setReservedAt).not.toHaveBeenCalled();
+      expect(syncForOrder).not.toHaveBeenCalled();
     },
   );
 

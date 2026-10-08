@@ -365,3 +365,56 @@ asignados» y la revisión que desbloquea `BLOQUEADO`). Los e2e de R34 siguen si
   ningún spec lo cubre.
 - Ajeno: `tests/integration/proveedores/catalog-line.int.test.ts` (R32) falla en local (shape del
   error de Prisma); dev lo sacó del baseline en f2be3eb8 y la rama no tiene diff en `proveedores`.
+
+### Bloque 7 — backend (T20–T22)
+
+Fecha: 2026-10-08. Sin commit. Grafo no usado (Grep/Read bastaron para 2 archivos de producción).
+
+**Archivos de producción:**
+- `lib/modules/pedidos/domain/errors.ts`: `ActionNotAllowedError` (`action_not_allowed`, ya en el
+  catálogo cerrado desde la décima enmienda; no se enmienda el catálogo).
+- `lib/modules/pedidos/domain/set-order-customer.ts`: `CUSTOMER_EDITABLE_STATUSES` (los ocho
+  abiertos); comprobación tras `findAliveById` y antes de comparar el cliente, y otra vez sobre la
+  fila de `transaction.orders.lockAliveById` antes de `setCustomerAlive`. El puerto no cambia.
+
+**Tests:**
+- `tests/unit/pedidos/update-order-presentation-lines.test.ts` (T20): el caso de
+  `POR_ACONDICIONAR`/`EN_ACONDICIONAMIENTO`/`TERMINADO` ahora afirma también que no se llama
+  `setStatus`, `setIngredientsCost`, `setReservedAt` ni `syncForOrder`, y un caso nuevo fija que
+  `not_editable` es `order_presentation_line_not_editable` (no `invalid_transition`). Ningún test
+  anterior afirmaba `invalid_transition` en la edición acotada: nada que corregir.
+- `tests/unit/pedidos/set-order-customer.test.ts` (T21): el `it.each` de QC-156 R14 sobre los diez
+  estados pasa a los ocho abiertos (R37), más «quitar el cliente» en `BLOQUEADO`,
+  `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO` y `TERMINADO`; R36 en `ENTREGADO` y `CANCELADO` con
+  mismo cliente, quitar y cliente nuevo, con catálogo, `run`, `lockAliveById` y `setCustomerAlive`
+  que explotan; carrera (abierto en la lectura, cerrado bajo el candado) y fila desaparecida bajo
+  el candado.
+- `tests/integration/pedidos/order-customer.int.test.ts` (T21): el caso «ENTREGADO» de QC-156 R14
+  pasa a `EN_ACONDICIONAMIENTO` y `TERMINADO` (R37), con `conditioned_by` añadido a las columnas
+  intactas; caso nuevo R36 en `ENTREGADO` y `CANCELADO` (las tres entradas, fila y libros iguales).
+- `tests/unit/pedidos/update-order.test.ts` (T22): R38 en `POR_EMPACAR`, `EN_EMPAQUE`,
+  `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO`, `TERMINADO`, `ENTREGADO`, `CANCELADO` con todos los
+  catálogos (clientes incluido) y la unidad de trabajo explotando; control en `PENDIENTE`,
+  `EN_CURSO`, `BLOQUEADO` (va por el atajo).
+
+**R → test:**
+
+| R | Test |
+|---|---|
+| R19 (texto D13) | `update-order-presentation-lines.test.ts` «R19 (QC-215, D13): not_editable es el codigo order_presentation_line_not_editable…»; «R19, R30 (QC-215, D13): rechaza %s como ENTREGADO…»; general: `update-order.test.ts` «R19, R30 (QC-215): … -> invalid_transition» |
+| R36 | `set-order-customer.test.ts` «R36: en ENTREGADO/CANCELADO, %s da action_not_allowed…», «R36: si el pedido pasa a %s entre la lectura y el candado…»; `order-customer.int.test.ts` «QC-215 R36: en $status, mismo cliente, quitar y cliente nuevo…» |
+| R37 | `set-order-customer.test.ts` «R37: CUSTOMER_EDITABLE_STATUSES son los ocho…», «R37 R15: en %s acepta el cambio…», «R37: en %s tambien se quita el cliente…»; `order-customer.int.test.ts` «R14, R15, QC-215 R37: en $status…» (EN_ACONDICIONAMIENTO, TERMINADO) |
+| R38 | `update-order.test.ts` «R38: en %s, solo cambiar el cliente -> invalid_transition…» + «R38 (control)…» |
+
+**Salida real:**
+- `pnpm run typecheck`: `tsc --noEmit` sin errores.
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)` (warnings ajenos: `confirm-catalog-import.test.ts`, `order-service.test.ts`).
+- `pnpm exec vitest related --run lib/modules/pedidos/domain/set-order-customer.ts lib/modules/pedidos/domain/errors.ts`:
+  `Test Files 1 failed | 360 passed (361)`, `Tests 1 failed | 5936 passed | 2 skipped (5939)`. El rojo es
+  `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx` («'/pedidos' se sirve con el permiso»,
+  TypeError en `loadFormCatalogs`), en `tests/baseline-rojos.json`: ajeno.
+- Los tres unit tocados: `Test Files 3 passed (3)`, `Tests 156 passed (156)`.
+- `pnpm exec vitest run tests/integration/pedidos/order-customer.int.test.ts` (con `.env`): `Test Files 1 passed (1)`, `Tests 8 passed (8)`.
+- `pnpm exec vitest run guard`: `Test Files 55 passed (55)`, `Tests 742 passed | 11 skipped (753)` (incluida la guardia de ámbito de empresa).
+
+Veredicto: T20, T21 y T22 en verde y marcadas; quedan T23–T25 (UI, E2E, cierre).

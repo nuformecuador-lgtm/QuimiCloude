@@ -139,12 +139,12 @@
 
 ## Bloque 7 — Decisiones del 2026-10-08 (D13, D14 corregida: cliente cerrado solo en los finales)
 
-- [ ] **T20.** `[P]` D13, solo tests (el código ya rechaza así, `design.md > 7b`):
+- [x] **T20.** `[P]` D13, solo tests (el código ya rechaza así, `design.md > 7b`):
   `tests/unit/pedidos/update-order-presentation-lines.test.ts` afirma
   `order_presentation_line_not_editable` en `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO` y `TERMINADO`,
   sin escribir. Si algún test de la tanda anterior afirmaba `invalid_transition` para la edición
   acotada, se corrige. **Hecho cuando:** R19 está en verde con el texto nuevo. Depende de: —.
-- [ ] **T21.** D14 en el dominio:
+- [x] **T21.** D14 en el dominio:
   - `ActionNotAllowedError` en `lib/modules/pedidos/domain/errors.ts`;
   - `CUSTOMER_EDITABLE_STATUSES` en `set-order-customer.ts`, con los ocho estados abiertos (todos
     menos `ENTREGADO` y `CANCELADO`, `design.md > 7b`);
@@ -163,7 +163,7 @@
     `packed_by` y `conditioned_by` no cambian.
 
   **Hecho cuando:** pasan y la guardia de ámbito de empresa sigue en verde. Depende de: T15.
-- [ ] **T22.** `[P]` R38, solo tests: `tests/unit/pedidos/update-order.test.ts` comprueba que la
+- [x] **T22.** `[P]` R38, solo tests: `tests/unit/pedidos/update-order.test.ts` comprueba que la
   edición de solo cliente rechaza con `invalid_transition`, sin consultar el catálogo de clientes,
   en los estados sin edición general (`POR_EMPACAR`, `EN_EMPAQUE`, los de acondicionamiento,
   `TERMINADO`, `ENTREGADO`, `CANCELADO`). **Hecho cuando:** pasa. Depende de: —.

@@ -1,12 +1,15 @@
 // QC-156 B4 — El cambio de cliente dedicado (R11, R12, R14-R18).
+// QC-215 B7 (T21) — R14 enmendada por D14: se rechaza con `action_not_allowed` en `ENTREGADO` y
+// `CANCELADO` (R36) y se acepta en los otros ocho estados (R37).
 //
-// La unidad de trabajo es el doble compartido: todo metodo que no sea `setCustomerAlive` explota
-// si se le llama, y aun asi se comprueba al final que ninguno se llamo.
+// La unidad de trabajo es el doble compartido: todo metodo que no sea `lockAliveById` o
+// `setCustomerAlive` explota si se le llama, y aun asi se comprueba al final que ninguno se llamo.
 
 import { describe, expect, it, vi } from 'vitest'
 
 import { ORDER_STATUS_VALUES, type OrderStatus } from '@/lib/modules/pedidos/domain/order-classification'
 import {
+  CUSTOMER_EDITABLE_STATUSES,
   createSetOrderCustomer,
   type SetOrderCustomerDeps,
 } from '@/lib/modules/pedidos/domain/set-order-customer'
@@ -17,6 +20,7 @@ import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { PedidosError } from '@/lib/modules/pedidos/domain/errors'
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { LockedOrderRow } from '@/lib/modules/pedidos/ports/order-write-repository'
 
 const EMPRESA = '33333333-3333-4333-8333-333333333333'
 const OTRA_EMPRESA = '44444444-4444-4444-8444-444444444444'
@@ -59,8 +63,28 @@ function fila(overrides: Partial<OrderRow> = {}): OrderRow {
   }
 }
 
-function escenario(opciones: { fila?: OrderRow | null; setCustomerAlive?: 'ok' | 'not_found' } = {}) {
+const ESTADOS_CERRADOS: readonly OrderStatus[] = ['ENTREGADO', 'CANCELADO']
+const ESTADOS_ABIERTOS: readonly OrderStatus[] = ORDER_STATUS_VALUES.filter((s) => !ESTADOS_CERRADOS.includes(s))
+
+function bloqueada(row: OrderRow): LockedOrderRow {
+  return { ...row, reservedAt: null, packagingCost: null }
+}
+
+function escenario(
+  opciones: {
+    fila?: OrderRow | null
+    /** La fila que ve `lockAliveById` dentro de la transaccion; por defecto, la misma que se leyo. */
+    bloqueada?: OrderRow | null
+    setCustomerAlive?: 'ok' | 'not_found'
+    /** El catalogo de clientes, la unidad de trabajo y la escritura explotan si se tocan. */
+    explotaSiEscribe?: boolean
+  } = {},
+) {
   const row = opciones.fila === undefined ? fila() : opciones.fila
+  const filaBloqueada = opciones.bloqueada === undefined ? row : opciones.bloqueada
+  const explota = (nombre: string) => (): never => {
+    throw new Error(`${nombre} no deberia llamarse en un pedido cerrado`)
+  }
   const findAliveById = vi.fn(async (id: string, scope: { companyId: string }) => {
     void id
     // Como el puerto real: un pedido de otra empresa no vuelve.
@@ -73,27 +97,46 @@ function escenario(opciones: { fila?: OrderRow | null; setCustomerAlive?: 'ok' |
     }),
   }
   const findAliveRefById = vi.fn(async (id: string, companyId: string): Promise<CustomerRef | null> => {
+    if (opciones.explotaSiEscribe === true) explota('customerCatalog.findAliveRefById')()
     const guardado = CLIENTES.find((c) => c.ref.id === id)
     if (guardado === undefined || guardado.companyId !== companyId || guardado.ref.isDeleted) return null
     return guardado.ref
   })
-  const setCustomerAlive = vi.fn(async () => opciones.setCustomerAlive ?? ('ok' as const))
-  const uow = fakeUnitOfWork({ orders: { setCustomerAlive } })
+  const setCustomerAlive = vi.fn(async () => {
+    if (opciones.explotaSiEscribe === true) explota('orders.setCustomerAlive')()
+    return opciones.setCustomerAlive ?? ('ok' as const)
+  })
+  const lockAliveById = vi.fn(async () => {
+    if (opciones.explotaSiEscribe === true) explota('orders.lockAliveById')()
+    return filaBloqueada === null ? null : bloqueada(filaBloqueada)
+  })
+  const uow = fakeUnitOfWork({ orders: { lockAliveById, setCustomerAlive } })
   const run = vi.spyOn(uow.unitOfWork, 'run')
+  if (opciones.explotaSiEscribe === true) run.mockImplementation(explota('unitOfWork.run'))
   const deps: SetOrderCustomerDeps = {
     orders: orders as unknown as OrderRepository,
     customerCatalog: { findAliveRefById },
     unitOfWork: uow.unitOfWork,
     now: () => AHORA,
   }
-  return { deps, uow, run, findAliveById, findAliveRefById, setCustomerAlive, setOrderCustomer: createSetOrderCustomer(deps) }
+  return {
+    deps,
+    uow,
+    run,
+    findAliveById,
+    findAliveRefById,
+    lockAliveById,
+    setCustomerAlive,
+    setOrderCustomer: createSetOrderCustomer(deps),
+  }
 }
 
-/** Todo lo que la unidad de trabajo vio, salvo `setCustomerAlive`. */
+/** Todo lo que la unidad de trabajo vio, salvo `lockAliveById` y `setCustomerAlive`. */
 function otrasLlamadas(uow: ReturnType<typeof fakeUnitOfWork>): string[] {
   const vistas: string[] = []
   for (const [nombre, metodo] of Object.entries(uow.orders)) {
-    if (nombre !== 'setCustomerAlive' && metodo.mock.calls.length > 0) vistas.push(`orders.${nombre}`)
+    if (nombre === 'setCustomerAlive' || nombre === 'lockAliveById') continue
+    if (metodo.mock.calls.length > 0) vistas.push(`orders.${nombre}`)
   }
   for (const [nombre, metodo] of Object.entries(uow.reservations)) {
     if (metodo.mock.calls.length > 0) vistas.push(`reservations.${nombre}`)
@@ -114,7 +157,7 @@ async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string
   return (error as PedidosError).code
 }
 
-describe('setOrderCustomer — en cualquier estado (R14, R15)', () => {
+describe('setOrderCustomer — en los estados de cliente abierto (R14 enmendada, R15, QC-215 R37)', () => {
   it('R14: los diez estados son exactamente los del catalogo', () => {
     expect([...ORDER_STATUS_VALUES].sort()).toEqual(
       [
@@ -132,21 +175,113 @@ describe('setOrderCustomer — en cualquier estado (R14, R15)', () => {
     )
   })
 
-  it.each<OrderStatus>([...ORDER_STATUS_VALUES])(
-    'R14 R15: en %s acepta el cambio y la unidad de trabajo solo ve setCustomerAlive(id, cliente, actor, ahora, scope)',
+  it('R37: CUSTOMER_EDITABLE_STATUSES son los ocho estados abiertos, sin ENTREGADO ni CANCELADO', () => {
+    expect([...CUSTOMER_EDITABLE_STATUSES].sort()).toEqual(
+      [
+        'PENDIENTE',
+        'EN_CURSO',
+        'BLOQUEADO',
+        'POR_EMPACAR',
+        'EN_EMPAQUE',
+        'POR_ACONDICIONAR',
+        'EN_ACONDICIONAMIENTO',
+        'TERMINADO',
+      ].sort(),
+    )
+    expect([...CUSTOMER_EDITABLE_STATUSES].sort()).toEqual([...ESTADOS_ABIERTOS].sort())
+    expect(ESTADOS_ABIERTOS).toHaveLength(8)
+  })
+
+  it.each<OrderStatus>([...ESTADOS_ABIERTOS])(
+    'R37 R15: en %s acepta el cambio; bloquea la fila y solo escribe setCustomerAlive(id, cliente, actor, ahora, scope)',
     async (status) => {
-      const e = escenario({
-        fila: fila({ status, cancellationReason: status === 'CANCELADO' ? 'anulado' : null }),
-      })
+      const e = escenario({ fila: fila({ status }) })
 
       await e.setOrderCustomer(ORDER_ID, { customerId: CLIENTE_B }, ACTOR)
 
+      expect(e.lockAliveById).toHaveBeenCalledWith(ORDER_ID, SCOPE)
       expect(e.setCustomerAlive).toHaveBeenCalledTimes(1)
       expect(e.setCustomerAlive).toHaveBeenCalledWith(ORDER_ID, CLIENTE_B, ACTOR.id, AHORA, SCOPE)
       expect(otrasLlamadas(e.uow)).toEqual([])
       expect(e.run).toHaveBeenCalledTimes(1)
     },
   )
+
+  it.each<OrderStatus>(['BLOQUEADO', 'POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'])(
+    'R37: en %s tambien se quita el cliente, sin consultar el catalogo ni ninguna otra escritura',
+    async (status) => {
+      const e = escenario({ fila: fila({ status }) })
+
+      await e.setOrderCustomer(ORDER_ID, { customerId: null }, ACTOR)
+
+      expect(e.setCustomerAlive).toHaveBeenCalledWith(ORDER_ID, null, ACTOR.id, AHORA, SCOPE)
+      expect(e.findAliveRefById).not.toHaveBeenCalled()
+      // Ni setStatus ni ninguna otra escritura: estado, finishedAt, packedBy y quien acondiciona
+      // no los puede mover este caso de uso.
+      expect(otrasLlamadas(e.uow)).toEqual([])
+    },
+  )
+})
+
+describe('setOrderCustomer — los estados de cliente cerrado (QC-215 R36)', () => {
+  const entradas: readonly (readonly [string, string | null])[] = [
+    ['el mismo cliente', CLIENTE_A],
+    ['quitar el cliente', null],
+    ['un cliente nuevo', CLIENTE_B],
+  ]
+
+  for (const status of ESTADOS_CERRADOS) {
+    it.each(entradas)(
+      `R36: en ${status}, %s da action_not_allowed sin tocar el catalogo, la unidad de trabajo ni la escritura`,
+      async (_caso, customerId) => {
+        const e = escenario({
+          fila: fila({ status, cancellationReason: status === 'CANCELADO' ? 'anulado' : null }),
+          explotaSiEscribe: true,
+        })
+
+        expect(await codigoDelFallo(() => e.setOrderCustomer(ORDER_ID, { customerId }, ACTOR))).toBe(
+          'action_not_allowed',
+        )
+        expect(e.findAliveById).toHaveBeenCalledWith(ORDER_ID, SCOPE)
+        expect(e.findAliveRefById).not.toHaveBeenCalled()
+        expect(e.run).not.toHaveBeenCalled()
+        expect(e.lockAliveById).not.toHaveBeenCalled()
+        expect(e.setCustomerAlive).not.toHaveBeenCalled()
+        expect(otrasLlamadas(e.uow)).toEqual([])
+      },
+    )
+  }
+
+  it('R36: un pedido que no existe sigue dando order_not_found, no action_not_allowed', async () => {
+    const e = escenario({ fila: null, explotaSiEscribe: true })
+
+    expect(await codigoDelFallo(() => e.setOrderCustomer(ORDER_ID, { customerId: CLIENTE_B }, ACTOR))).toBe(
+      'order_not_found',
+    )
+  })
+
+  it.each<OrderStatus>([...ESTADOS_CERRADOS])(
+    'R36: si el pedido pasa a %s entre la lectura y el candado, action_not_allowed sin escribir',
+    async (status) => {
+      const e = escenario({ fila: fila({ status: 'TERMINADO' }), bloqueada: fila({ status }) })
+
+      expect(await codigoDelFallo(() => e.setOrderCustomer(ORDER_ID, { customerId: CLIENTE_B }, ACTOR))).toBe(
+        'action_not_allowed',
+      )
+      expect(e.lockAliveById).toHaveBeenCalledWith(ORDER_ID, SCOPE)
+      expect(e.setCustomerAlive).not.toHaveBeenCalled()
+      expect(otrasLlamadas(e.uow)).toEqual([])
+    },
+  )
+
+  it('R18: si el pedido desaparece entre la lectura y el candado, order_not_found sin escribir', async () => {
+    const e = escenario({ bloqueada: null })
+
+    expect(await codigoDelFallo(() => e.setOrderCustomer(ORDER_ID, { customerId: CLIENTE_B }, ACTOR))).toBe(
+      'order_not_found',
+    )
+    expect(e.setCustomerAlive).not.toHaveBeenCalled()
+  })
 })
 
 describe('setOrderCustomer — quitar, mismo cliente y comprobacion (R11, R12, R16, R17)', () => {
