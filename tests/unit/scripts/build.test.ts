@@ -1,6 +1,7 @@
 // La guarda del build (`scripts/build.mjs`): las previews de Vercel comparten base con
-// produccion, asi que `prisma migrate deploy` y el seed solo pueden correr en produccion o fuera
-// de Vercel (local, CI). Se prueba la logica pura; el main no corre al importar.
+// produccion, asi que dentro de Vercel `prisma migrate deploy` y el seed solo corren con
+// `VERCEL_ENV=production`; sin el dato se falla hacia el lado seguro (no se tocan). Fuera de
+// Vercel (local, CI) corre todo. Se prueba la logica pura; el main no corre al importar.
 
 import { describe, expect, it } from 'vitest'
 
@@ -11,43 +12,71 @@ const GENERAR = 'prisma generate'
 const SEMBRAR = 'tsx scripts/seed.ts'
 const CONSTRUIR = 'next build'
 
+const TODO = [MIGRAR, GENERAR, SEMBRAR, CONSTRUIR]
+const SIN_BASE = [GENERAR, CONSTRUIR]
+
 describe('pasosDelBuild', () => {
-  it('con VERCEL_ENV=production corre los cuatro pasos, migrate y seed incluidos', () => {
-    const r = pasosDelBuild({ VERCEL_ENV: 'production' })
-    expect(r.pasos).toEqual([MIGRAR, GENERAR, SEMBRAR, CONSTRUIR])
+  it('Vercel con VERCEL_ENV=production corre los cuatro pasos, migrate y seed incluidos', () => {
+    const r = pasosDelBuild({ VERCEL: '1', VERCEL_ENV: 'production' })
+    expect(r.pasos).toEqual(TODO)
     expect(r.saltados).toEqual([])
-    expect(r.motivo).toBeNull()
+    expect(r.motivo).toBe('[build] Vercel production -> con migrate y seed')
   })
 
-  it('con VERCEL_ENV=preview se salta migrate y seed, y sigue con generate y next build', () => {
-    const r = pasosDelBuild({ VERCEL_ENV: 'preview' })
-    expect(r.pasos).toEqual([GENERAR, CONSTRUIR])
+  it('Vercel con VERCEL_ENV=preview se salta migrate y seed, y sigue con generate y next build', () => {
+    const r = pasosDelBuild({ VERCEL: '1', VERCEL_ENV: 'preview' })
+    expect(r.pasos).toEqual(SIN_BASE)
     expect(r.pasos).not.toContain(MIGRAR)
     expect(r.pasos).not.toContain(SEMBRAR)
     expect(r.saltados).toEqual([MIGRAR, SEMBRAR])
-    expect(r.motivo).toContain('VERCEL_ENV=preview')
+    expect(r.motivo).toBe(
+      '[build] Vercel preview -> sin migrate ni seed (comparte base con produccion)',
+    )
   })
 
-  it('con VERCEL_ENV=development tambien se salta migrate y seed', () => {
-    const r = pasosDelBuild({ VERCEL_ENV: 'development' })
-    expect(r.pasos).toEqual([GENERAR, CONSTRUIR])
+  it('Vercel con VERCEL_ENV=development tambien se salta migrate y seed', () => {
+    const r = pasosDelBuild({ VERCEL: '1', VERCEL_ENV: 'development' })
+    expect(r.pasos).toEqual(SIN_BASE)
     expect(r.saltados).toEqual([MIGRAR, SEMBRAR])
-    expect(r.motivo).toContain('VERCEL_ENV=development')
+    expect(r.motivo).toBe(
+      '[build] Vercel development -> sin migrate ni seed (comparte base con produccion)',
+    )
   })
 
-  it('sin VERCEL_ENV (local, CI) el build es el de siempre: los cuatro pasos', () => {
+  it('Vercel con VERCEL_ENV vacio falla hacia el lado seguro: sin migrate ni seed', () => {
+    const r = pasosDelBuild({ VERCEL: '1', VERCEL_ENV: '' })
+    expect(r.pasos).toEqual(SIN_BASE)
+    expect(r.saltados).toEqual([MIGRAR, SEMBRAR])
+    expect(r.motivo).toBe('[build] Vercel sin VERCEL_ENV -> sin migrate ni seed (lado seguro)')
+  })
+
+  it('Vercel sin VERCEL_ENV falla hacia el lado seguro: sin migrate ni seed', () => {
+    const r = pasosDelBuild({ VERCEL: '1' })
+    expect(r.pasos).toEqual(SIN_BASE)
+    expect(r.saltados).toEqual([MIGRAR, SEMBRAR])
+    expect(r.motivo).toBe('[build] Vercel sin VERCEL_ENV -> sin migrate ni seed (lado seguro)')
+  })
+
+  it('fuera de Vercel (local, CI) sin VERCEL_ENV el build es el de siempre: los cuatro pasos', () => {
     const r = pasosDelBuild({})
-    expect(r.pasos).toEqual([MIGRAR, GENERAR, SEMBRAR, CONSTRUIR])
+    expect(r.pasos).toEqual(TODO)
     expect(r.saltados).toEqual([])
+    expect(r.motivo).toBe('[build] fuera de Vercel -> con migrate y seed')
+  })
+
+  it('fuera de Vercel corre todo aunque VERCEL_ENV diga preview', () => {
+    const r = pasosDelBuild({ VERCEL_ENV: 'preview' })
+    expect(r.pasos).toEqual(TODO)
+    expect(r.motivo).toBe('[build] fuera de Vercel -> con migrate y seed')
   })
 
   it('migrate va antes que generate, el seed despues de generate, y next build al final', () => {
-    const { pasos } = pasosDelBuild({ VERCEL_ENV: 'production' })
+    const { pasos } = pasosDelBuild({ VERCEL: '1', VERCEL_ENV: 'production' })
     expect(pasos.indexOf(MIGRAR)).toBeLessThan(pasos.indexOf(GENERAR))
     expect(pasos.indexOf(GENERAR)).toBeLessThan(pasos.indexOf(SEMBRAR))
     expect(pasos.at(-1)).toBe(CONSTRUIR)
 
-    const preview = pasosDelBuild({ VERCEL_ENV: 'preview' }).pasos
+    const preview = pasosDelBuild({ VERCEL: '1', VERCEL_ENV: 'preview' }).pasos
     expect(preview.at(-1)).toBe(CONSTRUIR)
   })
 })

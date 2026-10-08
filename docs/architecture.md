@@ -637,9 +637,12 @@ migracion se aplica sobre un estado que Prisma cree que es otro.
 - **Tres secrets** en Settings > Secrets and variables > Actions del repo: `VERCEL_TOKEN` (se
   crea en vercel.com/account/tokens), `VERCEL_ORG_ID` y `VERCEL_PROJECT_ID` (los de
   `.vercel/project.json`). Sin uno, el workflow falla diciendo cual falta.
-- **Migrate y seed solo con `VERCEL_ENV=production`.** `pnpm run build` es `scripts/build.mjs`:
-  con otro `VERCEL_ENV` (preview, development) se salta `prisma migrate deploy` y el seed; sin
-  `VERCEL_ENV` (local, CI) corre todo, como antes.
+- **En Vercel, migrate y seed solo con `VERCEL_ENV=production`.** `pnpm run build` es
+  `scripts/build.mjs`. Con `VERCEL` definida (Vercel la pone en todo build) corre
+  `prisma migrate deploy` y el seed solo si `VERCEL_ENV=production`; con preview, development,
+  vacio o ausente se los salta (solo `prisma generate` y `next build`). Sin `VERCEL` (local, CI)
+  corre todo, como antes, sea cual sea `VERCEL_ENV`. El build imprime siempre una linea
+  `[build] ...` con la decision y el porque.
 
 `tests/guards/guard-despliegue-produccion.test.ts` lo fija.
 
@@ -650,7 +653,9 @@ Vercel tiene vinculada otra cuenta de GitHub y el repo vive en otra.
 
 **Migrate y seed solo en produccion.** Preview y produccion comparten base: una preview que
 migrara aplicaria a produccion las migraciones de una rama sin mergear. Por eso tampoco hay
-previews automaticas; esperan a una base separada (otra ficha).
+previews automaticas; esperan a una base separada (otra ficha). Dentro de Vercel, si
+`VERCEL_ENV` falta o viene vacio no se sabe si es produccion, y se falla hacia el lado seguro:
+no se toca la base.
 
 ## Componentes
 - `components/ui/`: primitivas de shadcn/ui. **Nunca crees un componente si ya existe en shadcn/ui.**

@@ -7,7 +7,8 @@
 # otra cuenta de GitHub y el repo vive en otra, asi que Vercel no puede conectarse al repo.
 #
 # El build lo hace Vercel en remoto (`vercel deploy` sube el codigo y Vercel corre
-# `pnpm run build`, que aplica migraciones y seed solo en produccion: `scripts/build.mjs`). El
+# `pnpm run build`, que en Vercel aplica migraciones y seed solo con VERCEL_ENV=production y
+# los salta en cualquier otro caso, VERCEL_ENV ausente incluido: `scripts/build.mjs`). El
 # runner no instala dependencias ni construye nada: plan GRATUITO de GitHub, minutos contados.
 #
 # Secrets (Settings > Secrets and variables > Actions del repo): VERCEL_TOKEN (se crea en

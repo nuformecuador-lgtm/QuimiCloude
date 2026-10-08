@@ -4,8 +4,11 @@
  *
  * Las previews de Vercel comparten base con produccion: una preview que corriera
  * `prisma migrate deploy` aplicaria a produccion las migraciones de una rama sin mergear, y el
- * seed escribiria en ella. Por eso migrate y seed solo corren con `VERCEL_ENV=production`, o sin
- * `VERCEL_ENV` (local y CI), donde el build sigue siendo el de siempre.
+ * seed escribiria en ella. Por eso, dentro de Vercel (`VERCEL` definida: Vercel la pone en todo
+ * build), migrate y seed corren SOLO con `VERCEL_ENV=production`. Cualquier otro caso en Vercel
+ * (preview, development, `VERCEL_ENV` vacio o ausente) se los salta: si falta el dato, se falla
+ * hacia el lado seguro, que es no tocar la base. Fuera de Vercel (local, CI) el build corre
+ * entero, como siempre, sea cual sea `VERCEL_ENV`.
  *
  * Node y no una cadena de `&&` en package.json: la regla necesita un `if` y este repo se trabaja
  * tambien desde Windows.
@@ -19,28 +22,32 @@ const GENERAR = 'prisma generate';
 const SEMBRAR = 'tsx scripts/seed.ts';
 const CONSTRUIR = 'next build';
 
+const CON_TODO = [MIGRAR, GENERAR, SEMBRAR, CONSTRUIR];
+const SIN_BASE = [GENERAR, CONSTRUIR];
+const DE_BASE = [MIGRAR, SEMBRAR];
+
 /**
- * Comandos del build, en orden, para un entorno dado.
+ * Comandos del build, en orden, para un entorno dado, y la linea que explica la decision.
  * @param {Record<string, string | undefined>} env
- * @returns {{ pasos: string[], saltados: string[], motivo: string | null }}
+ * @returns {{ pasos: string[], saltados: string[], motivo: string }}
  */
 export function pasosDelBuild(env) {
-  const vercelEnv = env.VERCEL_ENV;
-  if (vercelEnv === undefined || vercelEnv === '' || vercelEnv === 'production') {
-    return { pasos: [MIGRAR, GENERAR, SEMBRAR, CONSTRUIR], saltados: [], motivo: null };
+  if (!env.VERCEL) {
+    return { pasos: [...CON_TODO], saltados: [], motivo: '[build] fuera de Vercel -> con migrate y seed' };
   }
-  return {
-    pasos: [GENERAR, CONSTRUIR],
-    saltados: [MIGRAR, SEMBRAR],
-    motivo: `VERCEL_ENV=${vercelEnv} comparte base con produccion`,
-  };
+  const vercelEnv = env.VERCEL_ENV;
+  if (vercelEnv === 'production') {
+    return { pasos: [...CON_TODO], saltados: [], motivo: '[build] Vercel production -> con migrate y seed' };
+  }
+  const motivo = vercelEnv
+    ? `[build] Vercel ${vercelEnv} -> sin migrate ni seed (comparte base con produccion)`
+    : '[build] Vercel sin VERCEL_ENV -> sin migrate ni seed (lado seguro)';
+  return { pasos: [...SIN_BASE], saltados: [...DE_BASE], motivo };
 }
 
 function main() {
-  const { pasos, saltados, motivo } = pasosDelBuild(process.env);
-  if (saltados.length > 0) {
-    console.log(`[build] se salta ${saltados.map((s) => `\`${s}\``).join(' y ')}: ${motivo}.`);
-  }
+  const { pasos, motivo } = pasosDelBuild(process.env);
+  console.log(motivo);
   for (const paso of pasos) {
     console.log(`[build] ${paso}`);
     // `shell: true`: en Windows los binarios de node_modules/.bin son `.cmd` y spawn sin shell
