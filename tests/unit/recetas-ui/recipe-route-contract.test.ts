@@ -1286,6 +1286,10 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // funcion de ruta ni apunta a ninguna URL del asistente de lectura. La lista sigue
         // siendo CERRADA y por igualdad exacta.
         'CANCELLED_ORDER_PARAM',
+        // Alta el 2026-10-08: el parametro de consulta con el que «Por acondicionar» anuncia el
+        // pedido recien terminado (`?acondicionado=<numero>`). No es una ruta ni apunta a ninguna
+        // URL del asistente de lectura. La lista sigue CERRADA.
+        'CONDITIONED_ORDER_PARAM',
         'CREDENTIAL_SETUP_ROUTE',
         // Alta: la pantalla de clientes. No es una ruta ni una funcion de ruta del asistente de
         // lectura -no la marca el patron de arriba ni apunta a ninguna URL del asistente-.

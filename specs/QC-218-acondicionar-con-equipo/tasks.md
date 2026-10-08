@@ -56,7 +56,7 @@
 
 ## Tanda 2 — dominio (backend_dev)
 
-- [ ] **T6. `conditioning-team.ts`** (R13, R15, R16, R17, R18) [T2, T5].
+- [x] **T6. `conditioning-team.ts`** (R13, R15, R16, R17, R18) [T2, T5].
   `startConditioningSchema` y `composeConditioningTeam`, puros (`design.md > 3.1`).
   **Hecho:** `tests/unit/asignaciones/conditioning-team.test.ts` cubre:
   - la forma de la entrada (R18): listas ausentes, repetidos, las dos vacías, claves de más;
@@ -65,7 +65,7 @@
   - «gana el primero» y `position` (R13);
   - el equipo vacío (R17).
 
-- [ ] **T7. Comenzar con equipo** (R12, R16–R22, R24) [T3, T4, T6].
+- [x] **T7. Comenzar con equipo** (R12, R16–R22, R24) [T3, T4, T6].
   `ExecutionWriters` gana `conditioning` y `team`, y `lib/composition/index.ts` los construye sobre
   `tx`. `start-conditioning.ts` sigue los cinco pasos de `design.md > 3.2`.
   **Hecho:** `tests/unit/asignaciones/start-conditioning.test.ts`, reescrito con dobles, cubre:
@@ -83,7 +83,7 @@
     del pedido sin cambios; el miembro sin permiso recibe `unauthorized` y el acondicionador miembro
     que no acondiciona recibe `order_conditioning_taken` al terminar (R24, R29).
 
-- [ ] **T8 [P]. Candidatos del modal** (R6, R7, R30) [T3].
+- [x] **T8 [P]. Candidatos del modal** (R6, R7, R30) [T3].
   `list-conditioning-team-candidates.ts` y la clave `listConditioningTeamCandidates` en la fachada
   (`design.md > 3.3`).
   **Hecho:** `tests/unit/asignaciones/list-conditioning-team-candidates.test.ts` cubre:
@@ -93,7 +93,7 @@
   - `contributes` y `excludedAdministrators` por grupo, incluido un grupo de solo Administradores
     con `contributes = 0`.
 
-- [ ] **T9 [P]. Detalle con equipo** (R25, D12) [T2].
+- [x] **T9 [P]. Detalle con equipo** (R25, D12) [T2].
   `getConditioningOrder` devuelve `ConditioningOrderDetail` con `team`, leído solo en
   `EN_ACONDICIONAMIENTO` y `TERMINADO` (`design.md > 3.4`).
   **Hecho:** `tests/unit/asignaciones/get-conditioning-order.test.ts` gana casos:
@@ -101,7 +101,7 @@
   - nombre de una persona dada de baja;
   - en `POR_ACONDICIONAR` no se lee el equipo.
 
-- [ ] **T10. Server Actions** (R27, R28) [T7].
+- [x] **T10. Server Actions** (R27, R28) [T7].
   `order-conditioning-actions.ts` (`design.md > 4`) y `CONDITIONED_ORDER_PARAM` en
   `lib/shared/routes.ts`.
   **Hecho:** `tests/unit/asignaciones/order-conditioning-actions.test.ts` cubre:
@@ -110,7 +110,7 @@
   - `redirect` con `vista=por_acondicionar&acondicionado=<n>` al terminar, con el pedido en `TERMINADO` (D11);
   - el `ErrorState` por `code`.
 
-- [ ] **T11. Barrido del permiso y fachada** (R31) [T8].
+- [x] **T11. Barrido del permiso y fachada** (R31) [T8].
   `tests/unit/identity/roles/acondicionamiento-rol.test.ts` suma el caso de uso de candidatos.
   `tests/unit/composition/asignaciones-facade.test.ts` suma la clave nueva.
   **Hecho:** `pnpm exec vitest run guard` y los dos tests, en verde.

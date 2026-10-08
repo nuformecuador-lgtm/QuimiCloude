@@ -551,6 +551,11 @@
       "archivo": "pedidos/order-catalog-conditioned-by.int.test.ts",
       "motivo": "Ejercita 'listAliveSummariesInCompany' con el filtro 'conditionedBy' y 'createOrder', los adaptadores driven REALES de 'pedidos', que hablan con el cliente Prisma GLOBAL y 'createOrder' abre su PROPIA 'prisma.$transaction', asi que una transaccion del test no los envolveria. Dos empresas efimeras (randomUUID) nacen en 'beforeAll' y mueren en 'afterAll'; cada caso siembra sus pedidos y usuarios y los borra en un 'finally' por su id exacto. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-08"
+    },
+    {
+      "archivo": "asignaciones/start-conditioning-team.int.test.ts",
+      "motivo": "QC-218 T7 (R12, R13, R22, R24, R29): Comenzar con equipo con la composicion real: 'withExecutionTransaction' (execution-transaction-prisma.ts) abre su PROPIA 'prisma.$transaction' sobre el cliente GLOBAL y lo que se mide es que su ROLLBACK deshaga pedido y equipo, y la carrera de dos Comenzar reales con equipos distintos, asi que una transaccion del test no la envolveria. Cada caso fabrica su empresa efimera con randomUUID y la borra en un 'finally' por 'company_id' en orden de FK (equipo -> responsables -> pedidos -> receta -> miembros de grupo -> grupo -> usuarios -> permisos de rol -> roles -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-08"
     }
   ]
 }
