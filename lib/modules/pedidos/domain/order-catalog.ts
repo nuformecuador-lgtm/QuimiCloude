@@ -34,6 +34,13 @@ export type OrderAssignmentTarget = {
  *  antiguedad, numero); `finished_recent_first` es el de «Terminados». */
 export type OrderSummaryOrdering = 'work_queue' | 'finished_recent_first';
 
+/** Filtro opcional por persona de un resumen paginado. Va en la consulta, no despues, para que
+ *  `total` y la paginacion describan solo lo filtrado. */
+export type OrderSummaryFilter = {
+  readonly packedBy?: string;
+  readonly conditionedBy?: string;
+};
+
 /** Lo que entro al inventario por UNA linea del reparto cuando Terminar el empaque dio de alta
  *  su lote: el nombre del producto terminado que lo recibio y cuantos envases enteros. */
 export type FinishedGoodsReceipt = {
@@ -75,6 +82,7 @@ export interface OrderCatalog {
    * terminado, con los nulos al final y, entre ellos, por numero de pedido descendente.
    *
    * `filter.packedBy` deja solo los pedidos de ese empacador; un `packedBy` nulo no entra.
+   * `filter.conditionedBy` hace lo mismo con quien acondiciona.
    */
   listAliveSummariesInCompany(
     companyId: string,
@@ -82,7 +90,7 @@ export interface OrderCatalog {
     ordering: OrderSummaryOrdering,
     page: number,
     pageSize?: number,
-    filter?: { readonly packedBy?: string },
+    filter?: OrderSummaryFilter,
   ): Promise<Page<AssignedOrderSummary>>;
 
   /**
@@ -239,4 +247,7 @@ export type AssignedOrderSummary = {
    *  no lo tienen, los nuevos lo conservan). El identificador viaja en crudo, igual que
    *  `recipeId`; el nombre lo resuelve quien consulta con el directorio de personas. */
   readonly packedBy: string | null;
+  /** Quien acondiciona: obligatorio en `EN_ACONDICIONAMIENTO` y `TERMINADO`, opcional en
+   *  `ENTREGADO` y `null` en el resto. Viaja en crudo, como `packedBy`. */
+  readonly conditionedBy: string | null;
 };

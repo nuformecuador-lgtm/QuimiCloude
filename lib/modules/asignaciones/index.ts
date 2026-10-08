@@ -234,3 +234,23 @@ export {
   type FinishConditioningDeps,
   type FinishConditioningResult,
 } from './domain/finish-conditioning';
+
+// ---------------------------------------------------------------------------------------
+// Las pestanas del acondicionador y su detalle, de solo lectura. Bloque NUEVO al final.
+// ---------------------------------------------------------------------------------------
+export {
+  composeConditioningOrderRows,
+  type ConditioningOrderRow,
+} from './domain/conditioning-order-view';
+export {
+  createListConditioningOrders,
+  type ListConditioningOrdersDeps,
+} from './domain/list-conditioning-orders';
+export {
+  createListConditionedOrders,
+  type ListConditionedOrdersDeps,
+} from './domain/list-conditioned-orders';
+export {
+  createGetConditioningOrder,
+  type GetConditioningOrderDeps,
+} from './domain/get-conditioning-order';

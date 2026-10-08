@@ -152,3 +152,71 @@ describe('vistas segun `asignaciones.ejecutar`', () => {
     expect(resolveAssignmentView('asignados', vistasDelEmpacador)).toBe('terminados');
   });
 });
+
+describe('R1 — el permiso del acondicionador anade `por_acondicionar` y `acondicionados` al final', () => {
+  it('R1: con `acondicionamiento.modificar` se anaden las dos, en ese orden, detras de las que ya tocaban', () => {
+    expect(
+      resolveAssignmentViews({
+        permissions: ['asignaciones.ejecutar', 'terminados.consultar', 'empaque.modificar', 'acondicionamiento.modificar'],
+      }),
+    ).toEqual(['asignados', 'terminados', 'por_empacar', 'por_acondicionar', 'acondicionados']);
+    expect(resolveAssignmentViews({ permissions: ['pedidos.consultar', 'acondicionamiento.modificar'] })).toEqual([
+      'todos',
+      'por_acondicionar',
+      'acondicionados',
+    ]);
+  });
+
+  it('R1: con solo el permiso salen exactamente las dos, sin la vista de reserva', () => {
+    expect(resolveAssignmentViews({ permissions: ['acondicionamiento.modificar'] })).toEqual([
+      'por_acondicionar',
+      'acondicionados',
+    ]);
+  });
+
+  it('R1: depende solo del permiso: un campo de rol no cambia el resultado', () => {
+    const permissions = ['asignaciones.consultar', 'acondicionamiento.modificar'];
+    const conRol = { permissions, role: 'Operador' };
+    expect(resolveAssignmentViews(conRol)).toEqual(resolveAssignmentViews({ permissions }));
+  });
+
+  it('R1: la vista pedida, si esta permitida, se respeta; si no, cae a `por_acondicionar`', () => {
+    const vistas = resolveAssignmentViews({ permissions: ['acondicionamiento.modificar'] });
+    expect(resolveAssignmentView('acondicionados', vistas)).toBe('acondicionados');
+    expect(resolveAssignmentView('por_empacar', vistas)).toBe('por_acondicionar');
+    expect(resolveAssignmentView(undefined, vistas)).toBe('por_acondicionar');
+  });
+});
+
+describe('R3 — sin el permiso no aparece ninguna de las dos, y los roles de semilla siguen igual', () => {
+  const permisosDe = (rol: string): readonly string[] => SEED_ROLE_PERMISSIONS[rol] ?? [];
+
+  it('R3: Administrador -> todos; Operador -> asignados; Empacador -> terminados y por_empacar, como antes', () => {
+    expect(resolveAssignmentViews({ permissions: permisosDe(ROLE_ADMINISTRADOR) })).toEqual(['todos']);
+    expect(resolveAssignmentViews({ permissions: permisosDe(ROLE_OPERADOR) })).toEqual(['asignados']);
+    expect(resolveAssignmentViews({ permissions: permisosDe(ROLE_EMPACADOR) })).toEqual(['terminados', 'por_empacar']);
+  });
+
+  it('R3: ningun rol sin el permiso recibe `por_acondicionar` ni `acondicionados`', () => {
+    for (const rol of [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR]) {
+      const vistas = resolveAssignmentViews({ permissions: permisosDe(rol) });
+      expect(vistas, rol).not.toContain('por_acondicionar');
+      expect(vistas, rol).not.toContain('acondicionados');
+    }
+  });
+
+  it('R3: un bearer nulo, vacio o con otros permisos no las recibe', () => {
+    expect(resolveAssignmentViews(null)).toEqual(['asignados']);
+    expect(resolveAssignmentViews({ permissions: [] })).toEqual(['asignados']);
+    expect(resolveAssignmentViews({ permissions: ['empaque.modificar', 'terminados.consultar'] })).toEqual([
+      'terminados',
+      'por_empacar',
+    ]);
+  });
+
+  it('R3: pedir una de las dos sin el permiso cae a la vista por defecto del usuario', () => {
+    const vistasDelOperador = resolveAssignmentViews({ permissions: permisosDe(ROLE_OPERADOR) });
+    expect(resolveAssignmentView('por_acondicionar', vistasDelOperador)).toBe('asignados');
+    expect(resolveAssignmentView('acondicionados', vistasDelOperador)).toBe('asignados');
+  });
+});

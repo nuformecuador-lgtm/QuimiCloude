@@ -62,6 +62,7 @@ function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummar
     unitId: null,
     finishedAt: null,
     packedBy: null,
+    conditionedBy: null,
     ...overrides,
   };
 }

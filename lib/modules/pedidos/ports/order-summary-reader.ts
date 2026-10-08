@@ -1,5 +1,5 @@
 import type { OrderStatus } from '../domain/order-classification';
-import type { AssignedOrderSummary, OrderSummaryOrdering } from '../domain/order-catalog';
+import type { AssignedOrderSummary, OrderSummaryFilter, OrderSummaryOrdering } from '../domain/order-catalog';
 import type { Page } from '../domain/page';
 
 /** Una linea del reparto tal como sale de la base: con el id del envase, todavia sin su nombre,
@@ -30,6 +30,6 @@ export interface OrderSummaryReader {
     ordering: OrderSummaryOrdering,
     page: number,
     pageSize?: number,
-    filter?: { readonly packedBy?: string },
+    filter?: OrderSummaryFilter,
   ): Promise<Page<OrderSummaryRecord>>;
 }

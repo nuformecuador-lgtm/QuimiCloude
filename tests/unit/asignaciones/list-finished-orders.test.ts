@@ -51,6 +51,7 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
     unitId: null,
     finishedAt: new Date('2026-09-20T10:00:00.000Z'),
     packedBy: null,
+    conditionedBy: null,
     ...overrides,
   };
 }

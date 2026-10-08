@@ -10,7 +10,7 @@
 > - «Envases» es el reparto completo, que ya viaja en el resumen (`presentationLines`). Solo hay que
 >   añadir `conditionedBy` (T1).
 
-## T1 — `pedidos`: el resumen publica `conditionedBy` y filtra por él (backend)
+## [x] T1 — `pedidos`: el resumen publica `conditionedBy` y filtra por él (backend)
 
 - `AssignedOrderSummary.conditionedBy: string | null`. `filter.conditionedBy?` en
   `OrderCatalog.listAliveSummariesInCompany`, `OrderSummaryReader.listAliveInCompany` y
@@ -28,7 +28,7 @@
 **Hecho:** typecheck verde con los fakes ajustados; el test de integración verde; los tests
 existentes de `order-catalog` y `finished-orders` siguen verdes sin cambiar ninguna aserción.
 
-## T2 — `asignaciones`: fila, tres casos de uso, vistas y composición (backend) · depende de T1
+## [x] T2 — `asignaciones`: fila, tres casos de uso, vistas y composición (backend) · depende de T1
 
 - `domain/conditioning-order-view.ts`, con `composeConditioningOrderRows` (`design.md > 3.2`).
 - `domain/list-conditioning-orders.ts`, `domain/list-conditioned-orders.ts` y
