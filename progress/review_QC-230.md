@@ -129,3 +129,56 @@ sdd: false. El alcance es la ficha QC-230 y `progress/features/QC-230.md`. El hu
 Para pasar: arreglar H1 y añadir su test. H2 a H5 son menores y pueden quedar como deuda.
 
 Nota: el worktree tiene sin commitear un cambio en `progress/features/QC-230.md` (las decisiones del humano y «Preguntas abiertas: (ninguna)»). No es del diff revisado ni lo hice yo.
+
+## Vuelta 2 (acotada a fce8759b..2085939e)
+
+Reviso solo los arreglos de H1 y H2 y lo que puedan haber roto. 43f49769 solo trae docs y progress.
+
+### Verificación
+- `pnpm exec vitest run tests/unit/scripts`: 3 archivos, 48 tests en verde.
+- `./init.sh` (rápido): `== init OK ==`.
+  - `related`: 35 tests en verde.
+  - guardias: 59 archivos, 780 tests en verde.
+- Repetí la prueba con Prisma real: `DATABASE_URL=<local>?schema=public&host=nohay-remoto.invalid pnpm db:seed:demo` sale con exit 1 y el mensaje «DATABASE_URL apunta a "nohay-remoto.invalid", que no es una base local…». Lo rechaza antes de cargar Prisma.
+- Mutaciones (revertidas, `scripts/` queda limpio):
+  1. Ignorar el parámetro `?host=`: fallan 3 tests. **Muerde.**
+  2. Quitar la rama de `CI`: falla 1 test. **Muerde.**
+- Sondeo de la guarda nueva:
+
+| Caso | Resultado | ¿Correcto? |
+|---|---|---|
+| `?host=` remoto | rechaza | sí |
+| `?HOST=` remoto | rechaza (la guarda es más estricta que Prisma) | sí |
+| `?host=` repetido | rechaza (test en la línea 100) | sí |
+| `?host=` vacío | rechaza | sí |
+| `?host=localhost,db.remoto.co` | rechaza | sí |
+| socket Unix `?host=/var/run/postgresql` | permite, sin forzar | sí |
+| `VERCEL_ENV=production` con `--forzar` | rechaza | sí |
+| `CI=true` con `--forzar` | rechaza | sí |
+| `CI=1` con base local | rechaza | sí |
+| `SEED_DEMO_FORZAR=1` con base remota | rechaza | sí |
+| `?hostaddr=10.255.255.1` | permite, pero Prisma **ignora** `hostaddr` y conecta a localhost (lo probé contra Postgres real) | no es un bypass |
+
+### H1: CERRADO
+- `databaseHost` (`guard.ts:37-52`) toma como host efectivo el del parámetro `host`.
+- Si la URL es ambigua (`host` repetido, `host` vacío o una URL ilegible), la rechaza.
+- Un socket Unix, que es una ruta absoluta, se admite como local.
+- Cada caso tiene su test (`seed-demo-guard.test.ts:83-121`).
+
+### H2: CERRADO
+- Solo la bandera `--forzar` de la línea de comandos fuerza (`guard.ts:99`).
+- `hardRefusal` (`guard.ts:66-74`) rechaza `VERCEL_ENV=production` y `CI` antes de mirar la bandera.
+- `SEED_DEMO_FORZAR` ya no aparece en `.env.example`, en `docs/` ni en `scripts/`. Solo queda en el test que comprueba que ya no fuerza (`seed-demo-guard.test.ts:78-81`).
+- **La regla de `CI`** se rechaza salvo que esté vacía, sea `0` o sea `false`. **Me parece suficiente.**
+  - GitHub Actions pone `CI=true` y el build de Vercel pone `CI=1`.
+  - Un `CI=false` explícito es una decisión consciente de quien lo escribe.
+
+### Hallazgo nuevo (menor, no bloquea)
+- **H6, menor:** `--forzar` sí permite escribir con `VERCEL_ENV=preview` contra una base remota.
+  - Según `scripts/build.mjs:43`, la base de preview es la de producción.
+  - No hay un camino automático: el build de Vercel lleva `CI=1` y se rechaza.
+  - El camino es manual: hacer `vercel env pull` del entorno preview y luego correr con `--forzar` a propósito.
+  - Sugerencia: que `hardRefusal` rechace también cualquier `VERCEL_ENV` distinto de `development`, o con `VERCEL` definida.
+
+### Veredicto vuelta 2
+**OK.** H1 y H2 están cerrados, con tests que muerden y la prueba con Prisma real repetida. Ningún arreglo rompió nada. Quedan como menores H3, H4, H5 y H6, sin bloqueantes.
