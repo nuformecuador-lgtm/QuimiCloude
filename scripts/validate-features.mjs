@@ -344,9 +344,30 @@ notas.push(`cupo por zona respetado (${MI_CUENTA ? 'mis' : 'todas las'} in_progr
 // raiz hasta que su PR mergea en `dev`. Mirar solo la raiz daria rojo por la razon
 // equivocada, que es peor que no mirar; y mirar solo el directorio actual dejaba ciego al
 // gate corrido desde un worktree, que es como se corre siempre (ver `RAIZ` arriba).
+//
+// Y en la rama REMOTA de la feature (`origin/<f.branch>`): la de un companero no esta en tu
+// disco, y sin esto su `spec_ready` ponia en rojo el gate de todo el equipo (QC-167, 2026-10-08).
 function tieneSpec(f) {
   if (f.spec_path && existsSync(path.join(f.spec_path, 'requirements.md'))) return true;
-  return basesDeSpecs().some((base) => globRequirements(base, f));
+  if (basesDeSpecs().some((base) => globRequirements(base, f))) return true;
+  return specEnRamaRemota(f);
+}
+
+/** `origin/<f.branch>:specs/<key>-*\/requirements.md`, sin red: usa lo ultimo que trajo `git fetch`. */
+function specEnRamaRemota(f) {
+  if (!f.branch) return false;
+  let rutas;
+  try {
+    rutas = execFileSync('git', ['ls-tree', '-r', '--name-only', `refs/remotes/origin/${f.branch}`, 'specs/'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch {
+    return false;
+  }
+  return rutas
+    .split('\n')
+    .some((r) => prefijos(f).some((p) => new RegExp(`^specs/${p}-[^/]+/requirements\\.md$`).test(r)));
 }
 
 /** Busca `<base>/<key>-*\/requirements.md` y, como fallback, `<base>/<id>-*\/`.
