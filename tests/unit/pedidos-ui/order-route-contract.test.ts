@@ -42,7 +42,9 @@ describe('la ruta de pedidos se declara una sola vez (R2)', () => {
     //
     // `packingOrderRoute` vive en /asignacion: es la pantalla de empaque, no un detalle de
     // Pedidos. Casa con el patron solo por mencionar "order" en el nombre.
-    const EXCEPCIONES = new Set(['assignedOrderRoute', 'packingOrderRoute']);
+    //
+    // `conditioningOrderRoute`, igual: el detalle del acondicionador vive en /asignacion.
+    const EXCEPCIONES = new Set(['assignedOrderRoute', 'packingOrderRoute', 'conditioningOrderRoute']);
 
     // Ni `orderDetailRoute` ni ninguna otra funcion cuyo nombre hable de un pedido.
     const funcionesDePedido = Object.entries(rutas).filter(
@@ -53,6 +55,13 @@ describe('la ruta de pedidos se declara una sola vez (R2)', () => {
         !EXCEPCIONES.has(nombre),
     );
     expect(funcionesDePedido.map(([nombre]) => nombre)).toEqual([]);
+  });
+
+  it('R14: conditioningOrderRoute cuelga de /asignacion, no de la ruta de pedidos', async () => {
+    const { conditioningOrderRoute } = await import('@/lib/shared/routes');
+
+    expect(conditioningOrderRoute('order-a')).toBe('/asignacion/acondicionamiento/order-a');
+    expect(conditioningOrderRoute('order-a').startsWith(ORDERS_ROUTE)).toBe(false);
   });
 
   it('nadie redeclara la constante: private-nav la IMPORTA (R2)', () => {

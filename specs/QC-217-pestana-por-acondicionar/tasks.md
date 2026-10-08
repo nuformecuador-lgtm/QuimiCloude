@@ -52,7 +52,7 @@ existentes de `order-catalog` y `finished-orders` siguen verdes sin cambiar ning
 
 **Hecho:** los tests nombrados verdes. Cada caso de autorización afirma que ningún puerto se invocó.
 
-## T3 — Barrido del permiso (guardias) · depende de T2
+## [x] T3 — Barrido del permiso (guardias) · depende de T2
 
 - `tests/unit/identity/roles/acondicionamiento-rol.test.ts`: dos listas, casos de uso y
   consumidores que no son caso de uso (`design.md > 6`). La comparación exacta sigue siendo
@@ -61,7 +61,7 @@ existentes de `order-catalog` y `finished-orders` siguen verdes sin cambiar ning
 **Hecho:** `pnpm exec vitest run guard` verde y el test del barrido verde. Quitar cualquiera de las
 ocho rutas de la lista lo pone rojo (comprobado a mano una vez).
 
-## T4 [P con T5] — Pestañas «Por acondicionar» y «Terminados» (frontend) · depende de T2
+## [x] T4 [P con T5] — Pestañas «Por acondicionar» y «Terminados» (frontend) · depende de T2
 
 - `lib/shared/routes.ts`: `conditioningOrderRoute`.
 - Componentes de `design.md > 4.2` y barrel. `assignment-view-tabs.tsx`: etiquetas y `testid` de
@@ -83,7 +83,7 @@ ocho rutas de la lista lo pone rojo (comprobado a mano una vez).
 
 **Hecho:** tests verdes; en el navegador, con un usuario del rol, se ven las dos pestañas.
 
-## T5 [P con T4] — Detalle `/asignacion/acondicionamiento/[id]` (frontend) · depende de T2
+## [x] T5 [P con T4] — Detalle `/asignacion/acondicionamiento/[id]` (frontend) · depende de T2
 
 - `page.tsx` y `components/` (`conditioning-order-screen.tsx`, `index.ts`), según
   `design.md > 4.3`.
