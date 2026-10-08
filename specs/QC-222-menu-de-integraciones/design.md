@@ -89,6 +89,10 @@ Conclusión: no existe nada de esta ficha fuera de su dependencia, QC-221.
 10. **Tests que fijan la forma del menú y se pondrán rojos** (§7.2): la longitud y el orden de
     `PRIVATE_NAV_ITEMS`, «clientes es el último del array» y «Configuración tiene exactamente dos
     items».
+
+    **Enmienda 2026-10-08 (§14, E1).** T0 midió cinco tests más que fijan la forma del menú o
+    la lista de pantallas y que este hallazgo no contaba. Están en §7.2.
+
 11. **El Maestro no tiene empresa**, y QC-161 exige que solo un Maestro tenga la empresa vacía
     (`specs/QC-161-rol-maestro/requirements.md:277`). Ningún E2E de hoy crea un Maestro. Por eso
     queda fuera de la E2E (D12).
@@ -111,7 +115,7 @@ Conclusión: no existe nada de esta ficha fuera de su dependencia, QC-221.
 | `lib/shared/routes.ts` | Las tres constantes entran en `PRIVATE_ROUTE_PREFIXES`. Se borra el comentario de QC-221 que decía lo contrario |
 | `app/(private)/integraciones/components/` | `integration-placeholder.tsx` y su `index.ts` |
 | `app/(private)/integraciones/{proveedor-ia,inventarios,whatsapp}/page.tsx` | Tres páginas cascarón |
-| Tests | Los nuevos de §7.1, los rojos de §7.2 y las enmiendas a QC-221 de §7.3 |
+| Tests | Los nuevos de §7.1, los rojos de §7.2 y las enmiendas a QC-221 de §7.3. Enmienda 2026-10-08: la exclusión por nombre en los dos tests de alcance de §7.5 |
 | `e2e/integraciones.spec.ts` | Nuevo (§8) |
 
 **No se tocan**:
@@ -306,6 +310,18 @@ Con esto, `guard-rutas-privadas-cubiertas` (tres pantallas, tres prefijos),
 `guard-pantallas-exigen-permiso` (el código está en el catálogo) y `guard-nav-permisos-declarados`
 (los tres hijos declaran un código del catálogo) quedan en verde **sin excepciones** (R14).
 
+**Enmienda 2026-10-08 (§14, E1).** Lo anterior era incompleto: dos de esas guardias se ponen
+rojas sin tocar sus tests, porque tienen anclas que fijan el estado de hoy:
+
+- `tests/guards/guard-nav-permisos-declarados.test.ts:112-124` ancla **10** enlaces reales del
+  menú; pasan a ser **13**.
+- `tests/guards/guard-pantallas-exigen-permiso.test.ts` fija en `RUTAS_ESPERADAS_HOY` las
+  **21** pantallas privadas; pasan a ser **24**.
+
+Las dos se tensan a la cifra y la lista exactas nuevas (§7.2). Las tres rutas entran en
+`RUTAS_ESPERADAS_HOY` como **entradas de la lista**, no como excepciones: R14 sigue cumplido,
+porque ninguna guardia gana una excepción.
+
 ---
 
 ## 6. Contratos de entrada y salida
@@ -342,10 +358,22 @@ sincronizar. **Se tensan, nunca se relajan**: siguen exigiendo la lista exacta.
 | `tests/unit/configuracion-ui/private-nav-configuracion.test.ts:76` | «Configuración» tiene **2** items, y el primero es presentaciones | **3**. El primero sigue siendo presentaciones |
 | `tests/unit/configuracion-ui/private-nav-usuarios.test.ts:102` y `:108-111` | «Configuración» tiene **2** items, en el orden `[PRESENTATIONS_ROUTE, UNITS_ROUTE]` | **3**, en el orden `[PRESENTATIONS_ROUTE, UNITS_ROUTE, INTEGRATIONS_LABEL]`. El mapeo de ese test ya devuelve `label` para los grupos |
 
+**Enmienda 2026-10-08 (§14, E1).** Cinco filas más, medidas en T0 y aprobadas por el humano. Se
+tensan igual que las cuatro de arriba: a la lista o la cifra exactas nuevas.
+
+| Archivo:línea | Qué fija | Cambio |
+|---|---|---|
+| `tests/unit/app-sidebar.test.tsx:229-242` | El orden del DOM del sidebar, escrito a mano | Se añade `'nav-integraciones'` detrás de `'nav-unidades'`. Sigue siendo el orden exacto |
+| `tests/unit/navegacion/private-layout-menu.test.tsx:343-360` | El menú real tiene exactamente **10** items, con su lista de `testId` | **11**, con la entrada nueva en su mapa. Se renombra el caso a la cifra nueva |
+| `tests/guards/guard-nav-permisos-declarados.test.ts:112-124` | Ancla: el recorrido encuentra hoy **10** enlaces reales del menú | **13**, con los tres `nav-integraciones-*` en la lista. Se renombra el ancla a la cifra nueva |
+| `tests/unit/configuracion-ui/private-nav-unidades.test.ts:79` y `:92` | «Configuración» tiene exactamente **2** items | **3**, y se renombra el caso. El resto de lo que afirma de Unidades no cambia |
+| `tests/guards/guard-pantallas-exigen-permiso.test.ts`, `RUTAS_ESPERADAS_HOY` | El barrido encuentra exactamente las **21** pantallas privadas de hoy | **24**: las tres rutas entran en la lista como **entradas**, no como excepciones (R14, §5). Se renombra el caso a la cifra nueva |
+
 **No se ponen rojos**, porque derivan del dato o miran otra cosa:
 
-- `guard-nav-permisos-declarados`, `guard-nav-serializable`, `guard-pantallas-exigen-permiso` y
-  `guard-rutas-privadas-cubiertas`;
+- `guard-nav-serializable` y `guard-rutas-privadas-cubiertas`. (Enmienda 2026-10-08:
+  `guard-nav-permisos-declarados` y `guard-pantallas-exigen-permiso` salen de esta lista; sus
+  anclas están en la tabla de arriba);
 - `tests/unit/navegacion/nav-filtrado.test.ts`, que usa fixtures;
 - `sidebar-desktop`/`sidebar-mobile`/`app-sidebar`: buscan el **primer** grupo, que sigue siendo
   `nav-produccion`;
@@ -371,6 +399,39 @@ solo `lib/shared/routes.ts` para cada URL.
   `lib/modules/**`, `lib/composition/**`, `db/**`, `middleware.ts` ni `route-guard-middleware.ts`, y en
   `private-nav.ts` solo añade constantes, el nombre de icono y el item. La lista exacta está en
   `tasks.md > Archivos esperados`. Para `package.json` está además `guard-dependencias-aprobadas`.
+
+### 7.5 Exclusión en los tests de alcance (enmienda 2026-10-08, §14, E2)
+
+Dos tests de alcance barren `app/` por **nombre** de ruta y dan un falso positivo con las páginas
+nuevas:
+
+| Archivo | Caso | Por qué casa |
+|---|---|---|
+| `tests/unit/inventario/scope.test.ts` | «la pantalla del catalogo vive solo donde la declara QC-22…» | `screenPattern` (`/product\|presentation\|inventario/i`) casa con `(private)/integraciones/inventarios/page.tsx` |
+| `tests/unit/proveedores/scope.test.ts` | «la pantalla de proveedores vive solo donde la declara QC-44…» | `PATRON_PROVEEDORES` (`/proveedor\|supplier/i`) casa con `(private)/integraciones/proveedor-ia/page.tsx` |
+
+Ninguna de las dos es una pantalla del catálogo ni de proveedores: son páginas cascarón de
+integraciones. Decisión del humano: **se excluye `app/(private)/integraciones/` por nombre, con
+su motivo escrito, y no se toca ninguna regex**. Se sigue el patrón de las exclusiones que ya
+tienen esos archivos (las de recetas y presentaciones en `inventario/scope.test.ts`):
+
+- **La carpeta se deriva de las constantes**, no de un literal: `(private)` más el primer segmento
+  de `AI_PROVIDER_INTEGRATION_ROUTE`, como `RECIPES_ROUTE_DIR` sale de `FORMULAS_ROUTE`. Un
+  `expect` previo afirma que las tres constantes comparten ese primer segmento.
+- **Se suma al filtro** `fueraDeSuCarpeta` con una condición `!relPath.startsWith(...)` más sobre esa carpeta, igual
+  que las de recetas y presentaciones.
+- **Defensa extra, para que la exclusión no sea una puerta trasera.** Lo que casa bajo esa carpeta
+  tiene que ser **exactamente** la lista esperada:
+  - en `inventario/scope.test.ts`, solo la `page.tsx` de `INVENTORY_INTEGRATION_ROUTE`, y su fuente
+    no declara `ProductListSection` ni `product-table`;
+  - en `proveedores/scope.test.ts`, solo la `page.tsx` de `AI_PROVIDER_INTEGRATION_ROUTE`, y su
+    fuente no contiene `PATRON_PROVEEDORES`.
+
+  Así un archivo nuevo del catálogo o de proveedores escondido bajo `/integraciones` vuelve a poner
+  el caso en rojo. Si la carpeta desaparece, la lista exacta falla y la exclusión hay que borrarla.
+- **El motivo va escrito en un comentario** con fecha encima de la exclusión, como los de las
+  exclusiones previas. Por la regla transversal de este diseño, el comentario nuevo no cita
+  `QC-<n>` ni `R<n>`: dice que son las páginas cascarón de integraciones y que casan solo por nombre.
 
 ---
 
@@ -414,8 +475,12 @@ entra por `loginAndLand` (QC-93).
    - `toHaveCount(0)` sobre `nav-integraciones` y sobre los tres `testId` de los hijos;
    - para cada constante, `page.goto` con `status() === 404` y `private-not-found` visible;
    - el texto no contiene `permiso`, `rol` ni `autoriz`;
-   - `private-user-trigger` se abre por teclado (foco + `Enter`, por el overlay de `next dev` en
-     WebKit que documenta `permisos.spec.ts`) y `private-logout` es visible.
+   - ~~`private-user-trigger` se abre por teclado (foco + `Enter`, por el overlay de `next dev` en
+     WebKit que documenta `permisos.spec.ts`) y `private-logout` es visible.~~
+     **Enmienda 2026-10-08 (§14, E3):** `private-user-trigger` ya no existe; se quitó el
+     2026-09-07 (`components/private/nav-user.tsx:22`). El paso de teclado pasa a ser:
+     `private-logout` es visible y recibe el foco por teclado (se le da el foco y se comprueba
+     con `toBeFocused()`).
 
 `test.setTimeout(180_000)`, como `permisos.spec.ts`: compilación bajo demanda y bcrypt.
 
@@ -505,3 +570,19 @@ Todas cerradas por el humano; están en `requirements.md > Decisiones cerradas` 
 
 Queda como decisión técnica de este diseño, sin reabrir nada: una fila de
 `PRIVATE_ROUTE_PREFIXES` por ruta (§5, alternativa 1).
+
+---
+
+## 14. Enmiendas (2026-10-08)
+
+Las aprobó el humano el 2026-10-08, con el spec ya aprobado, tras el bloqueo que T0 dejó en
+`progress/features/QC-222.md > Preguntas abiertas` y en
+`progress/impl_QC-222-menu-de-integraciones.md`. Están en `requirements.md > Decisiones cerradas`
+como D15–D17. No cambian ningún requisito ni el mapa `R<n> -> test`; solo amplían los tests que
+se tocan.
+
+| # | Enmienda | Dónde |
+|---|---|---|
+| E1 (D15) | Se tensan cinco tests más a la forma nueva del menú: `app-sidebar.test.tsx:229-242`, `private-layout-menu.test.tsx:343-360`, `guard-nav-permisos-declarados.test.ts:112-124` (10→13), `private-nav-unidades.test.ts:79,92` (2→3) y `RUTAS_ESPERADAS_HOY` de `guard-pantallas-exigen-permiso.test.ts` (21→24, entrada de lista, no excepción). Se corrige §5, que daba esas guardias por verdes | hallazgo 10, §5, §7.2, `tasks.md > T10` |
+| E2 (D16) | `inventario/scope.test.ts` y `proveedores/scope.test.ts` excluyen `app/(private)/integraciones/` por nombre, con su motivo escrito y con el patrón de sus exclusiones previas. No se toca ninguna regex | §7.5, `tasks.md > T10` |
+| E3 (D17) | E2E: `private-user-trigger` no existe desde el 2026-09-07; el paso de teclado comprueba que `private-logout` es visible y recibe el foco por teclado | §8 |

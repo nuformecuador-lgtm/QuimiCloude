@@ -222,6 +222,9 @@ Ninguna página DEBE ofrecer una vía para configurar una integración o guardar
 | D12 Maestro fuera de la E2E, cubierto en unit | R5, R20 |
 | D13 Título = etiqueta del menú | R9 |
 | D14 Permiso y constantes de QC-221 en `dev` | R2, R11 |
+| D15 Tensar cinco tests más a la forma nueva del menú (enmienda 2026-10-08) | R1, R6, R14 |
+| D16 Exclusión por nombre en los tests de alcance (enmienda 2026-10-08) | R8 |
+| D17 Paso de teclado de la E2E sobre `private-logout` (enmienda 2026-10-08) | R20 |
 
 ## Preguntas abiertas
 
@@ -246,3 +249,6 @@ como D8–D14.
 | 2026-10-08 (F1.4) | ¿El Maestro entra en la E2E? | **No.** Un test unitario cubre que no ve el grupo |
 | 2026-10-08 (F1.4) | ¿Qué título lleva cada página? | **La etiqueta del hijo del menú**, sin prefijo |
 | 2026-10-08 (F1.4) | ¿Están en `dev` el permiso y las constantes de QC-221? | **Sí.** PR #176, merge `57fa8326`: `integraciones.modificar`, `AI_PROVIDER_INTEGRATION_ROUTE`, `INVENTORY_INTEGRATION_ROUTE` y `WHATSAPP_INTEGRATION_ROUTE` |
+| 2026-10-08 (enmienda, bloqueo de T0) | ¿Qué se hace con los cinco tests que fijan la forma del menú o la lista de pantallas y que el diseño no listaba? | **Se tensan** a la forma nueva (`design.md > 7.2`): orden del DOM del sidebar, lista de 10→11 items, ancla de 10→13 enlaces, «Configuración» de 2→3 items y `RUTAS_ESPERADAS_HOY` de 21→24. Las tres rutas entran en esa lista como **entradas**, no como excepciones |
+| 2026-10-08 (enmienda, bloqueo de T0) | ¿Qué se hace con el falso positivo de `inventario/scope.test.ts` y `proveedores/scope.test.ts`? | **Se excluye `app/(private)/integraciones/` por nombre, con su motivo escrito**, con el patrón de las exclusiones previas de esos archivos. **No se toca la regex** (`design.md > 7.5`) |
+| 2026-10-08 (enmienda, bloqueo de T0) | ¿Qué comprueba el paso de teclado de la E2E, si `private-user-trigger` ya no existe (se quitó el 2026-09-07)? | Que **`private-logout` es visible y recibe el foco por teclado** (`design.md > 8`) |

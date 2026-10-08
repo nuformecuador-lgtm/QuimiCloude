@@ -95,8 +95,27 @@ constantes de ruta. Esta rama todavía no la tiene: T0 la trae.
     WebKit sobre una base sembrada, y `guard-e2e-landing` sigue verde. Cubre R19, R20 y R21. La
     salida se pega en `progress/impl_QC-222-menu-de-integraciones.md`.
 
+- [ ] **T10 — Tensar cinco tests más y excluir integraciones de los tests de alcance**
+  (enmienda 2026-10-08, `design.md > 14`, E1 y E2; va antes de T9 y conserva su número para no
+  renumerar las demás)
+  - Depende de: T5.
+  - Hacer:
+    - las cinco filas de la enmienda de `design.md > 7.2`: `app-sidebar.test.tsx:229-242`,
+      `private-layout-menu.test.tsx:343-360`, `guard-nav-permisos-declarados.test.ts:112-124`
+      (10→13), `private-nav-unidades.test.ts:79,92` (2→3) y `RUTAS_ESPERADAS_HOY` de
+      `guard-pantallas-exigen-permiso.test.ts` (21→24, como entradas de la lista). Se tensan a la
+      lista o la cifra exactas, nunca a `toContain`;
+    - la exclusión de `design.md > 7.5` en `tests/unit/inventario/scope.test.ts` y
+      `tests/unit/proveedores/scope.test.ts`: carpeta derivada de las constantes, motivo escrito y
+      defensa extra con la lista exacta de lo que casa bajo ella. No se toca ninguna regex.
+  - Hecho cuando:
+    - los siete archivos están en verde con `pnpm exec vitest related --run` y
+      `pnpm exec vitest run guard`;
+    - ninguna guardia gana una excepción (R14);
+    - el diff de los dos tests de alcance no cambia `screenPattern` ni `PATRON_PROVEEDORES`.
+
 - [ ] **T9 — Cierre**
-  - Depende de: T0 y T2–T8.
+  - Depende de: T0, T2–T8 y T10.
   - Hacer:
     - `./init.sh`;
     - revisar el diff contra R7 y R22: sin cambios en `components/private/app-sidebar.tsx`,
@@ -125,6 +144,14 @@ constantes de ruta. Esta rama todavía no la tiene: T0 la trae.
 | R19, R20, R21 | T8 | `e2e/integraciones.spec.ts` |
 | R22 | T9 | revisión del diff + `guard-dependencias-aprobadas` |
 
+Enmienda 2026-10-08: T10 no añade ni quita ningún requisito ni cambia ninguna fila de arriba. Sus
+tests siguen fijando la forma exacta del menú y de las pantallas, y respaldan R1, R6, R8 y R14.
+
+## Enmiendas
+
+- **2026-10-08** (`design.md > 14`, aprobadas por el humano): E1 y E2 entran como T10; E3 cambia
+  el paso de teclado de T8 (`design.md > 8`) y no añade task.
+
 ## Archivos esperados
 
 - `lib/shared/navigation/private-nav.ts`
@@ -145,3 +172,9 @@ constantes de ruta. Esta rama todavía no la tiene: T0 la trae.
 - `tests/unit/configuracion-ui/private-nav-usuarios.test.ts`
 - `e2e/integraciones.spec.ts`
 - `progress/impl_QC-222-menu-de-integraciones.md`
+- `tests/unit/navegacion/private-layout-menu.test.tsx`
+- `tests/guards/guard-nav-permisos-declarados.test.ts`
+- `tests/unit/configuracion-ui/private-nav-unidades.test.ts`
+- `tests/guards/guard-pantallas-exigen-permiso.test.ts`
+- `tests/unit/inventario/scope.test.ts`
+- `tests/unit/proveedores/scope.test.ts`
