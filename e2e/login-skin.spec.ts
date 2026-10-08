@@ -19,12 +19,9 @@
  * con fixtures de base de datos, y esta ficha lo deja intacto (R26, segunda mitad): colgar
  * aserciones de pixeles de aquel archivo anadiria riesgo a lo unico que no debe romperse.
  *
- * SIN SCREENSHOTS COMPARADOS. Con tres burbujas animadas de forma continua, una comparacion de
- * imagen seria intermitente por construccion, y ademas no distingue "cambio el color" de "se
- * movio un fotograma": responderia a una pregunta distinta de la que hacen los requisitos. Todo
- * se afirma con estilo computado, medidas y visibilidad, que es exactamente lo que R14, R16,
- * R22 y R23 preguntan. Cuenta ademas para WebKit, donde la capa decorativa tiene
- * `pointer-events: none` y las burbujas nunca estan quietas.
+ * SIN SCREENSHOTS COMPARADOS. Con tres moleculas animadas de forma continua, una comparacion de
+ * imagen seria intermitente por construccion. Todo se afirma con estilo computado, medidas y
+ * visibilidad (ENMIENDA QC-226: las burbujas pasan a ser moleculas).
  */
 import { expect, test, type Locator } from '@playwright/test';
 
@@ -131,46 +128,131 @@ test.describe('piel de la pantalla de login en navegador real', () => {
     expect(await computedHeightPx(username)).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_PX);
   });
 
-  test('oculta la capa de burbujas cuando el sistema pide movimiento reducido', async ({
+  test('R22 (ENMIENDA QC-226): con movimiento reducido deja las tres moleculas visibles y quietas', async ({
     page,
   }) => {
-    // R14 — la emulacion se aplica ANTES de navegar, para que la media query ya este resuelta
-    // en el primer calculo de estilos y no dependa de un recalculo posterior.
+    // La emulacion va ANTES de navegar, para que la media query ya este resuelta en el primer
+    // calculo de estilos.
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.setViewportSize(DESKTOP_VIEWPORT);
     await page.goto(LOGIN_PATH);
 
-    // Anclaje: se espera a que la pantalla este pintada antes de afirmar que algo NO se ve; sin
-    // esto, un `toBeHidden` pasaria simplemente porque la pagina aun no habia cargado.
     await expect(page.getByTestId('login-form')).toBeVisible({ timeout: 60_000 });
 
-    const bubbles = page.locator('[data-login="bubbles"]');
-    await expect(bubbles).toBeHidden();
-    expect(
-      await bubbles.evaluate((element) => window.getComputedStyle(element).display),
-    ).toBe('none');
+    const molecules = page.locator('[data-login="molecule"]');
+    await expect(molecules).toHaveCount(3);
+    for (const molecule of await molecules.all()) {
+      await expect(molecule).toBeVisible();
+      expect(await molecule.evaluate((element) => window.getComputedStyle(element).animationName)).toBe(
+        'none',
+      );
+      expect(
+        Number.parseFloat(await molecule.evaluate((element) => window.getComputedStyle(element).opacity)),
+      ).toBeGreaterThan(0);
+    }
+
+    // La tarjeta solo hace el fundido, sin desplazamiento, y acaba opaca.
+    const card = page.locator('[data-slot="card"]');
+    expect(await card.evaluate((element) => window.getComputedStyle(element).animationName)).toBe(
+      'login-card-fade',
+    );
+    await expect.poll(() => card.evaluate((element) => window.getComputedStyle(element).opacity)).toBe('1');
+    expect(await card.evaluate((element) => window.getComputedStyle(element).transform)).toBe('none');
   });
 
-  test('pinta las tres burbujas cuando no hay preferencia de movimiento reducido', async ({
+  test('R18, R19 (ENMIENDA QC-226): sin movimiento reducido anima las tres moleculas con sus ciclos', async ({
     page,
   }) => {
-    // R14 (contraste) — sin este escenario, el test anterior tambien pasaria si alguien borrara
-    // el componente entero: "no visible" y "no existe" se parecen demasiado. Aqui se exige que
-    // la capa exista, se vea, y contenga exactamente tres burbujas (conteo local y semantico:
-    // la decision cerrada 8 dice tres, ni dos ni cuatro).
+    // Contraste del caso anterior: «quieta» y «no existe» se parecen demasiado. Se cuenta y se
+    // lee el estilo computado; con el fondo animado, una comparacion de imagen seria intermitente.
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.setViewportSize(DESKTOP_VIEWPORT);
     await page.goto(LOGIN_PATH);
 
-    const bubbles = page.locator('[data-login="bubbles"]');
-    await expect(bubbles).toBeVisible({ timeout: 60_000 });
-    expect(
-      await bubbles.evaluate((element) => window.getComputedStyle(element).display),
-    ).not.toBe('none');
+    const layer = page.locator('[data-login="molecules"]');
+    await expect(layer).toBeVisible({ timeout: 60_000 });
+    expect(await layer.evaluate((element) => window.getComputedStyle(element).pointerEvents)).toBe(
+      'none',
+    );
 
-    // Se cuenta, no se compara un screenshot: las burbujas estan animadas y tienen
-    // `pointer-events: none`, asi que cualquier aserto basado en imagen o en interaccion seria
-    // intermitente en WebKit.
-    await expect(page.locator('[data-login="bubble"]')).toHaveCount(3);
+    const molecules = page.locator('[data-login="molecule"]');
+    await expect(molecules).toHaveCount(3);
+
+    const animations = await molecules.evaluateAll((elements) =>
+      elements.map((element) => {
+        const style = window.getComputedStyle(element);
+        return {
+          name: style.animationName,
+          duration: style.animationDuration,
+          direction: style.animationDirection,
+          iterations: style.animationIterationCount,
+        };
+      }),
+    );
+    expect(animations).toEqual([
+      { name: 'login-molecule-float', duration: '22s', direction: 'alternate', iterations: 'infinite' },
+      { name: 'login-molecule-float', duration: '30s', direction: 'alternate-reverse', iterations: 'infinite' },
+      { name: 'login-molecule-float', duration: '26s', direction: 'alternate', iterations: 'infinite' },
+    ]);
+  });
+
+  test('R21 (ENMIENDA QC-226): la tarjeta entra una vez y acaba con opacidad 1', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.setViewportSize(DESKTOP_VIEWPORT);
+    await page.goto(LOGIN_PATH);
+
+    const card = page.locator('[data-slot="card"]');
+    await expect(card).toBeVisible({ timeout: 60_000 });
+
+    const animation = await card.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return { name: style.animationName, iterations: style.animationIterationCount };
+    });
+    expect(animation).toEqual({ name: 'login-card-enter', iterations: '1' });
+
+    await expect.poll(() => card.evaluate((element) => window.getComputedStyle(element).opacity)).toBe('1');
+  });
+
+  test('R17 (ENMIENDA QC-226): con el tema claro de la app, el login resuelve los tokens oscuros', async ({
+    page,
+  }) => {
+    // Sin cookie de tema y con el sistema en claro, `<html>` queda en claro; el `main` del login
+    // tiene que resolver aun asi los valores del ambito `.dark`.
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.setViewportSize(DESKTOP_VIEWPORT);
+    await page.goto(LOGIN_PATH);
+
+    const main = page.getByRole('main');
+    await expect(main).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator('html')).not.toHaveClass(/(^|\s)dark(\s|$)/);
+
+    const tokens = await main.evaluate((element) => {
+      const probe = document.createElement('div');
+      probe.className = 'dark';
+      document.body.appendChild(probe);
+      const read = (node: Element, name: string) =>
+        window.getComputedStyle(node).getPropertyValue(name).trim();
+      const names = ['--background', '--foreground', '--card', '--primary', '--input', '--ring'];
+      const result = names.map((name) => ({
+        name,
+        login: read(element, name),
+        dark: read(probe, name),
+        app: read(document.documentElement, name),
+      }));
+      probe.remove();
+      return result;
+    });
+    for (const token of tokens) {
+      expect(token.login, token.name).toBe(token.dark);
+      expect(token.login, token.name).not.toBe(token.app);
+    }
+
+    const screenStyle = await main.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return { colorScheme: style.colorScheme, backgroundImage: style.backgroundImage };
+    });
+    expect(screenStyle.colorScheme).toBe('dark');
+    expect(screenStyle.backgroundImage).toContain('radial-gradient');
+    expect(screenStyle.backgroundImage).toContain('linear-gradient');
   });
 });

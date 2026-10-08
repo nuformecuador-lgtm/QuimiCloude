@@ -121,20 +121,8 @@ export const ASSIGNED_ORDERS_LABEL = 'Asignación';
 /** Nombre accesible del landmark de navegacion de la barra lateral (R3). */
 export const PRIVATE_NAV_LABEL = 'Navegación principal';
 
-/** Marca larga, modo expandido (R4, D7). */
+/** Nombre accesible de la marca, que en pantalla se pinta solo como logo. */
 export const BRAND_LABEL = 'QuimiCloude';
-
-/** Marca corta, modo icono (R24, D7). */
-export const BRAND_SHORT_LABEL = 'QC';
-
-/**
- * Bajada de la marca, bajo el nombre y solo en modo expandido.
- *
- * **Es texto quemado a proposito** (decision humana del 2026-09-02): no hay identidad visual
- * definida para este producto y no la decide este archivo. Cuando la haya, esto y el simbolo
- * de `AppSidebar` salen de donde diga esa ficha.
- */
-export const BRAND_TAGLINE = 'ERP Químico';
 
 /** Titulos de las secciones en las que se agrupan los items de nivel superior. */
 export const NAV_SECTION_OPERATION = 'Operación';
