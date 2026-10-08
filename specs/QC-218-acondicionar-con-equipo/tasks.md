@@ -7,7 +7,7 @@
 
 ## Tanda 1 — datos y contratos (backend_dev)
 
-- [ ] **T1. Migración y esquema** (R23, R32).
+- [x] **T1. Migración y esquema** (R23, R32).
   `OrderConditioningTeamMember` en `db/schema.prisma` (`design.md > 1.1`). Migración
   `20261008150000_order_conditioning_team`:
   - `migration.sql`: tabla, índices, único de posición, dos `CHECK`, tres FK y RLS forzada, con el
@@ -25,7 +25,7 @@
 
   y que el rollback deja la base como antes (R32).
 
-- [ ] **T2 [P]. Puerto y adaptador del equipo** (R13, R14) [T1].
+- [x] **T2 [P]. Puerto y adaptador del equipo** (R13, R14) [T1].
   `ports/conditioning-team-repository.ts` y `adapters/driven/persistence/conditioning-team-prisma.ts`,
   con la fábrica `createConditioningTeamRepository(db)` (`design.md > 2.1, 2.2`).
   **Hecho:** `tests/integration/asignaciones/conditioning-team-repository.int.test.ts` comprueba:
@@ -33,7 +33,7 @@
   - una inserción con duplicado lanza;
   - renombrar o dar de baja el grupo, o sacar a un miembro, no cambia ninguna fila (R14).
 
-- [ ] **T3 [P]. Listado de grupos en `identity`** (R7).
+- [x] **T3 [P]. Listado de grupos en `identity`** (R7).
   `WorkGroupDirectory.listSnapshotsAliveInCompany` y su implementación en
   `assignment-directory-prisma.ts`, con dos consultas en total (`design.md > 2.3`).
   **Hecho:** `tests/integration/identity/assignment-directory.int.test.ts` gana casos:
@@ -43,13 +43,13 @@
   - `activeMemberIds` con el estado efectivo;
   - exactamente dos consultas.
 
-- [ ] **T4 [P]. Repositorio de acondicionamiento sobre `tx`** (R12, R22).
+- [x] **T4 [P]. Repositorio de acondicionamiento sobre `tx`** (R12, R22).
   `createOrderConditioningRepository(db)` en `order-prisma.ts`. Las dos funciones exportadas delegan
   en ella (`design.md > 2.4`).
   **Hecho:** `tests/integration/pedidos/order-conditioning.int.test.ts` y
   `guard-ambito-empresa-pedidos` siguen en verde sin cambiar aserciones.
 
-- [ ] **T5. Errores nuevos** (R16, R17).
+- [x] **T5. Errores nuevos** (R16, R17).
   `ConditioningTeamMemberNotAllowedError` y `ConditioningTeamEmptyError` en `domain/errors.ts`,
   con sus códigos en `error-codes.ts` y los textos en `error-catalog.ts` (`design.md > 3.5`).
   **Hecho:** los tests del catálogo cerrado de errores, en verde con los dos códigos.
@@ -117,7 +117,7 @@
 
 ## Tanda 3 — pantalla (frontend_dev)
 
-- [ ] **T12. Botón con espera** (R9, R10, R11).
+- [x] **T12. Botón con espera** (R9, R10, R11).
   `countdown-gated-button.tsx` con `CountdownTimer` y `CONDITIONING_WAIT_SECONDS = 5`.
   **Hecho:** `tests/unit/asignaciones-ui/countdown-gated-button.test.tsx` comprueba con timers
   falsos:

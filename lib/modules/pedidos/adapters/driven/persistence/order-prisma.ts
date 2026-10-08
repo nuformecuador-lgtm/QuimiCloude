@@ -29,6 +29,7 @@ import type {
   LockedOrderRow,
   OrderWriteRepository,
 } from '../../../ports/order-write-repository';
+import type { OrderConditioningRepository } from '../../../ports/order-conditioning-repository';
 import type { OrderPackingRepository } from '../../../ports/order-packing-repository';
 
 /** Cliente global o el transaccional que abra quien llama: los metodos de mas abajo no
@@ -1045,8 +1046,12 @@ export function createOrderPackingRepository(db: PrismaLike = prisma): OrderPack
  *  cuando el `UPDATE` condicional no movio ninguna fila. */
 type ConditioningStatusRow = { readonly status: OrderStatus; readonly conditionedBy: string | null };
 
-async function findAliveConditioningStatus(id: string, scope: OrderScope): Promise<ConditioningStatusRow | null> {
-  return prisma.order.findFirst({
+async function findAliveConditioningStatus(
+  id: string,
+  scope: OrderScope,
+  db: PrismaLike,
+): Promise<ConditioningStatusRow | null> {
+  return db.order.findFirst({
     where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
     select: { status: true, conditionedBy: true },
   });
@@ -1056,21 +1061,23 @@ async function findAliveConditioningStatus(id: string, scope: OrderScope): Promi
  * Implementa `OrderConditioningRepository['startConditioningAlive']`. Sin `SELECT ... FOR UPDATE`:
  * no hay otra tabla que leer bajo el bloqueo. Si dos llamadas compiten, la segunda espera el
  * bloqueo de fila de la primera, reevalua el `WHERE` sobre la version confirmada, no mueve nada y
- * su relectura ya ve el pedido a nombre de la otra.
+ * su relectura ya ve el pedido a nombre de la otra. Con un `db` transaccional, eso ocurre dentro de
+ * la transaccion de quien llama.
  */
 export async function startConditioningAliveOrder(
   id: string,
   conditionerId: string,
   now: Date,
   scope: OrderScope,
+  db: PrismaLike = prisma,
 ): Promise<'ok' | 'already_mine' | 'taken' | 'not_conditionable' | 'not_found'> {
-  const { count } = await prisma.order.updateMany({
+  const { count } = await db.order.updateMany({
     where: { AND: [orderCompanyScope(scope), { id, deletedAt: null, status: 'POR_ACONDICIONAR' }] },
     data: { status: 'EN_ACONDICIONAMIENTO', conditionedBy: conditionerId, updatedAt: now, updatedBy: conditionerId },
   });
   if (count === 1) return 'ok';
 
-  const row = await findAliveConditioningStatus(id, scope);
+  const row = await findAliveConditioningStatus(id, scope, db);
   if (row === null) return 'not_found';
   if (row.status === 'EN_ACONDICIONAMIENTO') {
     return row.conditionedBy === conditionerId ? 'already_mine' : 'taken';
@@ -1085,8 +1092,9 @@ export async function finishConditioningAliveOrder(
   conditionerId: string,
   now: Date,
   scope: OrderScope,
+  db: PrismaLike = prisma,
 ): Promise<'ok' | 'not_conditioner' | 'not_conditionable' | 'not_found'> {
-  const { count } = await prisma.order.updateMany({
+  const { count } = await db.order.updateMany({
     where: {
       AND: [
         orderCompanyScope(scope),
@@ -1097,10 +1105,23 @@ export async function finishConditioningAliveOrder(
   });
   if (count === 1) return 'ok';
 
-  const row = await findAliveConditioningStatus(id, scope);
+  const row = await findAliveConditioningStatus(id, scope, db);
   if (row === null) return 'not_found';
   if (row.status === 'EN_ACONDICIONAMIENTO' && row.conditionedBy !== conditionerId) return 'not_conditioner';
   return 'not_conditionable';
+}
+
+/**
+ * Fabrica de `OrderConditioningRepository` sobre el cliente que le pasen. Con un `tx`, Comenzar y
+ * Terminar se escriben dentro de la transaccion de quien llama y se deshacen con ella.
+ */
+export function createOrderConditioningRepository(db: PrismaLike = prisma): OrderConditioningRepository {
+  return {
+    startConditioningAlive: (id, conditionerId, now, scope) =>
+      startConditioningAliveOrder(id, conditionerId, now, scope, db),
+    finishConditioningAlive: (id, conditionerId, now, scope) =>
+      finishConditioningAliveOrder(id, conditionerId, now, scope, db),
+  };
 }
 
 /**

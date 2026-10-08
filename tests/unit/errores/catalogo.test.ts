@@ -19,6 +19,10 @@ import {
   type ErrorCode,
 } from '@/lib/modules/errores'
 import {
+  ConditioningTeamEmptyError,
+  ConditioningTeamMemberNotAllowedError,
+} from '@/lib/modules/asignaciones/domain/errors'
+import {
   PedidosError,
   RecipeNotFoundError,
   RecipeVersionUnderReviewError,
@@ -45,7 +49,7 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 74 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 76 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
       // 65 y no 60: entran `order_without_distribution`, `order_presentation_line_not_editable`,
       // `order_distribution_exceeds_quantity` y `order_without_unit` (QC-170) y
@@ -56,7 +60,8 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // 70 y no 69: entra `order_unit_not_convertible` (QC-204).
       // 72 y no 70: entran `batch_stock_changed` y `adjustment_reason_not_allowed`.
       // 74 y no 72: entran `order_conditioning_taken` y `order_not_conditionable`.
-      expect(ERROR_CODES).toHaveLength(74)
+      // 76 y no 74: entran `conditioning_team_member_not_allowed` y `conditioning_team_empty`.
+      expect(ERROR_CODES).toHaveLength(76)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -569,5 +574,40 @@ describe('acondicionamiento — order_conditioning_taken y order_not_conditionab
     expect(tomado).not.toBe(errorMessage('order_packing_taken'))
     expect(noAcondicionable).not.toBe(errorMessage('order_not_packable'))
     expect(noAcondicionable).not.toBe(errorMessage('invalid_transition'))
+  })
+})
+
+describe('equipo de acondicionamiento — conditioning_team_member_not_allowed y conditioning_team_empty', () => {
+  it('R16: conditioning_team_member_not_allowed esta en el catalogo con su clave y su texto exactos', () => {
+    const codigos: readonly string[] = ERROR_CODES
+    expect(codigos).toContain('conditioning_team_member_not_allowed')
+    expect(ERROR_MESSAGE_KEY.conditioning_team_member_not_allowed).toBe(
+      'errors.conditioning_team_member_not_allowed',
+    )
+    expect(errorMessage('conditioning_team_member_not_allowed')).toBe(
+      'Esta persona no puede formar parte del equipo de acondicionamiento.',
+    )
+  })
+
+  it('R17: conditioning_team_empty esta en el catalogo con su clave y su texto exactos', () => {
+    const codigos: readonly string[] = ERROR_CODES
+    expect(codigos).toContain('conditioning_team_empty')
+    expect(ERROR_MESSAGE_KEY.conditioning_team_empty).toBe('errors.conditioning_team_empty')
+    expect(errorMessage('conditioning_team_empty')).toBe(
+      'El equipo de acondicionamiento necesita al menos una persona.',
+    )
+  })
+
+  it('R16, R17: sus textos no coinciden con el de responsable ni entre si', () => {
+    const noPermitido = errorMessage('conditioning_team_member_not_allowed')
+    const vacio = errorMessage('conditioning_team_empty')
+    expect(noPermitido).not.toBe(vacio)
+    expect(noPermitido).not.toBe(errorMessage('user_cannot_be_responsible'))
+    expect(vacio).not.toBe(errorMessage('invalid_input'))
+  })
+
+  it('R16, R17: las dos clases del modulo llevan esos codigos', () => {
+    expect(new ConditioningTeamMemberNotAllowedError().code).toBe('conditioning_team_member_not_allowed')
+    expect(new ConditioningTeamEmptyError().code).toBe('conditioning_team_empty')
   })
 })

@@ -8,6 +8,8 @@
     "asignaciones/batch-states.int.test.ts",
     "asignaciones/company-orders.int.test.ts",
     "asignaciones/company-scope.int.test.ts",
+    "asignaciones/conditioning-team-constraints.int.test.ts",
+    "asignaciones/conditioning-team-repository.int.test.ts",
     "asignaciones/execution-log-read.int.test.ts",
     "asignaciones/finish-auto-assign-packers.int.test.ts",
     "asignaciones/finished-orders.int.test.ts",
