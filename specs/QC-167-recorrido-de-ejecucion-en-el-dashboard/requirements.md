@@ -29,7 +29,9 @@
 > reabrir)`, contando desde arriba y sin reordenar: `D1` «¿Qué se muestra?» … `D10` «¿Costura del
 > dashboard?», y las cuatro que el humano cerró al revisar el spec el 2026-10-07: `D11` «¿Cómo se
 > cuenta la duración?», `D12` «¿Pedidos dados de baja?», `D13` «¿Orden de la lista?» y `D14`
-> «¿Búsqueda por número?». `[P<n>]` es una pregunta de `## Preguntas abiertas`. Donde D11 y D2
+> «¿Búsqueda por número?»; y las tres que cerró después ese mismo día: `D15` «¿Búsqueda sin
+dígitos?», `D16` «¿«2026-42» encuentra «2026-0000042»?» y `D17` «¿Formato de duraciones largas?».
+`[P<n>]` es una pregunta de `## Preguntas abiertas`. Donde D11 y D2
 > difieren («el empaque aparte»), manda D11, que es posterior.
 >
 > **Vocabulario.** «El registro» es `order_execution_entries` (QC-82). «Anotación» es una fila suya.
@@ -78,13 +80,14 @@ se ve (`AAAA-NNNNNNN`, con los ceros de relleno), sin normalizar nada más:
 - `0000042` DEBE encontrar `2026-0000042` y `2025-0000042`, y **NO DEBE** encontrar `2026-0000142`;
 - `2026-0000042` DEBE encontrar exactamente ese pedido; `2026-` DEBE encontrar todos los de 2026;
 - `2026-42` **NO DEBE** encontrar `2026-0000042`, porque no es una subcadena de lo que se ve (sí
-  encontraría `2026-4200000`);
+  encontraría `2026-4200000`) `[D16]`;
 - `2026` DEBE encontrar los pedidos de 2026 **y** los de cualquier año cuya secuencia visible
   contenga `2026` (p. ej. `2025-0002026`).
 
 SI el texto, ya sin espacios en los extremos, contiene algún carácter que no sea dígito ni guion
-(`abc`, `42a`, `2026 42`), ENTONCES la lista DEBE quedar **vacía, sin error**: el filtro **NO DEBE**
-ignorarse. SI el texto queda vacío, ENTONCES el filtro DEBE tratarse como ausente. `[D3] [D14] [P2]`
+(`abc`, `42a`, `2026 42`), **o no contiene ningún dígito** (`-`, `--`), ENTONCES la lista DEBE
+quedar **vacía, sin error**: el filtro **NO DEBE** ignorarse. SI el texto queda vacío, ENTONCES el
+filtro DEBE tratarse como ausente. `[D3] [D14] [D15] [D16] [P2]`
 
 **R7.** CUANDO se filtra por persona, la lista DEBE mostrar solo los pedidos con al menos una
 anotación **de esa persona**. Las opciones del filtro DEBEN ser las personas de la empresa que
@@ -132,7 +135,11 @@ otra de empaque. Además:
   canceló desde la pantalla de pedidos, o se dio de baja a mitad de la ejecución), ENTONCES la
   duración DEBE cerrarse en la última anotación y mostrarse marcada **«sin cierre anotado»**.
 - Un pedido con una sola anotación que no está activo DEBE mostrar duración cero, con la marca que
-  le toque por las dos reglas anteriores. `[D2] [D6] [D11]`
+  le toque por las dos reglas anteriores.
+- **Formato:** una duración **menor de 24 h** DEBE mostrarse en horas, minutos y segundos
+  (`1 h 05 min`, `12 min 30 s`, `45 s`, `0 s`); una de **24 h o más** DEBE mostrarse en días, horas
+  y minutos con horas y minutos a dos cifras (`2 d 02 h 05 min`; exactamente 24 h es `1 d 00 h 00
+  min`). `[D2] [D6] [D11] [D17]`
 
 **R16.** Cada anotación de **retroceder** DEBE quedar marcada visualmente en el recorrido, y su
 número DEBE mostrarse en el detalle y en la fila con **la misma cifra**. `[D2]`
@@ -224,6 +231,9 @@ en `/dashboard` y en la URL del recorrido de un pedido de su propia empresa. `[D
 | D12 — los dados de baja salen marcados y abren su recorrido | R1, R2, R13, R18, R24 |
 | D13 — orden por número de pedido descendente | R4 |
 | D14 — búsqueda por parte del número visible | R6, R24 |
+| D15 — la búsqueda exige al menos un dígito | R6 |
+| D16 — «2026-42» no encuentra «2026-0000042» | R6 |
+| D17 — duraciones de 24 h o más en días | R15 |
 
 ## Preguntas abiertas
 
@@ -269,3 +279,6 @@ en `/dashboard` y en la URL del recorrido de un pedido de su propia empresa. `[D
 | 2026-10-07 | ¿Pedidos dados de baja? | «Aparece marcado»: un pedido dado de baja con anotaciones sale en la lista con la marca «dado de baja» y su recorrido se puede abrir. El 404 queda para inexistente, de otra empresa o sin anotaciones. «Solo cancelados» sigue mirando el estado `CANCELADO` |
 | 2026-10-07 | ¿Orden de la lista? | Número de pedido descendente |
 | 2026-10-07 | ¿Búsqueda por número? | «Parte del número»: con «42» salen 2026-0000042, 2026-0000142…; texto sin dígitos ni guion, lista vacía sin error |
+| 2026-10-07 | ¿Búsqueda sin dígitos? | El texto debe tener al menos un dígito. Sin dígitos (p. ej. «-» solo) la lista queda vacía, sin error |
+| 2026-10-07 | ¿«2026-42» encuentra «2026-0000042»? | No, y se acepta así: la búsqueda es subcadena del número visible, sin normalizar ceros |
+| 2026-10-07 | ¿Formato de duraciones largas? | A partir de 24 h, en días: «2 d 02 h 05 min». Por debajo, como estaba (horas, minutos, segundos) |

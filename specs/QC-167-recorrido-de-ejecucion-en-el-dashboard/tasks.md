@@ -8,7 +8,7 @@
 > del caso; en producción, ningún `QC-`/`R<n>` en comentarios.
 >
 > **Antes de T1:** F1.3 aprobado. Las cuatro propuestas de `design.md > 9` ya las decidió el humano
-> el 2026-10-07 (D11–D14 de `requirements.md`): no queda ningún ⚑.
+> el 2026-10-07 (D11–D17 de `requirements.md`): no queda ningún ⚑.
 
 ## Bloque A — Contratos de dominio (backend)
 
@@ -19,7 +19,8 @@
   `{2026, 42}` y `{2025, 42}` y no con `{2026, 142}`; `2026-0000042` solo con `{2026, 42}`;
   `2026-` con cualquier secuencia de 2026 y no con 2025; `2026-42` **no** casa con `{2026, 42}` y sí
   con `{2026, 4200000}`; `2026` casa con `{2025, 2026}`; espacios de los extremos se ignoran;
-  `abc`, `42a` y `2026 42` no casan con nada; y una secuencia de ocho dígitos se compara contra su
+  `abc`, `42a` y `2026 42` no casan con nada; **`-` y `--` no casan con nada** (D15: al menos un
+  dígito), aunque `-` sea subcadena de todos; y una secuencia de ocho dígitos se compara contra su
   forma sin truncar (la de `formatOrderNumber`). Cubre **R6**.
 
 - [ ] **T2 [P] — `listSummariesByIdsIncludingDeleted` en el contrato de `pedidos`.** Tipo
@@ -104,7 +105,7 @@
   backend.*
   **Hecho cuando:** unit: `parse` nunca lanza y acota cada parámetro de la tabla del design;
   `parse(build(p))` = `p`; cambiar un filtro devuelve `page` 1; `persona` no uuid se descarta;
-  `cancelados` distinto de `1` = desactivado; `q` con letras **se conserva** (no se descarta: R6 pide
+  `cancelados` distinto de `1` = desactivado; `q` con letras o sin dígitos (`-`) **se conserva** (no se descarta: R6 pide
   lista vacía, no filtro ignorado) y `q` de solo espacios se descarta. Cubre **R5, R6, R11, R17**
   (parte pura).
 
@@ -112,8 +113,10 @@
   etiquetas de acción (las ocho, exhaustivo por tipo), de estado (exhaustivo por `OrderStatus`,
   «En curso» para `EN_CURSO`) y la marca «Dado de baja» (`design.md > 4.3`).
   **Hecho cuando:** unit de los tres `kind` de duración («(en curso)», «(sin cierre anotado)», nada
-  en `closed`), horas/minutos/segundos, `0 s`, una noche en horas sin días, y que ningún formato usa
-  `toLocaleString` ni `Intl.NumberFormat`. Cubre **R3, R13, R15**.
+  en `closed`), horas/minutos/segundos por debajo de 24 h (`45 s`, `12 min 30 s`, `1 h 05 min`,
+  `0 s`, `23 h 59 min` justo antes del umbral), días desde 24 h (`1 d 00 h 00 min` en 24 h exactas,
+  `2 d 02 h 05 min`, segundos truncados), y que ningún formato usa `toLocaleString` ni
+  `Intl.NumberFormat`. Cubre **R3, R13, R15**.
 
 - [ ] **T10 — Lista en el dashboard.** `dashboard-content.tsx` (recibe `params`, `<Suspense>`),
   `execution-trace-list-section.tsx`, `execution-trace-table.tsx`, `execution-trace-columns.tsx`,

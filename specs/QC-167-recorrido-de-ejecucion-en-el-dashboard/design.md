@@ -118,9 +118,13 @@ al lado de `formatOrderNumber` y exportada por el barril (R6, D14):
 
 ```ts
 export function orderNumberContains(number: OrderNumber, text: string): boolean {
-  return formatOrderNumber(number).includes(text.trim());
+  const needle = text.trim();
+  return /\d/.test(needle) && formatOrderNumber(number).includes(needle);
 }
 ```
+
+- **Al menos un dígito (D15).** Un texto sin dígitos (`-`, `--`) no casa con nada, aunque `-` sea
+  subcadena de todos los números: la lista queda vacía, sin error.
 
 - **Se decide el número visible, no la secuencia.** Quien busca copia o lee lo que ve en pantalla
   (`2026-0000042`); buscar sobre la secuencia sin relleno haría que `0000042` o `2026-0000042` no
@@ -128,7 +132,7 @@ export function orderNumberContains(number: OrderNumber, text: string): boolean 
   lo encuentra, `2026-` acota el año y `42` encuentra todo lo que contiene «42».
 - **Ceros a la izquierda:** cuentan como caracteres, porque se ven. `0000042` encuentra `…-0000042`
   de cualquier año y no `…-0000142`. `2026-42` **no** encuentra `2026-0000042` (no es subcadena);
-  sí encuentra `2026-4200000`. Es el precio de no normalizar: una segunda regla («ignora los ceros
+  sí encuentra `2026-4200000`; el humano lo aceptó así (D16). Es el precio de no normalizar: una segunda regla («ignora los ceros
   tras el guion») haría que `2026-0` y `2026-` dieran cosas distintas a lo que se ve.
 - **Escribir el año:** `2026` encuentra todos los de 2026 **y** cualquier secuencia que contenga
   `2026` (`2025-0002026`). Se acepta: es exactamente «contiene».
@@ -387,10 +391,13 @@ y ninguna ruta importa de otra. Se declara uno propio, **exhaustivo por tipo**
 `components/shared/` tocaría dos rutas de otras fichas en vuelo: queda anotado como deuda, no se hace
 aquí.
 
-**Formato de duración.** `formatTraceDuration(d)`: `«1 h 05 min»`, `«12 min 30 s»`, `«45 s»`, `«0 s»`;
-`open` añade «(en curso)»; `unclosed`, «(sin cierre anotado)»; `closed`, nada. Una pausa de una noche
-sale en horas (`«15 h 20 min»`): no hay unidad de días, para que la cifra se compare de un vistazo.
-Aritmética entera sobre milisegundos, unas diez líneas. **No se usa librería** (§ 8).
+**Formato de duración (R15, D17).** `formatTraceDuration(d)`:
+- **< 24 h**: `«1 h 05 min»`, `«12 min 30 s»`, `«45 s»`, `«0 s»` (una noche: `«15 h 20 min»`).
+- **≥ 24 h**: días, horas y minutos, horas y minutos a dos cifras: `«2 d 02 h 05 min»`; exactamente
+  24 h es `«1 d 00 h 00 min»`. Los segundos se truncan, no se redondean.
+- `open` añade «(en curso)»; `unclosed`, «(sin cierre anotado)»; `closed`, nada.
+
+Aritmética entera sobre milisegundos, unas quince líneas. **No se usa librería** (§ 8).
 
 ### 4.4 Multiplataforma (R26)
 
@@ -462,8 +469,8 @@ sin verificar es un desconocido (regla 6).
 
 ## 9. Lo que se propuso y decidió el humano (2026-10-07)
 
-No queda ningún ⚑ abierto. Las cuatro respuestas están en `requirements.md > Decisiones cerradas`
-como D11–D14.
+No queda ningún ⚑ abierto. Las respuestas están en `requirements.md > Decisiones cerradas` como
+D11–D17.
 
 | | Propuesta del spec | Decisión del humano | Requisitos | Qué cambió en el diseño |
 |---|---|---|---|---|
@@ -471,6 +478,9 @@ como D11–D14.
 | **P3** | Dados de baja fuera y 404 | **D12** «Aparece marcado» | R1, R2, R13, R18, R24 | método nuevo `listSummariesByIdsIncludingDeleted` y tipo `OrderHistorySummary` con `deleted` (§ 3.3) |
 | Orden | Número descendente | **D13** aprobado tal cual | R4 | orden fijo del método nuevo; `OrderSummaryOrdering` no cambia |
 | Búsqueda | Coincidencia exacta | **D14** «Parte del número» | R6, R24 | `orderNumberContains` en lugar de `parseOrderNumber` (§ 3.3) |
+| Búsqueda sin dígitos | «-» encontraba todo | **D15** exige al menos un dígito | R6 | guarda `/\d/` en `orderNumberContains` |
+| «2026-42» | No encuentra «2026-0000042» | **D16** se acepta | R6 | nada |
+| Duraciones largas | Horas sin días | **D17** días desde 24 h | R15 | `formatTraceDuration` (§ 4.3) |
 
 ## 10. Alternativas descartadas
 
