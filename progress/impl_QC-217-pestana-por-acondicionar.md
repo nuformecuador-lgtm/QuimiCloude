@@ -35,6 +35,8 @@ Fuera de la lista del spec:
 - `tests/unit/asignaciones/conditioning-doubles.ts`: dobles compartidos.
 - `tests/integration/aislamiento.json`: entrada del `.int` nuevo (la exige la guardia de aislamiento).
 - `tests/unit/recetas-ui/recipe-route-contract.test.ts`: fija los exports de `routes.ts`; una línea.
+- `tests/unit/shared/data-table-alcance.test.ts`: alta de `e2e/acondicionamiento.spec.ts` en su lista cerrada (treinta → treinta y uno); el E2E localiza `data-table-row-<id>` y `data-table-cell-orderNumber`. Vuelta 2 tras el review.
+- `tests/guards/guard-identificador-de-request.test.ts`: alta de `acondicionamiento.spec.ts` en `E2E_ESPERADOS`, con motivo; no ejercita el identificador de petición. Vuelta 2 tras el review.
 
 Tests nuevos: `tests/integration/pedidos/order-catalog-conditioned-by.int.test.ts`; `tests/unit/asignaciones/{list-conditioning-orders,list-conditioned-orders,get-conditioning-order}.test.ts`; `tests/unit/asignaciones-ui/{conditioning-orders-columns,conditioning-orders-list-section,conditioning-order-page,conditioning-order-screen}.test.tsx`; `e2e/acondicionamiento.spec.ts`.
 
