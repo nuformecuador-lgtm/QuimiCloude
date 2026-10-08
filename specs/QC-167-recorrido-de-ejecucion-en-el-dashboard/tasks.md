@@ -193,6 +193,16 @@
   local porque la falta de memoria lo mata. Por decisión del humano, el gate es CI
   (`gate-completo`, PR #171).*
 
+## Bloque G — Añadido a pedido del humano (2026-10-08)
+
+- [x] **T17 — El item «Dashboard» vuelve al menú lateral.** El commit 736663a1 lo ocultó el
+  2026-10-05 (`HIDDEN_DASHBOARD_NAV_ITEM`). Vuelve a `PRIVATE_NAV_ITEMS` en
+  `lib/shared/navigation/private-nav.ts`, filtrado por `dashboard.consultar` como los demás items,
+  y sin cambiar el aterrizaje de nadie. Los tests que afirmaban su ausencia se enmiendan con nota
+  fechada.
+  **Hecho cuando:** test de que el Administrador ve el enlace a `/dashboard` y el Operador no; los
+  tests de aterrizaje siguen verdes y sin cambios. Cubre **R30**.
+
 ## Mapa de cobertura (previsto)
 
 | Requisito | Task(s) |
@@ -226,6 +236,7 @@
 | R27 | T14 |
 | R28 | T15 |
 | R29 | T15 |
+| R30 | T17 |
 
 ## Archivos esperados
 

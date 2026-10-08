@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { PERMISSIONS } from '@/lib/modules/identity';
-import { HIDDEN_DASHBOARD_NAV_ITEM } from '@/lib/shared/navigation/private-nav';
+import { PRIVATE_NAV_ITEMS, type NavLink } from '@/lib/shared/navigation/private-nav';
 import { DASHBOARD_ROUTE, executionTraceRoute } from '@/lib/shared/routes';
 
 /**
@@ -253,7 +253,12 @@ describe('contrato de la ruta del dashboard', () => {
 
   it('el item Dashboard de la navegacion apunta a la misma constante que ubica la pantalla', () => {
     // El item esta oculto del menu temporalmente, pero conserva el destino para cuando vuelva.
-    expect(HIDDEN_DASHBOARD_NAV_ITEM.href).toBe(DASHBOARD_ROUTE);
+    // 2026-10-08 (QC-167): el humano pide volver a mostrar el item Dashboard. Vuelve la parte
+    // positiva original: un unico enlace del menu apunta a `DASHBOARD_ROUTE`.
+    const enlaces = PRIVATE_NAV_ITEMS.filter((item): item is NavLink => item.kind === 'link');
+    const alDashboard = enlaces.filter((enlace) => enlace.href === DASHBOARD_ROUTE);
+
+    expect(alDashboard).toHaveLength(1);
 
     // Parte negativa, con un matiz que no se puede simplificar: `page.tsx` **si** importa
     // `BRAND_LABEL` de `private-nav` para la metadata (R5), y eso es correcto — es leer una

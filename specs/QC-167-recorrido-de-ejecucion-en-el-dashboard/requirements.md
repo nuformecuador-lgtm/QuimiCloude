@@ -213,6 +213,12 @@ filtros. `[D9] [D3] [D7]`
 **R29.** El sistema DEBE tener un E2E en el que un usuario de **otro rol** (Operador) recibe **404**
 en `/dashboard` y en la URL del recorrido de un pedido de su propia empresa. `[D9] [D5]`
 
+**R30.** *(Añadido a pedido del humano 2026-10-08.)* CUANDO el usuario tiene el permiso
+`dashboard.consultar`, el menú lateral privado DEBE mostrar el item **«Dashboard»**, que enlaza a
+`/dashboard`. CUANDO el usuario no tiene ese permiso, el menú NO DEBE mostrarlo. El filtrado es el
+mismo que el de los demás items (por permiso). Volver a mostrar el item NO DEBE cambiar a dónde
+aterriza ningún rol tras el login.
+
 ### Cobertura de las decisiones
 
 | Decisión | Requisitos |

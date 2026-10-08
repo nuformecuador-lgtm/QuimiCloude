@@ -530,3 +530,29 @@ vitest dashboard+pedidos contract/scope: 8 archivos, 139 passed; `vitest run gua
 743 passed, 11 skipped.
 
 **Veredicto:** M1 y M2 resueltos, verde en los checks pedidos.
+
+## 2026-10-08 — R30: el item «Dashboard» vuelve al menu (frontend_dev)
+
+- Modificados: `lib/shared/navigation/private-nav.ts` (item de nuevo en `PRIVATE_NAV_ITEMS`, segundo, tras «Asignación»; se retira `HIDDEN_DASHBOARD_NAV_ITEM`), `tests/guards/guard-nav-permisos-declarados.test.ts`, `tests/unit/app-sidebar.test.tsx`, `tests/unit/dashboard-route-contract.test.ts`, `tests/unit/navegacion/private-layout-menu.test.tsx`.
+- Aterrizaje: `firstVisibleNavHref` (login-action, e2e/helpers/landing) recorre el array; el unico rol con `dashboard.consultar` (Administrador) tiene `asignaciones.consultar`, que sigue primero. Sin cambios en login, logo ni middleware.
+- E2E: `e2e/permisos.spec.ts` lista `nav-dashboard` en `HIDDEN_NAV_TEST_IDS` del Operador, que sigue sin el permiso: no se cambia ni se corre.
+- R30 → `tests/unit/navegacion/private-layout-menu.test.tsx` «R30 — con los permisos del Administrador el layout pinta el enlace «Dashboard» hacia /dashboard» y «R30 — con los permisos del Operador el enlace «Dashboard» no llega al arbol».
+- typecheck: verde (tsc --noEmit, exit 0). lint: 0 errores, 7 warnings ajenos; eslint/prettier limpios en los archivos tocados.
+- vitest (44 archivos de nav/sidebar/layout/landing/login/route-access): 43 pasan, 1 falla ajeno: `tests/unit/recetas-ui/recipe-route-contract.test.ts` (QC-64 R12) no espera `executionTraceRoute`, que añadio el commit 674993b0 (T8-T11). 711 pasan, 37 skipped.
+- `vitest run guard`: 55/55 archivos, 742 pasan, 11 skipped.
+- Veredicto: item Dashboard visible con `dashboard.consultar`, aterrizaje intacto; queda el rojo heredado de recipe-route-contract.
+
+Cierre del implementer (T17):
+
+- El item lo ocultó el commit 736663a1 «feat(navegacion): oculta el dashboard del menu y aterriza
+  en asignacion» (2026-10-05). Ese commit no lleva key de feature: fue un cambio de navegación hecho
+  a mano.
+- R30 queda en `requirements.md` y T17 en `tasks.md`, marcada [x]. Mapa: **R30** →
+  `tests/unit/navegacion/private-layout-menu.test.tsx` («R30 — con los permisos del Administrador…»
+  y «R30 — con los permisos del Operador…»).
+- El rojo de `recipe-route-contract` sí era de esta rama: T8 añadió `executionTraceRoute` a
+  `lib/shared/routes.ts` y ese test no lo esperaba. Se arregló con un alta fechada en su lista
+  cerrada.
+- Salida tras el arreglo: `recipe-route-contract`, `private-layout-menu`, `app-sidebar` y
+  `dashboard-route-contract`: `Test Files 4 passed (4)`, `Tests 69 passed (69)`.
+  typecheck exit 0.
