@@ -15,9 +15,10 @@ board (QC-226/227/228), en `specs/` y en el grafo y el código.
 | **QC-29** (`specs/QC-29-tema-claro-oscuro/`): tokens agua/naranja, `--radius` de 0.625rem, degradado del panel, medidas del panel y el mecanismo de tema | Se **reutiliza** el mecanismo (cookie, script, `ThemeProvider`, `@custom-variant dark`) sin tocarlo. Se **enmiendan** los valores (D2, D3, D5). Las medidas se conservan (R10) |
 | **QC-30** (`specs/QC-30-rediseno-login/`): piel del login (vidrio, burbujas, medidas de ámbito, `data-login`) | Se **reutiliza** el ámbito `[data-login='screen']`, la base opaca con `@supports` y las medidas. Se **sustituyen** las burbujas por las moléculas y se recolorea el vidrio (D10) |
 | **QC-11** (`specs/11-layout-privado-con-sidebar/`): marca larga/corta, `private-brand-*` | Se **enmienda** D7/R24: el logo y el isotipo sustituyen a los textos (D7) |
-| Bloque del ítem activo (`feature/fix-ajuste-sidebar`, sin ficha) en `globals.css` | Se **reutiliza**: solo cambian los porcentajes y el texto (R11). La barra `::before` no se toca (pregunta abierta 2) |
+| Bloque del ítem activo (`feature/fix-ajuste-sidebar`, sin ficha) en `globals.css` | Se **reutiliza**: solo cambian los porcentajes y el texto (R11). La barra `::before` no se toca: se decide en QC-227 (D18) |
 | `middleware.ts` (`matcher`) y `decideRouteAccess` (`PRIVATE_ROUTE_PREFIXES`) | Se **reutilizan**: `.svg`, `.png` e `.ico` quedan fuera del `matcher`, y `/manifest.webmanifest` no es un prefijo privado. R28 lo verifica; no hace falta tocar nada |
-| `app/favicon.ico` y los SVG de plantilla en `public/` | Se sustituye el favicon y se borran los SVG (D13, pregunta abierta 1) |
+| `app/favicon.ico`, los SVG de plantilla en `public/` y `app/page.tsx` | Se sustituye el favicon y se borran `file.svg`, `globe.svg` y `window.svg`. `next.svg` y `vercel.svg` se quedan porque los usa `app/page.tsx`, que no se toca: `/` es de otra ficha (D17) |
+| `BRAND_TAGLINE`, `BRAND_SHORT_LABEL` (`private-nav.ts`, QC-13 R7) | Se **retiran** (D19); `BRAND_LABEL` se conserva |
 | QC-227 y QC-228 en el board | Sin solape: consumen los tokens que deja esta ficha. Lo que les toca está en `requirements.md > No entra` |
 
 No hay ningún componente de logo previo: el símbolo de `app-sidebar.tsx` era provisional («hasta
@@ -33,13 +34,13 @@ que haya identidad visual»).
 | `app/favicon.ico`, `app/icon.svg`, `app/apple-icon.png`, `app/opengraph-image.png`, `app/opengraph-image.alt.txt` | Copiados de `_trabajo/marca/web/` (el `.ico` se reemplaza). El texto alternativo es `QuimiCloude` |
 | `public/brand/{logo-horizontal-dark,logo-vertical-dark,isotipo,isotipo-dark}.svg` | **nuevos**, copiados de `_trabajo/marca/svg/` sin modificar |
 | `public/icons/{icon-192,icon-512,icon-maskable-512}.png` | **nuevos**, copiados de `_trabajo/marca/web/` |
-| `public/{file,globe,window}.svg` | **se borran** (`next.svg` y `vercel.svg`: pregunta abierta 1) |
+| `public/{file,globe,window}.svg` | **se borran**. `next.svg` y `vercel.svg` se quedan (D17) |
 | `components/shared/brand-logo.tsx` | **nuevo**: `BrandLogo` (§4) |
 | `components/private/app-sidebar.tsx` | El enlace de marca pinta el logo o el isotipo |
 | `app/(private)/layout.tsx` | Isotipo en el encabezado, solo en viewport angosto. Sigue siendo Server Component |
 | `app/(public)/login/page.tsx` | `h1` con el logo vertical; el `main` lleva el ámbito oscuro |
 | `app/(public)/login/components/login-background.tsx` | Tres isotipos decorativos en lugar de tres burbujas |
-| `lib/shared/navigation/private-nav.ts` | Solo los docblocks de `BRAND_*`, que hoy dicen «no hay identidad visual» |
+| `lib/shared/navigation/private-nav.ts` | Se retiran `BRAND_TAGLINE` y `BRAND_SHORT_LABEL` (D19, R34). Se limpia el docblock de `BRAND_LABEL` |
 
 `BrandLogo` va en `components/shared/` porque lo usan tres rutas distintas (la barra, el
 encabezado privado y el login). Cumple el umbral de «dos features con la misma API» de
@@ -131,7 +132,7 @@ para el `<img>` del isotipo: 32 px, sin `border-radius`.
 cambian los porcentajes: `color-mix(... 26%)` → `5%` en el fondo, `32%` en el anillo, y se añaden
 `color: #fff; font-weight: 600`. Sobre `--sidebar-primary` (`#80C5FF`), son exactamente los
 `rgba(128,197,255,.26/.05/.32)` del lienzo A. Se expresan sobre el token y no en hex para que un
-retoque del acento llegue solo. La barra `::before` no se toca (pregunta abierta 2).
+retoque del acento llegue solo. La barra `::before` no se toca: es de QC-227 (D18).
 
 **Panel (R9, R10).** Solo cambian las dos declaraciones de `--sidebar-panel-gradient`. Las
 reglas de radio, alto de ítem y modo icono no cambian.
@@ -182,7 +183,9 @@ y la `@keyframes` de las burbujas desaparece. El contenido, en orden:
 **Discrepancia documentada.** El lienzo C, en movimiento reducido, reutiliza la entrada **con**
 desplazamiento a 150 ms. La guía §08 dice que con movimiento reducido «los desplazamientos y
 escalados se eliminan y solo queda, como mucho, un fundido corto». Manda la guía, porque es la
-norma y el lienzo es una maqueta. Por eso existe la segunda `@keyframes`.
+norma y el lienzo es una maqueta. Por eso existe la segunda `@keyframes`. El humano lo aceptó al
+aprobar el spec (D10). Las medidas de la tarjeta siguen siendo las de QC-30 (400 px y 28 px), no
+los 320 px del lienzo (D20).
 
 **Marcado (`login-background.tsx`).** Sigue siendo Server Component y marcado puro. Es un
 `<div data-login="molecules" aria-hidden="true">` con tres `<svg>` de los polígonos y trazos de
@@ -226,6 +229,7 @@ afectado. Es el mismo formato que QC-29 R14. El texto original no se borra.
 | `specs/QC-29-tema-claro-oscuro/requirements.md` | D6, D7, D10, R1–R6, R18, R25 | Paleta, radio, `--chart-*` y paradas del degradado sustituidos por QC-226 D2, D3 y D5. Las medidas de R18–R20 siguen |
 | `specs/QC-30-rediseno-login/requirements.md` | D3, D8, D9, D10, D12, R1, R9, R12, R14, R20, R21, R22, R26 | Título → logo vertical; burbujas → moléculas; vidrio recoloreado; Geist → Plex; radio de 8 px |
 | `specs/11-layout-privado-con-sidebar/requirements.md` | D7, R24 | La versión corta pasa a ser el isotipo; la larga, el logo horizontal |
+| `specs/QC-13-guardia-de-sesion-en-navegacion/requirements.md` | R7 | `BRAND_SHORT_LABEL` y `BRAND_TAGLINE` se retiran (QC-226 D19) |
 
 Y los tests (D16), caso por caso, con la nota en el nombre o en un comentario corto:
 
@@ -250,7 +254,8 @@ Y los tests (D16), caso por caso, con la nota en el nombre o en un comentario co
 | R14 | `tests/unit/theme/private-header.test.tsx` (isotipo dentro de `md:hidden`, las dos variantes) |
 | R16–R22 | `tests/unit/login-skin.test.tsx` (marcado y CSS) y `e2e/login-skin.spec.ts`, en Chromium y WebKit. El E2E cubre los tokens oscuros computados en el tema claro, las tres moléculas con `animation-name` y duración, la tarjeta que acaba en `opacity: 1`, y con `reducedMotion: 'reduce'` `animation-name: none` en las moléculas, que siguen visibles |
 | R23 | `tests/unit/login-form.test.tsx` y `e2e/login.spec.ts` sin editar; las medidas, en `e2e/login-skin.spec.ts` |
-| R24–R27, R29, R30 | `tests/unit/brand/metadata-assets.test.ts`: existencia de los archivos, cabecera PNG y dimensiones leídas del chunk IHDR, `manifest()` con los valores de D12, `metadata` del root layout, ausencia de los SVG de plantilla, y los SVG de `public/brand/` con el `viewBox` esperado |
+| R24–R27, R29, R30 | `tests/unit/brand/metadata-assets.test.ts`: existencia de los archivos, cabecera PNG y dimensiones leídas del chunk IHDR, `manifest()` con los valores de D12, `metadata` del root layout, ausencia de `file`/`globe`/`window.svg` y presencia de `next`/`vercel.svg`, y los SVG de `public/brand/` con el `viewBox` esperado |
+| R34 | `tests/unit/brand/brand-logo.test.tsx`: el módulo `private-nav` no exporta `BRAND_TAGLINE` ni `BRAND_SHORT_LABEL`, y `BRAND_LABEL === 'QuimiCloude'`; ningún archivo de `app/`, `components/` ni `lib/` las nombra |
 | R25, R26, R28 | `e2e/brand-assets.spec.ts`: sin sesión, `GET` de `/manifest.webmanifest`, `/icon.svg`, `/apple-icon.png`, `/icons/icon-192.png` y de la URL de `og:image` → 2xx, y `/login` con los `<link>` y el `<meta property="og:image">` |
 | R31 | `tests/unit/theme/sin-dependencias-nuevas.test.ts` (ya existe) más la guardia `guard-dependencias-aprobadas` |
 | R33 | `tests/unit/theme/ui-primitivas-intactas.test.ts` (ya existe), en verde |

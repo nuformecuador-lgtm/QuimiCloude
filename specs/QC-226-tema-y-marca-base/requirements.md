@@ -33,6 +33,7 @@ archivos del kit que usa la app.
 - Movimiento de la app (entrada de pantalla, ítem que se desliza, botones, tarjetas, toasts,
   diálogos) y el bloque global de `prefers-reduced-motion`: QC-228.
 - Editar `components/ui/`.
+- La barra de acento del ítem activo (QC-227, D18) y qué hacer con la ruta `/` (otra ficha, D17).
 
 ## Decisiones cerradas (no reabrir)
 
@@ -47,13 +48,17 @@ archivos del kit que usa la app.
 | D7 | Barra lateral: logo horizontal en modo expandido. En el rail de 78 px, el isotipo sustituye a «QC». Los textos visibles `BRAND_LABEL` y `BRAND_TAGLINE` se retiran; la marca queda como nombre accesible | humano, 2026-10-08 | QC-11 D7, R24 | R12, R13, R15 |
 | D8 | Viewport angosto: isotipo en el encabezado privado; logo horizontal en el `Sheet` móvil | humano, 2026-10-08 | — | R12, R14 |
 | D9 | Login: el logo **vertical** sustituye al título de texto; se conserva un `h1` accesible | humano, 2026-10-08 | QC-30 D3, R1 (título de texto) | R16 |
-| D10 | Login, opción C «Moléculas»: fondo petróleo en los dos temas, 3 isotipos que flotan y giran (22–30 s), vidrio oscuro con los tokens nuevos y entrada única de la tarjeta en 300 ms. Las burbujas salen. Con movimiento reducido se detiene, con una regla local del login | humano, 2026-10-08 (lienzo) | QC-30 D8, D9, D12, R9, R12, R14, R21, R22 (burbujas), R26 (E2E de burbujas) | R17–R23 |
+| D10 | Login, opción C «Moléculas»: fondo petróleo en los dos temas, 3 isotipos que flotan y giran (22–30 s), vidrio oscuro con los tokens nuevos y entrada única de la tarjeta en 300 ms. Las burbujas salen. Con movimiento reducido se detiene, con una regla local del login. Aceptado al aprobar el spec: con movimiento reducido la tarjeta solo hace un fundido, sin desplazamiento, y el modo oscuro se aplica con un ámbito `.dark` en el `main` (`design.md > 6`) | humano, 2026-10-08 (lienzo y aprobación del spec) | QC-30 D8, D9, D12, R9, R12, R14, R21, R22 (burbujas), R26 (E2E de burbujas) | R17–R23 |
 | D11 | Enmienda a la §08 de la guía: se permite movimiento ambiental en bucle **solo detrás del contenido**, con ciclos ≥ 20 s, sin rebotes y quieto con movimiento reducido | humano, 2026-10-08 | guía §08 | R19, R22 |
 | D12 | Metadatos: title «QuimiCloude»; description «ERP para planta, almacén, ventas y administración». Manifest: `name` y `short_name` «QuimiCloude», `start_url` `/`, `display` `standalone`, `theme_color` `#02605A`, `background_color` `#F7FBFC` | humano, 2026-10-08 | — | R24, R25, R26, R28 |
-| D13 | Se borran de `public/` los SVG de la plantilla de Next | humano, 2026-10-08 | — | R29 (ver pregunta abierta 1) |
+| D13 | Se borran de `public/` los SVG de la plantilla de Next que nadie usa (acotada por D17) | humano, 2026-10-08 | — | R29 |
 | D14 | No entran el bloque global de `prefers-reduced-motion` ni ningún movimiento de la app fuera del login (QC-228). Los tokens `--dur-*` y `--ease-*` solo se declaran | humano, 2026-10-08 | — | R6, R32 |
 | D15 | Sin dependencias nuevas | humano, 2026-10-08 (ficha) | — | R31 |
 | D16 | Los tests de specs cerrados que esta ficha rompe (color-tokens, theme-provider, sidebar-panel, login-skin y los de la marca de la barra) **se actualizan** como enmienda, con nota en cada caso; no se borran sin más | humano, 2026-10-08 | — | `tasks.md > T10` (proceso, no conducta del sistema) |
+| D17 | `public/next.svg` y `public/vercel.svg` **se quedan**, porque los usa `app/page.tsx`. Solo se borran `file.svg`, `globe.svg` y `window.svg`. Qué hacer con `/` es de otra ficha | humano, 2026-10-08 (aprobación del spec) | — | R29 |
+| D18 | La barra de acento de 3 px con halo (`::before`) del ítem activo **no se toca** aquí: se decide en QC-227 | humano, 2026-10-08 (aprobación del spec) | — | R11 |
+| D19 | Se **retiran** las constantes `BRAND_TAGLINE` y `BRAND_SHORT_LABEL`. El nombre accesible de la marca sigue siendo `BRAND_LABEL` («QuimiCloude»). El lema vive en la `description` de los metadatos y en la imagen OG | humano, 2026-10-08 (aprobación del spec) | QC-13 R7; QC-11 D7 | R12, R13, R34 |
+| D20 | La tarjeta del login se mantiene en 400 px de ancho máximo y 28 px de padding (QC-30), no en los 320 px del lienzo | humano, 2026-10-08 (aprobación del spec) | — | R23 |
 
 ## Requisitos (EARS)
 
@@ -112,7 +117,8 @@ exterior de 18 px, 272 px de ancho expandido y 78 px en modo icono, e ítems de 
 
 **R11.** MIENTRAS un ítem de la barra lateral es el activo, el sistema DEBE pintarlo con el
 fondo `linear-gradient(90deg, <--sidebar-primary al 26 %>, <--sidebar-primary al 5 %>)`, un
-anillo interior de 1 px de `--sidebar-primary` al 32 % y el texto en blanco con peso 600.
+anillo interior de 1 px de `--sidebar-primary` al 32 % y el texto en blanco con peso 600. La
+regla de la barra de acento del borde izquierdo (`::before`) DEBE quedar sin cambios (D18).
 
 ### Marca en la zona privada
 
@@ -122,8 +128,8 @@ sistema DEBE mostrar en el enlace de marca el logo horizontal en su versión par
 accesible del enlace DEBE seguir siendo `BRAND_LABEL`.
 
 **R13.** MIENTRAS la barra lateral está en modo icono, el sistema DEBE mostrar en el enlace de
-marca el isotipo en su versión para fondo oscuro, a 32 px, en lugar de `BRAND_SHORT_LABEL`. El
-nombre accesible del enlace DEBE seguir siendo `BRAND_LABEL`.
+marca el isotipo en su versión para fondo oscuro, a 32 px, en lugar de la marca corta de texto
+(«QC»). El nombre accesible del enlace DEBE seguir siendo `BRAND_LABEL`.
 
 **R14.** MIENTRAS el viewport es angosto, el sistema DEBE mostrar en el encabezado privado el
 isotipo, al menos a 24 px, con nombre accesible `BRAND_LABEL`: la versión clara con el tema
@@ -192,9 +198,9 @@ nombre de archivo.
 **R28.** CUANDO un navegador sin sesión pide el manifest, un icono o la imagen OG, el sistema
 DEBE responder con el recurso (2xx) y NO DEBE redirigir al login.
 
-**R29.** El sistema NO DEBE contener en `public/` los SVG de la plantilla de Next (`file.svg`,
-`globe.svg`, `window.svg`, `next.svg` y `vercel.svg`; los dos últimos, según la pregunta abierta
-1).
+**R29.** El sistema NO DEBE contener `public/file.svg`, `public/globe.svg` ni
+`public/window.svg`, y DEBE conservar `public/next.svg` y `public/vercel.svg`, que usa
+`app/page.tsx` (D17).
 
 **R30.** El sistema DEBE servir los logos e isotipos desde archivos SVG versionados en el repo
 y copiados del kit sin modificar.
@@ -210,6 +216,10 @@ del login: ni la regla global de `prefers-reduced-motion` de `tokens.css`, ni `@
 
 **R33.** El sistema NO DEBE modificar ningún archivo de `components/ui/`.
 
+**R34.** El sistema NO DEBE exportar `BRAND_TAGLINE` ni `BRAND_SHORT_LABEL` desde
+`lib/shared/navigation/private-nav.ts`, y ningún archivo de producción DEBE referenciarlas
+(D19). `BRAND_LABEL` se conserva con el valor `QuimiCloude`.
+
 ### Cobertura de las decisiones cerradas
 
 Cada fila de `## Decisiones cerradas` tiene al menos un `R<n>` en su columna «Cubierta por». D16
@@ -218,21 +228,4 @@ T10 y la verifica el reviewer.
 
 ## Preguntas abiertas
 
-No bloquean. Se escriben para no rellenarlas con supuestos (regla 6 de `CLAUDE.md`).
-
-1. **`app/page.tsx` es la plantilla de `create-next-app`** y pinta `/next.svg` y `/vercel.svg`.
-   Si se borran esos dos archivos (D13), esa página queda con dos imágenes rotas. ¿Se borra o se
-   redirige `app/page.tsx` en esta ficha, o se dejan esos dos SVG hasta que otra ficha se ocupe de
-   `/`? Mientras no haya respuesta, la task T7 borra solo `file.svg`, `globe.svg` y
-   `window.svg`, y R29 se verifica sobre esos tres.
-2. **Barra de acento del ítem activo.** El bloque de `feature/fix-ajuste-sidebar` dibuja una
-   barra de 3 px con halo en el borde izquierdo del ítem activo (`::before`). El lienzo A no la
-   tiene. Esta ficha **no la toca** (R11 solo cambia fondo, anillo y texto). ¿Se retira aquí o
-   en QC-227?
-3. **`BRAND_TAGLINE` y `BRAND_SHORT_LABEL`.** Con D7 dejan de pintarse. El nombre accesible del
-   enlace sigue siendo `BRAND_LABEL` (R12, R13), así que el lema ya no se anuncia. Las constantes
-   se conservan exportadas (QC-13 R7 las protegía), pero sin consumidor. ¿Se retiran, o el lema
-   debe formar parte del nombre accesible?
-4. **Ancho de la tarjeta de login.** El lienzo C la dibuja a 320 px, con padding de
-   28/24/22 px. QC-30 fija un máximo de 400 px y 28 px de padding, y el humano no lo reabrió.
-   Se mantienen las de QC-30 (R23). ¿Correcto?
+Ninguna. Las cuatro que quedaban se cerraron al aprobar el spec (2026-10-08): son D17–D20.

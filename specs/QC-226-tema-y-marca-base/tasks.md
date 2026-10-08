@@ -28,9 +28,10 @@ tienen que estar hechas antes. Cada task acaba con `pnpm run typecheck`, `pnpm r
   *Hecho:* `tests/unit/brand/brand-logo.test.tsx` en verde: proporción por variante, `src`
   correcto, `tone="auto"` con las dos imágenes y sus clases `dark:`, y sin clases de fondo,
   sombra ni borde.
-- [ ] **T5 [P] — Barra lateral** (R9–R13). En `app-sidebar.tsx`, el logo horizontal o el
-  isotipo en el enlace de marca, sin textos visibles. En `globals.css`, las paradas de D5, el
-  ítem activo de R11 y las reglas del rail para el `<img>`. Dep.: T2, T4.
+- [ ] **T5 [P] — Barra lateral** (R9–R13, R34). En `app-sidebar.tsx`, el logo horizontal o el
+  isotipo en el enlace de marca, sin textos visibles. En `private-nav.ts`, retirar
+  `BRAND_TAGLINE` y `BRAND_SHORT_LABEL`. En `globals.css`, las paradas de D5, el ítem activo de
+  R11 sin tocar la barra `::before`, y las reglas del rail para el `<img>`. Dep.: T2, T4.
   *Hecho:* `app-sidebar`, `sidebar-desktop`, `sidebar-mobile`, `sidebar-ajuste` y
   `sidebar-panel` actualizados (T10) y en verde.
 - [ ] **T6 [P] — Encabezado privado** (R14). El isotipo `tone="auto"` dentro del `md:hidden` de
@@ -47,15 +48,15 @@ tienen que estar hechas antes. Cada task acaba con `pnpm run typecheck`, `pnpm r
   editarlo; `pnpm exec playwright test e2e/login-skin.spec.ts e2e/login.spec.ts` en verde en
   Chromium y WebKit.
 - [ ] **T8 [P] — Manifest y limpieza de `public/`** (R25–R29). Crear `app/manifest.ts` y borrar
-  `public/file.svg`, `globe.svg` y `window.svg`. `next.svg` y `vercel.svg` quedan pendientes de la
-  pregunta abierta 1. Comprobar en el preview de Vercel la URL absoluta de `og:image`. Dep.: T1.
+  `public/file.svg`, `globe.svg` y `window.svg`. `next.svg`, `vercel.svg` y `app/page.tsx` no se
+  tocan (D17). Comprobar en el preview de Vercel la URL absoluta de `og:image`. Dep.: T1.
   *Hecho:* `tests/unit/brand/metadata-assets.test.ts` y `e2e/brand-assets.spec.ts` en verde.
 
 ## Fase 4 — enmiendas y cierre
 
 - [ ] **T9 [P] — Enmiendas a los specs cerrados.** Añadir las notas
-  `> ENMIENDA DEL 2026-10-08 (QC-226)` de `design.md > 8` en QC-29, QC-30 y
-  `11-layout-privado-con-sidebar`, y los docblocks de `BRAND_*` en `private-nav.ts`.
+  `> ENMIENDA DEL 2026-10-08 (QC-226)` de `design.md > 8` en QC-29, QC-30, QC-13 y
+  `11-layout-privado-con-sidebar`.
   *Hecho:* cada requisito de la tabla de `design.md > 8` tiene su nota y nada del texto original
   se borra.
 - [ ] **T10 — Tests de specs cerrados (D16).** Va repartida en T2, T3, T5 y T7: cada caso que
@@ -91,9 +92,6 @@ tienen que estar hechas antes. Cada task acaba con `pnpm run typecheck`, `pnpm r
 - `public/file.svg`
 - `public/globe.svg`
 - `public/window.svg`
-- `public/next.svg`
-- `public/vercel.svg`
-- `app/page.tsx`
 - `tests/unit/theme/color-tokens.test.ts`
 - `tests/unit/theme/theme-provider.test.tsx`
 - `tests/unit/theme/sidebar-panel.test.tsx`
@@ -111,7 +109,5 @@ tienen que estar hechas antes. Cada task acaba con `pnpm run typecheck`, `pnpm r
 - `specs/QC-29-tema-claro-oscuro/requirements.md`
 - `specs/QC-30-rediseno-login/requirements.md`
 - `specs/11-layout-privado-con-sidebar/requirements.md`
+- `specs/QC-13-guardia-de-sesion-en-navegacion/requirements.md`
 - `progress/impl_QC-226.md`
-
-`public/next.svg`, `public/vercel.svg` y `app/page.tsx` están en la lista por la pregunta abierta
-1: según la respuesta, se tocan o no. Se declaran para que el detector de conflictos los vea.
