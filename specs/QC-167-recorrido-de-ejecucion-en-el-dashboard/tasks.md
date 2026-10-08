@@ -65,7 +65,7 @@
   ordena por `occurredAt, id`; (c) el puerto sigue sin ningún método de modificar o borrar. Cubre
   **R7, R8, R22, R23, R24**.
 
-- [ ] **T5 — Caso de uso de la lista.** `domain/list-execution-traces.ts` (`design.md > 3.5`).
+- [x] **T5 — Caso de uso de la lista.** `domain/list-execution-traces.ts` (`design.md > 3.5`).
   *Depende de T2, T3, T4.*
   **Hecho cuando** (unit, puertos simulados): (a) **autorización**: actor ausente, sin `permissions`,
   con `[]`, o con todo el catálogo **menos** `dashboard.consultar` → `UnauthorizedError` y **ningún
@@ -81,7 +81,7 @@
   (k) `personOptions` con dadas de baja; (l) consultas constantes por página. Cubre **R1, R2, R3,
   R4, R5, R6, R7, R8, R9, R10, R15, R19, R23**.
 
-- [ ] **T6 — Caso de uso del detalle.** `domain/get-execution-trace.ts` (`design.md > 3.6`).
+- [x] **T6 — Caso de uso del detalle.** `domain/get-execution-trace.ts` (`design.md > 3.6`).
   *Depende de T2, T3, T4.*
   **Hecho cuando** (unit): (a) autorización como T5(a); (b) id mal formado, pedido inexistente / de
   otra empresa (`orders` vacío) y pedido sin anotaciones → **el mismo** `OrderNotFoundError`;
@@ -89,7 +89,7 @@
   `deleted: true`; (d) anotaciones en orden con nombre de persona, posición y motivo, y la misma
   `duration` que la fila; (e) la empresa sale del actor. Cubre **R12, R13, R15, R18, R19, R23**.
 
-- [ ] **T7 — Cableado, contrato y Server Actions.** Dos factorías en `lib/composition/index.ts`,
+- [x] **T7 — Cableado, contrato y Server Actions.** Dos factorías en `lib/composition/index.ts`,
   bloque nuevo en `lib/modules/asignaciones/index.ts`, `adapters/driving/execution-trace-actions.ts`
   con `currentActor()` dentro de `runInRequestScope`, y su fila en `ACCIONES` de
   `session-once-per-request-actions.test.ts` (`design.md > 3.7`, `> 3.8`). *Depende de T5, T6.*

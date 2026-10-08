@@ -102,3 +102,87 @@ Lo que falta (R2, R5, R11–R13, R17, R19–R21, R25–R29, y los casos de uso d
   `Tests 7 failed | 4602 passed | 1 skipped (4610)`. Los 7 rojos son de UI, en archivos que esta
   tanda no toca: unidades-viewport, usuarios-viewport, product-page, pantallas-exigen-permiso y
   recipe-page. Los cinco están en `tests/baseline-rojos.json` y siguen rojos al correrlos solos.
+
+## Tanda 2: T5, T6 y T7 (2026-10-08)
+
+Antes de empezar, el leader mergeó `origin/dev` (346fa669). Ese merge trae QC-82 y QC-156.
+- Se aplicó a `QuimiCloude_QC167` la migración nueva (`migrate deploy`) y se corrió `prisma generate`.
+- Se corrió `pnpm install --frozen-lockfile`, porque dev trae `nodemailer` en el lockfile. No es una
+  dependencia nueva de esta rama.
+
+### Archivos
+
+Producción:
+- `lib/modules/asignaciones/domain/list-execution-traces.ts` (nuevo)
+- `lib/modules/asignaciones/domain/get-execution-trace.ts` (nuevo)
+- `lib/modules/asignaciones/adapters/driving/execution-trace-actions.ts` (nuevo, `'use server'`):
+  `listExecutionTracesAction` y `getExecutionTraceAction`
+- `lib/composition/index.ts` (+12, solo añadidos)
+- `lib/modules/asignaciones/index.ts` (+20, bloque nuevo al final)
+
+Tests:
+- `tests/unit/asignaciones/list-execution-traces.test.ts` (nuevo)
+- `tests/unit/asignaciones/get-execution-trace.test.ts` (nuevo)
+- `tests/unit/asignaciones/execution-trace-actions.test.ts` (nuevo)
+- `tests/unit/identity/session-once-per-request-actions.test.ts` (+10, fila de `getExecutionTraceAction`)
+- `tests/integration/pedidos/order-catalog-including-deleted.int.test.ts` (+1, `customerId: null`).
+  Con QC-156, `NewOrder.customerId` es obligatorio y sin esa línea el typecheck sale rojo.
+
+### Desvíos y notas para el reviewer
+
+- **Tipo del detalle:** el design (3.6 y 3.8) lo llama `ExecutionTrace`, pero ese nombre ya es el tipo
+  de retorno de `buildExecutionTrace` (T3). La salida del detalle se llama `ExecutionTraceDetail`, y
+  sus pasos `ExecutionTraceDetailStep`: `TraceStep` más `userDisplayName`.
+- **Entrada del detalle:** el caso de uso recibe `{ orderId }` con `strictObject`. Un id mal formado o
+  una clave de más dan el mismo `OrderNotFoundError`.
+- **Detalles que el spec no fija:**
+  - `pageSize` vale 10 si no llega y `cancelledOnly` vale `false`.
+  - Las fechas son `YYYY-MM-DD` que existan en el calendario: `2026-02-30` da `ValidationError`.
+  - Las opciones de persona salen por nombre y luego por id.
+  - Una persona que el directorio no devuelve se omite en la fila y sale con nombre `null` en el detalle.
+- **Pedido de la página sin anotaciones** (posible si una purga borra entre las dos lecturas): se omite
+  de la página, pero el `total` sigue siendo el de `pedidos`.
+- **Consultas:** las opciones de persona y la página se piden en paralelo. Son 6 como mucho por página,
+  ninguna por fila.
+
+### Mapa R<n> → test (tanda 2)
+
+| R | Archivo | Caso |
+|---|---|---|
+| R1 | `tests/unit/asignaciones/list-execution-traces.test.ts` | «R1: sin ningun pedido ejecutado, pagina vacia sin preguntar a pedidos»; «R1: el total y la paginacion son los de pedidos»; «R1: las consultas por pagina son constantes, no una por fila» |
+| R1, R24 | `list-execution-traces.test.ts` | «R1 R24: la pagina la pide a listSummariesByIdsIncludingDeleted con los ids del registro» |
+| R1, R2, R3 | `list-execution-traces.test.ts` | «R1 R2 R3: un pedido dado de baja sale marcado y su duracion no es abierta» |
+| R2, R15 | `list-execution-traces.test.ts` | «R2 R15: la fila lleva una sola duracion, la misma que da buildExecutionTrace» |
+| R3 | `list-execution-traces.test.ts` | «R3: un pedido activo sale con la duracion abierta hasta el instante de la consulta» |
+| R4 | `list-execution-traces.test.ts` | «R4: las filas salen en el orden en que pedidos pagina, sin reordenar» |
+| R5 | `list-execution-traces.test.ts` | «R5: %s es ValidationError sin tocar ningun puerto» (7 casos); «R5: sin pagina ni tamano, pide la pagina 1 de 10»; «R5: la pagina 3 de 25 llega tal cual a pedidos» |
+| R6 | `list-execution-traces.test.ts` | «R6: un texto con letras no es invalido, llega tal cual como numberContains»; «R6: los espacios de los extremos se quitan antes de mandarlo»; «R6: un texto vacio tras quitar espacios es filtro ausente y no se manda» |
+| R7 | `list-execution-traces.test.ts` | «R7: el filtro de persona llega al registro»; «R7: las opciones de persona incluyen a las dadas de baja, por nombre» |
+| R8 | `list-execution-traces.test.ts` | «R8: el rango va de las 00:00Z de «desde» inclusivo al dia siguiente a «hasta» exclusivo»; «R8: un extremo vacio no acota por ese lado»; «R8: sin rango ni persona, el registro no recibe ningun filtro» |
+| R9 | `list-execution-traces.test.ts` | «R9: «solo cancelados» pide solo CANCELADO»; «R9: sin «solo cancelados» pide todos los estados» |
+| R10 | `list-execution-traces.test.ts` | «R10: todos los filtros viajan a la vez, cada uno a su puerto» |
+| R12, R18 | `tests/unit/asignaciones/get-execution-trace.test.ts` | «R12 R18: pide a pedidos el pedido en cualquier estado, incluidos los dados de baja» |
+| R13 | `get-execution-trace.test.ts` | «R13: las anotaciones en orden, con persona, posicion y motivo, y el numero y estado del pedido»; «R13: una persona que el directorio ya no devuelve sale sin nombre, no rompe el recorrido» |
+| R15 | `get-execution-trace.test.ts` | «R15: la duracion del detalle es la misma cifra que la de la fila de la lista»; «R15: con la ultima anotacion de cierre y el pedido cancelado, la duracion es cerrada» |
+| R18 | `get-execution-trace.test.ts` | «R18: id mal formado, pedido inexistente o de otra empresa y pedido sin anotaciones dan el mismo error»; «R18: una entrada con claves de mas tambien es el mismo 404»; «R18: un pedido dado de baja con anotaciones no es 404, abre su recorrido marcado» |
+| R18 | `tests/unit/asignaciones/execution-trace-actions.test.ts` | «R18: sin recorrido, el error sale como `order_not_found` para que la pagina responda 404» |
+| R19 | `list-execution-traces.test.ts` y `get-execution-trace.test.ts` | «R19: un actor %s se rechaza sin llamar a ningun puerto» (null, undefined, sin permisos, `[]`, catálogo menos `dashboard.consultar`); «R19: con dashboard.consultar solo, …» |
+| R19 | `execution-trace-actions.test.ts` | «R19: pasa el actor de la sesion, la entrada tal cual y un instante puesto por la accion»; «R19: un actor sin el permiso llega igual al caso de uso: la accion no comprueba permisos»; «R19: el rechazo de autorizacion lo da el caso de uso y la accion lo traduce» |
+| R19 | `tests/unit/identity/session-once-per-request-actions.test.ts` | fila `getExecutionTraceAction` en `ACCIONES` |
+| R23 | `list-execution-traces.test.ts` | «R23: todas las llamadas llevan la empresa del actor»; «R23: una entrada con companyId se rechaza y no toca ningun puerto» |
+| R23 | `get-execution-trace.test.ts` | «R23: todas las llamadas llevan la empresa del actor» |
+| R24 | `execution-trace-actions.test.ts` | «R24: pide el recorrido al caso de uso del modulo con el id y un instante de la accion»; guardias y `module-contract` verdes |
+
+### Salida de los tests
+
+- `pnpm run typecheck`: exit 0 (lo corrió el implementer después del `pnpm install`).
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)`. Los avisos están en archivos ajenos
+  (`confirm-catalog-import.test`, `order-service.test`).
+- Implementer, los tres tests nuevos más `session-once-per-request-actions`, en dos corridas
+  (`session-once-per-request-actions` solo, tras el `pnpm install`):
+  - tres tests nuevos: `Test Files 3 passed (3)`, `Tests 60 passed (60)`;
+  - `session-once-per-request-actions`: `Test Files 1 passed (1)`, `Tests 66 passed (66)`.
+- Dev, los tres tests nuevos más `session-once-per-request-actions`, `module-contract` y
+  `execution-trace`: `Test Files 6 passed (6)`, `Tests 188 passed (188)`.
+- `pnpm exec vitest run guard`: `Test Files 55 passed (55)`, `Tests 741 passed | 11 skipped (752)`.
+- `.int` `order-catalog-including-deleted` tras añadir `customerId`: `Test Files 1 passed (1)`, `Tests 7 passed (7)`.
