@@ -11,7 +11,10 @@ evidencia) vive en `docs/verification.md` del proyecto.
 | --- | --- | --- |
 | Cerrar tanda, cerrar feature, antes de abrir el PR | `./init.sh` (rápido, el **default**) | local |
 | PR hacia la rama de integración (`ramas.integracion`, p. ej. `dev`) | `./init.sh --completo` | CI (`.github/workflows/gate.yml`), check `gate-completo` |
-| PR integración → producción (p. ej. `dev` → `main`, despliegue) | `./init.sh --completo` + E2E (Playwright) | CI, check `gate-completo` + E2E |
+| PR integración → producción (`ramas.produccion`, p. ej. `dev` → `main`, despliegue) | `./init.sh --completo` + E2E (Playwright) | CI, check `gate-completo` + E2E |
+
+- **Los nombres de rama salen de `arnes.config.json > ramas`.** `gate.yml` los lleva escritos
+  (GitHub no lee el JSON) y `./init.sh` falla si no coinciden (`scripts/check-perfil.mjs`).
 
 - **En local corre siempre el rápido**: typecheck + lint + los tests que el grafo de imports
   (`vitest related`) relaciona con tu diff + **todas** las guardias (~1 min).

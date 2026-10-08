@@ -56,7 +56,8 @@ máximo 4 preguntas por tanda, y pon siempre como primera opción lo que el repo
    - estados del board: el nombre de cada uno en Jira y a qué estado del arnés traduce
      (`pending`, `spec_ready`, `in_progress`, `done`, `cancelled`). Se leen del board, no se
      suponen (`docs/jira.md > Los estados del board`);
-   - ramas de integración y producción;
+   - ramas de integración y producción: pregúntalas **siempre**, una por una, con las ramas de
+     `git branch -r` como opciones. Nunca supongas `main`, `master` ni `dev`;
    - cupo por persona y zona (por defecto 2/3/3).
 7. **CI:** ¿GitHub Actions disponible? ¿Plan gratuito (minutos limitados, sin protección de
    ramas en repos privados)? ¿Qué variables necesita la suite en una máquina limpia?
@@ -71,6 +72,9 @@ En modo revisión, por cada doc del perfil:
 
 - **`arnes.config.json`:** `arnes_version` (la de `arnes.config.example.json` si existe),
   `jira` (`site`, `project`, `estados`), `ramas`, `cupos_por_persona` y `perfil` (`max_dias_sin_revisar`, `docs`).
+- **`.github/workflows/gate.yml`:** pon las dos `ramas` en `on.pull_request.branches` y la de
+  producción en el `github.base_ref == '<rama>'` del job E2E. GitHub no lee el JSON;
+  `scripts/check-perfil.mjs` hace fallar `./init.sh` si difieren.
 - **Los docs del perfil:** en montaje, desde las plantillas `docs/*.md` que traen
   `<!-- PLANTILLA -->`. En revisión, edita solo lo que cambió.
   - La primera línea de cada doc es `<!-- perfil: revisado=<hoy AAAA-MM-DD> por=<nombre de
