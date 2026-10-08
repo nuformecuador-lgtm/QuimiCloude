@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import {
+  ActiveOrderMark,
   DeletedOrderMark,
   EXECUTION_ACTION_LABELS,
   GO_BACK_MARK,
@@ -98,6 +99,7 @@ export function ExecutionTraceDetail({ trace, backHref }: ExecutionTraceDetailPr
           Recorrido del pedido {trace.numberText}
         </h1>
         {trace.deleted ? <DeletedOrderMark /> : null}
+        {trace.duration.kind === 'open' ? <ActiveOrderMark /> : null}
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
         <dt className="text-muted-foreground">Estado</dt>

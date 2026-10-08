@@ -7,6 +7,7 @@ import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import type { ExecutionTracePerson, ExecutionTraceRow } from '@/lib/modules/asignaciones';
 
 import {
+  ACTIVE_ORDER_MARK,
   DELETED_ORDER_MARK,
   TRACE_ORDER_STATUS_LABELS,
   formatTraceDuration,
@@ -39,6 +40,18 @@ export function DeletedOrderMark() {
   );
 }
 
+/** Marca de actividad: solo la lleva un pedido cuya duracion sigue abierta, nunca uno dado de baja. */
+export function ActiveOrderMark() {
+  return (
+    <span
+      data-testid="execution-trace-active"
+      className="rounded-md border border-primary/40 px-1.5 py-0.5 text-xs font-medium"
+    >
+      {ACTIVE_ORDER_MARK}
+    </span>
+  );
+}
+
 export type ExecutionTraceColumnsDeps = {
   readonly personOptions: readonly ExecutionTracePerson[];
   readonly params: ExecutionTraceListParams;
@@ -58,6 +71,7 @@ export function buildExecutionTraceColumns({
         <span className="flex items-center gap-2">
           <span data-testid="execution-trace-number">{row.numberText}</span>
           {row.deleted ? <DeletedOrderMark /> : null}
+          {row.duration.kind === 'open' ? <ActiveOrderMark /> : null}
         </span>
       ),
     },

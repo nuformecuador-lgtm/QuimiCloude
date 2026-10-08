@@ -789,19 +789,6 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // pieza de pedidos ahi que deba colarse igual-.
     const rutaCronCaducidad = join(repoRoot, 'app', 'api', 'cron', 'caducar-pedidos', 'route.ts')
 
-    // 2026-10-08 (QC-167): el formato del recorrido de ejecucion del dashboard consume el TIPO
-    // `OrderStatus` del contrato publico de `pedidos` para su mapa de etiquetas (`design.md` de
-    // QC-167, «Etiquetas de estado»). Exclusion NOMBRADA, por ARCHIVO; y aun excluido, solo
-    // puede importar el barril, nunca el interior del modulo ni el driving.
-    const formatoRecorridoDashboard = join(
-      repoRoot,
-      'app',
-      '(private)',
-      'dashboard',
-      'components',
-      'execution-trace-format.ts',
-    )
-
     let consumidoresDeLaPantalla = 0
     for (const file of [
       ...sourcesIn(join(repoRoot, 'app')),
@@ -816,16 +803,6 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       const dentroDeOtraPantallaAutorizada =
         !relative(carpetaAsignacion, file).startsWith(`..${sep}`) || file === rutaCronCaducidad
       if (dentroDeOtraPantallaAutorizada) continue
-
-      if (file === formatoRecorridoDashboard) {
-        for (const spec of especificadores) {
-          expect(
-            spec,
-            `${etiqueta(file)} solo puede consumir el contrato publico de pedidos`,
-          ).toBe('@/lib/modules/pedidos')
-        }
-        continue
-      }
 
       const dentroDeLaPantalla = !relative(carpetaDeLaPantalla, file).startsWith(`..${sep}`)
       expect(

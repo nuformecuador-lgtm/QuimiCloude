@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  ACTIVE_ORDER_MARK,
   CANCELLED_ONLY_LABEL,
   DELETED_ORDER_MARK,
   EXECUTION_TRACE_SECTION_TESTID,
@@ -86,6 +87,18 @@ const CERRADO: ExecutionTraceRow = {
 
 const ROWS = [ACTIVO, DE_BAJA, CERRADO];
 
+const ACTIVO_POR_EMPACAR: ExecutionTraceRow = {
+  orderId: 'o-por-empacar',
+  numberText: '2026-0000043',
+  status: 'POR_EMPACAR',
+  deleted: false,
+  people: [LUIS],
+  firstAt: new Date('2026-10-07T07:00:00.000Z'),
+  lastAt: new Date('2026-10-07T07:40:00.000Z'),
+  duration: { kind: 'open', ms: 50 * 60 * 1000 },
+  goBackCount: 0,
+};
+
 function params(overrides: Partial<ExecutionTraceListParams> = {}): ExecutionTraceListParams {
   return { ...createDefaultExecutionTraceListParams(), ...overrides };
 }
@@ -161,6 +174,35 @@ describe('R3 - R15 - en curso y duracion', () => {
     const activa = fila(ACTIVO.orderId);
     expect(within(activa).getByTestId('execution-trace-status')).toHaveTextContent('En curso');
     expect(within(activa).getByTestId('execution-trace-duration')).toHaveTextContent('45 min 00 s (en curso)');
+  });
+
+  it('R3 - una fila activa en POR_EMPACAR lleva la marca «En curso» aparte del estado y su duracion abierta', () => {
+    render(
+      <ExecutionTraceTable
+        rows={[ACTIVO_POR_EMPACAR, ...ROWS]}
+        personOptions={[ANA, LUIS]}
+        params={params()}
+        totalPages={1}
+      />,
+    );
+    const activa = fila(ACTIVO_POR_EMPACAR.orderId);
+    expect(within(activa).getByTestId('execution-trace-active')).toHaveTextContent(ACTIVE_ORDER_MARK);
+    expect(within(activa).getByTestId('execution-trace-status')).toHaveTextContent('Por empacar');
+    expect(within(activa).getByTestId('execution-trace-duration')).toHaveTextContent('50 min 00 s (en curso)');
+    expect(within(fila(ACTIVO.orderId)).getByTestId('execution-trace-active')).toHaveTextContent(ACTIVE_ORDER_MARK);
+  });
+
+  it('R3 - la fila dada de baja en EN_CURSO no lleva la marca de actividad aunque su estado diga «En curso»', () => {
+    montar();
+    const baja = fila(DE_BAJA.orderId);
+    expect(within(baja).queryByTestId('execution-trace-active')).toBeNull();
+    expect(within(baja).getByTestId('execution-trace-status')).toHaveTextContent('En curso');
+    expect(within(baja).getByTestId('execution-trace-deleted')).toBeInTheDocument();
+  });
+
+  it('R3 - una fila cerrada no lleva la marca de actividad', () => {
+    montar();
+    expect(within(fila(CERRADO.orderId)).queryByTestId('execution-trace-active')).toBeNull();
   });
 
   it('R15 - una sola cifra por fila, la del formateador, con su marca de cierre', () => {

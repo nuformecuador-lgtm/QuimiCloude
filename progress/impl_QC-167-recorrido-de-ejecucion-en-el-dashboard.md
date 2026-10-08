@@ -455,3 +455,78 @@ Los nombres exactos de los casos están en el mapa de cada tanda, más arriba.
 | R27 | T14: `git diff --name-only origin/dev...HEAD` sin `package.json`/`pnpm-lock.yaml`/`db/`/`prisma/`; `guard-dependencias-aprobadas` verde |
 | R28 | e2e «R28 - el Administrador ve los pedidos de su empresa y no el ajeno…» |
 | R29 | e2e «R29 - el Operador recibe 404 en el dashboard y en el recorrido…» |
+
+## Última tanda: merge de dev y menores del review (2026-10-08)
+
+### Merge de `origin/dev` (42c83910)
+
+La rama iba 18 commits por detrás de dev. Cuatro archivos chocaron y en todos se conservaron los dos
+lados, QC-167 y QC-215:
+- `lib/composition/index.ts`:
+  - imports: los de `createListExecutionTraces`/`createGetExecutionTrace` y los de
+    `createStartConditioning`/`createFinishConditioning`;
+  - fachada: las cuatro factorías.
+- `lib/modules/asignaciones/index.ts`: el bloque del recorrido y el del acondicionamiento, uno tras
+  otro.
+- `tests/guards/guard-ambito-empresa-pedidos.test.ts`: la fila `listSummariesByIdsIncludingDeleted`
+  y las filas `startConditioningAliveById`/`finishConditioningAliveById`.
+- `tests/unit/composition/asignaciones-facade.test.ts`: el censo exacto ya traía las 22 operaciones.
+  Se juntaron las dos notas fechadas y el nombre del caso pasa a «…las DOS de QC-167 y las DOS de
+  QC-215, y ninguna mas». El `describe` pasa a «VEINTIDOS operaciones», lo que de paso corrige M5.
+
+Lo que hizo falta después del merge:
+- Dev trae dos migraciones de QC-215, que se aplicaron a `QuimiCloude_QC167` antes de correr
+  `prisma generate`. El lockfile no cambia.
+- QC-215 añade los estados `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO` y `TERMINADO`. El mapa
+  exhaustivo de etiquetas del recorrido ya no compilaba, y se añadieron con los mismos textos que
+  `company-orders-columns.tsx`.
+- **Nota para el humano:** `buildExecutionTrace` trata como activo todo lo que no está en
+  `FINAL_STATUSES` (`ENTREGADO`, `CANCELADO`). Los tres estados nuevos cuentan como activos, con la
+  duración abierta hasta ahora, `TERMINADO` incluido, porque sigue pasando a `ENTREGADO`. Es lo que
+  dice D11 («no ha llegado a un estado final»). El código no se ha tocado.
+
+### M4
+
+Deuda anotada en `progress/deudas.md` como D35: tres mapas `OrderStatus → texto` duplicados.
+
+### M1, decisión del implementer
+
+R3 dice «MIENTRAS el pedido está activo, su fila DEBE marcarlo «En curso»». La marca de actividad
+pasa a ser un distintivo propio, `ActiveOrderMark`, que sale solo si la duración es `open`. La
+etiqueta de estado de la columna (R2) no cambia, así que un pedido activo en `EN_CURSO` muestra
+«En curso» dos veces: estado y marca. Un dado de baja en `EN_CURSO` conserva el estado y no lleva
+la marca.
+
+### Salida de los tests (merge)
+
+- `pnpm run typecheck`: exit 0.
+- `asignaciones-facade`, dashboard (unit y ui), `execution-trace`, `session-once-per-request-actions`,
+  `module-contract` y `scope` de pedidos y de asignaciones: `Test Files 12 passed (12)`,
+  `Tests 281 passed (281)`.
+- `pnpm exec vitest run guard`: `Test Files 55 passed (55)`, `Tests 743 passed | 11 skipped (754)`.
+
+### Menores M1 y M2 del review (frontend_dev)
+
+**Archivos:** `app/(private)/dashboard/components/execution-trace-format.ts` (mapa tipado con
+`ExecutionTraceRow['status']`, sin importar `pedidos`; `ACTIVE_ORDER_MARK`),
+`execution-trace-columns.tsx` (`ActiveOrderMark`, `data-testid="execution-trace-active"`, junto al
+número si `duration.kind === 'open'`), `components/index.ts` (barril),
+`recorrido/[id]/components/execution-trace-detail.tsx` (misma marca junto al h1),
+`tests/ui/dashboard/execution-trace-table.test.tsx`, `tests/ui/dashboard/execution-trace-detail.test.tsx`,
+`tests/unit/pedidos/module-contract.test.ts` y `tests/unit/pedidos/scope.test.ts` (revertido el
+hunk de 1cb97d9c: ya ningún archivo de `app/(private)/dashboard/` importa `@/lib/modules/pedidos`).
+Ninguna aserción previa cambia.
+
+**R3 → test (añadidos):** ui `execution-trace-table` («R3 - una fila activa en POR_EMPACAR lleva la
+marca «En curso» aparte del estado y su duracion abierta», «R3 - la fila dada de baja en EN_CURSO no
+lleva la marca de actividad aunque su estado diga «En curso»», «R3 - una fila cerrada no lleva la
+marca de actividad»); ui `execution-trace-detail` («R3 - un pedido activo en EN_EMPAQUE lleva la
+marca «En curso» aparte del estado», «R3 - un pedido dado de baja en EN_CURSO o uno cerrado no lleva
+la marca de actividad»).
+
+**Salida:** `pnpm run typecheck` sin errores; `pnpm run lint` 0 errores, 7 warnings ajenos
+(`tests/unit/documentos/confirm-catalog-import.test.ts`, `tests/unit/pedidos/order-service.test.ts`);
+vitest dashboard+pedidos contract/scope: 8 archivos, 139 passed; `vitest run guard`: 55 archivos,
+743 passed, 11 skipped.
+
+**Veredicto:** M1 y M2 resueltos, verde en los checks pedidos.

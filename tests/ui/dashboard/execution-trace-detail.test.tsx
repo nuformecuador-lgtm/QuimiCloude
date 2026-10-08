@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ExecutionTracePage from '@/app/(private)/dashboard/recorrido/[id]/page';
 import { BACK_TO_LIST_TEXT, ExecutionTraceDetail } from '@/app/(private)/dashboard/recorrido/[id]/components';
 import {
+  ACTIVE_ORDER_MARK,
   DELETED_ORDER_MARK,
   GO_BACK_MARK,
   createDefaultExecutionTraceListParams,
@@ -170,6 +171,32 @@ describe('R12 - R18 - R20 - la pagina del recorrido', () => {
     render(await abrir());
     expect(notFoundMock).not.toHaveBeenCalled();
     expect(screen.getByTestId('execution-trace-deleted')).toHaveTextContent(DELETED_ORDER_MARK);
+  });
+});
+
+describe('R3 - la marca de actividad del resumen', () => {
+  it('R3 - un pedido activo en EN_EMPAQUE lleva la marca «En curso» aparte del estado', async () => {
+    getExecutionTraceActionMock.mockResolvedValue({
+      status: 'success',
+      data: { ...TRACE, status: 'EN_EMPAQUE', duration: { kind: 'open', ms: 20 * MIN } },
+    });
+    render(await abrir());
+    expect(screen.getByTestId('execution-trace-active')).toHaveTextContent(ACTIVE_ORDER_MARK);
+    expect(screen.getByTestId('execution-trace-status')).toHaveTextContent('En empaque');
+  });
+
+  it('R3 - un pedido dado de baja en EN_CURSO o uno cerrado no lleva la marca de actividad', async () => {
+    getExecutionTraceActionMock.mockResolvedValue({
+      status: 'success',
+      data: { ...TRACE, status: 'EN_CURSO', deleted: true, duration: { kind: 'unclosed', ms: 20 * MIN } },
+    });
+    render(await abrir());
+    expect(screen.queryByTestId('execution-trace-active')).toBeNull();
+    expect(screen.getByTestId('execution-trace-status')).toHaveTextContent('En curso');
+    cleanup();
+    getExecutionTraceActionMock.mockResolvedValue({ status: 'success', data: TRACE });
+    render(await abrir());
+    expect(screen.queryByTestId('execution-trace-active')).toBeNull();
   });
 });
 

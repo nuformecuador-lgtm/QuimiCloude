@@ -1,8 +1,8 @@
-import type { ExecutionAction, TraceDuration } from '@/lib/modules/asignaciones';
-import type { OrderStatus } from '@/lib/modules/pedidos';
+import type { ExecutionAction, ExecutionTraceRow, TraceDuration } from '@/lib/modules/asignaciones';
 
 export const DELETED_ORDER_MARK = 'Dado de baja';
 export const GO_BACK_MARK = 'Vuelta atrás';
+export const ACTIVE_ORDER_MARK = 'En curso';
 
 export const EXECUTION_ACTION_LABELS: Readonly<Record<ExecutionAction, string>> = {
   start: 'Arrancar',
@@ -15,7 +15,7 @@ export const EXECUTION_ACTION_LABELS: Readonly<Record<ExecutionAction, string>> 
   pack_finish: 'Terminar empaque',
 };
 
-export const TRACE_ORDER_STATUS_LABELS: Readonly<Record<OrderStatus, string>> = {
+export const TRACE_ORDER_STATUS_LABELS: Readonly<Record<ExecutionTraceRow['status'], string>> = {
   PENDIENTE: 'Pendiente',
   EN_CURSO: 'En curso',
   POR_EMPACAR: 'Por empacar',

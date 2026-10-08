@@ -14,12 +14,14 @@ export {
   type ExecutionTraceTableProps,
 } from './execution-trace-table';
 export {
+  ActiveOrderMark,
   DeletedOrderMark,
   TRACE_LINK_TEXT,
   buildExecutionTraceColumns,
   type ExecutionTraceColumnsDeps,
 } from './execution-trace-columns';
 export {
+  ACTIVE_ORDER_MARK,
   DELETED_ORDER_MARK,
   EXECUTION_ACTION_LABELS,
   GO_BACK_MARK,
