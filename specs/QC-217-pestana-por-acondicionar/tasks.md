@@ -101,14 +101,14 @@ ocho rutas de la lista lo pone rojo (comprobado a mano una vez).
 
 **Hecho:** tests verdes y guardias verdes.
 
-## T6 — Verificación de cierre de las capas · depende de T3, T4, T5
+## [x] T6 — Verificación de cierre de las capas · depende de T3, T4, T5
 
 `./init.sh` en verde. `docs/conventions.md > Comentarios`: ninguna cita de ficha ni de requisito en
 producción.
 
 **Hecho:** `./init.sh` verde, sin avisos nuevos.
 
-## T7 — E2E (`e2e/acondicionamiento.spec.ts`) · depende de T6
+## [x] T7 — E2E (`e2e/acondicionamiento.spec.ts`) · depende de T6
 
 Escenarios de `design.md > 7`:
 
@@ -118,7 +118,7 @@ Escenarios de `design.md > 7`:
 **Hecho:** `pnpm exec playwright test e2e/acondicionamiento.spec.ts` verde sobre una base sembrada.
 `e2e/empaque.spec.ts` sigue verde.
 
-## T8 — Trazabilidad · depende de T7
+## [x] T8 — Trazabilidad · depende de T7
 
 `progress/impl_QC-217-pestana-por-acondicionar.md` con el mapa `R1…R24 → test`. R24 se cubre por
 revisión del diff (sin `package.json`, `db/schema.prisma` ni `db/migrations/`) y por
