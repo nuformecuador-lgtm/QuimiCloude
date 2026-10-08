@@ -427,11 +427,11 @@ describe('setAliveOrderStatus (createOrderWriteRepository(tx).setStatus), el cam
     })
   })
 
-  it('R3 - a ENTREGADO lleva finishedAt en el mismo data; a EN_CURSO no', async () => {
+  it('R33 (QC-215): ni a ENTREGADO ni a EN_CURSO escribe finishedAt', async () => {
     updateMany.mockResolvedValue({ count: 1 })
 
     await setStatus('o-1', 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA, { companyId: EMPRESA })
-    await setStatus('o-1', 'EN_CURSO', 'ENTREGADO', 'actor-1', AHORA, { companyId: EMPRESA })
+    await setStatus('o-1', 'TERMINADO', 'ENTREGADO', 'actor-1', AHORA, { companyId: EMPRESA })
 
     const [aEnCurso, aEntregado] = updateMany.mock.calls
     expect(aEnCurso?.[0]?.data).not.toHaveProperty('finishedAt')
@@ -439,7 +439,6 @@ describe('setAliveOrderStatus (createOrderWriteRepository(tx).setStatus), el cam
       status: 'ENTREGADO',
       updatedAt: AHORA,
       updatedBy: 'actor-1',
-      finishedAt: AHORA,
     })
   })
 

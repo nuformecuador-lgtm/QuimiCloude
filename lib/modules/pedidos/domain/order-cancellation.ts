@@ -4,9 +4,10 @@ import type { OrderTransactionScope, OrderUnitOfWork } from '../ports/order-unit
 
 /**
  * Desde `ENTREGADO` no se cancela -eso seria una devolucion, que no existe- y desde `CANCELADO`
- * tampoco, porque es final. `POR_EMPACAR` y `EN_EMPAQUE` tampoco: el material ya se consumio al
- * dejar el pedido `POR_EMPACAR`, asi que cancelar dejaria un consumo sin pedido que lo explique;
- * un problema en esos dos estados se corrige con un ajuste de inventario. Es un mapa total para
+ * tampoco, porque es final. `POR_EMPACAR`, `EN_EMPAQUE`, los de acondicionamiento y `TERMINADO`
+ * tampoco: el material ya se consumio al dejar el pedido `POR_EMPACAR`, asi que cancelar dejaria un
+ * consumo sin pedido que lo explique; un problema en esos estados se corrige con un ajuste de
+ * inventario. Es un mapa total para
  * que un estado nuevo no compile hasta decidir si es cancelable.
  *
  * `BLOQUEADO` si se cancela, con las mismas reglas que un `PENDIENTE` y su motivo: es la unica
@@ -19,6 +20,9 @@ const CANCELLABLE = {
   BLOQUEADO: true,
   POR_EMPACAR: false,
   EN_EMPAQUE: false,
+  POR_ACONDICIONAR: false,
+  EN_ACONDICIONAMIENTO: false,
+  TERMINADO: false,
   ENTREGADO: false,
   CANCELADO: false,
 } as const satisfies Record<OrderStatus, boolean>;

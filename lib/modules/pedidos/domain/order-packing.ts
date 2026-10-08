@@ -170,7 +170,7 @@ function unitCostByPresentationUnit(
 /** Firma exacta de `OrderCatalog['finishPackingAliveById']`. */
 export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['finishPackingAliveById'] {
   return async function finishPackingAliveById(id, companyId, packerId, now) {
-    assertTransition('EN_EMPAQUE', 'ENTREGADO');
+    assertTransition('EN_EMPAQUE', 'POR_ACONDICIONAR');
 
     try {
       return await deps.unitOfWork.run(async (scope) => {

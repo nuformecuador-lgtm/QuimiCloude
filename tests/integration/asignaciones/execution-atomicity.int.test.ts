@@ -514,6 +514,9 @@ describe('asignaciones · la anotacion y el pedido se confirman juntos (Postgres
     await conFixture(async (fixture) => {
       const { orderId } = await enEmpaque(fixture);
       await asignaciones.finishPacking(empacador(fixture), { orderId });
+      expect((await pedidoEnBase(orderId)).status).toBe('POR_ACONDICIONAR');
+      // Ninguna accion de la aplicacion escribe ENTREGADO: se fija a mano para sembrar el caso.
+      await prisma.order.update({ where: { id: orderId }, data: { status: 'ENTREGADO' } });
       expect((await pedidoEnBase(orderId)).status).toBe('ENTREGADO');
       const antes = await anotaciones(orderId);
 
@@ -603,7 +606,7 @@ describe('asignaciones · el empaque y su anotacion se confirman juntos (Postgre
     });
   });
 
-  it('R41, R5bis: comenzar y terminar con la anotacion buena dejan una fila PACK_START y una PACK_FINISH sin posicion', async () => {
+  it('R41, R5bis, R5 (QC-215): comenzar y terminar con la anotacion buena dejan POR_ACONDICIONAR y una fila PACK_START y una PACK_FINISH sin posicion', async () => {
     await conFixture(async (fixture) => {
       const { orderId } = await porEmpacar(fixture);
 
@@ -611,9 +614,9 @@ describe('asignaciones · el empaque y su anotacion se confirman juntos (Postgre
       await asignaciones.finishPacking(empacador(fixture), { orderId });
 
       const fila = await pedidoEnBase(orderId);
-      expect(fila.status).toBe('ENTREGADO');
+      expect(fila.status).toBe('POR_ACONDICIONAR');
       expect(fila.packedBy).toBe(fixture.empacadorId);
-      expect(fila.finishedAt).not.toBeNull();
+      expect(fila.finishedAt).toBeNull();
       expect(await productoTerminado(fixture)).toBe(1);
       const empaque = (await anotaciones(orderId)).filter(
         (anotacion) => anotacion.action === 'PACK_START' || anotacion.action === 'PACK_FINISH',

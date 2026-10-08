@@ -324,6 +324,11 @@
       "desde": "2026-09-24"
     },
     {
+      "archivo": "pedidos/order-conditioning.int.test.ts",
+      "motivo": "QC-215 T7 (R8-R14): 'startConditioningAliveOrder'/'finishConditioningAliveOrder' (order-prisma.ts) usan el cliente Prisma GLOBAL con un 'updateMany' condicional, sin 'tx'; una transaccion del test con ROLLBACK impediria que dos Comenzar reales compitan por el bloqueo de la misma fila (R10). Cada caso fabrica su propia empresa efimera con randomUUID (usuarios, receta y pedidos) y la limpia en un 'finally', en el orden que exigen las FK (pedidos -> receta -> usuarios -> roles -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-08"
+    },
+    {
       "archivo": "pedidos/order-packing.int.test.ts",
       "motivo": "QC-168 T8 (R18-R25, R28): 'startPackingAliveOrder'/'finishPackingAliveOrder' (order-prisma.ts) usan el cliente Prisma GLOBAL con un 'updateMany' condicional, sin 'tx'; una transaccion del test con ROLLBACK impediria que dos Comenzar reales compitan por el bloqueo de la misma fila (R19). Cada caso fabrica su propia empresa efimera con randomUUID (usuario(s), receta y pedido) y la limpia en un 'finally', en el orden que exigen las FK (asientos -> pedidos -> receta -> usuarios -> roles -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-25"

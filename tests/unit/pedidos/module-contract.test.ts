@@ -637,7 +637,8 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     //
     // `order-packing.ts` (QC-168) tambien la consume: Comenzar y Terminar llaman a
     // `assertTransition` con la transicion fija que cada uno alcanza -`POR_EMPACAR -> EN_EMPAQUE`
-    // y `EN_EMPAQUE -> ENTREGADO`- antes de delegar en `OrderPackingRepository`.
+    // y `EN_EMPAQUE -> POR_ACONDICIONAR`- antes de delegar en `OrderPackingRepository`. Lo mismo
+    // `order-conditioning.ts` con las dos del acondicionamiento.
     expect(
       pedidosSources.filter((file) => CONSUME_LA_GUARDIA.test(read(file))).map(etiqueta),
     ).toEqual([

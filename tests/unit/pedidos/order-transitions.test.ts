@@ -21,10 +21,7 @@ import {
 } from '@/lib/modules/pedidos/domain/order-transitions'
 
 /** Los UNICOS pares permitidos: las transiciones hacia delante del flujo, el «quedarse igual» de
- *  los tres estados editables desde Pedidos y el vaiven `PENDIENTE <-> BLOQUEADO`. Nada mas.
- *
- *  `EN_EMPAQUE -> ENTREGADO` sigue en la tabla mientras Terminar el empaque escriba ENTREGADO;
- *  sale de aqui en el mismo cambio que mueve ese destino a POR_ACONDICIONAR. */
+ *  los tres estados editables desde Pedidos y el vaiven `PENDIENTE <-> BLOQUEADO`. Nada mas. */
 const PERMITIDOS: ReadonlyArray<readonly [OrderStatus, OrderStatus]> = [
   ['PENDIENTE', 'PENDIENTE'],
   ['PENDIENTE', 'EN_CURSO'],
@@ -33,7 +30,6 @@ const PERMITIDOS: ReadonlyArray<readonly [OrderStatus, OrderStatus]> = [
   ['EN_CURSO', 'POR_EMPACAR'],
   ['POR_EMPACAR', 'EN_EMPAQUE'],
   ['EN_EMPAQUE', 'POR_ACONDICIONAR'],
-  ['EN_EMPAQUE', 'ENTREGADO'],
   ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO'],
   ['EN_ACONDICIONAMIENTO', 'TERMINADO'],
   ['TERMINADO', 'ENTREGADO'],
@@ -51,12 +47,12 @@ function esperado(from: OrderStatus, to: OrderStatus): boolean {
 }
 
 describe('pedidos — transiciones de estado', () => {
-  it('R3: la matriz es de 10x10 y hay exactamente 13 pares permitidos', () => {
+  it('R3: la matriz es de 10x10 y hay exactamente 12 pares permitidos', () => {
     // Si alguien anadiera un estado sin revisar esta tabla, el 100 dejaria de cuadrar.
     expect(ORDER_STATUS_VALUES).toHaveLength(10)
     expect(TODOS).toHaveLength(100)
     expect(TODOS.filter(([from, to]) => esperado(from, to))).toHaveLength(PERMITIDOS.length)
-    expect(PERMITIDOS).toHaveLength(13)
+    expect(PERMITIDOS).toHaveLength(12)
   })
 
   it('R1: los tres estados nuevos van detras de los siete de antes, que conservan su orden', () => {
@@ -97,6 +93,7 @@ describe('pedidos — transiciones de estado', () => {
     expect(isAllowedTransition('TERMINADO', 'ENTREGADO')).toBe(true)
 
     const prohibidos: ReadonlyArray<readonly [OrderStatus, OrderStatus]> = [
+      ['EN_EMPAQUE', 'ENTREGADO'],
       ['EN_EMPAQUE', 'TERMINADO'],
       ['EN_EMPAQUE', 'EN_ACONDICIONAMIENTO'],
       ['POR_ACONDICIONAR', 'ENTREGADO'],
@@ -152,7 +149,7 @@ describe('pedidos — transiciones de estado', () => {
     expect(isAllowedTransition('PENDIENTE', 'EN_CURSO')).toBe(true)
     expect(isAllowedTransition('EN_CURSO', 'POR_EMPACAR')).toBe(true)
     expect(isAllowedTransition('POR_EMPACAR', 'EN_EMPAQUE')).toBe(true)
-    expect(isAllowedTransition('EN_EMPAQUE', 'ENTREGADO')).toBe(true)
+    expect(isAllowedTransition('EN_EMPAQUE', 'POR_ACONDICIONAR')).toBe(true)
 
     expect(isAllowedTransition('PENDIENTE', 'ENTREGADO')).toBe(false)
     expect(isAllowedTransition('EN_CURSO', 'PENDIENTE')).toBe(false)
@@ -239,13 +236,13 @@ describe('pedidos — transiciones de estado', () => {
     }
   })
 
-  it('EN_EMPAQUE solo se alcanza desde POR_EMPACAR, y ENTREGADO solo desde EN_EMPAQUE o TERMINADO (R1, R3)', () => {
+  it('EN_EMPAQUE solo se alcanza desde POR_EMPACAR, y ENTREGADO solo desde TERMINADO (R1, R3)', () => {
     // Son acciones propias, no la edicion normal.
     for (const from of ORDER_STATUS_VALUES) {
       if (from !== 'POR_EMPACAR') {
         expect(isAllowedTransition(from, 'EN_EMPAQUE'), `${from} -> EN_EMPAQUE`).toBe(false)
       }
-      if (from !== 'EN_EMPAQUE' && from !== 'TERMINADO') {
+      if (from !== 'TERMINADO') {
         expect(isAllowedTransition(from, 'ENTREGADO'), `${from} -> ENTREGADO`).toBe(false)
       }
     }

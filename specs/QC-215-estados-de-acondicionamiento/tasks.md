@@ -17,7 +17,7 @@
 
 ## Bloque 1 — Base de datos
 
-- [ ] **T1.** Esquema y M1 (`design.md > 1.1–1.5`).
+- [x] **T1.** Esquema y M1 (`design.md > 1.1–1.5`).
   - `db/schema.prisma`: los valores del enum y `conditionedBy` con su `@@index`.
   - `pnpm run db:migrate:create`.
   - `migration.sql` a mano: `ADD VALUE`, FK compuesta y los `CHECK` con `::text`.
@@ -26,11 +26,11 @@
 
   **Hecho cuando:** `pnpm run db:migrate` y `pnpm run db:rollback` funcionan en la base de test y
   la guardia está en verde. Depende de: —.
-- [ ] **T2.** `[P]` Test estático de M1:
+- [x] **T2.** `[P]` Test estático de M1:
   `tests/unit/pedidos/schema/order-conditioning-states-migration.test.ts`. Comprueba que solo hay
   `ADD VALUE IF NOT EXISTS`, el texto de cada `CHECK` y que el `down.sql` restaura el texto
   literal. **Hecho cuando:** cubre R26 (idempotencia) y R27 (texto). Depende de: T1.
-- [ ] **T3.** `[P]` Integración contra la base:
+- [x] **T3.** `[P]` Integración contra la base:
   - `tests/integration/pedidos/order-conditioning-constraints.int.test.ts`: R24, R25, filas
     existentes válidas (R26).
   - `tests/integration/pedidos/order-conditioning-states-rollback.int.test.ts`: R27, aborto con un
@@ -42,7 +42,7 @@
 
 ## Bloque 2 — Dominio de `pedidos`
 
-- [ ] **T4.** `order-classification.ts` (valores y flujo) y `order-transitions.ts` (`ALLOWED` de
+- [x] **T4.** `order-classification.ts` (valores y flujo) y `order-transitions.ts` (`ALLOWED` de
   R3). Tests: `tests/unit/pedidos/order-transitions.test.ts` (los 100 pares) y
   `tests/unit/pedidos/module-contract.test.ts` (enum = dominio). **Hecho cuando:** R1, R2 y R3
   están en verde y `typecheck` señala todos los `Record<OrderStatus, …>` pendientes. Depende de: T1.
@@ -50,7 +50,7 @@
   `NO_BORRABLES`. Tests: `transition-order.test.ts`, `delete-order.test.ts`,
   `cancel-order.test.ts` y `update-order.test.ts` (R18, R19 con los estados nuevos). **Hecho
   cuando:** R4, R18 y R19 están en verde. Depende de: T4.
-- [ ] **T6.** Terminar el empaque deja `POR_ACONDICIONAR` sin `finishedAt`:
+- [x] **T6.** Terminar el empaque deja `POR_ACONDICIONAR` sin `finishedAt`:
   - `order-packing.ts`, `assertTransition`;
   - `order-prisma.ts`, `finishPackingAliveOrder`;
   - `setAliveOrderStatus` deja de escribir `finishedAt`;
@@ -61,7 +61,7 @@
   `tests/integration/pedidos/order-finished-at.int.test.ts` y
   `tests/integration/pedidos/finish-with-finished-goods.int.test.ts`. **Hecho cuando:** R5, R6 y
   R33 (`finishedAt`) están en verde. Depende de: T4.
-- [ ] **T7.** Puerto `order-conditioning-repository.ts`, adaptador en `order-prisma.ts`, dominio
+- [x] **T7.** Puerto `order-conditioning-repository.ts`, adaptador en `order-prisma.ts`, dominio
   `order-conditioning.ts`, dos métodos en `OrderCatalog` y cableado en `lib/composition/index.ts`
   (`design.md > 2`). Tests:
   - `tests/unit/pedidos/order-conditioning.test.ts`: puerto simulado, `assertTransition`;
@@ -111,7 +111,7 @@
 
 ## Bloque 5 — `TERMINADO`
 
-- [ ] **T15.** `TERMINADO` en el enum de T1 y las filas [P1] de `design.md > 1.3` en M1; M2
+- [x] **T15.** `TERMINADO` en el enum de T1 y las filas [P1] de `design.md > 1.3` en M1; M2
   con el índice `orders_company_terminated_idx` y su `down.sql`, dado de alta en la guardia de
   migraciones. Tests: amplían T2 y T3 (R30, base). Depende de: T1.
 - [ ] **T16.** «Terminados» = `TERMINADO` (`list-finished-orders.ts`); «Todos» exactamente

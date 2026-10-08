@@ -115,9 +115,20 @@ async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string
 }
 
 describe('setOrderCustomer — en cualquier estado (R14, R15)', () => {
-  it('R14: los siete estados son exactamente los del catalogo', () => {
+  it('R14: los diez estados son exactamente los del catalogo', () => {
     expect([...ORDER_STATUS_VALUES].sort()).toEqual(
-      ['BLOQUEADO', 'CANCELADO', 'EN_CURSO', 'EN_EMPAQUE', 'ENTREGADO', 'PENDIENTE', 'POR_EMPACAR'].sort(),
+      [
+        'BLOQUEADO',
+        'CANCELADO',
+        'EN_ACONDICIONAMIENTO',
+        'EN_CURSO',
+        'EN_EMPAQUE',
+        'ENTREGADO',
+        'PENDIENTE',
+        'POR_ACONDICIONAR',
+        'POR_EMPACAR',
+        'TERMINADO',
+      ].sort(),
     )
   })
 

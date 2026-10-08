@@ -773,9 +773,8 @@ async function insertAliveOrder(
  * cliente de la transaccion en curso, sin `assertTransition` -esa comprobacion ya la hizo el
  * dominio sobre la fila que acaba de bloquear `lockAliveById`-.
  *
- * Con destino `ENTREGADO` escribe tambien `finishedAt` en el mismo `UPDATE`, con el mismo `now`
- * que ya recibe la llamada: el cambio de estado y la fecha de terminado quedan atomicos entre
- * si. Con cualquier otro destino no toca `finishedAt`.
+ * No toca `finishedAt` con ningun destino: la fecha la escribe solo Terminar el acondicionamiento,
+ * y un `TERMINADO` que pase a `ENTREGADO` la conserva.
  */
 async function setAliveOrderStatus(
   id: string,
@@ -792,7 +791,6 @@ async function setAliveOrderStatus(
       status: to,
       updatedAt: now,
       updatedBy: actorId,
-      ...(to === 'ENTREGADO' ? { finishedAt: now } : {}),
     },
   });
   if (count === 1) return 'ok';
@@ -1043,10 +1041,72 @@ export function createOrderPackingRepository(db: PrismaLike = prisma): OrderPack
   };
 }
 
+/** Fila minima que las dos escrituras de acondicionamiento releen para clasificar el resultado
+ *  cuando el `UPDATE` condicional no movio ninguna fila. */
+type ConditioningStatusRow = { readonly status: OrderStatus; readonly conditionedBy: string | null };
+
+async function findAliveConditioningStatus(id: string, scope: OrderScope): Promise<ConditioningStatusRow | null> {
+  return prisma.order.findFirst({
+    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
+    select: { status: true, conditionedBy: true },
+  });
+}
+
+/**
+ * Implementa `OrderConditioningRepository['startConditioningAlive']`. Sin `SELECT ... FOR UPDATE`:
+ * no hay otra tabla que leer bajo el bloqueo. Si dos llamadas compiten, la segunda espera el
+ * bloqueo de fila de la primera, reevalua el `WHERE` sobre la version confirmada, no mueve nada y
+ * su relectura ya ve el pedido a nombre de la otra.
+ */
+export async function startConditioningAliveOrder(
+  id: string,
+  conditionerId: string,
+  now: Date,
+  scope: OrderScope,
+): Promise<'ok' | 'already_mine' | 'taken' | 'not_conditionable' | 'not_found'> {
+  const { count } = await prisma.order.updateMany({
+    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null, status: 'POR_ACONDICIONAR' }] },
+    data: { status: 'EN_ACONDICIONAMIENTO', conditionedBy: conditionerId, updatedAt: now, updatedBy: conditionerId },
+  });
+  if (count === 1) return 'ok';
+
+  const row = await findAliveConditioningStatus(id, scope);
+  if (row === null) return 'not_found';
+  if (row.status === 'EN_ACONDICIONAMIENTO') {
+    return row.conditionedBy === conditionerId ? 'already_mine' : 'taken';
+  }
+  return 'not_conditionable';
+}
+
+/** Implementa `OrderConditioningRepository['finishConditioningAlive']`: el estado y `finished_at`
+ *  van en la misma sentencia, que exige ademas ser quien acondiciona. */
+export async function finishConditioningAliveOrder(
+  id: string,
+  conditionerId: string,
+  now: Date,
+  scope: OrderScope,
+): Promise<'ok' | 'not_conditioner' | 'not_conditionable' | 'not_found'> {
+  const { count } = await prisma.order.updateMany({
+    where: {
+      AND: [
+        orderCompanyScope(scope),
+        { id, deletedAt: null, status: 'EN_ACONDICIONAMIENTO', conditionedBy: conditionerId },
+      ],
+    },
+    data: { status: 'TERMINADO', finishedAt: now, updatedAt: now, updatedBy: conditionerId },
+  });
+  if (count === 1) return 'ok';
+
+  const row = await findAliveConditioningStatus(id, scope);
+  if (row === null) return 'not_found';
+  if (row.status === 'EN_ACONDICIONAMIENTO' && row.conditionedBy !== conditionerId) return 'not_conditioner';
+  return 'not_conditionable';
+}
+
 /**
  * Implementa `OrderWriteRepository['finishPackingAlive']` (Terminar): el `UPDATE`
- * condicional exige ademas `packed_by = packerId`, y escribe
- * `finished_at` en la MISMA sentencia que el estado. Corre sobre `tx` -la transaccion
+ * condicional exige ademas `packed_by = packerId` y deja el pedido `POR_ACONDICIONAR`, sin
+ * `finished_at`: el pedido aun no esta terminado. Corre sobre `tx` -la transaccion
  * compartida de `OrderUnitOfWork`, no el cliente global- para que el alta de los lotes que hace
  * el dominio despues comparta la MISMA transaccion y un fallo posterior deshaga tambien este
  * `UPDATE`. Si `count === 1`, relee la receta/cantidad/coste guardado que Terminar necesita, ya
@@ -1065,7 +1125,7 @@ async function finishPackingAliveOrder(
     where: {
       AND: [orderCompanyScope(scope), { id, deletedAt: null, status: 'EN_EMPAQUE', packedBy: packerId }],
     },
-    data: { status: 'ENTREGADO', finishedAt: now, updatedAt: now, updatedBy: packerId },
+    data: { status: 'POR_ACONDICIONAR', updatedAt: now, updatedBy: packerId },
   });
   if (count === 1) {
     const row = await tx.order.findUniqueOrThrow({

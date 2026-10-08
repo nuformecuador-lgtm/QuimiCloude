@@ -357,8 +357,8 @@ describe('la accion «Cliente»', () => {
     expect(item).not.toHaveAttribute('aria-disabled');
   });
 
-  it('R32: cubre los siete estados del contrato', () => {
-    expect(ORDER_STATUS_VALUES).toHaveLength(7);
+  it('R32: cubre los diez estados del contrato', () => {
+    expect(ORDER_STATUS_VALUES).toHaveLength(10);
   });
 
   it.each(ORDER_STATUS_VALUES)('R32: sin canEditCustomer no aparece en %s', async (status) => {

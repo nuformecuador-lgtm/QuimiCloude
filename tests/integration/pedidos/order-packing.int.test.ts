@@ -423,7 +423,7 @@ describe('startPackingAliveById — R10, R18, R19, R20, R23, R24, R25', () => {
 });
 
 describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
-  it('R21: Terminar sobre su EN_EMPAQUE deja ENTREGADO con finished_at, en una sola escritura', async () => {
+  it('R21, R5 (QC-215): Terminar sobre su EN_EMPAQUE deja POR_ACONDICIONAR sin finished_at y conserva packed_by, en una sola escritura', async () => {
     const fixture = await crearFixture();
     const pedido = await createOrder(fixture, { status: 'EN_EMPAQUE', packedBy: fixture.packerId });
     try {
@@ -435,8 +435,12 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
       expect(resultado).toEqual({ kind: 'ok', finishedGoods: [] });
 
       const fila = await readOrder(pedido);
-      expect(fila.status).toBe('ENTREGADO');
-      expect(fila.finishedAt).toEqual(ahora);
+      expect(fila.status).toBe('POR_ACONDICIONAR');
+      expect(fila.finishedAt).toBeNull();
+      expect(fila.packedBy).toBe(fixture.packerId);
+      expect(fila.updatedAt).toEqual(ahora);
+      const conditionedBy = await prisma.order.findUniqueOrThrow({ where: { id: pedido }, select: { conditionedBy: true } });
+      expect(conditionedBy.conditionedBy).toBeNull();
       expect(await movementCountDe(fixture.companyId)).toBe(antes);
     } finally {
       await borrarFixture(fixture, [pedido]);
@@ -499,7 +503,7 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
     }
   });
 
-  it('R27: un pedido terminado por Terminar aparece con su finished_at, sin ninguna otra accion', async () => {
+  it('R5, R33 (QC-215): un pedido empacado por Terminar NO recibe finished_at: queda POR_ACONDICIONAR', async () => {
     const fixture = await crearFixture();
     const pedido = await createOrder(fixture, { status: 'EN_EMPAQUE', packedBy: fixture.packerId });
     try {
@@ -510,8 +514,8 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
         where: { id: pedido },
         select: { status: true, finishedAt: true },
       });
-      expect(fila.status).toBe('ENTREGADO');
-      expect(fila.finishedAt).toEqual(ahora);
+      expect(fila.status).toBe('POR_ACONDICIONAR');
+      expect(fila.finishedAt).toBeNull();
     } finally {
       await borrarFixture(fixture, [pedido]);
     }

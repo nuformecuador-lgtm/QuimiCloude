@@ -130,6 +130,44 @@ gate se pone rojo, con el cambio mínimo y anotado en «Excepciones».
   `./init.sh` (2026-10-08) lo mató el sistema por falta de memoria tras pasar las comprobaciones
   de board/perfil y antes de typecheck/tests. Hay que relanzarlo antes de empezar la fase C.
 
+### C1 — Núcleo de pedidos (2026-10-08, tras mergear origin/dev con QC-82 y QC-156)
+
+- Arreglo del merge (QC-156): `order-cancellation.ts` (`CANCELLABLE` exhaustivo: los 3 estados nuevos
+  = `false`) y su test (mapa de 10 + caso R18 por estado). `set-order-customer.test.ts` y
+  `order-row-actions.test.tsx`: cuenta del enum 7 → 10.
+- T4 final: `ALLOWED` exacto de R3 (fuera `EN_EMPAQUE → ENTREGADO`); `order-transitions.test.ts`
+  12 permitidos, `EN_EMPAQUE → ENTREGADO` en prohibidos, `ENTREGADO` solo desde `TERMINADO`.
+- T6: `order-packing.ts` (`assertTransition('EN_EMPAQUE','POR_ACONDICIONAR')`); `order-prisma.ts`
+  (`finishPackingAliveOrder` → `POR_ACONDICIONAR` sin `finishedAt`; `setAliveOrderStatus` ya no
+  escribe `finishedAt`); JSDoc de `order-catalog.ts` y `asignaciones/domain/finish-packing.ts`.
+- T7: `OrderCatalog` + `startConditioningAliveById`/`finishConditioningAliveById`; adaptadores
+  `startConditioningAliveOrder`/`finishConditioningAliveOrder` en `order-prisma.ts` (un `updateMany`
+  condicional + relectura que clasifica, sin unidad de trabajo); barrel `pedidos/index.ts`;
+  `lib/composition/index.ts` (`orderConditioningRepository` + dos métodos en `orderCatalog`).
+- Tests ajustados: `module-contract` (comentario), `order-packing` unit (R5, R6) e int, `order-finished-at.int`
+  (R33), `finish-with-finished-goods.int` (R5), `order-catalog.test.ts` (R33), `qc145-estado-solo-planta`
+  (un solo `data:` con `finishedAt`, el de TERMINADO; 6 escrituras de estado),
+  `execution-atomicity.int` (QC-82: Terminar deja `POR_ACONDICIONAR`; el caso R20 siembra ENTREGADO a
+  mano). Fakes de `OrderCatalog`: 6 `.int` de asignaciones + `assign-responsibles.test.ts`.
+  Guardia `guard-ambito-empresa-pedidos`: los dos métodos en `METODOS_DELEGADOS_EN_DOMINIO`.
+- Test nuevo: `tests/integration/pedidos/order-conditioning.int.test.ts` (alta `commit` en
+  `aislamiento.json`, desde 2026-10-08).
+- R → test: R3 → `order-transitions.test.ts`; R5 → `order-packing.test.ts`, `order-packing.int`,
+  `finish-with-finished-goods.int`, `execution-atomicity.int`; R6 → `order-packing.test.ts` y los casos
+  de rechazo de `finish-with-finished-goods.int`; R8, R9, R10, R12, R13, R14 → `order-conditioning.int`
+  (+ `order-conditioning.test.ts`); R18 → `order-cancellation.test.ts`; R33 → `order-finished-at.int`,
+  `order-catalog.test.ts`, `qc145-estado-solo-planta.test.ts`.
+- Verificación (sin `./init.sh` por OOM, a petición del humano): typecheck verde; lint 0 errores
+  (7 warnings ajenos); guardias 55 archivos, 742 verdes, 11 skipped; `tests/unit/pedidos` +
+  `pedidos-ui` 111 archivos, 2083 casos, verdes; `tests/unit/asignaciones` + `composition` 67/67,
+  1260 verdes; `.int` de pedidos (conditioning, packing, finished-at, finish-with-finished-goods)
+  53/53; `order-repository.int` + `execution-atomicity.int` 27/27; `.int` de asignaciones con fakes
+  25/26.
+- **Rojo conocido:** `finished-orders.int.test.ts` > «R27: Finalizar -> Comenzar -> Terminar deja el
+  pedido en «Terminados»». Lo causa T6 (Terminar ya no deja ENTREGADO) y se arregla con
+  `list-finished-orders.ts` → `TERMINADO` + el recorrido de acondicionamiento en el test (C3/T16).
+- Veredicto: C1 hecha salvo ese rojo, que depende de C3.
+
 ## Pendiente
 
 - Cerrar el gate de A2+A3 (`./init.sh`).

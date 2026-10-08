@@ -38,6 +38,8 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import {
   createOrderWriteRepository,
+  finishConditioningAliveOrder,
+  startConditioningAliveOrder,
   startPackingAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { assertTransition } from '@/lib/modules/pedidos/domain/order-transitions';
@@ -99,6 +101,10 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
       const outcome = await createOrderWriteRepository().finishPackingAlive(id, packerId, now, { companyId });
       return outcome.kind === 'ok' ? { kind: 'ok', finishedGoods: [] } : outcome.kind;
     },
+    startConditioningAliveById: (id, companyId, conditionerId, now) =>
+      startConditioningAliveOrder(id, conditionerId, now, { companyId }),
+    finishConditioningAliveById: (id, companyId, conditionerId, now) =>
+      finishConditioningAliveOrder(id, conditionerId, now, { companyId }),
   };
   const assignments = createOrderAssignmentRepository(tx);
   const execution = executionOnClient(tx, orders);
