@@ -59,11 +59,11 @@ tienen que estar hechas antes. Cada task acaba con `pnpm run typecheck`, `pnpm r
   `11-layout-privado-con-sidebar`.
   *Hecho:* cada requisito de la tabla de `design.md > 8` tiene su nota y nada del texto original
   se borra.
-- [ ] **T10 — Tests de specs cerrados (D16).** Va repartida en T2, T3, T5 y T7: cada caso que
+- [x] **T10 — Tests de specs cerrados (D16).** Va repartida en T2, T3, T5 y T7: cada caso que
   cambia lleva la referencia a la enmienda en su nombre o en un comentario corto, y ningún caso
   se borra sin sustituirlo por su equivalente.
   *Hecho:* el reviewer contrasta el diff de `tests/` con la tabla de `design.md > 8`.
-- [ ] **T11 — Cierre.** `./init.sh` en verde. Rellenar en `progress/impl_QC-226.md` el mapa
+- [x] **T11 — Cierre.** `./init.sh` en verde. Rellenar en `progress/impl_QC-226.md` el mapa
   `R<n> → test` de `design.md > 9`. Dep.: todas.
 
 ## Archivos esperados

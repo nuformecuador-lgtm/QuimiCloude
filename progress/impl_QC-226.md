@@ -307,3 +307,46 @@ El bloqueo de arriba se resuelve con D21 (opción A, decisión humana). D22 mant
 ### Veredicto
 
 T7 completo en lo que toca a frontend_dev: R16 con el `h1` del logo y su test, D21 aplicado en el único caso permitido, y el par de D22 en verde en los dos modos.
+
+## T11 — Cierre — leader, 2026-10-08
+
+- `./init.sh` en verde tras mergear origin/dev (con el arreglo del gate rápido, #180): typecheck y lint
+  pasan; el único rojo, `pantallas-exigen-permiso.test.tsx`, es heredado del baseline y el gate lo
+  nombra sin contarlo.
+- `e2e/login.spec.ts`: **10/10** en chromium y webkit, con la base local arriba (lo corrió el reviewer).
+  `login-skin` y `brand-assets`: 28/28.
+- El typecheck rojo que vio el reviewer era de entorno: un `next dev -p 3001` del worktree tenía
+  abiertos `.next/dev/types`. Se paró el servidor, se regeneraron los tipos y quedó en verde.
+
+### Mapa R<n> → test
+
+
+| R | Test |
+| --- | --- |
+| R1, R2 | `tests/unit/theme/color-tokens.test.ts` «R1 (ENMIENDA…)», «R2 (ENMIENDA…)», `--chart-*`, acromáticos; valores contrastados además contra el kit |
+| R3 | `color-tokens.test.ts` «R3: expone cada token de estado…» |
+| R4 | `color-tokens.test.ts` «R4 (ENMIENDA QC-226): declara --radius en 0.5rem» |
+| R5 | `color-tokens.test.ts` R5 `it.each(modes)` (`TEXT_PAIRS` 14, `UI_PAIRS` 2) |
+| R6 | `color-tokens.test.ts` «R6: …» |
+| R7, R8 | `tests/unit/brand/fonts.test.ts` (4 casos R7, 2 casos R8) |
+| R9 | `tests/unit/theme/sidebar-panel.test.tsx` «R9: …» ×2 |
+| R10 | `sidebar-panel.test.tsx` «usa 272px…78px», «al menos 44px», radio 22 en «R9»; `sidebar-ajuste.test.tsx` «44px con !important» (ver m3: 18 px sin test) |
+| R11 | `tests/unit/sidebar-ajuste.test.tsx` «R11: …» ×2 |
+| R12 | `tests/unit/app-sidebar.test.tsx` «R12: …», `sidebar-mobile.test.tsx` (Sheet), `sidebar-ajuste` «R12, R15» |
+| R13 | `app-sidebar.test.tsx` «R13: …», `sidebar-ajuste` «R13» ×2, `sidebar-desktop` (ENMIENDA) |
+| R14 | `tests/unit/theme/private-header.test.tsx` «R14: …»; `brand-logo.test.tsx` «R14, R15» |
+| R15 | `tests/unit/brand/brand-logo.test.tsx` «R15, R30» ×3, «R15: 132 px», «R15: sin fondo…» |
+| R16 | `tests/unit/login-skin.test.tsx` «R16: …»; `login-form.test.tsx` (D21) |
+| R17 | `login-skin.test.tsx` «R17 …» ×4; `e2e/login-skin.spec.ts` «R17 …» |
+| R18, R19 | `login-skin.test.tsx` R18 ×8, R19 ×2; E2E «R18, R19 …» |
+| R20 | `login-skin.test.tsx` R20 ×5 |
+| R21 | `login-skin.test.tsx` «R21 …»; E2E «R21 …» |
+| R22 | `login-skin.test.tsx` R22 ×3; E2E «R22 …» |
+| R23 | `login-form.test.tsx` (verde, solo D21 enmendado); `login-skin` medidas/`main`/enlace; `e2e/login.spec.ts` 10/10 en verde (esta revisión) |
+| R24–R27, R29, R30 | `tests/unit/brand/metadata-assets.test.ts` |
+| R25, R26, R28 | `e2e/brand-assets.spec.ts` (14/14) |
+| R31 | `tests/unit/theme/sin-dependencias-nuevas.test.ts` + guardia `guard-dependencias-aprobadas`; diff de `package.json` vacío |
+| R32 | `color-tokens.test.ts` «R32: …»; `login-skin.test.tsx` «R32 (ENMIENDA…)» |
+| R33 | `tests/unit/theme/ui-primitivas-intactas.test.ts`; diff de `components/ui/` vacío |
+| R34 | `brand-logo.test.tsx` «R34: …» ×2 |
+
