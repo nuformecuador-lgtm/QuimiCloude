@@ -6,9 +6,10 @@ import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
 import type { OrderStatus } from '@/lib/modules/pedidos';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
-import { OrderDistributionFull, assignmentViewHref } from '../../../components';
+import { OrderDistributionFull, assignmentViewHref, orderDistributionFullText } from '../../../components';
 
 import { ConditioningActions } from './conditioning-actions';
+import { ConditioningBatchDataForm } from './conditioning-batch-data-form';
 import { ConditioningTeamList } from './conditioning-team-list';
 
 /**
@@ -26,6 +27,7 @@ export const CONDITIONING_ORDER_STATUS_TESTID = 'conditioning-order-status';
 export const CONDITIONING_ORDER_CONDITIONER_TESTID = 'conditioning-order-conditioner';
 export const CONDITIONING_ORDER_BACK_LINK_TESTID = 'conditioning-order-back-link';
 export const CONDITIONING_ORDER_CANDIDATES_ERROR_TESTID = 'conditioning-order-candidates-error';
+export const CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID = 'conditioning-order-batch-data-missing';
 
 export const CONDITIONING_ORDER_SCREEN_TEXTS = {
   recipeMissing: 'Esta receta está dada de baja.',
@@ -34,12 +36,17 @@ export const CONDITIONING_ORDER_SCREEN_TEXTS = {
   conditionedBy: (name: string) => `Lo acondiciona ${name}.`,
   backToQueue: 'Volver a «Por acondicionar»',
   backToFinished: 'Volver a «Terminados»',
+  backToDelivered: 'Volver a «Entregados»',
+  batchDataMissing: (count: number) =>
+    count === 1 ? 'Faltan los datos de lote de 1 línea.' : `Faltan los datos de lote de ${count} líneas.`,
 } as const;
+
+const BATCH_DATA_MISSING_ID = 'conditioning-order-batch-data-missing';
 
 const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /**
- * Solo los tres estados que puede devolver `getConditioningOrder`; cualquier otro es imposible
+ * Solo los cuatro estados que puede devolver `getConditioningOrder`; cualquier otro es imposible
  * aquí y se pinta tal cual sin tumbar la pantalla. Etiquetas locales porque las de la tabla viven
  * en un módulo de cliente.
  */
@@ -47,19 +54,29 @@ function statusLabel(status: OrderStatus): string {
   if (status === 'POR_ACONDICIONAR') return 'Por acondicionar';
   if (status === 'EN_ACONDICIONAMIENTO') return 'En acondicionamiento';
   if (status === 'TERMINADO') return 'Terminado';
+  if (status === 'ENTREGADO') return 'Entregado';
   return status;
 }
 
 function backLink(status: OrderStatus): { readonly href: string; readonly label: string } {
-  return status === 'TERMINADO'
-    ? { href: assignmentViewHref('acondicionados'), label: CONDITIONING_ORDER_SCREEN_TEXTS.backToFinished }
-    : { href: assignmentViewHref('por_acondicionar'), label: CONDITIONING_ORDER_SCREEN_TEXTS.backToQueue };
+  if (status === 'TERMINADO') {
+    return { href: assignmentViewHref('acondicionados'), label: CONDITIONING_ORDER_SCREEN_TEXTS.backToFinished };
+  }
+  if (status === 'ENTREGADO') {
+    return {
+      href: assignmentViewHref('acondicionados_entregados'),
+      label: CONDITIONING_ORDER_SCREEN_TEXTS.backToDelivered,
+    };
+  }
+  return { href: assignmentViewHref('por_acondicionar'), label: CONDITIONING_ORDER_SCREEN_TEXTS.backToQueue };
 }
 
 export type ConditioningOrderScreenProps = {
   readonly order: ConditioningOrderDetail;
   readonly canStart?: boolean;
   readonly canFinish?: boolean;
+  /** «Terminar» se ofrece deshabilitado. */
+  readonly finishBlocked?: boolean;
   /** Sin candidatos no se ofrece «Acondicionar». */
   readonly candidates?: ConditioningTeamCandidates | null;
   readonly candidatesError?: ErrorState | null;
@@ -69,10 +86,13 @@ export function ConditioningOrderScreen({
   order,
   canStart = false,
   canFinish = false,
+  finishBlocked = false,
   candidates = null,
   candidatesError = null,
 }: ConditioningOrderScreenProps) {
   const back = backLink(order.status);
+  const batchData = order.batchData;
+  const missingCount = batchData?.missingCount ?? 0;
 
   return (
     <div
@@ -135,8 +155,32 @@ export function ConditioningOrderScreen({
         />
       ) : null}
 
+      {batchData === null ? null : (
+        <ConditioningBatchDataForm
+          orderId={order.id}
+          lines={batchData.lines.map((line) => ({ ...line, label: orderDistributionFullText([line]) }))}
+        />
+      )}
+
+      {missingCount > 0 ? (
+        <p
+          id={BATCH_DATA_MISSING_ID}
+          className="text-base font-medium"
+          data-testid={CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID}
+        >
+          {CONDITIONING_ORDER_SCREEN_TEXTS.batchDataMissing(missingCount)}
+        </p>
+      ) : null}
+
       {canFinish ? (
-        <ConditioningActions key="finish" kind="finish" orderId={order.id} orderNumber={order.numberText} />
+        <ConditioningActions
+          key="finish"
+          kind="finish"
+          orderId={order.id}
+          orderNumber={order.numberText}
+          blocked={finishBlocked}
+          describedBy={finishBlocked && missingCount > 0 ? BATCH_DATA_MISSING_ID : undefined}
+        />
       ) : null}
 
       {candidatesError === null ? null : (

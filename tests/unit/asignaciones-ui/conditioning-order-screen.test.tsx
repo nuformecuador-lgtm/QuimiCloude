@@ -6,7 +6,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   CONDITIONING_ACTIONS_TEXTS,
+  CONDITIONING_BATCH_DATA_LINE_TESTID,
+  CONDITIONING_BATCH_DATA_SECTION_TESTID,
   CONDITIONING_ORDER_BACK_LINK_TESTID,
+  CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID,
   CONDITIONING_ORDER_CANDIDATES_ERROR_TESTID,
   CONDITIONING_ORDER_CONDITIONER_TESTID,
   CONDITIONING_ORDER_DISTRIBUTION_TESTID,
@@ -20,11 +23,16 @@ import {
   ConditioningOrderScreen,
 } from '@/app/(private)/asignacion/acondicionamiento/[id]/components';
 import { buildConditioningOrdersColumns } from '@/app/(private)/asignacion/components';
-import type { ConditioningOrderDetail, ConditioningTeamCandidates } from '@/lib/modules/asignaciones';
+import type {
+  ConditioningBatchLineView,
+  ConditioningOrderDetail,
+  ConditioningTeamCandidates,
+} from '@/lib/modules/asignaciones';
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-conditioning-actions', () => ({
   startConditioningAction: vi.fn(),
   finishConditioningAction: vi.fn(),
+  saveConditioningBatchDataAction: vi.fn(),
 }));
 
 afterEach(() => {
@@ -274,5 +282,124 @@ describe('enlace de vuelta según el estado', () => {
       expect(fuente).not.toMatch(/\w+Action\(/);
       expect(fuente).not.toContain('<form');
     }
+  });
+});
+
+describe('«Datos de lote» en el detalle', () => {
+  const LINE: ConditioningBatchLineView = {
+    batchId: 'batch-1',
+    presentationId: 'pres-1',
+    presentationName: 'Frasco',
+    packagingName: '500 g',
+    packages: 12,
+    provisionalLot: '0000042',
+    lot: null,
+    expiryDate: null,
+    productionDate: null,
+  };
+  const SECOND: ConditioningBatchLineView = {
+    ...LINE,
+    batchId: 'batch-2',
+    presentationId: 'pres-2',
+    presentationName: 'Bolsa',
+    packagingName: '1 kg',
+    packages: 4,
+  };
+  const MINE = { ...ROW, conditionedById: 'user-1', conditionedByName: 'Ana Ruiz' };
+
+  it.each(['EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO'] as const)(
+    'R1 R18 R21: en %s, con batchData, pinta la sección con un bloque por línea en orden de alta',
+    (status) => {
+      render(
+        <ConditioningOrderScreen order={{ ...MINE, status, batchData: { lines: [LINE, SECOND], missingCount: 2 } }} />,
+      );
+
+      const seccion = screen.getByTestId(CONDITIONING_BATCH_DATA_SECTION_TESTID);
+      expect(within(seccion).getByRole('heading', { name: 'Datos de lote' })).toBeInTheDocument();
+      expect(
+        within(seccion)
+          .getAllByTestId(CONDITIONING_BATCH_DATA_LINE_TESTID)
+          .map((bloque) => bloque.querySelector('legend')?.textContent),
+      ).toEqual(['12 × 500 g', '4 × 1 kg']);
+      expect(within(seccion).getByRole('button', { name: 'Guardar datos de lote' })).toBeInTheDocument();
+    },
+  );
+
+  it('R3: en POR_ACONDICIONAR (batchData null) no hay sección ni ningún campo', () => {
+    const { container } = render(
+      <ConditioningOrderScreen
+        order={{ ...ROW, status: 'POR_ACONDICIONAR', conditionedByName: null, conditionedById: null, batchData: null }}
+      />,
+    );
+
+    expect(screen.queryByTestId(CONDITIONING_BATCH_DATA_SECTION_TESTID)).toBeNull();
+    expect(container.querySelectorAll('input')).toHaveLength(0);
+  });
+
+  it('R3: si lo acondiciona otra persona (batchData null) no hay sección ni aviso', () => {
+    const { container } = render(<ConditioningOrderScreen order={{ ...ROW, batchData: null }} />);
+
+    expect(screen.queryByTestId(CONDITIONING_BATCH_DATA_SECTION_TESTID)).toBeNull();
+    expect(screen.queryByTestId(CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID)).toBeNull();
+    expect(container.querySelectorAll('input')).toHaveLength(0);
+  });
+
+  it('R4: con una línea sin datos dice «Faltan los datos de lote de 1 línea.» y «Terminar» va deshabilitado', () => {
+    render(
+      <ConditioningOrderScreen
+        order={{ ...MINE, batchData: { lines: [LINE], missingCount: 1 } }}
+        canFinish
+        finishBlocked
+      />,
+    );
+
+    const aviso = screen.getByTestId(CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID);
+    expect(aviso).toHaveTextContent('Faltan los datos de lote de 1 línea.');
+    const terminar = screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish });
+    expect(terminar).toBeDisabled();
+    expect(terminar).toHaveAttribute('aria-describedby', aviso.id);
+  });
+
+  it('R4: con k > 1 líneas sin datos dice «Faltan los datos de lote de k líneas.»', () => {
+    render(
+      <ConditioningOrderScreen
+        order={{ ...MINE, batchData: { lines: [LINE, SECOND], missingCount: 2 } }}
+        canFinish
+        finishBlocked
+      />,
+    );
+
+    expect(screen.getByTestId(CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID)).toHaveTextContent(
+      'Faltan los datos de lote de 2 líneas.',
+    );
+    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeDisabled();
+  });
+
+  it('R4: con todas las líneas con datos no hay aviso y «Terminar» está habilitado', () => {
+    const conDatos = { ...LINE, provisionalLot: null, lot: 'L-1', expiryDate: '2027-01-01', productionDate: '2026-10-01' };
+    render(
+      <ConditioningOrderScreen order={{ ...MINE, batchData: { lines: [conDatos], missingCount: 0 } }} canFinish />,
+    );
+
+    expect(screen.queryByTestId(CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID)).toBeNull();
+    const terminar = screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish });
+    expect(terminar).toBeEnabled();
+    expect(terminar).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('R21: en ENTREGADO no ofrece «Acondicionar» ni «Terminar» y la vuelta es «Volver a «Entregados»»', () => {
+    render(
+      <ConditioningOrderScreen
+        order={{ ...MINE, status: 'ENTREGADO', batchData: { lines: [LINE], missingCount: 1 } }}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeNull();
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeNull();
+    expect(screen.getByTestId(CONDITIONING_ORDER_STATUS_TESTID)).toHaveTextContent('Entregado');
+    const back = screen.getByTestId(CONDITIONING_ORDER_BACK_LINK_TESTID);
+    expect(back).toHaveTextContent('Volver a «Entregados»');
+    expect(back).toHaveAttribute('href', '/asignacion?vista=acondicionados_entregados');
+    expect(back.className).toContain('min-h-11');
   });
 });

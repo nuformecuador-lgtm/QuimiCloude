@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ConditioningOrderPage from '@/app/(private)/asignacion/acondicionamiento/[id]/page';
 import {
   CONDITIONING_ACTIONS_TEXTS,
+  CONDITIONING_BATCH_DATA_SECTION_TESTID,
+  CONDITIONING_ORDER_BACK_LINK_TESTID,
+  CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID,
   CONDITIONING_ORDER_CANDIDATES_ERROR_TESTID,
   CONDITIONING_ORDER_SCREEN_TESTID,
 } from '@/app/(private)/asignacion/acondicionamiento/[id]/components';
@@ -80,6 +83,7 @@ const ROW = {
   conditionedByName: null,
   conditionedById: null,
   team: [],
+  batchData: null,
 };
 
 const CANDIDATES = {
@@ -236,5 +240,94 @@ describe('qué acción se ofrece y qué se lee para ella', () => {
     listConditioningTeamCandidatesMock.mockRejectedValue(new Error('fallo de base de datos'));
 
     await expect(invocar()).rejects.toThrow('fallo de base de datos');
+  });
+});
+
+describe('«Datos de lote» y Terminar bloqueado', () => {
+  const MINE = {
+    ...ROW,
+    status: 'EN_ACONDICIONAMIENTO',
+    conditionedById: ACTOR_ID,
+    conditionedByName: 'Acondicionador de Prueba',
+  };
+  const LINE = {
+    batchId: '55555555-5555-4555-8555-555555555555',
+    presentationId: 'pres-1',
+    presentationName: 'Botella',
+    packagingName: '1 L',
+    packages: 10,
+    provisionalLot: '0000042',
+    lot: null,
+    expiryDate: null,
+    productionDate: null,
+  };
+
+  it('R4: con líneas sin datos, «Terminar» se pinta deshabilitado con el aviso', async () => {
+    getConditioningOrderMock.mockResolvedValue({
+      ...MINE,
+      batchData: { lines: [LINE, { ...LINE, batchId: 'otro' }], missingCount: 2 },
+    });
+
+    render(await invocar());
+
+    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeDisabled();
+    expect(screen.getByTestId(CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID)).toHaveTextContent(
+      'Faltan los datos de lote de 2 líneas.',
+    );
+    expect(screen.getByTestId(CONDITIONING_BATCH_DATA_SECTION_TESTID)).toBeInTheDocument();
+  });
+
+  it('R4: con todas las líneas con datos, «Terminar» se habilita', async () => {
+    getConditioningOrderMock.mockResolvedValue({
+      ...MINE,
+      batchData: {
+        lines: [{ ...LINE, provisionalLot: null, lot: 'L-1', expiryDate: '2027-01-01', productionDate: '2026-10-01' }],
+        missingCount: 0,
+      },
+    });
+
+    render(await invocar());
+
+    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeEnabled();
+    expect(screen.queryByTestId(CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID)).toBeNull();
+  });
+
+  it('R18: en TERMINADO propio pinta la sección editable y no ofrece «Terminar»', async () => {
+    getConditioningOrderMock.mockResolvedValue({
+      ...MINE,
+      status: 'TERMINADO',
+      batchData: { lines: [LINE], missingCount: 1 },
+    });
+
+    render(await invocar());
+
+    expect(screen.getByTestId(CONDITIONING_BATCH_DATA_SECTION_TESTID)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeNull();
+    expect(listConditioningTeamCandidatesMock).not.toHaveBeenCalled();
+  });
+
+  it('R21: en ENTREGADO propio pinta la sección, sin «Acondicionar» ni «Terminar», y vuelve a «Entregados»', async () => {
+    getConditioningOrderMock.mockResolvedValue({
+      ...MINE,
+      status: 'ENTREGADO',
+      batchData: { lines: [LINE], missingCount: 1 },
+    });
+
+    render(await invocar());
+
+    expect(listConditioningTeamCandidatesMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId(CONDITIONING_BATCH_DATA_SECTION_TESTID)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeNull();
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeNull();
+    expect(screen.getAllByRole('button').map((boton) => boton.textContent)).toEqual(['Guardar datos de lote']);
+    const back = screen.getByTestId(CONDITIONING_ORDER_BACK_LINK_TESTID);
+    expect(back).toHaveTextContent('Volver a «Entregados»');
+    expect(back).toHaveAttribute('href', '/asignacion?vista=acondicionados_entregados');
+  });
+
+  it('R21: un ENTREGADO que no deja ver el caso de uso sigue dando 404', async () => {
+    getConditioningOrderMock.mockRejectedValue(new OrderNotFoundError());
+
+    await expect(invocar()).rejects.toThrow('NEXT_NOT_FOUND');
   });
 });
