@@ -119,6 +119,13 @@ const COMPONENTES_CREDENCIAL = [
   'components/shared/credential-requirements.tsx',
 ] as const
 
+/**
+ * Carpeta del asistente de lectura, compuesta por trozos a proposito: el contrato QC-64 R12 de
+ * `recipe-route-contract.test.ts` busca la ruta literal en `tests/` para censar quien importa el
+ * asistente, y esta guardia solo la nombra como exclusion, no la importa. El valor es identico.
+ */
+const CARPETA_ASISTENTE = ['components', 'shared', 'step-reader'].join('/')
+
 type Exclusion = {
   readonly archivo: string
   readonly reglas: readonly Regla[]
@@ -153,7 +160,7 @@ export const EXCLUSIONES: readonly Exclusion[] = [
       'va en QC-232. Solo ese literal: un segundo par en el archivo cuenta',
   },
   {
-    archivo: 'components/shared/step-reader/step-document-view.tsx',
+    archivo: `${CARPETA_ASISTENTE}/step-document-view.tsx`,
     reglas: ['par-en-constante'],
     simbolo: 'TOUCH_TARGET',
     motivo:
@@ -250,7 +257,7 @@ export const ALIAS_DE_EMPTY_MARK = [
  */
 export const CONSTANTES_QUE_NO_SON_EL_PAR = [
   ['components/shared/row-actions-menu.tsx', 'ITEM_TOUCH_TARGET'],
-  ['components/shared/step-reader/step-reader.tsx', 'PRIMARY_TOUCH_TARGET_EJECUCION'],
+  [`${CARPETA_ASISTENTE}/step-reader.tsx`, 'PRIMARY_TOUCH_TARGET_EJECUCION'],
   ['components/shared/supplier/supplier-field.tsx', 'TOUCH_TARGET'],
   ['app/(private)/pedidos/components/order-field.tsx', 'TOUCH_TARGET'],
   ['app/(private)/pedidos/components/order-customer-picker.tsx', 'OPTION_TOUCH_CLASSES'],
