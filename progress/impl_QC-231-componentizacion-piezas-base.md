@@ -174,3 +174,97 @@ Veredicto: T3, T5 y T7 hechas; piezas en verde y cada copia local con su combina
   no cambia. `table-skeleton.tsx` no tenía nada que ajustar. typecheck y lint limpios;
   `vitest run tests/unit/shared-ui tests/unit/paridad`: 27 archivos, 278 en verde; `vitest run guard`:
   58 archivos, 760 en verde, 11 skipped.
+
+## Tanda 2 (T8)
+
+**Archivos**
+- `components/shared/data-table/data-table-types.ts`: `DataTableStates` (`loading: TableSkeletonProps`, `error: ErrorStateProps`, `empty: EmptyStateProps`, todas opcionales) y `DataTableProps.states?`.
+- `components/shared/data-table/data-table.tsx`: tres `return` tempranos (`TableSkeleton`/`ErrorState`/`EmptyState`) despues del ultimo hook (`useRef`), solo si `visibleState` coincide y la clave existe. Sin `states`, rama de siempre.
+- `components/shared/data-table/index.ts`: exporta `type DataTableStates`.
+- `tests/unit/shared/data-table-states-sustituyen.test.tsx` (nuevo).
+
+**Decision:** `states.error` es `ErrorStateProps` tal cual, no `Omit<ErrorStateProps,'error'> & { error: OperationError }` (design 5.1). Equivale en tipo (`error` ya es `OperationError`), pero el `Omit` aplana la union de reintento (`retry`/`retryTestId`) y `data-table.test.tsx` prohibe `@/lib/modules` en el directorio, asi que `OperationError` no se puede importar alli.
+
+**R -> test** (`tests/unit/shared/data-table-states-sustituyen.test.tsx`)
+- R16 -> «cargando (R16)»: `TableSkeleton` es la raiz, filas = `pageSize`, sin `data-table`/barras/paginacion.
+- R17 -> «error (R17)»: `ErrorState` raiz, «Reintentar», referencia del inesperado, sin filas.
+- R18 -> «vacio (R18, D5)»: sin busqueda `EmptyState` raiz; con busqueda y sin `states.empty`, `data-table-empty` con barras.
+- R19 -> «sin la clave del estado: como hoy (R19)» (3 casos) + `data-table.test.tsx` y `data-table-states.test.tsx` sin tocar, en verde.
+
+**Salida**
+- `pnpm run typecheck`: sin errores.
+- `pnpm run lint`: 0 errors (warnings heredados ajenos a T8); eslint de los archivos tocados: sin issues.
+- `vitest run` del test nuevo + `data-table.test.tsx` + `data-table-states.test.tsx`: 3 files, 41 passed.
+- `vitest run tests/unit/shared tests/unit/paridad`: 50 files passed, 504 passed / 2 skipped.
+- `vitest run guard`: 58 files passed, 760 passed / 11 skipped.
+- `vitest related` sobre los 3 archivos: cortado a los 500 s (arrastra a todos los consumidores); hasta ahi solo el rojo heredado `pantallas-exigen-permiso.test.tsx > '/pedidos'` (baseline).
+
+**Veredicto:** T8 hecha; `states` aditivo, sin cambio sin `states`.
+
+## Tanda 4 (T10)
+
+### Archivos y pieza que entró en cada uno
+| Archivo | Pieza |
+|---|---|
+| `components/shared/confirm-action-dialog.tsx` | `touchTarget` (Cancel/Action de AlertDialog) |
+| `components/shared/presentation-unit-select.tsx` | `touchTarget` |
+| `components/shared/presentation-select.tsx` | `touchTarget` (tooltip, input, item, input de alta); `<Button touch>` (3 botones del alta); `Spinner` |
+| `components/shared/async-autocomplete.tsx` | `Spinner` |
+| `components/shared/file-field.tsx` | `<Button touch className="self-start">` |
+| `components/shared/row-actions-menu.tsx` | `touchTarget` (trigger por render-prop); `ITEM_TOUCH_TARGET` se queda (valor distinto) |
+| `components/shared/responsible-avatars.tsx` | `touchTarget`; `EMPTY_MARK` |
+| `components/shared/shared-select.tsx` | `touchTarget` |
+| `components/shared/order-distribution-label.tsx` | `EMPTY_MARK` (fuera `MISSING_NAME_MARK`) |
+| `components/shared/document-upload/document-upload.tsx` | `touchTarget` + `'text-base'` en la `label`; `<Button touch className="text-base">` (3) |
+| `components/shared/document-upload/document-upload-row.tsx` | `` `inline-flex ${touchTarget} items-center text-base underline` `` |
+| `components/shared/document-upload/document-upload-dialog.tsx` | `` `${touchTarget} text-base` `` (triggers por render-prop) |
+| `components/shared/supplier/supplier-sheet.tsx` | `touchTarget` (render-prop) |
+| `components/shared/supplier/supplier-form.tsx` | `ErrorAlert` (catálogo con mensaje + código, `after` = enlace a la lista); `touchTarget` en el enlace y en Cancelar (render-prop); `<Button touch>` en Guardar |
+| `components/shared/step-reader/step-reader.tsx` | `<Button touch>` en Anterior; `touchTarget` en la rama no-ejecución del primario |
+| `components/shared/data-table/data-table-scroll-nav.tsx` | `touchTarget` |
+| `components/shared/data-table/data-table-pagination.tsx` | `<Button touch>` (anterior/siguiente); `touchTarget` en el SelectTrigger |
+| `components/shared/data-table/data-table-header-menu.tsx` | `touchTarget` |
+| `components/shared/data-table/data-table-filters.tsx` | `touchTarget`; `<Button touch>` en limpiar |
+| `components/shared/data-table/data-table-filter-date.tsx` | `touchTarget` en el PopoverTrigger; `<Button touch>` en los 3 atajos |
+
+Tests: ninguno tocado (ninguno necesitaba repunte: `responsible-avatars.test.tsx` importa la marca
+del barrel de pedidos y sigue en verde; `data-table-viewport` / `data-table-filter-date` solo se
+repuntan con la limpieza de `formatDateLocalISO`, que es T11).
+
+### Decisiones
+- **`touch` solo en `<Button>` directo** con el par al principio del `className`: la cadena que
+  produce `buttonVariants` es idéntica (base, variant, size, par, resto). En los `Button` pasados
+  por `render` a un trigger de Base UI y en los no-`Button` va `touchTarget` en la misma posición
+  que tenía la constante local.
+- **Constantes compuestas** (`document-upload*`) en línea como plantilla con `touchTarget`, mismo
+  orden de clases; no queda ninguna constante local `*TOUCH_TARGET` con el par.
+- **`MISSING_RESPONSIBLES_MARK` se conserva como alias de `EMPTY_MARK`**: la reexporta
+  `app/(private)/pedidos/components/index.ts`, que es D11. Su borrado pasa a QC-232. T14 debe
+  tolerar el alias (no vale el literal `—`).
+- **`step-document-view.tsx` NO se migró (revertido)**: `order-execution-screen.test.tsx > R18`
+  cierra `components/shared/step-reader/**` a solo `step-reader.tsx`. Sigue con su
+  `const TOUCH_TARGET = 'min-h-11 min-w-11'` local. **Abierto para el leader**: o se enmienda la
+  lista cerrada de ese test, o T14 excluye ese archivo, o pasa a QC-232.
+- **`hooks/use-async-paginated-options.ts` sin cambios**: no tiene talla, `Spinner` ni marca; su
+  entrada en `Archivos esperados` es por `createUrlPageFetcher` (T11).
+- `supplier-field.tsx` no se toca: su constante vale solo `min-h-11` (no es el par).
+- Comentarios: se borraron los de las constantes eliminadas (citaban R<n>/QC) y el de
+  `supplier-form` sobre la región de error; el del botón de ayuda de `presentation-select` se
+  acortó porque afirmaba que usaba una constante local.
+
+### Salida de comandos (2026-10-08)
+- `pnpm run typecheck`: sin errores.
+- `pnpm run lint`: 0 errores, 7 warnings preexistentes (`confirm-catalog-import.test.ts`,
+  `order-service.test.ts`).
+- `pnpm exec vitest related --run <21 archivos>`: 229 archivos, 3377 pass, 1 skip, 2 fail:
+  `pantallas-exigen-permiso > '/pedidos'` (baseline) y `order-execution-screen > R18` (lista
+  cerrada de step-reader, por `step-document-view.tsx`). Tras revertir ese archivo:
+  `order-execution-screen.test.tsx` + `step-reader.test.tsx`: 107/107 en verde.
+- `pnpm exec vitest run tests/unit/paridad`: 14/15 archivos, 124/125; el rojo es
+  `pedidos-paridad > vacio en una pagina posterior` (`order-list-first-page` gana
+  `border-transparent`), que viene de los cambios en curso de `app/(private)/pedidos/components/order-list-empty.tsx`
+  (T9c, otro agente), no de T10. Snapshots no regenerados.
+- `pnpm exec vitest run guard`: 58 archivos, 760 pass, 11 skip.
+
+**Veredicto:** T10 hecha en 20 consumidores con DOM idéntico; `step-document-view.tsx` queda
+pendiente de decisión por la lista cerrada de step-reader.

@@ -80,7 +80,7 @@ y se anota en el impl.
 
 ## Tanda 2 — La `DataTable` y sus estados (depende de T3)
 
-- [ ] **T8. `states` en la `DataTable`** (R16-R19).
+- [x] **T8. `states` en la `DataTable`** (R16-R19).
   - **Qué se toca:** `data-table-types.ts`, `data-table.tsx` (el `return` temprano va después de los
     hooks) y `index.ts`, que exporta `type DataTableStates`.
   - **Test:** `tests/unit/shared/data-table-states-sustituyen.test.tsx`. Con `states`, cargando,
@@ -107,10 +107,10 @@ y se anota en el impl.
 - `vitest related` está en verde;
 - toda excepción de D4 queda anotada en el impl.
 
-- [ ] **T9a [P]. `inventario`**, incluidos `importar/` y producto terminado.
-- [ ] **T9b [P]. `produccion/formulas`**: la lista, las 4 páginas con `RecipeListError` e
+- [x] **T9a [P]. `inventario`**, incluidos `importar/` y producto terminado.
+- [x] **T9b [P]. `produccion/formulas`**: la lista, las 4 páginas con `RecipeListError` e
   `importar/`.
-- [ ] **T9c [P]. `pedidos`, limitado por D11.**
+- [x] **T9c [P]. `pedidos`, limitado por D11.**
   - **Qué se hace:**
     - `order-list-empty`, `order-list-error` y `order-list-skeleton` delegan en `EmptyState`,
       `ErrorState` y `TableSkeleton` **sin cambiar su firma ni sus exports**;
@@ -119,14 +119,14 @@ y se anota en el impl.
       `Spinner` y `EMPTY_MARK`.
   - **Qué no se toca:** ni `order-table`, ni `order-list-section`, ni `order-columns`, ni
     `order-sheet`, ni el barrel, ni `page.tsx`, ni la guardia de anclas de pedidos.
-- [ ] **T9d [P]. `clientes`.**
-- [ ] **T9e [P]. `proveedores`** (la vitrina) y `proveedores/[id]`, con el catálogo, `importar/` y
+- [x] **T9d [P]. `clientes`.**
+- [x] **T9e [P]. `proveedores`** (la vitrina) y `proveedores/[id]`, con el catálogo, `importar/` y
   los errores previos de la página.
-- [ ] **T9f [P]. `configuracion/unidades`.**
-- [ ] **T9g [P]. `configuracion/presentaciones`.**
-- [ ] **T9h [P]. `configuracion/usuarios`**: usuarios y grupos. `UserStatusBadge` y
+- [x] **T9f [P]. `configuracion/unidades`.**
+- [x] **T9g [P]. `configuracion/presentaciones`.**
+- [x] **T9h [P]. `configuracion/usuarios`**: usuarios y grupos. `UserStatusBadge` y
   `WorkGroupRowActions` se quedan como están (D13).
-- [ ] **T9i [P]. `asignacion`, limitado por D7 y D11.**
+- [x] **T9i [P]. `asignacion`, limitado por D7 y D11.**
   - **Qué se hace:**
     - `AssignedOrdersError` delega en `ErrorState` **sin cambiar su firma**, y las secciones no se
       tocan;
@@ -135,8 +135,8 @@ y se anota en el impl.
     - `EMPTY_MARK` y `formatCivilDate` en las columnas que no son D11.
   - **Qué no se toca:** ni los vacíos ni los esqueletos de las 5 listas, ni los archivos D11 de
     QC-217.
-- [ ] **T9j [P]. `dashboard`**: lista y detalle de recorridos.
-- [ ] **T9k [P]. `(public)/login`** (R27). Su paridad pasa con la única excepción declarada, en
+- [x] **T9j [P]. `dashboard`**: lista y detalle de recorridos.
+- [x] **T9k [P]. `(public)/login`** (R27). Su paridad pasa con la única excepción declarada, en
   un commit aparte que cita D10.
 - [ ] **T9l [P]. `establecer-contrasena`** (R27, D12).
   - **Antes de empezar:** pedir al leader que compruebe el choque con QC-96, que tiene la rama sin
