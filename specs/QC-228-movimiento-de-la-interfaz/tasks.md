@@ -46,7 +46,7 @@ la fase 3 entra. Las demás preguntas tienen propuesta por defecto y no bloquean
   - Reglas de `design.md > 6` en `app/globals.css`; caso `R10` en `motion-tokens.test.ts`.
   - **Hecho cuando:** ninguna duración de Sonner calculada supera 400 ms (se comprueba en T9).
 
-- [ ] **T5 (tras T2, T3, T4). Guardia de movimiento** (R1, R2, R23)
+- [x] **T5 (tras T2, T3, T4). Guardia de movimiento** (R1, R2, R23)
   - `tests/guards/guard-movimiento.test.ts` (`design.md > 10`), con casos negativos que demuestren
     que detecta cada patrón prohibido.
   - **Hecho cuando:** `pnpm exec vitest run guard` está verde.
@@ -74,7 +74,7 @@ la fase 3 entra. Las demás preguntas tienen propuesta por defecto y no bloquean
 
 ## Fase 3 — Ítem activo que se desliza (recortable por P4)
 
-- [ ] **T8. Indicador del ítem activo** (R13, R14, R15)
+- [x] **T8. Indicador del ítem activo** (R13, R14, R15)
   - `components/private/sidebar-active-indicator.tsx` y su uso en
     `components/private/app-sidebar.tsx`; regla `[data-indicator-ready]` en `app/globals.css`
     (`design.md > 5`).

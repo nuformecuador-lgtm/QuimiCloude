@@ -131,3 +131,93 @@
   `color-mix(in oklch, var(--primary) 10%, transparent)`.
 
 **Veredicto:** T2 y T3 hechas; los casos nuevos pasan y solo fallan la paridad (T6) y el R22 que rompe el segundo bloque de movimiento reducido de T7.
+
+## T5 — Guardia de movimiento, y arreglo del R22 roto por T7 (frontend_dev)
+
+### Archivos
+- `app/globals.css` (modificado): la regla `[data-screen-enter] > * > :nth-child(n) { animation-delay: 0ms }`
+  pasa **dentro** del bloque global de movimiento reducido, después de la regla del kit (intacta), y se borra
+  el segundo `@media (prefers-reduced-motion: reduce)` del final. Como el bloque global va antes de los
+  retardos de entrada y tiene su misma especificidad (0,2,0), por orden perdería: gana con `!important`,
+  como el resto del bloque. No se tocó `tests/unit/theme/motion-tokens.test.ts`.
+- `tests/guards/guard-movimiento.test.ts` (nuevo): recorre `.ts/.tsx/.css` de `app/` y `components/` (sin
+  comentarios; `globals.css` sin el bloque del login). Falla con `duration-N` > 400, `duration-[...]` > 400 ms
+  o sin medida, `duration-(--x)` que no sea un `--dur-*` ≤ 400 ms, duraciones literales o `var(--dur-*)` > 400
+  en `transition`/`animation` de CSS, tokens `--dur-*` > 400, `ease-linear/in/out/in-out`, `ease-(--x)` fuera
+  de los tres tokens, `ease-[...]`, `cubic-bezier` fuera de la declaración de `--ease-*` y del login, tokens
+  `--ease-*` con Y fuera de [0, 1], `animate-bounce`, `animate-ping`, `infinite`, y `animate-*`/`animation:`/
+  `@keyframes` en `table.tsx`, `badge.tsx` y `brand-logo.tsx`. Cada detector tiene casos negativos con
+  fuentes inventadas, más un ancla de no vacuidad (≥ 50 archivos) y una prueba de que quitar los
+  delimitadores del login sí da infracciones.
+
+### Mapa R → test
+- R1 → `guard-movimiento.test.ts > R1: duration-N…`, `R1: duration-[...]…`, `R1: duration-(--x)…`,
+  `R1: duraciones literales y tokens…` y el barrido `ningún archivo declara movimiento prohibido`.
+- R2 → `guard-movimiento.test.ts > R2: ease-linear…`, `R2: ease-(--x)…`, `R2: cubic-bezier fuera…` y el barrido.
+- R23 → `guard-movimiento.test.ts > R23: una curva… con rebote`, `R23: animate-bounce y animate-ping`,
+  `R23: infinite fuera del login…`, `R23: animate-* y animaciones CSS en la tabla, el badge y el logo` y el barrido.
+
+### Hallazgos de la guardia en el código actual
+Ninguno. Las únicas apariciones de `cubic-bezier` e `infinite` son las tres declaraciones `--ease-*` y el
+bloque del login; las clases de movimiento en uso son `duration-(--dur-*)`, `ease-(--ease-*)`, `animate-in/out`,
+`animate-spin`, `animate-pulse` y `animate-none`.
+
+### Salida
+- `pnpm run typecheck` → `tsc --noEmit`, exit 0.
+- `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)` (avisos heredados en tests de pedidos y documentos).
+  Una pasada anterior dio `1 error` mientras otro subagente editaba en paralelo; la siguiente, 0.
+- `pnpm exec vitest run guard` → `Test Files 63 passed (63)`, `Tests 850 passed | 15 skipped (865)`.
+- `pnpm exec vitest run tests/unit/theme tests/unit/screen-enter.test.tsx` → `Test Files 11 passed (11)`,
+  `Tests 69 passed (69)` (incluye `motion-tokens > R22`, de nuevo verde).
+
+**Veredicto:** T5 hecha y R22 de `motion-tokens` en verde sin editar el test; la guardia no encuentra infracciones.
+
+## T8 — Indicador del ítem activo que se desliza (frontend_dev)
+
+### Archivos
+- `components/private/sidebar-active-indicator.tsx` (nuevo, `'use client'`): envuelve una lista en un
+  `div.relative`; `span aria-hidden data-slot="sidebar-active-indicator" data-variant="menu|sub"`
+  hermano de la lista. `useLayoutEffect` con `usePathname`; activo = `:scope > ul > li > [data-active]`;
+  posición sumando `offsetTop/Left` por la cadena de `offsetParent` hasta el contenedor (el `<li>` es
+  `relative`); `ResizeObserver` sobre el contenedor (recoloca sin transición). Modos en `data-motion`:
+  `slide` (misma lista), `fade` (llega de otra lista o la lista no tenía activo; fuerza reflow con
+  opacidad 0 y sin transición de posición), `none` (primera colocación y tamaño).
+- `components/private/app-sidebar.tsx`: `SidebarMenu` de cada sección (`variant="menu"`) y cada
+  `SidebarMenuSub` (`variant="sub"`) envueltos. El chevron de T2 intacto.
+- `app/globals.css`: tras la regla del submenú activo y antes de `@layer base`, sin capa: pintura del
+  indicador (`opacity: 0` inicial, mismo fondo y anillo que R11; `sub` con `--sidebar-accent` y anillo
+  al 22 %) y la regla `[data-indicator-ready] > [data-slot='sidebar-menu'] > … > [data-active]` (y la
+  del submenú) con `background: transparent; box-shadow: none`. La regla de R11 no se tocó.
+- `tests/unit/sidebar-active-indicator.test.tsx` (nuevo, 14 casos).
+
+### Mapa R → test
+| R | Test |
+| --- | --- |
+| R13 | `sidebar-active-indicator.test.tsx > R13: dentro de la misma lista se desliza…`, `R13: el deslizamiento anima transform con --dur-base y --ease-standard` |
+| R14 | `… > R14: la primera colocacion…`, `R14: si el activo llega de otra lista…`, `R14: el activo de un submenu no lo toma…`, `R14: sin item activo…` |
+| R15 | `… > R15: al cambiar de tamano…`, `R15: el indicador es decorativo…`, `R15: sin JavaScript…` (SSR con `renderToString`), `R15: la barra lateral real…`, y los 4 casos de `SidebarActiveIndicator: CSS` (opacidad 0, mismo fondo/anillo que R11, anillo del submenú, regla de listo sin capa) |
+
+### Salida de los comandos
+- `pnpm run typecheck` → `tsc --noEmit` sin errores.
+- `pnpm run lint` → `ESLint: 0 errors, 7 warnings in 2 files` (preexistentes: `confirm-catalog-import.test.ts`, `order-service.test.ts`).
+- `pnpm exec vitest related --run components/private/sidebar-active-indicator.tsx components/private/app-sidebar.tsx app/globals.css tests/unit/sidebar-active-indicator.test.tsx`
+  → `Test Files 19 passed (19)`, `Tests 339 passed (339)` (incluye `app-sidebar.test.tsx` y `sidebar-ajuste.test.tsx`, sin editar).
+- `pnpm exec vitest run tests/unit/theme tests/unit/brand/fonts.test.ts tests/unit/login-skin.test.tsx tests/unit/sidebar-desktop.test.tsx tests/unit/sidebar-mobile.test.tsx guard`
+  → `Test Files 77 passed (77)`, `Tests 971 passed | 15 skipped (986)`.
+- `pnpm exec vitest run tests/unit/paridad` → `Test Files 13 failed | 3 passed (16)`, `Tests 152 failed | 37 passed (189)`:
+  los diffs son clases de T2/T3 (`transition-all`, `scale-[0.98]`, `btn-veil`, `btn-shine`, `duration-(--dur-*)`,
+  `ease-(--ease-*)`, `fade-*`, `zoom-*`, `slide-in-*`). Ningún test de paridad renderiza `AppSidebar` y el
+  span del indicador no aparece en ningún diff (0 coincidencias de `sidebar-active-indicator`). Snapshots sin regenerar.
+
+### Notas
+- Primera pasada de `related`: rojo en `pedidos-ui/pedidos-viewport.test.tsx > R45`, que prohíbe la clase
+  `opacity-0` en cualquier elemento. Se movió la opacidad inicial a la regla CSS del indicador; verde.
+- Desvío leve de `design.md > 5`: la primera colocación de cada lista (montaje/hidratación) es inmediata y
+  sin fundido, porque el botón ya está pintado por CSS en ese sitio y un fundido produciría un parpadeo.
+  El fundido se aplica cuando el activo llega de otra lista o la lista no tenía activo. Cumple R14
+  («como mucho un fundido»).
+- El fundido usa reflow forzado en vez de esperar al frame siguiente (`requestAnimationFrame` puede correr
+  antes del cálculo de estilos del mismo frame y saltarse la transición).
+- La medición real (Chromium y WebKit) queda para `e2e/movimiento.spec.ts` (T9).
+
+**Veredicto:** T8 hecha; R13–R15 con tests verdes, `app-sidebar` y `sidebar-ajuste` verdes sin tocar, y el span no entra en los snapshots de paridad.
