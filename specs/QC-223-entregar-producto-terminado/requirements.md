@@ -117,7 +117,10 @@ empresa; operación que mueve existencias idempotente y auditable).
 - **R22** SI la entrada no tiene la forma acordada, ENTONCES el servidor DEBE responder
   `invalid_input` sin escribir nada. Son casos de forma no acordada: un identificador sin forma de
   uuid, envases no enteros o menores que uno, la misma línea y lote repetidos, ninguna línea, una
-  línea del reparto que no es del pedido, un campo de más o un campo ausente.
+  línea del reparto que no es del pedido, un campo de más o un campo ausente. *(Enmienda,
+  aprobada por el humano el 2026-10-09: el identificador del cliente es la excepción. Un
+  `customerId` sin forma de uuid no es `invalid_input`: responde `customer_not_found` (R21),
+  porque su forma la decide la búsqueda del cliente vivo; `design.md > domain/deliver-order.ts`.)*
 - **R23** [D10] CUANDO el servidor aplica una entrega, DEBE descontar de cada lote elegido sus
   envases por el contenido de envase del lote, en la unidad base del lote [D13]. DEBE recalcular la
   existencia del producto terminado como la suma de sus lotes.
