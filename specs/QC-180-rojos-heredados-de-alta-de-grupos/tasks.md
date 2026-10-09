@@ -45,7 +45,7 @@
 
 ## Grupo 1: baseline y cierre
 
-- [ ] **T5** Borrar de `tests/baseline-rojos.json` las entradas de `tests/unit/recetas/scope.test.ts`,
+- [x] **T5** Borrar de `tests/baseline-rojos.json` las entradas de `tests/unit/recetas/scope.test.ts`,
   `tests/unit/recetas/module-contract.test.ts` y `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`.
   Depende de T1 a T4.
   - **Hecho:** el JSON parsea. Las demás entradas quedan byte a byte iguales (`git diff` solo muestra
