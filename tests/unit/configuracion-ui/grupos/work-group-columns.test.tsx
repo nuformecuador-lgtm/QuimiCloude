@@ -15,7 +15,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   WORK_GROUP_ACTIONS_COLUMN_ID,
   WORK_GROUP_ACTIONS_COLUMN_LABEL,
+  WORK_GROUP_ACTION_DELETE_LABEL,
   WORK_GROUP_ACTION_DELETE_TESTID,
+  WORK_GROUP_ACTION_EDIT_LABEL,
   WORK_GROUP_ACTION_EDIT_TESTID,
   WORK_GROUP_COLUMNS,
   WORK_GROUP_COLUMN_COUNT,
@@ -27,12 +29,8 @@ import {
   WORK_GROUP_SKELETON_COLUMN_COUNT,
   WorkGroupRowActions,
   createWorkGroupColumns,
-} from '@/app/(private)/configuracion/usuarios/components';
-import {
-  WORK_GROUP_ACTION_DELETE_LABEL,
-  WORK_GROUP_ACTION_EDIT_LABEL,
   workGroupRowActionsLabel,
-} from '@/app/(private)/configuracion/usuarios/components/work-group-columns';
+} from '@/app/(private)/configuracion/usuarios/components';
 import {
   RESPONSIBLE_AVATARS_LIMIT,
   RESPONSIBLE_AVATAR_TESTID,
