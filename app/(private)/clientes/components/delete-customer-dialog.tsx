@@ -4,23 +4,12 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
-import { ErrorAlert } from '@/components/shared/error-alert';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import type { CustomerView } from '@/lib/modules/clientes';
 import {
   deleteCustomerAction,
   type CustomerMutationFormState,
 } from '@/lib/modules/clientes/adapters/driving/customer-actions';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Confirmacion de la baja de un cliente, calcada de `delete-unit-dialog.tsx`.
@@ -54,8 +43,6 @@ export const DELETE_CUSTOMER_ID_TESTID = 'delete-customer-id';
 export const DELETE_CUSTOMER_ID_FIELD = 'id';
 
 const TITLE = 'Eliminar el cliente';
-const CONFIRM_LABEL = 'Eliminar';
-const CONFIRM_PENDING_LABEL = 'Eliminando…';
 const DISMISS_LABEL = 'Volver';
 const DELETE_SUCCESS = 'Cliente eliminado.';
 
@@ -89,52 +76,39 @@ export function DeleteCustomerDialog({ customer, open, onOpenChange }: DeleteCus
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent data-testid={DELETE_CUSTOMER_DIALOG_TESTID}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{TITLE}</AlertDialogTitle>
-          <AlertDialogDescription data-testid={DELETE_CUSTOMER_MESSAGE_TESTID}>
-            Se va a eliminar el cliente {fullName(customer)}. Esta acción no se puede deshacer.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        {error === undefined ? null : (
-          <ErrorAlert
-            error={error}
-            id={errorId}
-            className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            testId={DELETE_CUSTOMER_ERROR_TESTID}
-            withDataCode
-            renderCatalogued={(catalogued) => (
-              <p data-testid={DELETE_CUSTOMER_ERROR_MESSAGE_TESTID}>{catalogued.message}</p>
-            )}
-          />
-        )}
-
-        <form action={formAction} data-testid={DELETE_CUSTOMER_FORM_TESTID}>
-          <input
-            type="hidden"
-            name={DELETE_CUSTOMER_ID_FIELD}
-            defaultValue={customer.id}
-            data-testid={DELETE_CUSTOMER_ID_TESTID}
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel className={touchTarget} data-testid={DELETE_CUSTOMER_DISMISS_TESTID}>
-              {DISMISS_LABEL}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              type="submit"
-              variant="destructive"
-              touch
-              disabled={isPending}
-              aria-busy={isPending}
-              data-testid={DELETE_CUSTOMER_CONFIRM_TESTID}
-            >
-              {isPending ? CONFIRM_PENDING_LABEL : CONFIRM_LABEL}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </form>
-      </AlertDialogContent>
-    </AlertDialog>
+    <DeleteConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      texts={{
+        title: TITLE,
+        description: (
+          <>Se va a eliminar el cliente {fullName(customer)}. Esta acción no se puede deshacer.</>
+        ),
+        dismiss: DISMISS_LABEL,
+      }}
+      testIds={{
+        dialog: DELETE_CUSTOMER_DIALOG_TESTID,
+        message: DELETE_CUSTOMER_MESSAGE_TESTID,
+        dismiss: DELETE_CUSTOMER_DISMISS_TESTID,
+        confirm: DELETE_CUSTOMER_CONFIRM_TESTID,
+        form: DELETE_CUSTOMER_FORM_TESTID,
+        error: DELETE_CUSTOMER_ERROR_TESTID,
+        errorMessage: DELETE_CUSTOMER_ERROR_MESSAGE_TESTID,
+      }}
+      submit={{
+        kind: 'action',
+        action: formAction,
+        hidden: [
+          {
+            name: DELETE_CUSTOMER_ID_FIELD,
+            value: customer.id,
+            testId: DELETE_CUSTOMER_ID_TESTID,
+          },
+        ],
+      }}
+      isPending={isPending}
+      error={error}
+      errorId={errorId}
+    />
   );
 }
