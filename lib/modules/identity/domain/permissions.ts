@@ -77,6 +77,9 @@ import {
  * Como `empaque`, su modulo no es una carpeta de `lib/modules/` y solo escribe. Lo recibe el
  * Administrador.
  *
+ * `entregas.anular` es la segunda accion que no es `consultar` ni `modificar`: separa entregar de
+ * deshacer una entrega, que devuelve producto al inventario. Lo recibe el Administrador.
+ *
  * El catalogo solo cambia por migracion y seed: no hay via de aplicacion que lo edite (R5).
  */
 export const PERMISSIONS = [
@@ -244,6 +247,12 @@ export const PERMISSIONS = [
     action: 'modificar',
     description: 'Entregar al cliente el producto terminado de los pedidos de la empresa.',
   },
+  {
+    code: 'entregas.anular',
+    module: 'entregas',
+    action: 'anular',
+    description: 'Anular entregas de producto terminado de los pedidos de la empresa.',
+  },
 ] as const;
 
 /**
@@ -294,6 +303,7 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
     'documentos.modificar',
     'integraciones.modificar',
     'entregas.modificar',
+    'entregas.anular',
   ],
   [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar'],
   [ROLE_EMPACADOR]: ['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar'],

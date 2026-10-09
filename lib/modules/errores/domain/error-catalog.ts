@@ -83,6 +83,8 @@ export const ERROR_MESSAGE_KEY = {
   conditioning_team_empty: 'errors.conditioning_team_empty',
   delivery_exceeds_remaining: 'errors.delivery_exceeds_remaining',
   delivery_batch_insufficient: 'errors.delivery_batch_insufficient',
+  delivery_not_found: 'errors.delivery_not_found',
+  delivery_already_voided: 'errors.delivery_already_voided',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -212,4 +214,7 @@ export const ERROR_MESSAGES_ES = {
     'La entrega supera los envases que faltan por entregar en alguna presentacion.',
   'errors.delivery_batch_insufficient':
     'Algun lote ya no tiene los envases elegidos: revisa los lotes y confirma de nuevo.',
+  'errors.delivery_not_found': 'La entrega no existe.',
+  'errors.delivery_already_voided':
+    'Alguna presentacion elegida ya estaba anulada: revisa la lista y vuelve a intentarlo.',
 } as const satisfies Record<ErrorMessageKey, string>;

@@ -2,7 +2,7 @@ import type { MovementReason } from './movement-reason';
 
 export type InventoryMovementView = {
   readonly id: string;
-  readonly kind: 'opening' | 'adjustment' | 'consumption' | 'production' | 'delivery';
+  readonly kind: 'opening' | 'adjustment' | 'consumption' | 'production' | 'delivery' | 'delivery_void';
   readonly quantity: string;
   readonly reason: MovementReason | null;
   readonly authorName: string | null;
@@ -23,6 +23,7 @@ export type NewInventoryMovement = {
   readonly orderPresentationLineId: string | null;
   /** Solo lo lleva `delivery`, y siempre: opcional para que los demas escritores no lo nombren. */
   readonly orderDeliveryId?: string | null;
+  readonly orderDeliveryVoidId?: string | null;
   /** Solo los lleva un ajuste, y los dos juntos: el `CHECK` de la tabla rechaza uno sin el otro. */
   readonly previousStock?: string | null;
   readonly countedStock?: string | null;

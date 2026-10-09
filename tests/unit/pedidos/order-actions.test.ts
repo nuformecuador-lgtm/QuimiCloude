@@ -598,7 +598,8 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     // Uno por action, sin ninguno de mas y sin ninguno de menos.
     expect(traducciones.length).toBe(catches.length)
     // QC-223 2026-10-08: 15 y no 13, entran `getOrderDeliveryAction` y `deliverOrderAction`.
-    expect(catches.length).toBe(15)
+    // QC-224 2026-10-09: 17 y no 15, entran `listOrderDeliveriesAction` y `voidDeliveryAction`.
+    expect(catches.length).toBe(17)
     expect(source, 'hay un catch vacio').not.toMatch(/catch\s*\([^)]*\)\s*\{\s*\}/)
   })
 })
@@ -910,6 +911,8 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
       ['getOrderDeliveryAction', 1],
       // La cobertura de la pagina, argumento ya tipado, ningun `FormData`.
       ['listOrderCoverageAction', 1],
+      // QC-224 2026-10-09: la lista de entregas del pedido.
+      ['listOrderDeliveriesAction', 1],
       ['listOrdersAction', 1],
       ['quoteOrderCostAction', 1],
       // T11: el disponible de solo lectura, argumento ya tipado.
@@ -921,6 +924,8 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
       // T25: la edicion acotada, `id` + argumento ya tipado, ningun `FormData`.
       ['updateOrderAction', 3],
       ['updateOrderDistributionAction', 2],
+      // QC-224 2026-10-09: anular una entrega, argumento ya tipado.
+      ['voidDeliveryAction', 1],
     ])
   })
 
@@ -943,6 +948,9 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
       // QC-223 2026-10-08
       getOrderDeliveryAction: 'orderId: string',
       deliverOrderAction: 'input: unknown',
+      // QC-224 2026-10-09
+      listOrderDeliveriesAction: 'orderId: string',
+      voidDeliveryAction: 'input: unknown',
     }
     for (const [nombre, parametros] of Object.entries(FIRMAS)) {
       const desde = source.indexOf(`export async function ${nombre}(`)

@@ -331,3 +331,21 @@ export class DeliveryBatchNotFoundError extends PedidosError {
     super('batch_not_found', diagnostic);
   }
 }
+
+/** La entrega no existe o es de otra empresa: las dos se responden igual. */
+export class DeliveryNotFoundError extends PedidosError {
+  readonly code = 'delivery_not_found';
+
+  constructor(diagnostic?: string) {
+    super('delivery_not_found', diagnostic);
+  }
+}
+
+/** Alguna presentacion pedida ya tenia sus lineas anuladas en esa entrega. */
+export class DeliveryAlreadyVoidedError extends PedidosError {
+  readonly code = 'delivery_already_voided';
+
+  constructor(diagnostic?: string) {
+    super('delivery_already_voided', diagnostic);
+  }
+}

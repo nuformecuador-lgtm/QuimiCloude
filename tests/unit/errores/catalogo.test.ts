@@ -63,7 +63,8 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // 76 y no 74: entran `conditioning_team_member_not_allowed` y `conditioning_team_empty`.
       // QC-223 2026-10-08: 78 y no 76: entran `delivery_exceeds_remaining` y
       // `delivery_batch_insufficient`.
-      expect(ERROR_CODES).toHaveLength(78)
+      // QC-224 2026-10-09: 80 y no 78: entran `delivery_not_found` y `delivery_already_voided`.
+      expect(ERROR_CODES).toHaveLength(80)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 

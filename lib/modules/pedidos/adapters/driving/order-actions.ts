@@ -33,10 +33,12 @@ import {
   type OrderCustomer,
   type OrderCustomerSearchPurpose,
   type OrderDeliveryView,
+  type OrderDeliveryHistoryView,
   type OrderPresentationAvailabilityNext,
   type OrderSummary,
   type OrderView,
   type Page,
+  type VoidDeliveryResult,
 } from '@/lib/modules/pedidos';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
@@ -573,6 +575,45 @@ export async function deliverOrderAction(input: unknown): Promise<DeliverOrderAc
 
   try {
     const data = await pedidos.deliverOrder(input, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// La anulacion de entregas.
+// ---------------------------------------------------------------------------------------------
+
+export type OrderDeliveriesResult = { status: 'success'; data: OrderDeliveryHistoryView } | ErrorState;
+
+/** Las entregas de un pedido, con lo anulado de cada una. */
+export async function listOrderDeliveriesAction(orderId: string): Promise<OrderDeliveriesResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await pedidos.listOrderDeliveries(orderId, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export type VoidDeliveryInput = {
+  readonly deliveryId: string;
+  readonly voidKey: string;
+  readonly presentationLineIds: readonly string[];
+  readonly reason: string;
+};
+
+export type VoidDeliveryActionResult = { status: 'success'; data: VoidDeliveryResult } | ErrorState;
+
+/** Anula presentaciones de una entrega. `input` tiene la forma de `VoidDeliveryInput`; la valida el caso de uso. */
+export async function voidDeliveryAction(input: unknown): Promise<VoidDeliveryActionResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await pedidos.voidDelivery(input, actor);
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);

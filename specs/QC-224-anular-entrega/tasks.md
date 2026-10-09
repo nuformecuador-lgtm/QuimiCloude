@@ -16,7 +16,7 @@
 
 ---
 
-## [ ] T0 — Publicar el contrato (bloquea todo lo demás)
+## [x] T0 — Publicar el contrato (bloquea todo lo demás)
 
 Implementa `design.md > 2` tal cual, con el stub de `design.md > 2.7`.
 
