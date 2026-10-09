@@ -7,6 +7,7 @@ type CataloguedError = Exclude<OperationError, { code: typeof UNEXPECTED_ERROR_C
 
 type ErrorAlertProps = {
   readonly error: OperationError;
+  readonly as?: 'div' | 'p';
   readonly testId?: string;
   readonly id?: string;
   readonly className?: string;
@@ -26,6 +27,7 @@ function renderMessage(error: CataloguedError): ReactNode {
 // anuncian el mismo error dos veces.
 export function ErrorAlert({
   error,
+  as: Container = 'div',
   testId,
   id,
   className,
@@ -36,7 +38,7 @@ export function ErrorAlert({
   after,
 }: ErrorAlertProps) {
   return (
-    <div
+    <Container
       role={role ?? undefined}
       id={id}
       className={className}
@@ -50,6 +52,6 @@ export function ErrorAlert({
         renderCatalogued(error)
       )}
       {after}
-    </div>
+    </Container>
   );
 }

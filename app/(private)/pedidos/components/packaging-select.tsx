@@ -4,7 +4,7 @@ import { CircleAlertIcon } from 'lucide-react';
 import { useCallback, useId, useState } from 'react';
 
 import { Spinner } from '@/components/shared/spinner';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 
 import {
   Autocomplete,
@@ -263,17 +263,13 @@ export function PackagingSelect({ unitIds, onSelect, disabled = false }: Packagi
                 ) : null}
               </>
             ) : (
-              <p
-                role="alert"
+              <ErrorAlert
+                error={loadFailure}
+                as="p"
                 className="p-2 text-sm text-destructive"
-                data-testid={PACKAGING_SELECT_LOAD_ERROR_TESTID}
-              >
-                {loadFailure.code === UNEXPECTED_ERROR_CODE ? (
-                  <UnexpectedErrorNotice state={loadFailure} />
-                ) : (
-                  loadFailure.message
-                )}
-              </p>
+                testId={PACKAGING_SELECT_LOAD_ERROR_TESTID}
+                renderCatalogued={(error) => error.message}
+              />
             )}
 
             <p

@@ -152,3 +152,38 @@ describe('ErrorAlert — el contenedor conserva el marcado de cada sitio', () =>
     expect(hijos[2]).toBe(screen.getByRole('button', { name: 'Reintentar' }));
   });
 });
+
+describe('ErrorAlert — la etiqueta del contenedor', () => {
+  it('R11 — sin as el contenedor es un div', () => {
+    render(<ErrorAlert error={CATALOGADO} testId="alerta" />);
+
+    expect(screen.getByTestId('alerta').tagName).toBe('DIV');
+  });
+
+  it('R11 — as="p" pinta un p con los mismos atributos', () => {
+    render(
+      <ErrorAlert
+        error={CATALOGADO}
+        as="p"
+        testId="packaging-select-load-error"
+        className="p-2 text-sm text-destructive"
+        renderCatalogued={(error) => error.message}
+      />,
+    );
+
+    const alerta = screen.getByRole('alert');
+    expect(alerta.tagName).toBe('P');
+    expect(alerta).toHaveAttribute('data-testid', 'packaging-select-load-error');
+    expect(alerta).toHaveAttribute('class', 'p-2 text-sm text-destructive');
+    expect(alerta.children).toHaveLength(0);
+    expect(alerta).toHaveTextContent(CATALOGADO.message);
+  });
+
+  it('R10 R11 — as="p" con el error inesperado pinta el aviso dentro del p', () => {
+    render(<ErrorAlert error={INESPERADO} as="p" testId="alerta" />);
+
+    const alerta = screen.getByTestId('alerta');
+    expect(alerta.tagName).toBe('P');
+    expect(alerta).toContainElement(screen.getByTestId(UNEXPECTED_ERROR_NOTICE_TESTID));
+  });
+});
