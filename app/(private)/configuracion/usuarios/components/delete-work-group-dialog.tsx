@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect } from 'react';
 import { toast } from 'sonner';
 
-import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
+import { ConfirmDialogFrame } from '@/components/shared/confirm-dialog';
+import { DeleteConfirmDialogBody } from '@/components/shared/delete-confirm-dialog';
 import type { WorkGroupRow } from '@/lib/modules/identity';
 import {
   deleteWorkGroupAction,
@@ -24,8 +25,8 @@ import { WORK_GROUP_ID_FIELD } from './work-group-form';
  * confirmar. **Abrir el dialogo no escribe nada.**
  *
  * **Un rechazo se pinta DENTRO del dialogo, por su `code` y nunca por su texto** (R34), el dialogo
- * **sigue abierto** y **la fila no se retira**. El dialogo se monta solo mientras esta abierto,
- * asi que un rechazo anterior no reaparece.
+ * **sigue abierto** y **la fila no se retira**. El cuerpo se monta solo mientras el popup esta
+ * abierto, asi que un rechazo anterior no reaparece.
  *
  * Con exito se aplica R35: cerrar, avisar por toast —sobre el `<Toaster />` del layout privado, no
  * uno propio— y `router.refresh()`, que reejecuta la lista con la MISMA URL y por tanto conserva
@@ -58,6 +59,22 @@ export type DeleteWorkGroupDialogProps = {
 };
 
 export function DeleteWorkGroupDialog({ group, open, onOpenChange }: DeleteWorkGroupDialogProps) {
+  return (
+    <ConfirmDialogFrame
+      open={open}
+      onOpenChange={onOpenChange}
+      testId={DELETE_WORK_GROUP_DIALOG_TESTID}
+    >
+      <DeleteWorkGroupDialogBody group={group} onOpenChange={onOpenChange} />
+    </ConfirmDialogFrame>
+  );
+}
+
+/** Se monta con el popup: cada apertura arranca sin el rechazo de la anterior. */
+function DeleteWorkGroupDialogBody({
+  group,
+  onOpenChange,
+}: Omit<DeleteWorkGroupDialogProps, 'open'>) {
   const router = useRouter();
   const [state, formAction, isPending] = useActionState(deleteWorkGroupAction, INITIAL_STATE);
 
@@ -72,8 +89,7 @@ export function DeleteWorkGroupDialog({ group, open, onOpenChange }: DeleteWorkG
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <DeleteConfirmDialog
-      open={open}
+    <DeleteConfirmDialogBody
       onOpenChange={onOpenChange}
       texts={{
         title: TITLE,
@@ -81,7 +97,6 @@ export function DeleteWorkGroupDialog({ group, open, onOpenChange }: DeleteWorkG
         dismiss: DISMISS_LABEL,
       }}
       testIds={{
-        dialog: DELETE_WORK_GROUP_DIALOG_TESTID,
         message: DELETE_WORK_GROUP_MESSAGE_TESTID,
         dismiss: DELETE_WORK_GROUP_DISMISS_TESTID,
         confirm: DELETE_WORK_GROUP_CONFIRM_TESTID,

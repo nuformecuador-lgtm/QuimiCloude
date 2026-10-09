@@ -191,10 +191,10 @@ export type OrderRowSheetActionsProps = {
  * dialogo, CONTROLADO, con ese mismo pedido. Con el pedido en estado final `OrderRowActions` no
  * llega a emitir nada (R24), asi que **no se monta ninguno de los tres**.
  *
- * **Los dos dialogos se montan solo mientras estan abiertos.** No es un detalle de rendimiento:
- * asi cada apertura arranca con el estado de accion limpio -un `not_cancellable` de un intento
- * anterior no reaparece- y el arbol de una fila cerrada no contiene ningun formulario de
- * cancelacion ni de borrado, que es lo que R24 comprueba en negativo.
+ * **Los dialogos de cancelar y borrar se montan en su primera apertura y ya no se desmontan**, para
+ * que el cierre anime su salida. Su contenido si se desmonta al cerrar: cada apertura arranca con
+ * el estado de accion limpio -un `not_cancellable` de un intento anterior no reaparece- y el arbol
+ * de una fila cerrada no contiene ningun formulario de cancelacion ni de borrado.
  *
  * Es lo que la celda de acciones de `buildOrderColumns` renderiza por fila: sin esta pieza, los
  * tres botones de `OrderRowActions` no abririan nada.
@@ -212,8 +212,9 @@ export function OrderRowSheetActions({
   canDeliver = false,
 }: OrderRowSheetActionsProps) {
   const [editOpen, setEditOpen] = useState(false);
-  const [cancelOpen, setCancelOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
+  // `null` mientras no se ha abierto nunca; despues el dialogo queda montado para animar su cierre.
+  const [cancelOpen, setCancelOpen] = useState<boolean | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState<boolean | null>(null);
   const [distributionOpen, setDistributionOpen] = useState(false);
   const [customerOpen, setCustomerOpen] = useState(false);
   const [deliverOpen, setDeliverOpen] = useState(false);
@@ -262,12 +263,12 @@ export function OrderRowSheetActions({
         coverage={coverage}
         section={section}
       />
-      {cancelOpen ? (
-        <CancelOrderDialog order={order} open onOpenChange={setCancelOpen} />
-      ) : null}
-      {deleteOpen ? (
-        <DeleteOrderDialog order={order} open onOpenChange={setDeleteOpen} />
-      ) : null}
+      {cancelOpen === null ? null : (
+        <CancelOrderDialog order={order} open={cancelOpen} onOpenChange={setCancelOpen} />
+      )}
+      {deleteOpen === null ? null : (
+        <DeleteOrderDialog order={order} open={deleteOpen} onOpenChange={setDeleteOpen} />
+      )}
       {distributionOpen ? (
         <OrderDistributionDialog
           order={order}

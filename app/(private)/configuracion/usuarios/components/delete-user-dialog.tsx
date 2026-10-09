@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
-import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
+import { ConfirmDialogFrame } from '@/components/shared/confirm-dialog';
+import { DeleteConfirmDialogBody } from '@/components/shared/delete-confirm-dialog';
 import type { UserRow } from '@/lib/modules/identity';
 import {
   deleteUserAction,
@@ -23,8 +24,8 @@ import {
  *
  * **Un rechazo se pinta DENTRO del dialogo, por su `code` y nunca por su texto** (R31), el dialogo
  * **sigue abierto** y **la fila no se retira**: aqui los casos vivos son `self_operation` (es tu
- * propia ficha) y `last_administrator` (dejaria a la empresa sin administrador). El dialogo se
- * monta solo mientras esta abierto, asi que un rechazo anterior no reaparece.
+ * propia ficha) y `last_administrator` (dejaria a la empresa sin administrador). El cuerpo se
+ * monta solo mientras el popup esta abierto, asi que un rechazo anterior no reaparece.
  *
  * Con exito se aplica R29: cerrar, avisar por toast —sobre el `<Toaster />` del layout privado, no
  * uno propio— y `router.refresh()`, que reejecuta la lista con la MISMA URL.
@@ -58,6 +59,19 @@ export type DeleteUserDialogProps = {
 export function DeleteUserDialog({ user, open, onOpenChange }: DeleteUserDialogProps) {
   const fieldId = useId();
   const errorId = `${fieldId}-error`;
+  return (
+    <ConfirmDialogFrame open={open} onOpenChange={onOpenChange} testId={DELETE_USER_DIALOG_TESTID}>
+      <DeleteUserDialogBody user={user} onOpenChange={onOpenChange} errorId={errorId} />
+    </ConfirmDialogFrame>
+  );
+}
+
+type DeleteUserDialogBodyProps = Omit<DeleteUserDialogProps, 'open'> & {
+  readonly errorId: string;
+};
+
+/** Se monta con el popup: cada apertura arranca sin el rechazo de la anterior. */
+function DeleteUserDialogBody({ user, onOpenChange, errorId }: DeleteUserDialogBodyProps) {
   const router = useRouter();
   const [state, formAction, isPending] = useActionState(deleteUserAction, INITIAL_STATE);
 
@@ -72,8 +86,7 @@ export function DeleteUserDialog({ user, open, onOpenChange }: DeleteUserDialogP
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <DeleteConfirmDialog
-      open={open}
+    <DeleteConfirmDialogBody
       onOpenChange={onOpenChange}
       texts={{
         title: TITLE,
@@ -83,7 +96,6 @@ export function DeleteUserDialog({ user, open, onOpenChange }: DeleteUserDialogP
         dismiss: DISMISS_LABEL,
       }}
       testIds={{
-        dialog: DELETE_USER_DIALOG_TESTID,
         message: DELETE_USER_MESSAGE_TESTID,
         dismiss: DELETE_USER_DISMISS_TESTID,
         confirm: DELETE_USER_CONFIRM_TESTID,

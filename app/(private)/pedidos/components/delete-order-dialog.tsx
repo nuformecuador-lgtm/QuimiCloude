@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
-import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
+import { ConfirmDialogFrame } from '@/components/shared/confirm-dialog';
+import { DeleteConfirmDialogBody } from '@/components/shared/delete-confirm-dialog';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import {
   deleteOrderAction,
@@ -65,6 +66,19 @@ export type DeleteOrderDialogProps = {
 
 export function DeleteOrderDialog({ order, open, onOpenChange }: DeleteOrderDialogProps) {
   const fieldId = useId();
+  return (
+    <ConfirmDialogFrame open={open} onOpenChange={onOpenChange} testId={DELETE_ORDER_DIALOG_TESTID}>
+      <DeleteOrderDialogBody order={order} onOpenChange={onOpenChange} fieldId={fieldId} />
+    </ConfirmDialogFrame>
+  );
+}
+
+type DeleteOrderDialogBodyProps = Omit<DeleteOrderDialogProps, 'open'> & {
+  readonly fieldId: string;
+};
+
+/** Se monta con el popup: cada apertura arranca sin el rechazo de la anterior. */
+function DeleteOrderDialogBody({ order, onOpenChange, fieldId }: DeleteOrderDialogBodyProps) {
   const errorId = `${fieldId}-error`;
   const router = useRouter();
   const [state, formAction, isPending] = useActionState(deleteOrderAction, INITIAL_STATE);
@@ -80,8 +94,7 @@ export function DeleteOrderDialog({ order, open, onOpenChange }: DeleteOrderDial
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <DeleteConfirmDialog
-      open={open}
+    <DeleteConfirmDialogBody
       onOpenChange={onOpenChange}
       texts={{
         title: TITLE,
@@ -94,7 +107,6 @@ export function DeleteOrderDialog({ order, open, onOpenChange }: DeleteOrderDial
         dismiss: DISMISS_LABEL,
       }}
       testIds={{
-        dialog: DELETE_ORDER_DIALOG_TESTID,
         message: DELETE_ORDER_MESSAGE_TESTID,
         dismiss: DELETE_ORDER_DISMISS_TESTID,
         confirm: DELETE_ORDER_CONFIRM_TESTID,

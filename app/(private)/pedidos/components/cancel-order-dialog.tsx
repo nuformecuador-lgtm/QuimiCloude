@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId, useState } from 'react';
 import { toast } from 'sonner';
 
-import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { ConfirmDialogBody, ConfirmDialogFrame } from '@/components/shared/confirm-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import type { ErrorCode } from '@/lib/modules/errores';
 import { cancelOrderSchema, formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
@@ -44,10 +44,9 @@ import {
  * privado ya monta -**no se monta otro** (R36)- y se refresca la lista con `router.refresh()`,
  * que reejecuta el Server Component con la MISMA URL y conserva pagina, orden y filtros.
  *
- * **Apertura CONTROLADA y montaje bajo demanda.** Quien dispara es `OrderRowActions`, en la fila,
- * asi que aqui no hay disparador propio. Quien compone monta el dialogo solo mientras esta
- * abierto: asi cada apertura arranca con el estado de accion limpio y un intento anterior no deja
- * restos.
+ * **Apertura CONTROLADA.** Quien dispara es `OrderRowActions`, en la fila, asi que aqui no hay
+ * disparador propio. El cuerpo se monta solo mientras el popup esta abierto: cada apertura arranca
+ * con el estado de accion limpio y un intento anterior no deja restos.
  */
 
 export const CANCEL_ORDER_DIALOG_TESTID = 'cancel-order-dialog';
@@ -102,6 +101,19 @@ export type CancelOrderDialogProps = {
 
 export function CancelOrderDialog({ order, open, onOpenChange }: CancelOrderDialogProps) {
   const fieldId = useId();
+  return (
+    <ConfirmDialogFrame open={open} onOpenChange={onOpenChange} testId={CANCEL_ORDER_DIALOG_TESTID}>
+      <CancelOrderDialogBody order={order} onOpenChange={onOpenChange} fieldId={fieldId} />
+    </ConfirmDialogFrame>
+  );
+}
+
+type CancelOrderDialogBodyProps = Omit<CancelOrderDialogProps, 'open'> & {
+  readonly fieldId: string;
+};
+
+/** Se monta con el popup: cada apertura arranca sin el motivo ni el rechazo de la anterior. */
+function CancelOrderDialogBody({ order, onOpenChange, fieldId }: CancelOrderDialogBodyProps) {
   const reasonId = `${fieldId}-reason`;
   const errorId = `${fieldId}-error`;
   const router = useRouter();
@@ -141,8 +153,7 @@ export function CancelOrderDialog({ order, open, onOpenChange }: CancelOrderDial
   const isEmpty = reason.trim() === '';
 
   return (
-    <ConfirmDialog
-      open={open}
+    <ConfirmDialogBody
       onOpenChange={onOpenChange}
       variant="destructive"
       texts={{
@@ -158,7 +169,6 @@ export function CancelOrderDialog({ order, open, onOpenChange }: CancelOrderDial
         pending: CONFIRM_PENDING_LABEL,
       }}
       testIds={{
-        dialog: CANCEL_ORDER_DIALOG_TESTID,
         message: 'cancel-order-message',
         dismiss: CANCEL_ORDER_DISMISS_TESTID,
         confirm: CANCEL_ORDER_CONFIRM_TESTID,
@@ -193,6 +203,6 @@ export function CancelOrderDialog({ order, open, onOpenChange }: CancelOrderDial
           data-testid={CANCEL_ORDER_REASON_TESTID}
         />
       </div>
-    </ConfirmDialog>
+    </ConfirmDialogBody>
   );
 }

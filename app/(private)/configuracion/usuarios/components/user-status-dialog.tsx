@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
-import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { ConfirmDialogBody, ConfirmDialogFrame } from '@/components/shared/confirm-dialog';
 import {
   Select,
   SelectContent,
@@ -78,6 +78,19 @@ export type UserStatusDialogProps = {
 
 export function UserStatusDialog({ user, open, onOpenChange }: UserStatusDialogProps) {
   const fieldId = useId();
+  return (
+    <ConfirmDialogFrame open={open} onOpenChange={onOpenChange} testId={USER_STATUS_DIALOG_TESTID}>
+      <UserStatusDialogBody user={user} onOpenChange={onOpenChange} fieldId={fieldId} />
+    </ConfirmDialogFrame>
+  );
+}
+
+type UserStatusDialogBodyProps = Omit<UserStatusDialogProps, 'open'> & {
+  readonly fieldId: string;
+};
+
+/** Se monta con el popup: cada apertura arranca sin el rechazo ni la selección de la anterior. */
+function UserStatusDialogBody({ user, onOpenChange, fieldId }: UserStatusDialogBodyProps) {
   const labelId = `${fieldId}-label`;
   const errorId = `${fieldId}-error`;
   const router = useRouter();
@@ -94,8 +107,7 @@ export function UserStatusDialog({ user, open, onOpenChange }: UserStatusDialogP
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <ConfirmDialog
-      open={open}
+    <ConfirmDialogBody
       onOpenChange={onOpenChange}
       texts={{
         title: TITLE,
@@ -105,7 +117,6 @@ export function UserStatusDialog({ user, open, onOpenChange }: UserStatusDialogP
         pending: CONFIRM_PENDING_LABEL,
       }}
       testIds={{
-        dialog: USER_STATUS_DIALOG_TESTID,
         message: USER_STATUS_MESSAGE_TESTID,
         dismiss: USER_STATUS_DISMISS_TESTID,
         confirm: USER_STATUS_CONFIRM_TESTID,
@@ -155,6 +166,6 @@ export function UserStatusDialog({ user, open, onOpenChange }: UserStatusDialogP
           ))}
         </SelectContent>
       </Select>
-    </ConfirmDialog>
+    </ConfirmDialogBody>
   );
 }
