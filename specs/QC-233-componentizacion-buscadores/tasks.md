@@ -91,7 +91,7 @@ pregunta al leader.
 
 ## Tanda 3 — Guardia y enmienda (depende de la tanda 2)
 
-- [ ] **T3. `tests/guards/guard-buscadores.test.ts`** (R7, R19, R20, R21, R22; `design.md > 7`).
+- [x] **T3. `tests/guards/guard-buscadores.test.ts`** (R7, R19, R20, R21, R22; `design.md > 7`).
   - **Qué comprueba:**
     - las reglas `primitivo-fuera` y `hook-fuera`;
     - que no hay `.filter(` en `async-autocomplete.tsx`;
