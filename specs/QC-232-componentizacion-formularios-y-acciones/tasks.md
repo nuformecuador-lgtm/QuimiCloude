@@ -257,6 +257,7 @@ lista aquí, para que `archivos-en-vuelo` no lo lea como ruta de esta feature. L
 - `app/(private)/configuracion/usuarios/components/end-user-sessions-dialog.tsx`
 - `app/(private)/configuracion/usuarios/components/user-columns.tsx`
 - `app/(private)/configuracion/usuarios/components/work-group-columns.tsx`
+- `app/(private)/configuracion/usuarios/components/index.ts` (barrel: exporta los nombres nuevos del menú de grupos)
 - `app/(private)/configuracion/usuarios/components/user-table.tsx` (R33)
 - `app/(private)/configuracion/usuarios/components/work-group-table.tsx` (R33)
 
