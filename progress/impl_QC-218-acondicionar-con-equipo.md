@@ -199,3 +199,21 @@ Todo con el árbol completo (HEAD `11dde9a7`), salvo lo que se indica.
     `Tests 5396 passed | 42 skipped (5438)`. Antes del arreglo: 1 archivo rojo (guard-piezas-base,
     2 tests).
   - `prisma migrate status`: «Database schema is up to date!».
+
+## Rojo de CI en el PR #187 (run 37951548421, 2026-10-09)
+
+- **Rojo:** `tests/integration/scripts/seed-demo.int.test.ts` (no está en el baseline). El seed de demo,
+  que entró con el merge de `dev`, llamaba a `startConditioning` con la entrada vieja `{ orderId }` y
+  el caso de uso respondía `ValidationError`.
+- **Arreglo en el seed** (`scripts/seed-demo/gateway.ts`): el paso de comenzar el acondicionamiento
+  manda como equipo a la propia persona que acondiciona (`demo.acondicionador`, rol acondicionamiento,
+  activa, no Administradora): `{ orderId, userIds: [actors.conditioner], workGroupIds: [] }`.
+  Es determinista. No había otros llamadores fuera de `lib/` y `tests/` (no hay seeds de Prisma que lo usen).
+- **Arreglo en el test:** `deleteCompany` borra ahora `orderConditioningTeamMember` antes de `order`.
+  Sin eso la limpieza fallaba por la clave foránea. `countByTable` no cuenta esa tabla, así que los
+  conteos esperados no cambian y no se tocaron.
+- **Verificación:**
+  - `vitest run tests/integration/scripts/seed-demo.int.test.ts`: `Test Files 1 passed (1)`, `Tests 1 passed (1)`.
+  - `pnpm typecheck`: exit 0.
+  - `pnpm lint`: exit 0 (0 errores, 7 avisos previos que no son de esta feature).
+  - `vitest run tests/guards`: `Test Files 54 passed (54)`, `Tests 735 passed | 9 skipped (744)`.
