@@ -248,8 +248,12 @@ function funcionesQueEscribenLotes(fuente: string): string[] {
  * modulo- recalcula una vez por producto DESPUES de todos los decrementos, no una vez por lote:
  * sumar `product_batches` de nuevo en cada iteracion seria trabajo repetido para el mismo
  * resultado. El recalculo sigue pasando, en la misma transaccion: solo se mueve de sitio.
+ *
+ * Nota (2026-10-09, QC-219 R27): `writeFinishedBatchLabels` es la segunda excepcion. Escribe lote,
+ * vencimiento y dia de produccion, no `stock`, asi que no hay nada que recalcular. Que no escriba
+ * `stock` lo vigilan `qc91-alcance.test.ts` y `guard-libro-de-inventario.test.ts`.
  */
-const EXCEPCIONES_SIN_RECALCULO = new Set(['consumeBatchStock']);
+const EXCEPCIONES_SIN_RECALCULO = new Set(['consumeBatchStock', 'writeFinishedBatchLabels']);
 
 /** De las que escriben lotes, las que NO llaman a `recalculateProductStock` en su propio cuerpo. */
 function funcionesSinRecalculo(fuente: string): string[] {
@@ -272,6 +276,7 @@ const CAMINOS_ESPERADOS = [
   'createWithFirstBatch',
   'receiveFinishedGoods',
   'addImportedFinishedGoodsBatch',
+  'writeFinishedBatchLabels',
 ];
 const CENSO_ESPERADO = CAMINOS_ESPERADOS.map((nombre) => `${PRODUCT_PRISMA}::${nombre}`).sort();
 
@@ -297,9 +302,10 @@ describe('QC-121 R29 — toda escritura exportada de product_batches recalcula p
       construirCamino('consumeBatchStock', 'updateMany', sinRecalculoEn === 'consumeBatchStock'),
       construirCamino('receiveFinishedGoods', 'create', sinRecalculoEn !== 'receiveFinishedGoods'),
       construirCamino('addImportedFinishedGoodsBatch', 'create', sinRecalculoEn !== 'addImportedFinishedGoodsBatch'),
+      construirCamino('writeFinishedBatchLabels', 'update', sinRecalculoEn === 'writeFinishedBatchLabels'),
     ].join('\n\n');
 
-  it('verde: los seis caminos fabricados, cada uno con su recalculo (o su excepcion)', () => {
+  it('verde: los siete caminos fabricados, cada uno con su recalculo (o su excepcion)', () => {
     const fuente = fuenteCuatroCaminos(null);
     expect(funcionesQueEscribenLotes(fuente)).toEqual(CAMINOS_ESPERADOS.slice().sort());
     expect(funcionesSinRecalculo(fuente)).toEqual([]);
@@ -317,7 +323,12 @@ describe('QC-121 R29 — toda escritura exportada de product_batches recalcula p
     expect(funcionesSinRecalculo(fuente)).toEqual([]);
   });
 
-  it('rojo: un septimo camino fabricado sin recalculo tambien queda marcado', () => {
+  it('R27 (QC-219): writeFinishedBatchLabels SIN recalculo en su cuerpo no queda marcado -es la excepcion-', () => {
+    const fuente = fuenteCuatroCaminos('writeFinishedBatchLabels');
+    expect(funcionesSinRecalculo(fuente)).toEqual([]);
+  });
+
+  it('rojo: un octavo camino fabricado sin recalculo tambien queda marcado', () => {
     const fuente = `${fuenteCuatroCaminos(null)}\n\n${construirCamino('rogueWrite', 'create', false)}`;
     expect(funcionesSinRecalculo(fuente)).toEqual(['rogueWrite']);
   });
@@ -328,7 +339,7 @@ describe('QC-121 R29 — toda escritura exportada de product_batches recalcula p
     expect(funcionesSinRecalculo(fuente)).toEqual([]);
   });
 
-  it('el censo real bajo lib/ es exactamente esos seis caminos, ni uno mas', () => {
+  it('el censo real bajo lib/ es exactamente esos siete caminos, ni uno mas', () => {
     const archivos = archivosBajoCarpeta('lib');
     expect(archivos.length).toBeGreaterThan(50);
 

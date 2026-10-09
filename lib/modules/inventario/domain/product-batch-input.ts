@@ -48,7 +48,7 @@ const MESSAGE_LOTE_NUMERICO_LARGO = 'Un lote de solo números puede tener hasta 
  * Un lote de solo digitos no puede tener 60 caracteres: su siguiente correlativo no cabria en el
  * largo maximo.
  */
-const lotSchema = z
+export const typedLotSchema = z
   .string()
   .trim()
   .min(1)
@@ -85,12 +85,14 @@ function esDiaDeCalendario(value: string): boolean {
   );
 }
 
-/** Que no sea futura lo comprueba el caso de uso: el esquema no tiene el reloj. */
-const purchaseDateSchema = z
+export const civilDateSchema = z
   .string()
   // Sin `abort`, zod ejecuta tambien el `refine` y una fecha sin forma cobra dos errores.
   .regex(CIVIL_DATE_PATTERN, { abort: true })
   .refine(esDiaDeCalendario);
+
+/** Que no sea futura lo comprueba el caso de uso: el esquema no tiene el reloj. */
+const purchaseDateSchema = civilDateSchema;
 
 function esImporteAceptado(amount: unknown): boolean {
   return typeof amount === 'string' && DECIMAL_PATTERN.test(amount) && !ZERO_PATTERN.test(amount);
@@ -109,7 +111,7 @@ export const createProductWithFirstBatchSchema = z
     presentationId: presentationIdSchema,
     unitCost: amountSchema.nullish(),
     totalCost: amountSchema.nullish(),
-    lot: lotSchema.nullish(),
+    lot: typedLotSchema.nullish(),
     expiryDate: expiryDateSchema.nullish(),
     // Opcional aunque la columna sea NOT NULL: ausente significa hoy.
     purchaseDate: purchaseDateSchema.nullish(),
