@@ -24,6 +24,7 @@
  * **Decimoquinta enmienda, 2026-10-01**: `order_would_block`, `order_blocked`.
  * **2026-10-05**: `order_unit_not_convertible`.
  * **2026-10-07**: `order_conditioning_taken`, `order_not_conditionable`.
+ * **2026-10-09**: `integration_secret_unreadable`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -154,6 +155,7 @@ export const ERROR_CODES = [
   // Distinto de `invalid_input`: el motivo es uno de los validos, pero no para el sentido del
   // ajuste.
   'adjustment_reason_not_allowed',
+  'integration_secret_unreadable',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
