@@ -2,10 +2,7 @@ import type { DataTableParams } from '@/components/shared/data-table';
 import { listPresentationsAction } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
 
-import { PresentationListEmpty } from './presentation-list-empty';
-import { PresentationListError } from './presentation-list-error';
 import { FIRST_PAGE, presentationListHref } from './presentation-list-params';
-import { PresentationSheet } from './presentation-sheet';
 import { PresentationTable } from './presentation-table';
 
 /**
@@ -21,9 +18,8 @@ import { PresentationTable } from './presentation-table';
  * catalogo ENTERO de unidades ya NO lo pide esta seccion —lo pide `page.tsx`, una sola vez por
  * pantalla— y llega aqui por props, listo para bajar al formulario sin que este consulte nada.
  *
- * **QC-80 R19 — si el catalogo de unidades falla, `page.tsx` no monta esta seccion**: decide eso
- * ANTES, con `PresentationListError` y sin pintar ni `<h1>` ni el disparador de la cabecera. Esta
- * seccion asume que si se esta ejecutando, el catalogo ya llego bien.
+ * **Si el catalogo de unidades falla, `page.tsx` no monta esta seccion**: decide eso antes, con
+ * el error de la lista y sin pintar ni `<h1>` ni el disparador de la cabecera.
  *
  * **Una sola llamada a `listPresentationsAction`**, con los parametros **enteros y sin traducir**:
  * `DataTableParams` es campo a campo la misma forma que `ListQuery` (`design.md > 5.2`), y
@@ -36,10 +32,9 @@ import { PresentationTable } from './presentation-table';
  * `inventario`, y si la operacion responde `unauthorized` se pinta el estado de error **sin un
  * solo dato**.
  *
- * **Una lista vacia NO se pinta como tabla sin filas** (R15, R17): son tres situaciones distintas
- * —fallo, catalogo realmente vacio y pagina que se quedo atras tras una baja— y cada una dice lo
- * suyo. El destino de «volver a la primera» se deriva de `PRESENTATIONS_ROUTE` a traves de
- * `presentationListHref`, nunca de un literal (R2).
+ * Error y vacio los pinta la tabla en lugar de si misma; el envoltorio de la lista solo existe
+ * con filas. Con busqueda y sin filas tambien se pinta el vacio, no el «sin resultados» de la
+ * tabla.
  */
 
 export const PRESENTATION_LIST_TESTID = 'presentation-list';
@@ -55,36 +50,39 @@ export async function PresentationListSection({ params, units }: PresentationLis
   const result = await listPresentationsAction(params);
 
   if (result.status === 'error') {
-    return <PresentationListError error={result} />;
+    return (
+      <PresentationTable
+        status="error"
+        error={result}
+        presentations={[]}
+        params={params}
+        totalPages={0}
+        units={units}
+      />
+    );
   }
 
   const { items, page: currentPage, totalPages } = result.data;
 
   if (items.length === 0) {
-    // El slot de «crear la primera» (R15) lo llena `<PresentationSheet />` como `children`: es la
-    // unica accion util cuando no hay ni una presentacion, y bajando el disparador desde aqui el
-    // estado vacio no tiene que conocer el panel lateral ni convertirse en modulo de cliente.
     return (
-      <PresentationListEmpty
-        firstPageHref={
-          currentPage > FIRST_PAGE
-            ? presentationListHref({ ...params, page: FIRST_PAGE })
-            : undefined
-        }
-      >
-        <PresentationSheet units={units} />
-      </PresentationListEmpty>
+      <PresentationTable
+        presentations={items}
+        params={params}
+        totalPages={totalPages}
+        units={units}
+        empty={{
+          firstPageHref:
+            currentPage > FIRST_PAGE
+              ? presentationListHref({ ...params, page: FIRST_PAGE })
+              : undefined,
+        }}
+      />
     );
   }
 
   return (
     <div className="flex flex-col gap-4" data-testid={PRESENTATION_LIST_TESTID}>
-      {/*
-        `presentation-table.tsx` es un modulo de CLIENTE —la columna de acciones declara una celda
-        que devuelve elementos (`design.md > 6`)—, asi que desde aqui solo bajan datos
-        serializables: las filas, los parametros vigentes y el total de paginas. La tabla recibe
-        `status: 'idle'` siempre: los tres estados se pintan FUERA de `<DataTable>`.
-      */}
       <PresentationTable
         presentations={items}
         params={params}
