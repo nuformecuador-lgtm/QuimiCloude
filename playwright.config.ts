@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto'
+
 import { defineConfig, devices } from '@playwright/test'
 
 /**
@@ -12,6 +14,23 @@ import { defineConfig, devices } from '@playwright/test'
  */
 const E2E_PORT = 3117
 const E2E_BASE_URL = `http://localhost:${E2E_PORT}`
+
+/**
+ * Clave de cifrado de las credenciales de integraciones para el servidor del E2E: se genera al
+ * cargar la configuracion y nunca se versiona un literal. Si el entorno ya trae las variables, se
+ * respetan. Las filas que el E2E cifra con ella son efimeras y se borran al terminar.
+ */
+const E2E_ENCRYPTION_ENV: Record<string, string> = process.env.INTEGRATIONS_ENCRYPTION_KEYS
+  ? {}
+  : {
+      INTEGRATIONS_ENCRYPTION_KEYS: `v1:${randomBytes(32).toString('base64')}`,
+      INTEGRATIONS_ENCRYPTION_ACTIVE: 'v1',
+    }
+
+/** La URL del webhook se construye sobre esta base; sin ella la pantalla avisa de que falta. */
+const E2E_PUBLIC_BASE_URL_ENV: Record<string, string> = process.env.APP_BASE_URL
+  ? {}
+  : { APP_BASE_URL: E2E_BASE_URL }
 
 // Runner E2E del flujo de autenticacion (QC-7, aprobado en `design.md > 6.4`).
 //
@@ -65,6 +84,11 @@ export default defineConfig({
       FORMULA_PROMPT: 'prompt ficticio de formula para el recorrido de extremo a extremo',
       // El doble de Graph: la prueba de la conexion de WhatsApp responde sin red.
       INTEGRATIONS_E2E_DOUBLES: '1',
+      // No es un secreto. Con el doble no se lee; esta para que el servidor del E2E tenga el mismo
+      // entorno completo que un despliegue.
+      WHATSAPP_GRAPH_API_VERSION: 'v21.0',
+      ...E2E_PUBLIC_BASE_URL_ENV,
+      ...E2E_ENCRYPTION_ENV,
     },
   },
 })

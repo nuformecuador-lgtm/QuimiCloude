@@ -334,6 +334,10 @@ export const E2E_ESPERADOS = [
   // cliente, entrega que completa y usuario sin permiso. No lee ni afirma nada sobre el
   // identificador de peticion ni sobre `reference`.
   'entregar-producto-terminado.spec.ts',
+  // Alta por el mismo motivo que las demas. Recorre la conexion de WhatsApp de una empresa: alta
+  // rechazada por Meta, alta valida, recarga sin el verify token, edicion, deshabilitar y
+  // habilitar. No lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'integraciones-whatsapp.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
