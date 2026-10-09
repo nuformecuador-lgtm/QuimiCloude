@@ -29,9 +29,9 @@ export type DeliverOrderResult = {
 export type DeliverOrderDeps = {
   readonly customerCatalog: Pick<CustomerCatalog, 'findAliveRefById'>;
   readonly unitOfWork: OrderDeliveryUnitOfWork;
-  /** Sobre el cliente global: la clave se mira antes de abrir la transaccion (R29). */
+  /** Sobre el cliente global: la clave se mira antes de abrir la transaccion. */
   readonly deliveries: Pick<OrderDeliveryRepository, 'findByKey'>;
-  /** Solo para responder con el estado del pedido de la entrega ya registrada (R29). */
+  /** Solo para responder a un reintento con el estado del pedido de la entrega ya registrada. */
   readonly orders: OrderRepository;
   readonly now?: () => Date;
 };
@@ -176,7 +176,7 @@ export function createDeliverOrder(
     const scope: OrderScope = { companyId: actor.companyId };
 
     // La clave antes que el cliente, el bloqueo y el estado: un reintento sobre un pedido que la
-    // primera ya dejo ENTREGADO tiene que responder que ya estaba registrada (R29).
+    // primera ya dejo ENTREGADO tiene que responder que ya estaba registrada.
     const registered = await deps.deliveries.findByKey(data.deliveryKey, scope);
     if (registered !== null) return alreadyRegistered(deps.orders, registered.orderId, scope);
 
