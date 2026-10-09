@@ -14,10 +14,8 @@
 > `QC-<n>`, `R<n>`, `design.md` ni «decisión cerrada». En los tests, `R<n>` va en el nombre del
 > caso. Ningún nombre nuevo lleva el segmento `password`/`pass` (`guard-password-never-plaintext`).
 >
-> **Antes de T1.** Que el humano haya respondido en F1.4 las preguntas abiertas 1, 2 y 3 de
-> `requirements.md`. Si cambia el código o el texto del error, o el trato del texto vacío, se
-> actualizan los tres archivos del spec antes de escribir código. Medir también en `dev` el conteo
-> de `ERROR_CODES` (hoy 74): si otra ficha lo cambió, manda el de `dev` + 1.
+> **Antes de T1.** Medir en `dev` el conteo de `ERROR_CODES` (hoy 74): si otra ficha lo cambió,
+> manda el de `dev` + 1. D6–D8 de `requirements.md` ya están cerradas por el humano (2026-10-09).
 
 ## T1–T2 — Catálogo, dominio y puertos
 

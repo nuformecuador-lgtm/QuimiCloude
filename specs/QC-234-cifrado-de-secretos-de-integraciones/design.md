@@ -181,12 +181,12 @@ local y no tiene por qué dejar de serlo.
 
 ## 4. El catálogo de errores
 
-Una entrada nueva (R21, Pregunta abierta 2):
+Una entrada nueva (R21, D7):
 
 - `error-codes.ts`: `'integration_secret_unreadable'` al final de `ERROR_CODES`, con su línea de
   enmienda en el JSDoc (fecha, sin cita de ficha).
 - `error-catalog.ts`: `integration_secret_unreadable: 'errors.integration_secret_unreadable'` y el
-  texto propuesto «No se pudo leer una credencial guardada de la integración. Vuelve a
+  texto «No se pudo leer una credencial guardada de la integración. Vuelve a
   escribirla.».
 - `tests/unit/errores/catalogo.test.ts`: el conteo literal pasa de 74 a 75 con su línea de
   comentario.
@@ -211,7 +211,7 @@ coste —partir una cadena corta y decodificar uno o dos base64 por llamada— e
 lado de una petición a Graph.
 
 **`INTEGRATIONS_ENCRYPTION_KEYS`**: `v1:<base64>,v2:<base64>`. Se parte por `,`, cada entrada se
-recorta y se parte por el **primer** `:`. Errores (todos `Error` llano, Pregunta abierta 3), y su
+recorta y se parte por el **primer** `:`. Errores (todos `Error` llano, D8), y su
 mensaje siempre empieza por el nombre de la variable:
 
 | Caso | Mensaje (forma) |
@@ -448,7 +448,7 @@ Daría una clave por empresa sin guardar nada más. Pero el AAD ya impide mover 
 empresas (D3), y una derivación añade otra pieza que fijar y probar sin cambiar lo que protege:
 quien tiene la maestra tiene todas las derivadas.
 
-### 11.5 Errores de configuración como error de dominio con código propio — descartada (Pregunta abierta 3)
+### 11.5 Errores de configuración como error de dominio con código propio — descartada (D8)
 
 Pondría otra entrada en el catálogo para un caso que solo ve quien despliega. Y el mensaje del
 catálogo es fijo, así que el nombre de la variable iría solo en `diagnostic`, que no es lo que pide

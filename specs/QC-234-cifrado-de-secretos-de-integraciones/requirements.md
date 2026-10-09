@@ -122,7 +122,7 @@ falte. [A, D2]
 **R13.** SI se pide cifrar un texto vacío, o cifrar o descifrar con un contexto en el que la
 empresa, el registro o el campo están vacíos, ENTONCES el cifrador DEBE fallar con el error de
 dominio de entrada inválida (código `invalid_input`) del módulo, sin producir ningún valor guardado.
-*(Propuesta de `spec_author`: Pregunta abierta 1.)* [A]
+[A, D6]
 
 **R14.** Ningún error que lancen el cifrador o el resumidor DEBE contener en su mensaje ni en su
 diagnóstico el texto en claro, ninguna clave ni el valor guardado. Ninguna operación del cifrador
@@ -171,9 +171,9 @@ algo del módulo. [A]
 NO DEBE reexportar nada de `ports/` ni de `adapters/`. [A, D5]
 
 **R21.** El catálogo único de errores DEBE ganar exactamente un código, `integration_secret_unreadable`,
-con su clave y un texto propio. Ese texto NO DEBE repetir el de otra clave. `guard-catalogo-de-errores`
-DEBE seguir en verde, con el archivo de errores del módulo dentro de su barrido. *(Texto propuesto:
-Pregunta abierta 2.)* [D1, D3]
+con su clave y el texto «No se pudo leer una credencial guardada de la integración. Vuelve a
+escribirla.». Ese texto NO DEBE repetir el de otra clave. `guard-catalogo-de-errores` DEBE seguir en
+verde, con el archivo de errores del módulo dentro de su barrido. [D1, D3, D7]
 
 ### Alcance y verificación
 
@@ -198,26 +198,14 @@ red. `./init.sh` y el check `gate-completo` DEBEN quedar en verde, incluida
 | D3 El contexto de la fila va como AAD | R5, R6, R21 |
 | D4 El verify token se guarda como hash | R15, R16, R17 |
 | D5 `node:crypto` solo en el adapter | R18, R20 |
+| D6 Texto o contexto vacío se rechaza | R13 |
+| D7 Código `integration_secret_unreadable` | R4, R5, R7, R8, R21 |
+| D8 Errores de configuración como `Error` llano | R11, R12 |
 | Alcance [A] | R1–R3, R7, R10–R17, R19, R20, R22, R23 |
 
 ## Preguntas abiertas
 
-1. **Texto vacío y contexto con componentes vacíos (R13).** La ficha no lo dice. Propuesta: se
-   rechazan con `ValidationError` (`invalid_input`). Un secreto vacío nunca es una credencial
-   válida, y en QC-237 «campo vacío» significa «conservar el actual», cosa que se decide antes de
-   llamar al cifrador. Un contexto con un hueco vacío ligaría el secreto a menos de lo que dice
-   D3. Confirmar en F1.4.
-2. **El código nuevo del catálogo de errores (R21).** El descifrado fallido es «un error de
-   dominio» (criterio de aceptación), y todo error de dominio de este repo lleva un código del
-   catálogo único. Eso es una enmienda al catálogo, que siempre la ha aprobado el humano en F1.4.
-   Propuesta: `integration_secret_unreadable`, con el texto «No se pudo leer una credencial
-   guardada de la integración. Vuelve a escribirla.». Confirmar código y texto.
-3. **Errores de configuración: `Error` llano, no de dominio (R11, R12).** Falta la clave o está mal
-   formada: es una mala configuración del despliegue, no una condición del negocio. Se sigue el
-   patrón de `processing-config-env.ts`: un `Error` cuyo mensaje nombra la variable. El traductor
-   único lo muestra como `unexpected` y deja el detalle en el log del servidor. Confirmar que
-   «error claro» en la ficha no pide un código propio del catálogo.
-4. **Enmienda a QC-221 (aviso, no bloquea).** `tests/unit/integraciones/module-shape.test.ts` fija
+1. **Enmienda a QC-221 (aviso, no bloquea).** `tests/unit/integraciones/module-shape.test.ts` fija
    que el módulo está vacío y que `lib/composition` no lo nombra (R11 y R12 de QC-221). Esta ficha
    los relaja (R19, R20) y actualiza esos casos (`design.md > 8`). Es la consecuencia prevista del
    armazón, no un cambio de criterio.
@@ -231,3 +219,6 @@ red. `./init.sh` y el check `gate-completo` DEBEN quedar en verde, incluida
 | D3 | El contexto de la fila va como dato autenticado (AAD) | Impide mover un ciphertext a otra empresa, fila o campo. |
 | D4 | El verify token se guarda como hash, no cifrado | Solo se compara; no hace falta recuperarlo. |
 | D5 | `node:crypto` solo en el adapter | Lo exige la regla del repo: `domain/` y `ports/` no importan crypto. |
+| D6 | Cifrar un texto vacío, o cifrar o descifrar con un contexto con algún campo vacío, se rechaza con `ValidationError` (`invalid_input`) (decisión del humano, 2026-10-09) | Un secreto vacío nunca es una credencial válida (en QC-237 «campo vacío» significa «conservar el actual» y se decide antes de llamar al cifrador), y un contexto con un hueco ligaría el secreto a menos de lo que dice D3. |
+| D7 | Código nuevo del catálogo `integration_secret_unreadable`, con el texto «No se pudo leer una credencial guardada de la integración. Vuelve a escribirla.» (decisión del humano, 2026-10-09) | El descifrado fallido es un error de dominio, y todo error de dominio del repo lleva un código del catálogo único. |
+| D8 | Los errores de configuración de las variables son un `Error` llano cuyo mensaje nombra la variable, como en `processing-config-env.ts` (decisión del humano, 2026-10-09) | Es una mala configuración del despliegue, no una condición del negocio. El traductor único lo muestra como `unexpected` y el detalle queda en el log del servidor. |
