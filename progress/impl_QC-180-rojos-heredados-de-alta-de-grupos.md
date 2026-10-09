@@ -134,4 +134,4 @@ Revertida con `git checkout -- "app/(private)/pedidos/page.tsx"`. Tras revertir 
 
 ## Pendiente para el leader
 
-T7: `./init.sh` (gate local) no lo corrió el implementer, según el encargo (T1 a T6).
+T7: `./init.sh` (gate local, rápido) lo corrió el leader el 2026-10-09 en el worktree: en verde (`== init OK ==`).
