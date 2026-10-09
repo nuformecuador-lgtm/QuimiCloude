@@ -8,7 +8,7 @@
 
 ## Bloque A — piezas independientes
 
-### T1 [P] — Comprobación previa de preview (R9, R10)
+### [x] T1 [P] — Comprobación previa de preview (R9, R10)
 - Crear `scripts/entorno-de-preview.mjs` con `VARIABLE_REF_DE_PREVIEW`, `apuntanAPreview(env,
   nombres)` y `comprobarEntornoDePreview(env)` (`design.md > 4`). Node puro, sin imports de `lib/`.
 - `DOCUMENTS_E2E_DOUBLES` solo se lee (índice o elemento de arreglo), nunca se asigna.
@@ -17,7 +17,7 @@
   separado y juntas, ningún mensaje contiene un valor, y el literal de la variable de dobles
   coincide con el de `e2e-doubles-env.ts`. `pnpm exec vitest run guard` sigue verde.
 
-### T2 [P] — Transporte de correo `desactivado` (R11, R12)
+### [x] T2 [P] — Transporte de correo `desactivado` (R11, R12)
 - `mail-config-env.ts`: añadir `'desactivado'` al final de `MAIL_TRANSPORTS` (`resend` sigue
   primero).
 - Crear `lib/modules/identity/adapters/driven/mail/credential-setup-mailer-desactivado.ts`
@@ -30,7 +30,7 @@
   contiene destinatario/URL/secreto; ausente o vacía sigue siendo `resend`;
   `guard-envio-de-correo.test.ts` verde.
 
-### T3 [P] — Workflow de preview (R1–R6)
+### [x] T3 [P] — Workflow de preview (R1–R6)
 - Crear `.github/workflows/preview.yml` (`design.md > 3`): `pull_request` a `dev`, `if:` de fork,
   concurrencia por PR sin cancelar, `environment: preview` con la URL, comprobación de secrets,
   `npx --yes vercel@63.1.0 deploy --yes`, resumen, `curl` que falla ante `2xx`.
@@ -41,7 +41,7 @@
 
 ## Bloque B — depende de T1
 
-### T4 — Build de preview (R7, R8, R9, R10) · depende de T1
+### [x] T4 — Build de preview (R7, R8, R9, R10) · depende de T1
 - `scripts/build.mjs`: `SEMBRAR_DEMO`, `CON_TODO_Y_DEMO`, rama `VERCEL_ENV=preview` con
   `comprobarEntornoDePreview`, `problemas` en `ejecutarBuild` (`design.md > 5`). Actualizar el
   comentario de cabecera y el mensaje de la rama sin base.
@@ -50,7 +50,7 @@
   sin ejecutar ningún paso y escribe cada problema; production, development, vacío, ausente y fuera
   de Vercel dan los mismos pasos que antes; `tests/unit/identity/seed/deploy-hook.test.ts` verde.
 
-### T5 [P] — Enmienda de la guarda del seed de demo (R13, R14, R15) · depende de T1
+### [x] T5 [P] — Enmienda de la guarda del seed de demo (R13, R14, R15) · depende de T1
 - `scripts/seed-demo/guard.ts`: rama de preview con `apuntanAPreview(env, ['DATABASE_URL',
   'DIRECT_URL'])` (`design.md > 8`); cabecera con la nota de enmienda fechada (2026-10-09, QC-249).
 - Cabecera de `scripts/seed-demo.ts`: quitar «preview incluido» y lo de compartir base.
