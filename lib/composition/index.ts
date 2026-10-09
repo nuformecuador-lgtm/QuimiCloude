@@ -2203,3 +2203,20 @@ function buildCustomerCatalog(): CustomerCatalog {
     searchRefs: (query, companyId) => searchCustomerRefs(query, { companyId }),
   };
 }
+
+// ---------------------------------------------------------------------------------------
+// `integraciones`. Bloque nuevo al final, con sus imports: no reordena ni reformatea nada de
+// lo de arriba.
+// ---------------------------------------------------------------------------------------
+
+import { secretCipherAesGcm } from '@/lib/modules/integraciones/adapters/driven/security/secret-cipher-aes-gcm';
+import { secretDigestSha256 } from '@/lib/modules/integraciones/adapters/driven/security/secret-digest-sha256';
+import type { SecretCipher } from '@/lib/modules/integraciones/ports/secret-cipher';
+import type { SecretDigest } from '@/lib/modules/integraciones/ports/secret-digest';
+
+/** Importarlo no lee ninguna variable: las claves se leen dentro de cada `encrypt`/`decrypt`. */
+const secretCipher: SecretCipher = secretCipherAesGcm;
+const secretDigest: SecretDigest = secretDigestSha256;
+
+/** Cifrador y resumidor de las credenciales de integraciones, vistos por sus puertos. */
+export const integraciones = { secretCipher, secretDigest } as const;

@@ -26,6 +26,7 @@
  * **2026-10-07**: `order_conditioning_taken`, `order_not_conditionable`.
  * **2026-10-08**: `conditioning_team_member_not_allowed`, `conditioning_team_empty`.
  * **2026-10-08**: `delivery_exceeds_remaining`, `delivery_batch_insufficient`.
+ * **2026-10-09**: `integration_secret_unreadable`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -168,6 +169,7 @@ export const ERROR_CODES = [
   // Distinto de `batch_stock_negative` e `insufficient_material`: el lote existe, pero ya no tiene
   // los envases enteros que la entrega le pide.
   'delivery_batch_insufficient',
+  'integration_secret_unreadable',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
