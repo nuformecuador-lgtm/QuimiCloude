@@ -62,7 +62,7 @@
 
 ## Bloque C — documentación (depende de T1, T2, T4, T5)
 
-### T6 — Tabla de variables y docs (R17)
+### [x] T6 — Tabla de variables y docs (R17)
 - `docs/architecture.md`: nueva sección `## Previews (QC-249)` con el flujo, la comprobación previa
   y `### Variables por entorno` (tabla de `design.md > 11`); corregir el «Por qué» de
   `## Despliegue a produccion`.
@@ -75,7 +75,7 @@
 - **Hecho:** la guardia nueva verde con caso de sensibilidad; `guard-dobles-e2e.test.ts` y el test
   de `.env.example` de `deploy-hook.test.ts` verdes.
 
-### T7 [P] — Notas de enmienda en specs cerrados · depende de T2
+### [x] T7 [P] — Notas de enmienda en specs cerrados · depende de T2
 - Nota fechada en `specs/QC-79-alta-sin-contrasena-y-enlace/design.md > 9.2` (transporte
   `desactivado`) y en `specs/QC-107-componente-de-carga-de-archivos/design.md > 8` (variable en el
   scope Preview de Vercel).
