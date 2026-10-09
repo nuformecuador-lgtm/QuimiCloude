@@ -25,6 +25,8 @@
  * **2026-10-05**: `order_unit_not_convertible`.
  * **2026-10-07**: `order_conditioning_taken`, `order_not_conditionable`.
  * **2026-10-08**: `conditioning_team_member_not_allowed`, `conditioning_team_empty`.
+ * **2026-10-09**: `batch_expiry_not_future`, `batch_production_date_future`,
+ * `conditioning_batch_data_missing`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -161,6 +163,14 @@ export const ERROR_CODES = [
   // Distinto de `invalid_input`: la entrada marca personas o grupos, pero ninguna persona elegible
   // queda en el equipo.
   'conditioning_team_empty',
+  // Distinto de `invalid_input`: la fecha tiene forma valida, lo que falla es que no es posterior
+  // a hoy.
+  'batch_expiry_not_future',
+  // Distinto de `invalid_input`: la fecha tiene forma valida, lo que falla es que es posterior a hoy.
+  'batch_production_date_future',
+  // Distinto de `order_not_conditionable`: el pedido si se puede terminar, lo que falta son los
+  // datos de lote de alguna linea.
+  'conditioning_batch_data_missing',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
