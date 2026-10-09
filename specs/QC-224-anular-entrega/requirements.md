@@ -238,3 +238,4 @@ Ninguna.
 | 2026-10-09 | Idempotencia | Clave de anulación generada en el cliente, como `deliveryKey` en QC-223. |
 | 2026-10-09 | ¿Y si el lote de origen fue dado de baja tras la entrega? (era P1) | Un lote no tiene borrado lógico; lo que se da de baja es su producto terminado. Se devuelven igual los envases al mismo lote, con su asiento, y se recalcula ese producto; no se bloquea la anulación (R31). Humano, F1.3. |
 | 2026-10-09 | ¿Qué permiso exige ver la lista de entregas? (era P2) | `pedidos.consultar`, el de la pantalla de Pedidos. «Anular» sigue exigiendo `entregas.anular` (R4, R10). Humano, F1.3. |
+| 2026-10-09 | ¿Se puede tocar la guardia qc91? | Sí: admite un `update` más en `returnFinishedGoods`; resto intacto. Humano, F2.1 (B2). |

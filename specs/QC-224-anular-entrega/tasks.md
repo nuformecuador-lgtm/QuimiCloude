@@ -98,7 +98,7 @@ Archivos:
 - el cliente regenerado compila, `pnpm exec vitest run guard` está en verde y los tests nuevos
   también, contra Postgres.
 
-### [ ] B2 [P] — Devolución física en `inventario`
+### [x] B2 [P] — Devolución física en `inventario`
 Depende de: B1. Va en paralelo con B3.
 
 Archivos:
@@ -111,7 +111,8 @@ Archivos:
 - Enmiendas que la función nueva pone en rojo:
   - `tests/guards/guard-libro-de-inventario.test.ts`: `CAMINOS_ESPERADOS` y el título;
   - `tests/unit/inventario/qc121-alcance.test.ts`: `CAMINOS_ESPERADOS` y la fuente fabricada.
-  - `tests/unit/inventario/qc91-alcance.test.ts`: verificar que sigue en verde sin cambios.
+  - `tests/unit/inventario/qc91-alcance.test.ts` (enmienda 2026-10-09): admite exactamente un
+    `update` más, en `returnFinishedGoods`; el resto de aserciones sigue igual.
 - Tests nuevos:
   - `tests/unit/inventario/finished-goods-return-prisma.test.ts` (tx doblado): orden lotes →
     productos bloqueados por `id` → incremento → asiento → recálculo; lote ausente da

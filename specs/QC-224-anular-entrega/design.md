@@ -620,7 +620,7 @@ Cada enmienda conserva sus aserciones previas y lleva una nota fechada.
 | `tests/unit/pedidos/order-delivery-append-only.test.ts` | caminos que modifican o anulan una entrega | `NOMBRE_MUTANTE` admite exactamente `createVoidDelivery` y `voidDeliveryAction` (solo insertan, R33); `PRISMA_MUTANTE` y `SQL_MUTANTE` ganan `orderDeliveryVoid`, `orderDeliveryVoidLine`, `order_delivery_voids` y `order_delivery_void_lines`; un caso sintético nuevo con un tercer nombre `void…Deliver` sigue en rojo | TC |
 | `tests/guards/guard-libro-de-inventario.test.ts` | caminos de escritura de `product_batches` | + `returnFinishedGoods` y el título | B2 |
 | `tests/unit/inventario/qc121-alcance.test.ts` | caminos con recálculo | + `returnFinishedGoods` (recalcula) | B2 |
-| `tests/unit/inventario/qc91-alcance.test.ts` | `updateMany` | sin cambio (verificar) | B2 |
+| `tests/unit/inventario/qc91-alcance.test.ts` | `update` y `updateMany` sobre `productBatch` | enmienda 2026-10-09: admite exactamente un `update` más, en `returnFinishedGoods` (D12, R31); `delete`, `deleteMany`, `upsert`, SQL crudo y `updateMany` siguen igual | B2 |
 | `tests/guards/guard-identificador-de-request.test.ts` | `MIGRACIONES_ESPERADAS`, `E2E_ESPERADOS` | + las tres migraciones; + `anular-entrega.spec.ts` | B1, TI |
 | `tests/unit/pedidos/schema/pedidos-schema.test.ts` | modelos `@module pedidos`, referencias sin `@relation` | + `OrderDeliveryVoid`, `OrderDeliveryVoidLine` | B1 |
 | `tests/unit/inventario/schema/inventario-schema.test.ts`, `inventario-migration.test.ts`, `finished-product-enum-values-migration.test.ts`, `tests/unit/proveedores/schema/proveedores-migration.test.ts` | valores de `InventoryMovementKind` | + `delivery_void`, si enumeran el tipo entero | B1 |

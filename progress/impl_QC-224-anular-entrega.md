@@ -333,3 +333,18 @@ Veredicto: B2 implementado y verde salvo `qc91-alcance` R21, que exige decidir l
   dentro de una entrega; `batch_not_found` -> `Error` interno (design § 4 paso 5).
 - Decision de B1 a validar: el CHECK `btrim("reason")` acepta un motivo de solo tabs/saltos de linea
   (R32 dice «solo con espacios»); el dominio si lo rechaza.
+
+## B2 — cierre tras la enmienda de qc91 (implementer, 2026-10-09)
+
+Decision humana 2026-10-09: enmendar qc91, como la enmienda del 2026-09-17.
+- `tests/unit/inventario/qc91-alcance.test.ts`: `llamaAUpdateFueraDe` acepta lista de nombres;
+  `UPDATE_PERMITIDO = ['adjustBatchStock', 'returnFinishedGoods']`; nota fechada 2026-10-09 (QC-224
+  D12/R31) junto a la del 2026-09-17; el caso R21 del archivo real exige ningun `update` fuera de las
+  dos, que solo `adjustBatchStock` ya no baste, y exactamente UN `update` en `returnFinishedGoods`;
+  caso sintetico nuevo: un `update` en una tercera funcion sigue en rojo. `delete`, `deleteMany`,
+  `upsert`, SQL crudo y `updateMany` sin cambios; nada reordenado.
+- Spec: `design.md > 8` (fila qc91 = enmienda), `tasks.md > B2` (enmienda), `requirements.md >
+  Decisiones cerradas` (fila nueva). qc91 ya estaba en `## Archivos esperados`.
+- `vitest run qc91-alcance qc121-alcance guard-libro-de-inventario`: 3 archivos, 90 pass, 0 fail.
+
+Veredicto: B2 cerrada.
