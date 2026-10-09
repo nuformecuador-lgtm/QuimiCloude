@@ -3,13 +3,23 @@
  * `process.env` por su cuenta, para que el test pueda probar cada rama sin tocar el proceso.
  *
  * - `evaluateDemoSeedGuard` decide si el seed puede escribir en la base que apunta
- *   `DATABASE_URL`. Solo una base local (localhost / 127.0.0.1 o un socket Unix). La bandera
- *   `--forzar` de la linea de comandos salta SOLO la regla de base local; con un
- *   `VERCEL_ENV` no vacio distinto de `development` (production y preview, que comparte la
- *   base de produccion: `scripts/build.mjs`) o dentro de CI se niega siempre, con o sin bandera.
+ *   `DATABASE_URL`:
+ *   - `VERCEL_ENV=preview`: solo dentro de Vercel (`VERCEL` definida) y con `DATABASE_URL` y
+ *     `DIRECT_URL` apuntando al proyecto de preview (`PREVIEW_SUPABASE_REF`, ver
+ *     `scripts/entorno-de-preview.mjs`). Ahi se permite sin `--forzar`, aunque la base sea remota y
+ *     aunque haya `CI`; si no se cumple, se niega y `--forzar` no lo anula.
+ *   - otro `VERCEL_ENV` no vacio distinto de `development` (production incluido): se niega
+ *     siempre, con o sin bandera.
+ *   - `VERCEL_ENV` vacio o `development`: solo una base local (localhost / 127.0.0.1 o un socket
+ *     Unix); `--forzar` salta SOLO esa regla, y dentro de CI se niega siempre.
  * - `readDemoCredentials` lee las contrasenas de los usuarios de demo. Sin valor por
  *   defecto: si falta alguna, falla nombrandolas todas, sin imprimir ningun valor.
+ *
+ * Enmienda 2026-10-09 (QC-249, specs/QC-249-entorno-de-preview/design.md > 8): antes preview se
+ * negaba siempre porque compartia la base de produccion. Desde QC-249 preview tiene base propia y
+ * el build de preview siembra la demo en ella; production sigue negandose siempre.
  */
+import { apuntanAPreview } from '../entorno-de-preview.mjs'
 
 export const DEMO_SEED_FORCE_FLAG = '--forzar'
 
@@ -62,11 +72,32 @@ function isCi(env: DemoSeedEnvironment['env']): boolean {
   return value !== '' && value !== '0' && value !== 'false'
 }
 
-/** Rechazos que ninguna bandera anula. */
+/** Variables de base que, en preview, tienen que apuntar al proyecto de preview. */
+const PREVIEW_DATABASE_VARIABLES: readonly string[] = ['DATABASE_URL', 'DIRECT_URL']
+
+/** `VERCEL_ENV=preview`: el veredicto no depende de `--forzar` ni de `CI`. */
+function previewVerdict(env: DemoSeedEnvironment['env']): DemoSeedGuardVerdict {
+  if ((env.VERCEL ?? '').trim() === '') {
+    return {
+      allowed: false,
+      reason: `VERCEL_ENV=preview sin VERCEL: el seed de demostracion en preview solo corre dentro de Vercel (${DEMO_SEED_FORCE_FLAG} no lo anula)`,
+    }
+  }
+  const target = apuntanAPreview(env, PREVIEW_DATABASE_VARIABLES)
+  if (!target.ok) {
+    return {
+      allowed: false,
+      reason: `VERCEL_ENV=preview: no apuntan a la base de preview: ${target.variables.join(', ')} (${DEMO_SEED_FORCE_FLAG} no lo anula)`,
+    }
+  }
+  return { allowed: true, forced: false }
+}
+
+/** Rechazos que ninguna bandera anula, fuera de preview. */
 function hardRefusal(input: DemoSeedEnvironment): string | null {
   const vercelEnv = (input.env.VERCEL_ENV ?? '').trim()
   if (vercelEnv !== '' && vercelEnv !== 'development') {
-    return `VERCEL_ENV=${vercelEnv}: el seed de demostracion solo corre fuera de Vercel o con VERCEL_ENV=development; preview usa la base de produccion (${DEMO_SEED_FORCE_FLAG} no lo anula)`
+    return `VERCEL_ENV=${vercelEnv}: el seed de demostracion solo corre fuera de Vercel, con VERCEL_ENV=development o en preview contra la base de preview (${DEMO_SEED_FORCE_FLAG} no lo anula)`
   }
   if (isCi(input.env)) {
     return `variable CI presente: el seed de demostracion no corre en integracion continua (${DEMO_SEED_FORCE_FLAG} no lo anula)`
@@ -89,6 +120,7 @@ function localRefusal(input: DemoSeedEnvironment): string | null {
 }
 
 export function evaluateDemoSeedGuard(input: DemoSeedEnvironment): DemoSeedGuardVerdict {
+  if ((input.env.VERCEL_ENV ?? '').trim() === 'preview') return previewVerdict(input.env)
   const hard = hardRefusal(input)
   if (hard !== null) return { allowed: false, reason: hard }
   const reason = localRefusal(input)
