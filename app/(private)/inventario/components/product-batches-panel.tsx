@@ -15,6 +15,7 @@ import { EMPTY_CELL } from './product-columns';
 const LOT_LABEL = 'Lote';
 const QUANTITY_LABEL = 'Cantidad';
 const PURCHASE_DATE_LABEL = 'Fecha de compra';
+const EXPIRY_DATE_LABEL = 'Vencimiento';
 const RESERVED_LABEL = 'Apartado';
 const AVAILABLE_LABEL = 'Disponible';
 const OVER_RESERVED_LABEL = 'Sobre-reservado';
@@ -22,7 +23,8 @@ const PACKAGING_PRESENTATION_LABEL = 'Presentación del envase';
 const PACKAGING_LEGACY_LABEL = 'Envase sin presentación fija';
 
 /**
- * Panel de lotes de un producto: numero de lote, cantidad con su unidad y fecha de compra.
+ * Panel de lotes de un producto: numero de lote, cantidad con su unidad, fecha de compra y,
+ * si el lote lo tiene, vencimiento.
  *
  * Puramente presentacional: recibe los lotes y el catalogo de unidades por props y no pide nada
  * por su cuenta. El detalle del historial y las acciones de ajuste son dos ranuras -el mismo
@@ -215,6 +217,12 @@ export function ProductBatchesPanel({
                   <dt className="text-xs text-muted-foreground">{PURCHASE_DATE_LABEL}</dt>
                   <dd data-testid="product-batch-purchase-date">{batch.purchaseDate}</dd>
                 </div>
+                {batch.expiryDate === null ? null : (
+                  <div className="flex flex-col">
+                    <dt className="text-xs text-muted-foreground">{EXPIRY_DATE_LABEL}</dt>
+                    <dd data-testid="product-batch-expiry-date">{batch.expiryDate}</dd>
+                  </div>
+                )}
                 {batch.reserved === undefined ? null : (
                   <div className="flex flex-col">
                     <dt className="text-xs text-muted-foreground">{RESERVED_LABEL}</dt>
