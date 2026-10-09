@@ -407,3 +407,11 @@ El único rojo está en `tests/baseline-rojos.json`: es heredado de `dev` y ya f
 
 ### E2E
 No se ha escrito ni tocado ningún spec de `e2e/`, así que no se corre ninguno en local (design 18: `e2e/login-skin.spec.ts` y `e2e/errores.spec.ts` sin editar, y corren en CI).
+
+## Tras las decisiones del humano del 2026-10-08
+- Merge de `origin/dev` (con QC-230, #182): sin conflictos y sin migraciones.
+- T9l `4d65bd6b`: `establecer-contrasena/[token]/components/submit-button.tsx` delega en el `SubmitButton` compartido, con la misma firma y el testid `set-credential-submit`. El botón gana `min-w-11`, que es la excepción de D12 y no se ve en un botón `w-full`. `set-credential-form.test.tsx` y `scope.test.ts` pasan sin tocarlos (131/131), y el diff de la ruta es un solo archivo.
+- Tests de alcance con el ancla endurecida:
+  - `grupos/alcance.test.ts` (QC-85) se activa solo si la rama es exactamente `feature/QC-85-pantalla-de-grupos-de-trabajo`: se lee con `git rev-parse` y, si sale `HEAD`, con `GITHUB_HEAD_REF`. El diff usa `--diff-filter=d`. La señal antigua de las dos piezas solo la usa ya el ancla. Hay muestras nuevas (igualdad exacta, `null`/`HEAD`, QC-67 y QC-231 no cuentan). Los casos de «filtro de columna» y «fetch» ganan la misma comprobación de rama.
+  - `shared/data-table-alcance.test.ts` (QC-56) usa el mismo ancla por nombre de rama, con muestras. **No se le pone `--diff-filter=d`:** ese test no lee archivos, solo lista nombres, y con el filtro un borrado en la tabla compartida dejaría de contar para R20 y R28, lo que los debilitaría.
+- `guard-piezas-base`: los alias `EMPTY_CELL` citan ya QC-232.

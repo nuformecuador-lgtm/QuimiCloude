@@ -138,7 +138,7 @@ y se anota en el impl.
 - [x] **T9j [P]. `dashboard`**: lista y detalle de recorridos.
 - [x] **T9k [P]. `(public)/login`** (R27). Su paridad pasa con la única excepción declarada, en
   un commit aparte que cita D10.
-- [ ] **T9l [P]. `establecer-contrasena`** (R27, D12).
+- [x] **T9l [P]. `establecer-contrasena`** (R27, D12).
   - **Antes de empezar:** pedir al leader que compruebe el choque con QC-96, que tiene la rama sin
     publicar (`design.md > 16`). Si choca, la task pasa a QC-232 y se anota.
   - **Qué se hace:** solo `components/submit-button.tsx`, que delega en el `SubmitButton`
