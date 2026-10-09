@@ -127,7 +127,7 @@ Archivos:
 **Hecho cuando:** los archivos están en verde y cada caso lleva su `R<n>`, las guardias enmendadas
 están en verde y el gate de la tanda también.
 
-### [ ] B3 [P] — Persistencia de la anulación en `pedidos`
+### [x] B3 [P] — Persistencia de la anulación en `pedidos`
 Depende de: B1. Va en paralelo con B2.
 
 Archivos:
@@ -147,7 +147,7 @@ Archivos:
 **Hecho cuando:** los archivos están en verde, `tests/guards/guard-ambito-empresa-pedidos.test.ts` y
 los `company-scope` de `pedidos` están en verde, y el gate de la tanda también.
 
-### [ ] B4 — Casos de uso reales
+### [x] B4 — Casos de uso reales
 Depende de: T0. La parte unitaria puede empezar en paralelo con B1–B3 porque trabaja con dobles; se
 cierra después de B3.
 

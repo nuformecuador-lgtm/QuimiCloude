@@ -206,3 +206,130 @@ ROLLBACK hecho
   la base: `btrim("reason", E' \t\r\n')`. Decision del leader/humano.
 
 Veredicto: B1 listo para commit; migraciones verificadas up/down/up contra `qc224_anular_entrega`.
+
+## B3 — persistencia de la anulacion en `pedidos` (backend_dev, 2026-10-09)
+
+### Archivos
+Nuevos:
+- `lib/modules/pedidos/adapters/driven/persistence/order-delivery-void-prisma.ts`:
+  `createOrderDeliveryVoidRepository(tx)` (`findByKey`, `findDelivery`, `findDeliveryLines` con
+  `quantity.toFixed(4)` y `voided` por `voidLine`, `create` con P2002 → `duplicate_key`, `addLines`
+  con `createMany` y P2002 → `already_voided`) y `createOrderDeliveryHistoryReader(tx)` (`listByOrder`:
+  `createdAt desc, id asc`, lineas con su `voidLine.void`). Todo filtra con `companyScopeColumns`; sin
+  `update`, `delete` ni `upsert`.
+- `tests/integration/pedidos/order-delivery-void-repository.int.test.ts` (13 casos).
+
+Modificados:
+- `order-delivery-prisma.ts`: `sumOrderDeliveredPackages` añade `voidLine: null` al `where`.
+- `tests/integration/pedidos/order-delivery-repository.int.test.ts`: caso R26 con nota fechada.
+- `tests/integration/aislamiento.json`: `pedidos/order-delivery-void-repository.int.test.ts` en `transaccion`.
+- `tests/unit/pedidos/module-contract.test.ts` (censo, nota fechada 2026-10-09): el adaptador nuevo entra en
+  `DUENOS_DE_PRISMA` y `DUENOS_DEL_CLIENTE`; listas cerradas y aserciones previas intactas.
+- Arreglo heredado de B4: `lib/modules/pedidos/domain/list-order-deliveries.ts` renombra `customers` →
+  `customerNames` (tipo interno `Names` y destructuring); sin cambio de contrato. Ya no queda `customers` en
+  `lib/modules/pedidos/`; `tests/unit/clientes/scope.test.ts` en verde. El test unitario no lo usaba.
+
+### R -> test (B3)
+`order-delivery-void-repository.int.test.ts`:
+- R18: `R18: create con el ambito de B no puede apuntar a la entrega de A`; `R18: findDelivery … la de otra empresa y la que no existe salen null`; `R18: addLines con el ambito de B no puede colgar lineas de la anulacion de A`
+- R21, R22: `R21, R22: findDeliveryLines trae todas las lineas con su cantidad y su marca de anulada; con el ambito de B, ninguna`
+- R21, R30: `R21, R30: addLines sobre una linea ya anulada responde already_voided y no escribe ninguna de las pedidas`
+- R22: `R22: create guarda la anulacion …`; `R22: addLines guarda una linea por linea de entrega …`
+- R28: `R28: la misma clave … duplicate_key …`; `R28: la clave es unica por empresa …`; `R28: findByKey …`
+- R6, R7, R8, R9: `R7, R9: listByOrder ordena … y trae la anulacion de cada linea`; `R7: dos entregas en el mismo instante salen ordenadas por id`; `R6, R8: listByOrder solo ve las entregas del pedido y la empresa; con el ambito de B, ninguna`
+`order-delivery-repository.int.test.ts`:
+- R26: `R26: sumDeliveredPackages no suma las lineas anuladas, y una linea con todo anulado no aparece`
+
+### Gate
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: 0 errores, 7 avisos ajenos (los mismos de T0).
+- `vitest related --run --project node --project ui` (3 archivos de produccion): 315 archivos, 5241 pass, 1 skip,
+  1 fail (`module-contract` por el adaptador nuevo) → enmendado; rerun de `module-contract`, `clientes/scope`,
+  `pedidos/company-scope` y `guard-ambito-empresa-pedidos`: 4 archivos, 103 pass.
+- `vitest run guard` (+ los anteriores): 65 archivos, 890 pass, 15 skip, **1 fail ajeno a B3**:
+  `guard-aislamiento-integracion > ningun archivo del arbol se queda fuera del censo`, por
+  `inventario/finished-goods-return.int.test.ts` (B2 en curso, aun sin su entrada).
+- `vitest run --project integration` contra `qc224_anular_entrega` (copia efimera): `order-delivery-void-repository`,
+  `order-delivery-repository`, `company-scope`, `company-scope-queries`, `order-delivery`: 5 archivos, 72 pass.
+- No corrido: `order-delivery-append-only.test.ts` (lo enmienda TC).
+
+Veredicto: B3 listo para commit; la guardia de aislamiento queda verde cuando B2 anote su suite.
+
+## B2 — devolucion fisica en `inventario` (backend_dev, 2026-10-09)
+
+### Archivos
+Nuevos:
+- `lib/modules/inventario/adapters/driven/persistence/finished-goods-return-prisma.ts`: `createFinishedGoodsReturn(tx)`
+  (molde de `createFinishedGoodsDispatch`) y `batchLotDirectoryPrisma` (`findLots`: id + empresa, sin filtrar producto vivo).
+- `tests/unit/inventario/finished-goods-return-prisma.test.ts` (9 casos, tx doblado)
+- `tests/integration/inventario/finished-goods-return.int.test.ts` (5 casos)
+
+Modificados:
+- `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`: `returnFinishedGoods` (octavo camino,
+  design § 4.2): lee lotes (id IN, empresa) → `batch_not_found` sin escribir → bloquea productos `FOR NO KEY UPDATE`
+  `ORDER BY "id"` sin `deleted_at` → por linea `productBatch.update` (`stock increment`, clave `(id, companyId)`) +
+  `writeMovement(delivery_void)` → `recalculateProductStock` una vez por producto (en orden de id). Sin aviso a
+  `StockIncreaseListener`.
+- `lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma.ts`: `writeMovement` escribe
+  `orderDeliveryVoidId` cuando llega. La lectura del historial ya admitia `delivery_void` (cast de T0; sin filtro por kind).
+- Censos con nota fechada 2026-10-09, aserciones previas conservadas:
+  `tests/guards/guard-libro-de-inventario.test.ts` (`CAMINOS_ESPERADOS` + titulo) y
+  `tests/unit/inventario/qc121-alcance.test.ts` (`CAMINOS_ESPERADOS`, fuente fabricada con el octavo camino, titulos siete→ocho, noveno fabricado).
+- `tests/integration/inventario/ledger-cuadre.int.test.ts`: caso `QC-224 R23, R24` (entrega + anulacion, cuadra antes y despues).
+- `tests/integration/aislamiento.json`: `inventario/finished-goods-return.int.test.ts` en `commit` (motivo: `findLots` y
+  `findBatchMovements` leen con el cliente global; el resto de casos usa ROLLBACK).
+- `lib/composition/index.ts` NO se toca (B5 cablea).
+
+### BLOQUEO: `qc91-alcance.test.ts` rojo
+`tasks.md` B2 pide verificar que `qc91-alcance.test.ts` sigue verde sin cambios, y design § 4.2 dice que el incremento es
+un `update` porque «el censo de qc91 limita `updateMany`». Pero qc91 tambien limita `update`:
+`R21: el alta y el agregado de lote siguen creando; el unico update vive en adjustBatchStock`
+(`llamaAUpdateFueraDe(fuente, 'adjustBatchStock')` debe ser `false`) cae con `returnFinishedGoods`. Cualquier
+alternativa tambien rompe qc91 (`updateMany` fuera de los dos decrementos; `UPDATE "product_batches"` crudo lo caza
+`escrituraDestructivaDeLotes`). No se enmendo por la instruccion explicita «sin cambios». Propuesta (decision del
+leader/humano): enmendar qc91 con nota fechada, admitiendo `update` tambien en `returnFinishedGoods` (mismo
+mecanismo de lista que QC-223 uso para `updateMany`), conservando la asercion con `'adjustBatchStock'` solo como `true`.
+
+### R -> test (B2)
+`finished-goods-return-prisma.test.ts`:
+- R23: `R23: lotes -> bloqueo de productos -> (incremento -> asiento) por linea -> un recalculo por producto`;
+  `R23: el recalculo va una vez por producto afectado, en orden de id`; `R23: los lotes se leen por id y empresa, sin filtrar por producto vivo`;
+  `R23: el incremento suma la cantidad de la linea al lote por su clave (id, empresa), sin condicion de stock`
+- R24: `R24: writeMovement recibe delivery_void, cantidad positiva, pedido, anulacion y reason null`;
+  `R24: returnForDeliveryVoid acota por la empresa de la entrada y delega en la misma tx`
+- R29: `R29: un lote que no vuelve (ausente o de otra empresa) da batch_not_found con ese lote y no escribe nada`
+- R30, R31: `R30, R31: bloquea los productos de la empresa ordenados por id, FOR NO KEY UPDATE y sin filtrar por deleted_at`
+`finished-goods-return.int.test.ts`:
+- R23: `R23: cada lote queda en antes + cantidad y products.stock es la suma de todos sus lotes`
+- R24: `R24: un asiento delivery_void por lote, en positivo, con pedido, anulacion, autor y sin motivo`
+- R31: `R31: el producto dado de baja recupera igual sus envases y su existencia se recalcula`
+- R29 (empresa B no se toca): `R29: un lote de la empresa B pedido con el ambito de A da batch_not_found y no toca nada`
+- R7, R24 (`findLots` + historial): `R7, R24: findLots devuelve solo los lotes de la empresa y el historial muestra el asiento delivery_void`
+`ledger-cuadre.int.test.ts`: `QC-224 R23, R24: cuadra con un lote del que sale una entrega y vuelve con su anulacion`
+
+### Gate
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: 0 errores, 7 avisos ajenos (los mismos de T0).
+- `vitest related --run --project node --project ui <6 archivos>`: 292 archivos, 4536 pass, 1 skip, 1 fail por timeout
+  (`ui` `inventario/product-page.test.tsx`, 20 s con otra corrida en paralelo); solo, en verde.
+- `vitest run guard`: 62 archivos, 838 pass, 15 skip, 0 fail.
+- `vitest run tests/unit/inventario/qc121-alcance.test.ts tests/unit/inventario/qc91-alcance.test.ts`: qc121 verde;
+  **qc91 1 fail (el bloqueo de arriba)**.
+- `vitest run --project integration` contra `qc224_anular_entrega` (copia efimera): `finished-goods-return`,
+  `ledger-cuadre`, `finished-goods-dispatch`: 3 archivos, 16 pass, base efimera borrada.
+
+Veredicto: B2 implementado y verde salvo `qc91-alcance` R21, que exige decidir la enmienda (spec contradictorio).
+
+## Estado de la tanda 1 (implementer, 2026-10-09)
+
+- Cerradas: T0, B1, B3, B4. B2 implementada pero NO cerrada; B5 no empezada.
+- Bloqueo B2: `tests/unit/inventario/qc91-alcance.test.ts` «R21: el alta y el agregado de lote siguen
+  creando; el unico update vive en adjustBatchStock» prohibe todo `productBatch.update` fuera de
+  `adjustBatchStock`. `design.md > 4.2` (linea ~524) manda un `update` en `returnFinishedGoods` y
+  `design.md > 8` / `tasks.md > B2` dicen que qc91 queda «sin cambio». Contradiccion del spec: pendiente
+  de decision (propuesta de backend_dev: enmendar qc91 con nota fechada para admitir `update` tambien en
+  `returnFinishedGoods`, conservando las aserciones previas).
+- Decisiones de B4 a validar: id corto de 8 caracteres cuando falta un nombre; orden de presentaciones
+  dentro de una entrega; `batch_not_found` -> `Error` interno (design § 4 paso 5).
+- Decision de B1 a validar: el CHECK `btrim("reason")` acepta un motivo de solo tabs/saltos de linea
+  (R32 dice «solo con espacios»); el dominio si lo rechaza.

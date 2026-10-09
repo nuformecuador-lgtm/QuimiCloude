@@ -56,6 +56,7 @@
     "pedidos/order-delivery-constraints.int.test.ts",
     "pedidos/order-delivery-repository.int.test.ts",
     "pedidos/order-delivery-void-constraints.int.test.ts",
+    "pedidos/order-delivery-void-repository.int.test.ts",
     "pedidos/order-packing-constraints.int.test.ts",
     "pedidos/order-packing-states-rollback.int.test.ts",
     "pedidos/order-status-blocked-rollback.int.test.ts",
@@ -227,6 +228,11 @@
       "archivo": "inventario/ledger-cuadre.int.test.ts",
       "motivo": "QC-92 T15: llama a 'createWithFirstBatch', 'addBatchToAlive' y 'adjustBatchStock' de 'product-prisma.ts', que usan el cliente Prisma GLOBAL y abren cada uno SU PROPIA 'prisma.$transaction', asi que envolverlos en una transaccion del test seria aislamiento de mentira -correrian en otra conexion del pool y no verian las filas del fixture-. Cada caso fabrica su empresa efimera con randomUUID, escribe solo en ella y la limpia en un 'finally' en orden de FK (asientos -> lotes -> productos -> presentacion -> usuario). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-18"
+    },
+    {
+      "archivo": "inventario/finished-goods-return.int.test.ts",
+      "motivo": "QC-224 B2: los casos de 'createFinishedGoodsReturn' corren en una transaccion interactiva con ROLLBACK, pero 'batchLotDirectoryPrisma.findLots' y 'findBatchMovements' leen con el cliente Prisma GLOBAL, que no ve lo que una transaccion abierta no confirmo. Ese caso fabrica dos empresas efimeras con randomUUID, escribe solo en ellas y las borra en un 'finally' en orden de FK (asientos -> anulaciones -> entregas -> lotes -> productos -> presentacion -> unidad -> pedido -> receta -> cliente -> usuario -> rol y tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-09"
     },
     {
       "archivo": "inventario/list-query-indexes.int.test.ts",
