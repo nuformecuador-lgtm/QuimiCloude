@@ -211,3 +211,65 @@ preexistentes no son añadidas, así que no son hallazgo del punto 9. Aun así, 
 El «cero cambio» está demostrado: la paridad está intacta, salvo la excepción declarada, y las
 capturas no difieren. Los bloqueantes no tocan el comportamiento: son dos huecos de decisión y dos
 de forma.
+
+## Vuelta 2 (acotada a 2cda7887..8ebaf099)
+
+Commits: `1b5e470c`, `ebc1fce7`, `0bec4d1b` y `8ebaf099`. Son 15 archivos: 7 de producción, la
+guardia, `error-alert.test.tsx`, los specs y `progress/`.
+
+### Verificación ejecutada
+| Qué | Resultado |
+|---|---|
+| `./init.sh` (rápido) | `== init OK ==`, exit 0. Typecheck en verde. Lint: 0 errores. Related: 269/270, más 97/99 de los tests de árbol. Los tres rojos son los mismos de la vuelta 1 y están en `tests/baseline-rojos.json` |
+| `vitest run guard-piezas-base tests/unit/paridad tests/unit/shared-ui` | 28 archivos, 312/312 en verde |
+| Snapshots de paridad | Ninguno cambia en `2cda7887..HEAD`. El árbol de trabajo queda limpio después de correrlos |
+| Tests de los diálogos (`delete-recipe-dialog`, `delete-catalog-line-dialog`, `product-page`, `supplier-detail-page`, `recipe-page`) | No se tocan en este rango y pasan en el related de `./init.sh` |
+| Barrido de citas en comentarios (`git diff --ignore-cr-at-eol d5eb43a4..HEAD`, líneas añadidas de `app components lib hooks`) | 0 resultados |
+| `UNEXPECTED_ERROR_CODE` en los 4 diálogos | 0 apariciones |
+
+### Hallazgos de la vuelta 1
+- **H1 — cerrado.** Los cuatro comentarios se han reescrito sin claves y explican el porqué: el
+  orden de los hooks y lo que hace la clave ausente. El barrido de toda la rama sale vacío.
+- **H2 — cerrado.**
+  - **La prop nueva.** `ErrorAlert` gana `cataloguedAs`, que por defecto vale `as`. La comparación
+    con `UNEXPECTED_ERROR_CODE` queda solo dentro de `ErrorAlert`.
+  - **Los 4 diálogos.** Pasan a
+    `<ErrorAlert error cataloguedAs="p" className="text-sm text-destructive" testId=…>`. Salen sus
+    4 exclusiones de la guardia, y la guardia sigue en verde sin ellas.
+  - **El DOM se conserva.**
+    - Rama de catálogo: el test exige el `innerHTML` exacto
+      `<p role="alert" class="text-sm text-destructive" data-testid="delete-product-error">{message}</p>`,
+      que es lo que pintaba el diálogo.
+    - Rama inesperada: el test comprueba que sigue siendo un `div` con el mismo rol, la misma clase y
+      `UnexpectedErrorNotice` como único hijo.
+  - **El aviso del implementer** (rama de catálogo con `p` y sin `renderCatalogued`: el mensaje sale
+    suelto) es **el comportamiento correcto**. Es exactamente el marcado que tenían los cuatro
+    diálogos, y evita un `<p>` dentro de otro `<p>`. Miré el único efecto lateral posible: el default
+    de `renderCatalogued` ahora depende de la etiqueta. Con `as="p"` y sin `renderCatalogued`, antes
+    salía `<p><p>msg</p></p>` y ahora `<p>msg</p>`. El único consumidor con `as="p"`
+    (`packaging-select.tsx:266-271`) pasa `renderCatalogued` explícito, así que su DOM no cambia.
+    Sin `as` ni `cataloguedAs` el resultado es idéntico al de antes, y un test lo fija con
+    `innerHTML`.
+- **H3 — cerrado.**
+  - **La decisión del humano** está anotada en `progress/features/QC-231.md > Decisiones`.
+  - **R18 y D5** quedan enmendadas con fecha en `requirements.md`, y el `design.md` §5.2 recoge la
+    misma enmienda.
+  - **El comentario de `DataTableStates.empty`** dice ahora lo que hace el código.
+  - **La nota de T0** se ha corregido.
+- **H4 — cerrado.** T16 está en `[x]` y remite a la nota del leader.
+
+### Regresiones
+Ninguna. Fuera de lo arreglado, el diff de producción no cambia nada.
+
+### Menores que siguen abiertos de la vuelta 1 (no bloquean)
+- **m2:** `design.md > 13` sigue diciendo que los dos tests de alcance usan `--diff-filter=d`.
+- **m3:** QC-232 sigue sin un sitio en el repo que recoja lo que se le traspasa. El alias
+  `MISSING_VALUE_MARK` de `assigned-orders-columns.tsx` sigue sin decisión explícita.
+- **m4:** `user-table.tsx` sigue saliendo entero en el diff por el cambio de CRLF a LF.
+- **m1:** no lo he vuelto a mirar, porque `progress/impl_…` cambió en `8ebaf099` y queda fuera de
+  la verificación de código.
+
+### Veredicto de la vuelta 2
+
+**OK.** H1-H4 están cerrados, no hay regresiones y la verificación está en verde. Falta
+`gate-completo` en CI, que es del PR.
