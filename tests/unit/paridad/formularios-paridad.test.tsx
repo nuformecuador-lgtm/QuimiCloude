@@ -1,14 +1,12 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
 
-import { CustomerSheet } from '@/app/(private)/clientes/components/customer-sheet';
-import { PresentationSheet } from '@/app/(private)/configuracion/presentaciones/components/presentation-sheet';
-import { UnitSheet } from '@/app/(private)/configuracion/unidades/components/unit-sheet';
-import { UserSheet } from '@/app/(private)/configuracion/usuarios/components/user-sheet';
-import { WorkGroupSheet } from '@/app/(private)/configuracion/usuarios/components/work-group-sheet';
+import { CustomerSheet } from '@/app/(private)/clientes/components';
+import { PresentationSheet } from '@/app/(private)/configuracion/presentaciones/components';
+import { UnitSheet } from '@/app/(private)/configuracion/unidades/components';
+import { UserSheet, WorkGroupSheet } from '@/app/(private)/configuracion/usuarios/components';
 import { ProductSheet } from '@/app/(private)/inventario/components/product-sheet';
-import { OrderSheet } from '@/app/(private)/pedidos/components/order-sheet';
-import { ORDER_DISTRIBUTION_DEBOUNCE_MS } from '@/app/(private)/pedidos/components/use-order-distribution-availability';
+import { ORDER_DISTRIBUTION_DEBOUNCE_MS, OrderSheet } from '@/app/(private)/pedidos/components';
 import { CatalogLineSheet } from '@/app/(private)/proveedores/[id]/components';
 import { SupplierSheet } from '@/components/shared/supplier/supplier-sheet';
 import type { CustomerView } from '@/lib/modules/clientes';

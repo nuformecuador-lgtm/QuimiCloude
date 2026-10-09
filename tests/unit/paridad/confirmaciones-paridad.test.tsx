@@ -1,15 +1,16 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-import { DeleteCustomerDialog } from '@/app/(private)/clientes/components/delete-customer-dialog';
-import { DeletePresentationDialog } from '@/app/(private)/configuracion/presentaciones/components/delete-presentation-dialog';
-import { DeleteUnitDialog } from '@/app/(private)/configuracion/unidades/components/delete-unit-dialog';
-import { DeleteUserDialog } from '@/app/(private)/configuracion/usuarios/components/delete-user-dialog';
-import { DeleteWorkGroupDialog } from '@/app/(private)/configuracion/usuarios/components/delete-work-group-dialog';
-import { EndUserSessionsDialog } from '@/app/(private)/configuracion/usuarios/components/end-user-sessions-dialog';
-import { UserStatusDialog } from '@/app/(private)/configuracion/usuarios/components/user-status-dialog';
+import { DeleteCustomerDialog } from '@/app/(private)/clientes/components';
+import { DeletePresentationDialog } from '@/app/(private)/configuracion/presentaciones/components';
+import { DeleteUnitDialog } from '@/app/(private)/configuracion/unidades/components';
+import {
+  DeleteUserDialog,
+  DeleteWorkGroupDialog,
+  EndUserSessionsDialog,
+  UserStatusDialog,
+} from '@/app/(private)/configuracion/usuarios/components';
 import { DeleteProductDialog } from '@/app/(private)/inventario/components/delete-product-dialog';
-import { CancelOrderDialog } from '@/app/(private)/pedidos/components/cancel-order-dialog';
-import { DeleteOrderDialog } from '@/app/(private)/pedidos/components/delete-order-dialog';
+import { CancelOrderDialog, DeleteOrderDialog } from '@/app/(private)/pedidos/components';
 import { DeleteRecipeDialog } from '@/app/(private)/produccion/formulas/components/delete-recipe-dialog';
 import { DeleteCatalogLineDialog, DeleteSupplierDialog } from '@/app/(private)/proveedores/[id]/components';
 import { OrderCancelDialog } from '@/app/(private)/asignacion/[id]/components/order-cancel-dialog';

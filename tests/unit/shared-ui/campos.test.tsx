@@ -3,7 +3,7 @@ import { useId, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProductBatchDateField } from '@/app/(private)/inventario/components/product-batch-date-field';
-import { OrderField } from '@/app/(private)/pedidos/components/order-field';
+import { OrderField } from '@/app/(private)/pedidos/components';
 import { UnitSelect } from '@/app/(private)/proveedores/[id]/components';
 import { DataTableFilterDate } from '@/components/shared/data-table/data-table-filter-date';
 import type { DataTableTexts } from '@/components/shared/data-table/data-table-types';

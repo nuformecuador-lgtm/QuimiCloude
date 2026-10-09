@@ -1,14 +1,13 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
 
-import { CustomerSheet } from '@/app/(private)/clientes/components/customer-sheet';
-import { PresentationSheet } from '@/app/(private)/configuracion/presentaciones/components/presentation-sheet';
-import { UnitSheet } from '@/app/(private)/configuracion/unidades/components/unit-sheet';
-import { UserSheet } from '@/app/(private)/configuracion/usuarios/components/user-sheet';
+import { CustomerSheet } from '@/app/(private)/clientes/components';
+import { PresentationSheet } from '@/app/(private)/configuracion/presentaciones/components';
+import { UnitSheet } from '@/app/(private)/configuracion/unidades/components';
+import { UserSheet } from '@/app/(private)/configuracion/usuarios/components';
 import { ProductBatchDateField } from '@/app/(private)/inventario/components/product-batch-date-field';
 import { ProductField } from '@/app/(private)/inventario/components/product-field';
 import { DialogTextField } from '@/app/(private)/inventario/importar/components/import-dialog-parts';
-import { OrderField } from '@/app/(private)/pedidos/components/order-field';
-import { OrderSheet } from '@/app/(private)/pedidos/components/order-sheet';
+import { OrderField, OrderSheet } from '@/app/(private)/pedidos/components';
 import { CatalogLineSheet, UnitSelect } from '@/app/(private)/proveedores/[id]/components';
 import { DataTableFilterDate } from '@/components/shared/data-table/data-table-filter-date';
 import type { DataTableTexts } from '@/components/shared/data-table/data-table-types';
