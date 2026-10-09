@@ -4,23 +4,12 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { ErrorAlert } from '@/components/shared/error-alert';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import {
   deleteOrderAction,
   type OrderMutationFormState,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Confirmacion del borrado de un pedido (R38, R35, `design.md > 8`).
@@ -62,8 +51,6 @@ export const DELETE_ORDER_ID_TESTID = 'delete-order-id';
 export const DELETE_ORDER_ID_FIELD = 'id';
 
 const TITLE = 'Eliminar el pedido';
-const CONFIRM_LABEL = 'Eliminar';
-const CONFIRM_PENDING_LABEL = 'Eliminando…';
 const DISMISS_LABEL = 'Volver';
 const DELETE_SUCCESS = 'Pedido eliminado.';
 
@@ -93,53 +80,36 @@ export function DeleteOrderDialog({ order, open, onOpenChange }: DeleteOrderDial
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent data-testid={DELETE_ORDER_DIALOG_TESTID}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{TITLE}</AlertDialogTitle>
-          <AlertDialogDescription data-testid={DELETE_ORDER_MESSAGE_TESTID}>
+    <DeleteConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      texts={{
+        title: TITLE,
+        description: (
+          <>
             Se va a eliminar el pedido {formatOrderNumber(order.number)}. Esta acción no se puede
             deshacer.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        {error === undefined ? null : (
-          <ErrorAlert
-            error={error}
-            id={errorId}
-            className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            testId={DELETE_ORDER_ERROR_TESTID}
-            withDataCode
-            renderCatalogued={(catalogued) => (
-              <p data-testid="delete-order-error-message">{catalogued.message}</p>
-            )}
-          />
-        )}
-
-        <form action={formAction} data-testid="delete-order-form">
-          <input
-            type="hidden"
-            name={DELETE_ORDER_ID_FIELD}
-            defaultValue={order.id}
-            data-testid={DELETE_ORDER_ID_TESTID}
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel className={touchTarget} data-testid={DELETE_ORDER_DISMISS_TESTID}>
-              {DISMISS_LABEL}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              type="submit"
-              variant="destructive"
-              className={touchTarget}
-              disabled={isPending}
-              aria-busy={isPending}
-              data-testid={DELETE_ORDER_CONFIRM_TESTID}
-            >
-              {isPending ? CONFIRM_PENDING_LABEL : CONFIRM_LABEL}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </form>
-      </AlertDialogContent>
-    </AlertDialog>
+          </>
+        ),
+        dismiss: DISMISS_LABEL,
+      }}
+      testIds={{
+        dialog: DELETE_ORDER_DIALOG_TESTID,
+        message: DELETE_ORDER_MESSAGE_TESTID,
+        dismiss: DELETE_ORDER_DISMISS_TESTID,
+        confirm: DELETE_ORDER_CONFIRM_TESTID,
+        form: 'delete-order-form',
+        error: DELETE_ORDER_ERROR_TESTID,
+        errorMessage: 'delete-order-error-message',
+      }}
+      submit={{
+        kind: 'action',
+        action: formAction,
+        hidden: [{ name: DELETE_ORDER_ID_FIELD, value: order.id, testId: DELETE_ORDER_ID_TESTID }],
+      }}
+      isPending={isPending}
+      error={error}
+      errorId={errorId}
+    />
   );
 }

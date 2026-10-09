@@ -4,17 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId, useState } from 'react';
 import { toast } from 'sonner';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { ErrorAlert } from '@/components/shared/error-alert';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import type { ErrorCode } from '@/lib/modules/errores';
 import { cancelOrderSchema, formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
@@ -22,7 +12,6 @@ import {
   cancelOrderAction,
   type OrderMutationFormState,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Dialogo de cancelacion de un pedido, con su MOTIVO (R37, R35, R34, `design.md > 8`).
@@ -152,72 +141,58 @@ export function CancelOrderDialog({ order, open, onOpenChange }: CancelOrderDial
   const isEmpty = reason.trim() === '';
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent data-testid={CANCEL_ORDER_DIALOG_TESTID}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{TITLE}</AlertDialogTitle>
-          <AlertDialogDescription data-testid="cancel-order-message">
-            {/* El pedido se nombra por su CORRELATIVO, nunca por el uuid (R10). */}
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      variant="destructive"
+      texts={{
+        title: TITLE,
+        description: (
+          <>
             Se va a cancelar el pedido {formatOrderNumber(order.number)}. Un pedido cancelado ya no
             se puede editar.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        <form action={formAction} className="flex flex-col gap-3" data-testid="cancel-order-form">
-          <input
-            type="hidden"
-            name={CANCEL_ORDER_ID_FIELD}
-            defaultValue={order.id}
-            data-testid={CANCEL_ORDER_ID_TESTID}
-          />
-
-          <div className="flex flex-col gap-2">
-            <label htmlFor={reasonId} className="text-sm font-medium">
-              {REASON_LABEL}
-            </label>
-            <Textarea
-              id={reasonId}
-              name={CANCEL_ORDER_REASON_FIELD}
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-              className={FIELD_TEXT}
-              aria-invalid={error === undefined ? undefined : true}
-              aria-describedby={error === undefined ? undefined : errorId}
-              data-testid={CANCEL_ORDER_REASON_TESTID}
-            />
-          </div>
-
-          {/* Region de error del DIALOGO (`design.md > 8`): aqui aterriza `not_cancellable`. */}
-          {error === undefined ? null : (
-            <ErrorAlert
-              error={error}
-              id={errorId}
-              className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-              testId={CANCEL_ORDER_ERROR_TESTID}
-              withDataCode
-              renderCatalogued={(catalogued) => (
-                <p data-testid="cancel-order-error-message">{catalogued.message}</p>
-              )}
-            />
-          )}
-
-          <AlertDialogFooter>
-            <AlertDialogCancel className={touchTarget} data-testid={CANCEL_ORDER_DISMISS_TESTID}>
-              {DISMISS_LABEL}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              type="submit"
-              variant="destructive"
-              className={touchTarget}
-              disabled={isEmpty || isPending}
-              aria-busy={isPending}
-              data-testid={CANCEL_ORDER_CONFIRM_TESTID}
-            >
-              {isPending ? CONFIRM_PENDING_LABEL : CONFIRM_LABEL}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </form>
-      </AlertDialogContent>
-    </AlertDialog>
+          </>
+        ),
+        dismiss: DISMISS_LABEL,
+        confirm: CONFIRM_LABEL,
+        pending: CONFIRM_PENDING_LABEL,
+      }}
+      testIds={{
+        dialog: CANCEL_ORDER_DIALOG_TESTID,
+        message: 'cancel-order-message',
+        dismiss: CANCEL_ORDER_DISMISS_TESTID,
+        confirm: CANCEL_ORDER_CONFIRM_TESTID,
+        form: 'cancel-order-form',
+        error: CANCEL_ORDER_ERROR_TESTID,
+        errorMessage: 'cancel-order-error-message',
+      }}
+      submit={{
+        kind: 'action',
+        action: formAction,
+        hidden: [{ name: CANCEL_ORDER_ID_FIELD, value: order.id, testId: CANCEL_ORDER_ID_TESTID }],
+        formClassName: 'flex flex-col gap-3',
+      }}
+      layout="error-in-form"
+      isPending={isPending}
+      confirmDisabled={isEmpty}
+      error={error}
+      errorId={errorId}
+    >
+      <div className="flex flex-col gap-2">
+        <label htmlFor={reasonId} className="text-sm font-medium">
+          {REASON_LABEL}
+        </label>
+        <Textarea
+          id={reasonId}
+          name={CANCEL_ORDER_REASON_FIELD}
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          className={FIELD_TEXT}
+          aria-invalid={error === undefined ? undefined : true}
+          aria-describedby={error === undefined ? undefined : errorId}
+          data-testid={CANCEL_ORDER_REASON_TESTID}
+        />
+      </div>
+    </ConfirmDialog>
   );
 }

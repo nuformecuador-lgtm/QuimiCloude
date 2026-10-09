@@ -1,13 +1,12 @@
 'use client';
 
 import { PlusIcon } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
-import { toast } from 'sonner';
 
 import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
+import { useEntitySheet } from '@/hooks/use-entity-sheet';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { OrderSummary } from '@/lib/modules/pedidos';
 import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
@@ -112,33 +111,25 @@ export function OrderSheet({
   coverage,
   section = 'form',
 }: OrderSheetProps) {
-  const [selfOpen, setSelfOpen] = useState(false);
   /** Instancia del formulario: cambia en cada apertura para que arranque SIEMPRE vacio (2026-09-09). */
   const [openKey, setOpenKey] = useState(0);
-  const router = useRouter();
   const isEdit = order !== undefined;
-  const isControlled = open !== undefined;
-  const isOpen = open ?? selfOpen;
 
-  const changeOpen = useCallback(
+  // La `key` avanza solo al abrir: si dependiera de `isOpen`, `handleSaved` cambiaria de identidad
+  // y el efecto de exito del formulario se dispararia dos veces.
+  const handleOpenChange = useCallback(
     (next: boolean) => {
-      // Cada APERTURA es un formulario nuevo: la `key` avanza en el sentido que abre. Cerrar no
-      // toca nada -depende de `isOpen` cambiaria la identidad de este callback y con ella la de
-      // `handleSaved`, disparando dos veces el efecto de exito del formulario-.
       if (next) setOpenKey((key) => key + 1);
-      if (!isControlled) setSelfOpen(next);
       onOpenChange?.(next);
     },
-    [isControlled, onOpenChange],
+    [onOpenChange],
   );
 
-  const handleSaved = useCallback(() => {
-    changeOpen(false);
-    toast.success(isEdit ? UPDATE_SUCCESS : CREATE_SUCCESS);
-    // Vuelve a ejecutar el Server Component de la lista con la MISMA URL: ni `push` ni `replace`,
-    // asi que pagina, tamano, orden y filtros siguen siendo los de antes de abrir (R25).
-    router.refresh();
-  }, [changeOpen, isEdit, router]);
+  const { isOpen, isControlled, changeOpen, handleSaved } = useEntitySheet({
+    open,
+    onOpenChange: handleOpenChange,
+    successMessage: isEdit ? UPDATE_SUCCESS : CREATE_SUCCESS,
+  });
 
   return (
     <Sheet open={isOpen} onOpenChange={changeOpen}>
