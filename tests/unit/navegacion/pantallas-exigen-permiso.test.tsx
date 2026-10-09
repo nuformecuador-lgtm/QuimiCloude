@@ -36,9 +36,10 @@ import { LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
  *   resuelto prueba que la pantalla ni siquiera miró la URL. Es un espía real, no un adorno: el
  *   caso «con permiso» afirma que **sí** se leyeron, así que un espía que no funcionara pondría
  *   ese caso en rojo.
- * - Las cuatro Server Actions que las páginas invocan en su propio cuerpo (`getSupplierAction`,
- *   `getRecipeAction`, `listUnitsAction`, `listProductsAction`) están mockeadas y se afirma
- *   `not.toHaveBeenCalled()` en TODAS las pantallas, no solo en las que las usan.
+ * - Las seis Server Actions que las páginas invocan en su propio cuerpo (`getSupplierAction`,
+ *   `getRecipeAction`, `listUnitsAction`, `listProductsAction`, `listRecipesAction` y
+ *   `getMassVolumeBridgeAction`) están mockeadas y se afirma `not.toHaveBeenCalled()` en TODAS
+ *   las pantallas, no solo en las que las usan.
  *
  * **Por qué no se renderiza el árbol.** No hace falta para lo que este archivo afirma, y traería
  * ruido ajeno: las listas de estas pantallas viven bajo `<Suspense>` en componentes de servidor
@@ -57,6 +58,12 @@ import { LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
  * espia y pasa a `leeAlgo: true`. Entra `/dashboard/recorrido/[id]`, que lee `params`,
  * `searchParams` y `getExecutionTraceAction`; las dos acciones del recorrido se espian como las
  * demas.
+ *
+ * Nota del 2026-10-08 (QC-180 T1, R3, R5 a R7): `/pedidos` lee en su propio cuerpo la primera
+ * pagina de recetas (`listRecipesAction`) y el puente masa-volumen (`getMassVolumeBridgeAction`)
+ * para el alta. Las dos entran en el espia `actions`: con permiso reciben el error del
+ * `beforeEach` y la pagina degrada a selector vacio; sin permiso o sin sesion, el `toEqual([])`
+ * de las lecturas ocurridas las vigila tambien.
  */
 
 const { getSessionUserMock, notFoundMock, redirectMock, actions } = vi.hoisted(() => ({
@@ -67,6 +74,9 @@ const { getSessionUserMock, notFoundMock, redirectMock, actions } = vi.hoisted((
     getSupplierAction: vi.fn(),
     getRecipeAction: vi.fn(),
     listUnitsAction: vi.fn(),
+    // 2026-10-08 (QC-180): las dos lecturas de catalogo del alta de `/pedidos`.
+    listRecipesAction: vi.fn(),
+    getMassVolumeBridgeAction: vi.fn(),
     listProductsAction: vi.fn(),
     listProductFormUnitsAction: vi.fn(),
     // 2026-10-08: las dos lecturas del recorrido de ejecucion.
@@ -100,7 +110,7 @@ vi.mock('@/lib/modules/proveedores/adapters/driving/supplier-actions', () => ({
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   getRecipeAction: actions.getRecipeAction,
-  listRecipesAction: vi.fn(),
+  listRecipesAction: actions.listRecipesAction,
   createRecipeAction: vi.fn(),
   updateRecipeAction: vi.fn(),
   deleteRecipeAction: vi.fn(),
@@ -111,7 +121,7 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
 
 vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
   listUnitsAction: actions.listUnitsAction,
-  getMassVolumeBridgeAction: vi.fn(),
+  getMassVolumeBridgeAction: actions.getMassVolumeBridgeAction,
 }));
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/execution-trace-actions', () => ({

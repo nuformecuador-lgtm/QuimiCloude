@@ -8,7 +8,7 @@
 
 ## Grupo 0: mocks de `/pedidos`
 
-- [ ] **T1 [P]** Completar los mocks de `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`
+- [x] **T1 [P]** Completar los mocks de `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`
   (`design.md > 3.1`).
   - Añadir `listRecipesAction` y `getMassVolumeBridgeAction` al objeto `actions` de `vi.hoisted`, y
     apuntar a ellos los `vi.mock` de `recipe-actions` y `unit-actions`.
@@ -22,7 +22,7 @@
 
 ## Grupo A: lista cerrada de los guardianes (D4)
 
-- [ ] **T2 [P]** `tests/unit/recetas/scope.test.ts` (`design.md > 4.1`).
+- [x] **T2 [P]** `tests/unit/recetas/scope.test.ts` (`design.md > 4.1`).
   - `PANTALLA_DE_EJECUCION` pasa a ser un conjunto cerrado de dos rutas exactas:
     `app/(private)/asignacion/[id]/page.tsx` y `app/(private)/pedidos/page.tsx`.
   - El filtro `segundasPantallas` excluye las rutas del conjunto.
@@ -30,13 +30,13 @@
     `897a4f91`) y lo que sigue prohibido.
   - La lista E2E cerrada **no** se toca.
   - **Hecho:** `pnpm exec vitest run tests/unit/recetas/scope.test.ts` en verde. Cubre R1, R8 y R10.
-- [ ] **T3 [P]** `tests/unit/recetas/module-contract.test.ts` (`design.md > 4.1`).
+- [x] **T3 [P]** `tests/unit/recetas/module-contract.test.ts` (`design.md > 4.1`).
   - `PANTALLAS_AUTORIZADAS` pasa de una ruta a las mismas dos de T2.
   - Comentario fechado equivalente.
   - `consumesOnlyPublicContract` se sigue aplicando a las dos.
   - **Hecho:** `pnpm exec vitest run tests/unit/recetas/module-contract.test.ts` en verde. Las dos
     listas (T2 y T3) tienen los mismos dos literales. Cubre R2, R9 y R10.
-- [ ] **T4** Falsabilidad de los guardianes (`design.md > 3.3`). Depende de T2 y T3.
+- [x] **T4** Falsabilidad de los guardianes (`design.md > 3.3`). Depende de T2 y T3.
   - Hacer las mutaciones 1 y 2 en local, sin commitear.
   - Comprobar que la 1 pone rojos los dos guardianes y la 2 pone rojo `module-contract`.
   - Revertir y comprobar que vuelven a verde.
