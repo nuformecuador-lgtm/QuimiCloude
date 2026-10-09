@@ -37,11 +37,11 @@ hace push y el leader vuelve a correr `archivos-en-vuelo`.
 
 ## Tanda 0 — Congelar el «antes» (bloquea todo lo demás; depende de TA)
 
-- [ ] **T0a. Cerrar la lista de campos** (R17; `design.md > 2.3`).
+- [x] **T0a. Cerrar la lista de campos** (R17; `design.md > 2.3`).
   - **Qué se escribe:** en `progress/impl_QC-232-…md > Campos`, cada sitio con su archivo y su pieza
     destino, y los que se quedan fuera con su motivo.
   - **Hecho cuando:** la lista está escrita y no queda ningún «por confirmar».
-- [ ] **T0b. Paridades nuevas** (R1, R20–R23, D6; `design.md > 10.1`).
+- [x] **T0b. Paridades nuevas** (R1, R20–R23, D6; `design.md > 10.1`).
   - **Qué se escribe:**
     - `formularios-paridad.test.tsx`;
     - `confirmaciones-paridad.test.tsx`;
@@ -326,6 +326,8 @@ lista aquí, para que `archivos-en-vuelo` no lo lea como ruta de esta feature. L
 - `tests/unit/paridad/__snapshots__/confirmaciones-paridad.test.tsx.snap`
 - `tests/unit/paridad/__snapshots__/campos-paridad.test.tsx.snap`
 - `tests/unit/paridad/__snapshots__/acciones-por-fila.test.tsx.snap`
+- `tests/unit/paridad/asignacion-listas-paridad.test.tsx` (T0b: vacío y esqueleto de assigned, company, finished y packing que `asignacion-paridad` no cubre)
+- `tests/unit/paridad/__snapshots__/asignacion-listas-paridad.test.tsx.snap`
 - `tests/unit/shared-ui/form-sheet.test.tsx`
 - `tests/unit/shared-ui/use-entity-sheet.test.tsx`
 - `tests/unit/shared-ui/confirm-dialog.test.tsx`
