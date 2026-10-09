@@ -4,7 +4,9 @@ import type { DataTableColumn } from '@/components/shared/data-table';
 import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import type { FinishedOrderView } from '@/lib/modules/asignaciones';
+import { formatCivilDate } from '@/lib/shared/ui/date-civil';
 import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
 /**
  * Las SEIS columnas de «Terminados»: número, receta, cantidad,
@@ -12,13 +14,10 @@ import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
  * vista es de solo lectura para toda la empresa, incluido el propio actor.
  */
 
-/** Mismo glifo que el marcador de `/pedidos`, pero declarado aqui: son rutas distintas. */
-export const MISSING_VALUE_MARK = '—';
-
 function MissingValue({ field }: { readonly field: string }) {
   return (
     <span aria-label="Sin dato" data-testid={`finished-order-missing-${field}`}>
-      {MISSING_VALUE_MARK}
+      {EMPTY_MARK}
     </span>
   );
 }
@@ -30,14 +29,6 @@ export const FINISHED_ORDER_PRESENTATION_COLUMN_ID = 'presentationName';
 export const FINISHED_ORDER_DATE_COLUMN_ID = 'finishedAt';
 export const FINISHED_ORDER_RESPONSIBLES_COLUMN_ID = 'responsibles';
 
-/**
- * `YYYY-MM-DD` en UTC, nunca `toLocaleDateString`: el Server Component y el
- * navegador tienen husos y locales distintos.
- */
-function formatFinishedAt(value: Date): string {
-  return value.toISOString().slice(0, 10);
-}
-
 const MISSING_DATE_TEXT = 'Sin fecha';
 
 function FinishedAtCell({ finishedAt }: { readonly finishedAt: Date | null }) {
@@ -48,7 +39,7 @@ function FinishedAtCell({ finishedAt }: { readonly finishedAt: Date | null }) {
       data-testid="finished-order-date"
       data-missing={isMissing ? 'true' : undefined}
     >
-      {isMissing ? MISSING_DATE_TEXT : formatFinishedAt(finishedAt)}
+      {isMissing ? MISSING_DATE_TEXT : formatCivilDate(finishedAt)}
     </span>
   );
 }

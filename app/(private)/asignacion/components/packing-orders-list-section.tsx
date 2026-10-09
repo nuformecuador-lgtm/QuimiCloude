@@ -148,8 +148,7 @@ export async function PackingOrdersListSection({ params }: PackingOrdersListSect
             data-slot="button"
             data-testid="packing-orders-prev-page"
             className={cn(
-              buttonVariants({ variant: 'outline' }),
-              'min-h-11 min-w-11',
+              buttonVariants({ variant: 'outline', touch: true }),
               hasPrevious ? undefined : 'pointer-events-none opacity-50',
             )}
           >
@@ -161,8 +160,7 @@ export async function PackingOrdersListSection({ params }: PackingOrdersListSect
             data-slot="button"
             data-testid="packing-orders-next-page"
             className={cn(
-              buttonVariants({ variant: 'outline' }),
-              'min-h-11 min-w-11',
+              buttonVariants({ variant: 'outline', touch: true }),
               hasNext ? undefined : 'pointer-events-none opacity-50',
             )}
           >

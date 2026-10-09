@@ -5,19 +5,17 @@ import { OrderDistributionLabel } from '@/components/shared/order-distribution-l
 import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import type { AssignedOrderView } from '@/lib/modules/asignaciones';
 import type { OrderPriority } from '@/lib/modules/pedidos';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
 import { AssignedOrderEnterTrigger } from './assigned-order-enter-trigger';
 
-/**
- * Mismo glifo que el marcador de `/pedidos`, pero declarado aqui: son rutas distintas y esta no
- * importa por ruta profunda desde la otra.
- */
-export const MISSING_VALUE_MARK = '—';
+// El barrel de la ruta sigue exportando este nombre.
+export { EMPTY_MARK as MISSING_VALUE_MARK } from '@/lib/shared/ui/empty-mark';
 
 function MissingValue({ field }: { readonly field: string }) {
   return (
     <span aria-label="Sin dato" data-testid={`assigned-order-missing-${field}`}>
-      {MISSING_VALUE_MARK}
+      {EMPTY_MARK}
     </span>
   );
 }

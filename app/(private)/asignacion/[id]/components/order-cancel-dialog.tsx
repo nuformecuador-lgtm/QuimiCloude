@@ -2,7 +2,7 @@
 
 import { useActionState, useId, useState } from 'react';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -19,8 +19,9 @@ import {
   cancelAssignedOrderAction,
   type CancelAssignedOrderResult,
 } from '@/lib/modules/asignaciones/adapters/driving/order-execution-actions';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode } from '@/lib/modules/errores';
+import type { ErrorCode } from '@/lib/modules/errores';
 import { cancelOrderSchema } from '@/lib/modules/pedidos';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Cancela el pedido desde la ejecucion pidiendo antes el motivo. La accion redirige a la lista
@@ -49,7 +50,6 @@ export const ORDER_CANCEL_TEXTS = {
   dismiss: 'Volver',
 } as const;
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 // Por debajo de 16 px Safari en iOS hace zoom al enfocar el campo.
 const FIELD_TEXT = 'text-base md:text-base';
 
@@ -79,7 +79,7 @@ export function OrderCancelDialog({ orderId, stepPosition }: OrderCancelDialogPr
           <Button
             type="button"
             variant="outline"
-            className={TOUCH_TARGET}
+            touch
             data-testid={ORDER_CANCEL_TRIGGER_TESTID}
           />
         }
@@ -147,25 +147,19 @@ function OrderCancelForm({ orderId, stepPosition }: OrderCancelDialogProps) {
       </div>
 
       {error === undefined ? null : (
-        <div
-          role="alert"
+        <ErrorAlert
+          error={error}
           id={errorId}
           className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-          data-testid={ORDER_CANCEL_ERROR_TESTID}
-          data-code={error.code}
-        >
-          {error.code === UNEXPECTED_ERROR_CODE ? (
-            <UnexpectedErrorNotice state={error} />
-          ) : (
-            <p>{error.message}</p>
-          )}
-        </div>
+          testId={ORDER_CANCEL_ERROR_TESTID}
+          withDataCode
+        />
       )}
 
       <AlertDialogFooter>
         <AlertDialogCancel
           type="button"
-          className={TOUCH_TARGET}
+          className={touchTarget}
           disabled={isPending}
           data-testid={ORDER_CANCEL_DISMISS_TESTID}
         >
@@ -174,7 +168,7 @@ function OrderCancelForm({ orderId, stepPosition }: OrderCancelDialogProps) {
         <Button
           type="submit"
           variant="destructive"
-          className={TOUCH_TARGET}
+          touch
           disabled={isPending}
           aria-busy={isPending}
           data-testid={ORDER_CANCEL_CONFIRM_TESTID}
