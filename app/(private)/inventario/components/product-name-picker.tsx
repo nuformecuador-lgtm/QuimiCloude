@@ -1,8 +1,8 @@
 'use client';
 
-import { Loader2Icon } from 'lucide-react';
 import { useCallback, useId, useState } from 'react';
 
+import { Spinner } from '@/components/shared/spinner';
 import {
   Autocomplete,
   AutocompleteContent,
@@ -18,6 +18,7 @@ import {
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import type { ProductType } from '@/lib/modules/inventario';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Autocomplete del NOMBRE de producto en el alta (`design.md` heredado de QC-22, R18).
@@ -61,7 +62,6 @@ export type ProductNameOption = {
   readonly unitId?: string | null;
 };
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base md:text-base';
 const SEARCH_DEBOUNCE_MS = 400;
 const MAX_LIST_HEIGHT = 256;
@@ -220,7 +220,7 @@ export function ProductNamePicker({
             aria-labelledby={labelId}
             aria-invalid={error === undefined ? undefined : true}
             aria-describedby={error === undefined ? undefined : errorId}
-            className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT}`}
+            className={`w-full ${touchTarget} ${FIELD_TEXT}`}
             placeholder={PLACEHOLDER}
             data-testid="product-field-name"
           />
@@ -241,7 +241,7 @@ export function ProductNamePicker({
                       key={option.id}
                       index={index}
                       value={option}
-                      className={`${TOUCH_TARGET} ${FIELD_TEXT} items-center`}
+                      className={`${touchTarget} ${FIELD_TEXT} items-center`}
                       data-testid="product-name-option"
                       data-product-id={option.id}
                       onClick={() => choose(option)}
@@ -278,7 +278,7 @@ export function ProductNamePicker({
             >
               {cargando ? (
                 <>
-                  <Loader2Icon className="size-4 animate-spin" aria-hidden />
+                  <Spinner />
                   <span className="py-2">{LOADING_LABEL}</span>
                 </>
               ) : null}

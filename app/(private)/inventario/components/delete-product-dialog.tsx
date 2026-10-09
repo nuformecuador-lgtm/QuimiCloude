@@ -24,8 +24,7 @@ import {
 } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import type { ProductView } from '@/lib/modules/inventario';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 const DELETE_SUCCESS = 'Producto borrado.';
 
@@ -70,7 +69,7 @@ export function DeleteProductDialog({ product }: { readonly product: ProductView
         render={
           <Button
             variant="ghost"
-            className={TOUCH_TARGET}
+            touch
             aria-label={`Borrar ${product.name}`}
             data-testid="product-delete-open"
           />
@@ -105,13 +104,13 @@ export function DeleteProductDialog({ product }: { readonly product: ProductView
         <form action={formAction}>
           <input type="hidden" name="id" defaultValue={product.id} data-testid="delete-product-id" />
           <AlertDialogFooter>
-            <AlertDialogCancel className={TOUCH_TARGET} data-testid="delete-product-cancel">
+            <AlertDialogCancel className={touchTarget} data-testid="delete-product-cancel">
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
               type="submit"
               variant="destructive"
-              className={TOUCH_TARGET}
+              touch
               data-testid="delete-product-confirm"
             >
               Borrar

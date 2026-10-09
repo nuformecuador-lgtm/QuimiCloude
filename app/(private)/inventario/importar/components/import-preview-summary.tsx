@@ -1,7 +1,8 @@
 'use client';
 
-import { DownloadIcon, InfoIcon, LoaderCircleIcon } from 'lucide-react';
+import { DownloadIcon, InfoIcon } from 'lucide-react';
 
+import { Spinner } from '@/components/shared/spinner';
 import { Button } from '@/components/ui/button';
 import type { InventoryImportPreview } from '@/lib/modules/inventario';
 
@@ -60,7 +61,7 @@ export function ErrorFileButton({ onDownload }: { readonly onDownload: () => voi
     <Button
       type="button"
       variant="outline"
-      className="min-h-11 min-w-11"
+      touch
       data-testid={ERROR_FILE_BUTTON_TESTID}
       onClick={onDownload}
     >
@@ -103,13 +104,13 @@ export function ImportPreviewSummary({
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"
-          className="min-h-11 min-w-11"
+          touch
           disabled={validRows === 0 || confirming}
           aria-busy={confirming}
           data-testid={CONFIRM_BUTTON_TESTID}
           onClick={onConfirm}
         >
-          {confirming ? <LoaderCircleIcon className="animate-spin" aria-hidden /> : null}
+          {confirming ? <Spinner size="inherit" /> : null}
           {confirming ? CONFIRMING_LABEL : confirmLabel(validRows)}
         </Button>
         {totals.error > 0 ? <ErrorFileButton onDownload={onDownloadErrors} /> : null}
