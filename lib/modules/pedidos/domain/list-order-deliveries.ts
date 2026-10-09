@@ -64,7 +64,7 @@ function nameOrShortId(names: ReadonlyMap<string, string>, id: string): string {
 
 type Names = {
   readonly presentationByLine: ReadonlyMap<string, string>;
-  readonly customers: ReadonlyMap<string, string>;
+  readonly customerNames: ReadonlyMap<string, string>;
   readonly people: ReadonlyMap<string, string>;
   readonly lots: ReadonlyMap<string, string>;
 };
@@ -102,7 +102,7 @@ function toDeliveryView(row: DeliveryHistoryRow, names: Names): DeliveryView {
   return {
     id: row.id,
     createdAt: row.createdAt.toISOString(),
-    customerName: nameOrShortId(names.customers, row.customerId),
+    customerName: nameOrShortId(names.customerNames, row.customerId),
     authorName: nameOrShortId(names.people, row.createdBy),
     presentations: [...byPresentation].map(([presentationLineId, lines]) =>
       toPresentationView(presentationLineId, lines, names),
@@ -127,7 +127,7 @@ async function resolveNames(
   ];
   const batchIds = [...new Set(lines.map((line) => line.batchId))];
 
-  const [presentationByLine, customers, people, lots] = await Promise.all([
+  const [presentationByLine, customerNames, people, lots] = await Promise.all([
     deps.lines.findPresentationLinesForFinish(orderId, scope).then(async (orderLines) => {
       const presentationIds = [...new Set(orderLines.map((line) => line.presentationId))];
       const refs = await deps.presentations.findRefs(presentationIds, scope.companyId);
@@ -147,7 +147,7 @@ async function resolveNames(
       .then((refs) => new Map(refs.map((ref) => [ref.id, ref.displayName]))),
     deps.batchLots.findLots(batchIds, scope.companyId),
   ]);
-  return { presentationByLine, customers, people, lots };
+  return { presentationByLine, customerNames, people, lots };
 }
 
 /** Las entregas de un pedido, con lo anulado de cada una. */

@@ -82,6 +82,7 @@ async function addOrderDeliveryLines(
   });
 }
 
+/** Lo anulado no cuenta como entregado: vuelve a quedar pendiente y se puede entregar de nuevo. */
 async function sumOrderDeliveredPackages(
   orderId: string,
   scope: OrderScope,
@@ -90,7 +91,7 @@ async function sumOrderDeliveredPackages(
   const columns = companyScopeColumns(scope);
   const rows = await tx.orderDeliveryLine.groupBy({
     by: ['orderPresentationLineId'],
-    where: { ...columns, delivery: { ...columns, orderId } },
+    where: { ...columns, delivery: { ...columns, orderId }, voidLine: null },
     _sum: { packages: true },
   });
   return new Map(rows.map((row) => [row.orderPresentationLineId, row._sum.packages ?? 0]));
