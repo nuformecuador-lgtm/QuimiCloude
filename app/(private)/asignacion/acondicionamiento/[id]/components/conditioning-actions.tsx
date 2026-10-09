@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import type { ConditioningTeamCandidates } from '@/lib/modules/asignaciones';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { FinishConditioningDialog } from './finish-conditioning-dialog';
 import { StartConditioningDialog } from './start-conditioning-dialog';
@@ -15,8 +16,6 @@ export const CONDITIONING_ACTIONS_TEXTS = {
   start: 'Acondicionar',
   finish: 'Terminar',
 } as const;
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 export type ConditioningActionsProps =
   | {
@@ -47,7 +46,7 @@ export function ConditioningActions(props: ConditioningActionsProps) {
     <div className="flex flex-col gap-2">
       <Button
         type="button"
-        className={`w-fit ${TOUCH_TARGET}`}
+        className={`w-fit ${touchTarget}`}
         onClick={openDialog}
         data-testid={isStart ? CONDITIONING_START_BUTTON_TESTID : CONDITIONING_FINISH_BUTTON_TESTID}
       >

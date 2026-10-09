@@ -9,6 +9,7 @@ import type {
   ConditioningTeamCandidateGroup,
   ConditioningTeamCandidates,
 } from '@/lib/modules/asignaciones';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 export const CONDITIONING_TEAM_PICKER_TESTID = 'conditioning-team-picker';
 export const CONDITIONING_TEAM_PEOPLE_TESTID = 'conditioning-team-people';
@@ -37,7 +38,6 @@ export const CONDITIONING_TEAM_PICKER_TEXTS = {
   groupContributesNobody: 'Este grupo no aporta personas al equipo.',
 } as const;
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 // Por debajo de 16 px Safari en iOS hace zoom al enfocar el campo.
 const FIELD_TEXT = 'text-base md:text-base';
 
@@ -95,7 +95,7 @@ export function ConditioningTeamPicker({
           type="search"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+          className={`${touchTarget} ${FIELD_TEXT}`}
           data-testid={CONDITIONING_TEAM_SEARCH_TESTID}
         />
         {people.length === 0 ? (
@@ -110,7 +110,7 @@ export function ConditioningTeamPicker({
                   <Checkbox
                     id={id}
                     aria-label={person.displayName}
-                    className={TOUCH_TARGET}
+                    className={touchTarget}
                     disabled={disabled}
                     checked={selection.userIds.includes(person.id)}
                     onCheckedChange={() =>
@@ -190,7 +190,7 @@ function WorkGroupOption({ baseId, group, checked, disabled, onToggle }: WorkGro
           id={id}
           aria-label={CONDITIONING_TEAM_PICKER_TEXTS.groupLabel(group.name, group.contributes)}
           aria-describedby={hasHint ? hintId : undefined}
-          className={TOUCH_TARGET}
+          className={touchTarget}
           disabled={disabled || contributesNobody}
           checked={checked}
           onCheckedChange={onToggle}

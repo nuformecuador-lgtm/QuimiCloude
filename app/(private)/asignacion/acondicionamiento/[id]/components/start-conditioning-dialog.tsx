@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -17,7 +17,7 @@ import {
   startConditioningAction,
   type StartConditioningResult,
 } from '@/lib/modules/asignaciones/adapters/driving/order-conditioning-actions';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import {
   ConditioningTeamPicker,
@@ -38,8 +38,6 @@ export const START_CONDITIONING_TEXTS = {
   cancel: 'Cancelar',
   confirm: 'Comenzar',
 } as const;
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 type StartFormState = { readonly status: 'idle' } | StartConditioningResult;
 
@@ -116,18 +114,12 @@ function StartConditioningForm({ orderId, orderNumber, candidates, onStarted }: 
       />
 
       {error === undefined ? null : (
-        <div
-          role="alert"
+        <ErrorAlert
+          error={error}
           className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-          data-testid={START_CONDITIONING_ERROR_TESTID}
-          data-code={error.code}
-        >
-          {error.code === UNEXPECTED_ERROR_CODE ? (
-            <UnexpectedErrorNotice state={error} />
-          ) : (
-            <p>{error.message}</p>
-          )}
-        </div>
+          testId={START_CONDITIONING_ERROR_TESTID}
+          withDataCode
+        />
       )}
 
       <DialogFooter>
@@ -136,7 +128,7 @@ function StartConditioningForm({ orderId, orderNumber, candidates, onStarted }: 
             <Button
               type="button"
               variant="outline"
-              className={TOUCH_TARGET}
+              className={touchTarget}
               disabled={isPending}
               data-testid={START_CONDITIONING_CANCEL_TESTID}
             />

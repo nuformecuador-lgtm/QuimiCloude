@@ -2,7 +2,7 @@
 
 import { useActionState } from 'react';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -16,7 +16,7 @@ import {
   finishConditioningAction,
   type FinishConditioningResult,
 } from '@/lib/modules/asignaciones/adapters/driving/order-conditioning-actions';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { CountdownGatedButton } from './countdown-gated-button';
 
@@ -32,8 +32,6 @@ export const FINISH_CONDITIONING_TEXTS = {
   cancel: 'Cancelar',
   confirm: 'Terminar',
 } as const;
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 type FinishFormState = { readonly status: 'idle' } | FinishConditioningResult;
 
@@ -89,24 +87,18 @@ function FinishConditioningForm({ orderId, orderNumber }: FinishConditioningForm
       <input type="hidden" name={FINISH_CONDITIONING_ORDER_ID_FIELD} value={orderId} />
 
       {error === undefined ? null : (
-        <div
-          role="alert"
+        <ErrorAlert
+          error={error}
           className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-          data-testid={FINISH_CONDITIONING_ERROR_TESTID}
-          data-code={error.code}
-        >
-          {error.code === UNEXPECTED_ERROR_CODE ? (
-            <UnexpectedErrorNotice state={error} />
-          ) : (
-            <p>{error.message}</p>
-          )}
-        </div>
+          testId={FINISH_CONDITIONING_ERROR_TESTID}
+          withDataCode
+        />
       )}
 
       <AlertDialogFooter>
         <AlertDialogCancel
           type="button"
-          className={TOUCH_TARGET}
+          className={touchTarget}
           disabled={isPending}
           data-testid={FINISH_CONDITIONING_CANCEL_TESTID}
         >

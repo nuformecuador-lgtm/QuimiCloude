@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { CountdownTimer } from '@/components/shared/countdown-timer';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Botón que no se puede pulsar hasta que pasa la espera. La cuenta arranca al montar: quien lo usa
@@ -16,8 +17,6 @@ import { cn } from '@/lib/utils';
 export const CONDITIONING_WAIT_SECONDS = 5;
 
 export const COUNTDOWN_GATED_BUTTON_TESTID = 'countdown-gated-button';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 export type CountdownGatedButtonProps = {
   readonly label: string;
@@ -37,7 +36,7 @@ export function CountdownGatedButton({
     <Button
       type="submit"
       disabled={waiting || disabled}
-      className={cn(TOUCH_TARGET, 'gap-2', className)}
+      className={cn(touchTarget, 'gap-2', className)}
       data-testid={COUNTDOWN_GATED_BUTTON_TESTID}
     >
       {label}
