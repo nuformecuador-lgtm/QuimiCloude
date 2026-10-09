@@ -124,6 +124,11 @@ Se conservan los exports, los testids y los textos (R5, R10, R15, R17).
   - los 3 consumidores de `ConfirmActionDialog` pasan a `ConfirmDialog` sin form;
   - se borra `components/shared/confirm-action-dialog.tsx`.
 - [ ] **T2j [P]. `DatePicker` del filtro de la tabla. Solo si P6 es sí.**
+- [ ] **T2k. Diálogos siempre montados** (R33, enmienda del 2026-10-09). `user-table`,
+  `work-group-table` y `order-sheet` dejan de montar sus diálogos de baja/confirmación solo al
+  abrirse. Los `*-row-actions` de clientes, presentaciones y unidades lo hacen en la tanda 3.
+  - **Test:** `tests/unit/shared-ui/confirm-dialog-montado.test.tsx`: tras cerrarse, el diálogo
+    sigue en el DOM marcado como cerrado.
 
 ## Tanda 3 — Acciones por fila: el cambio visible (depende de la tanda 2; cada tabla [P])
 
@@ -252,6 +257,8 @@ lista aquí, para que `archivos-en-vuelo` no lo lea como ruta de esta feature. L
 - `app/(private)/configuracion/usuarios/components/end-user-sessions-dialog.tsx`
 - `app/(private)/configuracion/usuarios/components/user-columns.tsx`
 - `app/(private)/configuracion/usuarios/components/work-group-columns.tsx`
+- `app/(private)/configuracion/usuarios/components/user-table.tsx` (R33)
+- `app/(private)/configuracion/usuarios/components/work-group-table.tsx` (R33)
 
 ### inventario
 - `app/(private)/inventario/components/product-form.tsx`
@@ -333,6 +340,7 @@ lista aquí, para que `archivos-en-vuelo` no lo lea como ruta de esta feature. L
 - `tests/unit/shared-ui/confirm-dialog.test.tsx`
 - `tests/unit/shared-ui/campos.test.tsx`
 - `tests/unit/shared-ui/row-actions-menu-href.test.tsx`
+- `tests/unit/shared-ui/confirm-dialog-montado.test.tsx` (R33)
 - `tests/unit/shared-ui/actions-column.test.tsx`
 - `tests/helpers/row-actions-menu.ts`
 - `tests/guards/guard-formularios-y-acciones.test.ts`

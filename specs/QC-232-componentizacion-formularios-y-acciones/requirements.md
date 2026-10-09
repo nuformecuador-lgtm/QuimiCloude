@@ -336,6 +336,16 @@ DEBE quedar anotada en `progress/deudas.md`, con su archivo, su motivo y la fich
 **R32.** `node scripts/archivos-en-vuelo.mjs --candidata QC-232` NO DEBE dar `CHOCA` con ninguna
 feature en vuelo cuando el spec se aprueba, ni cuando se pide el merge.
 
+### Enmienda 2026-10-09 (decisión del humano, vía el leader)
+
+**R33.** Los diálogos de baja y de confirmación que hoy se montan solo mientras están abiertos
+(`customer-row-actions`, `presentation-row-actions`, `unit-row-actions`, `user-table`,
+`work-group-table` y `order-sheet`) DEBEN quedar **siempre montados** y controlados por estado
+(`open` / `onOpenChange`) al migrar a `ConfirmDialog` / `DeleteConfirmDialog`, para que el cierre
+anime su salida (R5 de QC-228). No cambia nada más: el mismo foco, el mismo texto y la misma
+acción. Un test DEBE comprobar que, tras cerrarse, el diálogo sigue en el DOM marcado como cerrado.
+Es la única excepción a R1 que añade esta enmienda.
+
 ## Preguntas abiertas
 
 **P1. Choque real con QC-223 y QC-217: este agente no ha podido leer sus ramas.**
