@@ -48,6 +48,7 @@ const ROW: ConditioningOrderDetail = {
   conditionedByName: 'Berta Ruiz',
   conditionedById: 'user-2',
   team: [],
+  batchData: null,
 };
 
 const CANDIDATES: ConditioningTeamCandidates = {

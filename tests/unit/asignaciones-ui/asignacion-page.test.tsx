@@ -406,7 +406,7 @@ describe('las dos vistas del acondicionador', () => {
     const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
     expect(pestanas.props).toMatchObject({
       current: 'por_acondicionar',
-      views: ['por_acondicionar', 'acondicionados'],
+      views: ['por_acondicionar', 'acondicionados', 'acondicionados_entregados'],
     });
     expect(encontrarPorTipo(arbol, ConditioningOrdersListSection)).toHaveLength(1);
     expect(encontrarPorTipo(arbol, ConditionedOrdersListSection)).toHaveLength(0);

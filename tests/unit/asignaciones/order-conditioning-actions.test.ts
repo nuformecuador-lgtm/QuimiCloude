@@ -6,9 +6,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   finishConditioningAction,
+  saveConditioningBatchDataAction,
   startConditioningAction,
 } from '@/lib/modules/asignaciones/adapters/driving/order-conditioning-actions';
 import {
+  BatchExpiryNotFutureError,
+  BatchProductionDateFutureError,
+  ConditioningBatchDataMissingError,
+  ConditioningBatchDuplicateLotError,
+  ConditioningBatchNotFoundError,
   ConditioningTeamEmptyError,
   ConditioningTeamMemberNotAllowedError,
   OrderConditioningTakenError,
@@ -23,9 +29,11 @@ const {
   getSessionContextMock,
   startConditioningMock,
   finishConditioningMock,
+  saveConditioningBatchDataMock,
   redirectMock,
   revalidatePathMock,
 } = vi.hoisted(() => ({
+  saveConditioningBatchDataMock: vi.fn(),
   getSessionUserMock: vi.fn(),
   getSessionContextMock: vi.fn(),
   startConditioningMock: vi.fn(),
@@ -43,6 +51,7 @@ vi.mock('@/lib/composition', () => ({
   asignaciones: {
     startConditioning: startConditioningMock,
     finishConditioning: finishConditioningMock,
+    saveConditioningBatchData: saveConditioningBatchDataMock,
   },
 }));
 
@@ -193,6 +202,145 @@ describe('finishConditioningAction — Terminar vuelve a «Por acondicionar» co
 
     expect(resultado).toMatchObject({ status: 'error', code, message: errorMessage(code) });
     expect(redirectMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('QC-219 — finishConditioningAction traduce la falta de datos de lote', () => {
+  it('R15: `conditioning_batch_data_missing` llega como ErrorState con su texto, sin redirigir', async () => {
+    finishConditioningMock.mockRejectedValue(new ConditioningBatchDataMissingError());
+
+    const resultado = await finishConditioningAction({ status: 'success' }, formData([['orderId', ORDER_ID]]));
+
+    expect(resultado).toEqual({
+      status: 'error',
+      code: 'conditioning_batch_data_missing',
+      message: errorMessage('conditioning_batch_data_missing'),
+    });
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('QC-219 T12 — saveConditioningBatchDataAction', () => {
+  const LOTE_A = '7a7a7a7a-7a7a-4a7a-8a7a-7a7a7a7a7a7a';
+  const LOTE_B = '7b7b7b7b-7b7b-4b7b-8b7b-7b7b7b7b7b7b';
+  const LOTE_C = '7c7c7c7c-7c7c-4c7c-8c7c-7c7c7c7c7c7c';
+  const VACIO = '';
+
+  function lineaFd(batchId: string, lot: string, expiryDate: string, productionDate: string) {
+    return [
+      ['batchId', batchId],
+      ['lot', lot],
+      ['expiryDate', expiryDate],
+      ['productionDate', productionDate],
+    ] as const;
+  }
+
+  it('R6: empareja las cuatro listas por posicion y pasa el actor de la sesion', async () => {
+    saveConditioningBatchDataMock.mockResolvedValue(undefined);
+
+    await saveConditioningBatchDataAction(
+      { status: 'idle' },
+      formData([
+        ['orderId', ORDER_ID],
+        ...lineaFd(LOTE_A, 'CR-A', '2027-04-30', '2026-10-01'),
+        ...lineaFd(LOTE_B, 'CR-B', '2027-05-31', '2026-10-02'),
+      ]),
+    );
+
+    expect(saveConditioningBatchDataMock).toHaveBeenCalledWith(
+      { id: 'user-1', companyId: 'company-1', permissions: SESSION_USER.permissions },
+      {
+        orderId: ORDER_ID,
+        lines: [
+          { batchId: LOTE_A, lot: 'CR-A', expiryDate: '2027-04-30', productionDate: '2026-10-01' },
+          { batchId: LOTE_B, lot: 'CR-B', expiryDate: '2027-05-31', productionDate: '2026-10-02' },
+        ],
+      },
+    );
+  });
+
+  it('R6: omite la linea con los tres datos vacios; la que viene a medias viaja tal cual (R7)', async () => {
+    saveConditioningBatchDataMock.mockResolvedValue(undefined);
+
+    await saveConditioningBatchDataAction(
+      { status: 'idle' },
+      formData([
+        ['orderId', ORDER_ID],
+        ...lineaFd(LOTE_A, VACIO, VACIO, VACIO),
+        ...lineaFd(LOTE_B, 'CR-B', VACIO, '2026-10-02'),
+        ...lineaFd(LOTE_C, 'CR-C', '2027-05-31', '2026-10-02'),
+      ]),
+    );
+
+    expect(saveConditioningBatchDataMock.mock.calls[0]?.[1]).toEqual({
+      orderId: ORDER_ID,
+      lines: [
+        { batchId: LOTE_B, lot: 'CR-B', expiryDate: VACIO, productionDate: '2026-10-02' },
+        { batchId: LOTE_C, lot: 'CR-C', expiryDate: '2027-05-31', productionDate: '2026-10-02' },
+      ],
+    });
+  });
+
+  it('R7: sin ninguna linea con datos llega una lista vacia, y el caso de uso decide', async () => {
+    saveConditioningBatchDataMock.mockRejectedValue(new ValidationError());
+
+    const resultado = await saveConditioningBatchDataAction(
+      { status: 'idle' },
+      formData([['orderId', ORDER_ID], ...lineaFd(LOTE_A, VACIO, VACIO, VACIO)]),
+    );
+
+    expect(saveConditioningBatchDataMock.mock.calls[0]?.[1]).toEqual({ orderId: ORDER_ID, lines: [] });
+    expect(resultado).toEqual({ status: 'error', code: 'invalid_input', message: errorMessage('invalid_input') });
+  });
+
+  it('R6: exito -> revalida el detalle y no redirige', async () => {
+    saveConditioningBatchDataMock.mockResolvedValue(undefined);
+
+    const resultado = await saveConditioningBatchDataAction(
+      { status: 'idle' },
+      formData([['orderId', ORDER_ID], ...lineaFd(LOTE_A, 'CR-A', '2027-04-30', '2026-10-01')]),
+    );
+
+    expect(resultado).toEqual({ status: 'success' });
+    expect(revalidatePathMock).toHaveBeenCalledWith(`/asignacion/acondicionamiento/${ORDER_ID}`);
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['batch_expiry_not_future', new BatchExpiryNotFutureError(LOTE_B)],
+    ['batch_production_date_future', new BatchProductionDateFutureError(LOTE_B)],
+    ['batch_duplicate_lot', new ConditioningBatchDuplicateLotError(LOTE_B)],
+    ['batch_not_found', new ConditioningBatchNotFoundError(LOTE_B)],
+  ] as const)(
+    'R5: %s se traduce a ErrorState con el texto del catalogo y la linea culpable, sin revalidar',
+    async (code, error) => {
+      saveConditioningBatchDataMock.mockRejectedValue(error);
+
+      const resultado = await saveConditioningBatchDataAction(
+        { status: 'idle' },
+        formData([['orderId', ORDER_ID], ...lineaFd(LOTE_B, 'CR-B', '2027-04-30', '2026-10-01')]),
+      );
+
+      expect(resultado).toEqual({ status: 'error', code, message: errorMessage(code), batchId: LOTE_B });
+      expect(revalidatePathMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ['batch_duplicate_lot en carrera, sin linea', 'batch_duplicate_lot', new ConditioningBatchDuplicateLotError()],
+    ['unauthorized', 'unauthorized', new UnauthorizedError()],
+    ['order_conditioning_taken', 'order_conditioning_taken', new OrderConditioningTakenError()],
+    ['order_not_conditionable', 'order_not_conditionable', new OrderNotConditionableError()],
+  ] as const)('R5: %s llega sin `batchId`', async (_n, code, error) => {
+    saveConditioningBatchDataMock.mockRejectedValue(error);
+
+    const resultado = await saveConditioningBatchDataAction(
+      { status: 'idle' },
+      formData([['orderId', ORDER_ID], ...lineaFd(LOTE_A, 'CR-A', '2027-04-30', '2026-10-01')]),
+    );
+
+    expect(resultado).toEqual({ status: 'error', code, message: errorMessage(code) });
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 });

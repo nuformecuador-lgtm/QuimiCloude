@@ -159,18 +159,20 @@ describe('R1 — el permiso del acondicionador anade `por_acondicionar` y `acond
       resolveAssignmentViews({
         permissions: ['asignaciones.ejecutar', 'terminados.consultar', 'empaque.modificar', 'acondicionamiento.modificar'],
       }),
-    ).toEqual(['asignados', 'terminados', 'por_empacar', 'por_acondicionar', 'acondicionados']);
+    ).toEqual(['asignados', 'terminados', 'por_empacar', 'por_acondicionar', 'acondicionados', 'acondicionados_entregados']);
     expect(resolveAssignmentViews({ permissions: ['pedidos.consultar', 'acondicionamiento.modificar'] })).toEqual([
       'todos',
       'por_acondicionar',
       'acondicionados',
+      'acondicionados_entregados',
     ]);
   });
 
-  it('R1: con solo el permiso salen exactamente las dos, sin la vista de reserva', () => {
+  it('R1, QC-219 R20: con solo el permiso salen exactamente las tres, sin la vista de reserva', () => {
     expect(resolveAssignmentViews({ permissions: ['acondicionamiento.modificar'] })).toEqual([
       'por_acondicionar',
       'acondicionados',
+      'acondicionados_entregados',
     ]);
   });
 
@@ -202,6 +204,7 @@ describe('R3 — sin el permiso no aparece ninguna de las dos, y los roles de se
       const vistas = resolveAssignmentViews({ permissions: permisosDe(rol) });
       expect(vistas, rol).not.toContain('por_acondicionar');
       expect(vistas, rol).not.toContain('acondicionados');
+      expect(vistas, rol).not.toContain('acondicionados_entregados');
     }
   });
 
@@ -218,5 +221,18 @@ describe('R3 — sin el permiso no aparece ninguna de las dos, y los roles de se
     const vistasDelOperador = resolveAssignmentViews({ permissions: permisosDe(ROLE_OPERADOR) });
     expect(resolveAssignmentView('por_acondicionar', vistasDelOperador)).toBe('asignados');
     expect(resolveAssignmentView('acondicionados', vistasDelOperador)).toBe('asignados');
+    expect(resolveAssignmentView('acondicionados_entregados', vistasDelOperador)).toBe('asignados');
+  });
+});
+
+describe('QC-219 R20 — «Entregados» va detras de «Terminados», con el mismo permiso', () => {
+  it('R20: `acondicionados_entregados` sigue inmediatamente a `acondicionados`', () => {
+    const vistas = resolveAssignmentViews({ permissions: ['empaque.modificar', 'acondicionamiento.modificar'] });
+    expect(vistas.indexOf('acondicionados_entregados')).toBe(vistas.indexOf('acondicionados') + 1);
+  });
+
+  it('R20: la vista pedida se respeta con el permiso', () => {
+    const vistas = resolveAssignmentViews({ permissions: ['acondicionamiento.modificar'] });
+    expect(resolveAssignmentView('acondicionados_entregados', vistas)).toBe('acondicionados_entregados');
   });
 });
