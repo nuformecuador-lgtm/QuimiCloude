@@ -16,7 +16,7 @@ pregunta al leader.
 
 ## Antes de empezar (leader)
 
-- [ ] **TA. Comprobar el choque con QC-223** (P1).
+- [x] **TA. Comprobar el choque con QC-223** (P1).
   - **Qué se hace:** correr `node scripts/archivos-en-vuelo.mjs` y
     `git diff --name-only origin/dev...origin/feature/QC-223-entregar-producto-terminado`.
   - **Hecho cuando:** el resultado queda anotado en `progress/features/QC-233.md`, y P1 y P2 tienen
@@ -24,7 +24,7 @@ pregunta al leader.
 
 ## Tanda 0 — Congelar el «antes» (bloquea todo lo demás; depende de TA)
 
-- [ ] **T0. Paridad de los buscadores** (R1, R2, R8, D6; `design.md > 8.1`).
+- [x] **T0. Paridad de los buscadores** (R1, R2, R8, D6; `design.md > 8.1`).
   - **Qué se escribe:** `tests/unit/paridad/buscadores-paridad.test.tsx`, con un `describe` por
     buscador.
     - **Cubre** cada estado del desplegable que le aplica (`requirements.md > Glosario`).
@@ -36,7 +36,7 @@ pregunta al leader.
       `test(QC-233): congela la paridad de los buscadores`;
     - la suite pasa en verde;
     - no ha cambiado ni un archivo de producción.
-- [ ] **T0b [P]. Capturas «antes»** (R3; `design.md > 8.4`). **La hace el leader**, como la T16 de
+- [x] **T0b [P]. Capturas «antes»** (R3; `design.md > 8.4`). **La hace el leader**, como la T16 de
   QC-231.
   - **Cómo:** desde `dev` y con el seed demo de QC-230.
   - **Dónde:** `_trabajo/marca/capturas-antes-buscadores/`, sin versionar.
