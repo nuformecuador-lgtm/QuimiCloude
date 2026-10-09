@@ -60,7 +60,7 @@ Cubre: base de R1, R2, R4, R35.
 
 ## Bloque B — backend (`backend_dev`)
 
-### [ ] B1 — Migraciones, esquema y permiso sembrado
+### [x] B1 — Migraciones, esquema y permiso sembrado
 Depende de: T0.
 
 Archivos:

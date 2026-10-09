@@ -15,7 +15,7 @@ export type InventoryMovementView = {
  *  puede dar varios asientos `production` por pedido, uno por linea. */
 export type NewInventoryMovement = {
   readonly batchId: string;
-  readonly kind: 'opening' | 'adjustment' | 'consumption' | 'production' | 'delivery';
+  readonly kind: 'opening' | 'adjustment' | 'consumption' | 'production' | 'delivery' | 'delivery_void';
   readonly quantity: string;
   readonly reason: MovementReason | null;
   readonly createdBy: string;
