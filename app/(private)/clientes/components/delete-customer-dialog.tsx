@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
-import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
+import { ConfirmDialogFrame } from '@/components/shared/confirm-dialog';
+import { DeleteConfirmDialogBody } from '@/components/shared/delete-confirm-dialog';
 import type { CustomerView } from '@/lib/modules/clientes';
 import {
   deleteCustomerAction,
@@ -27,7 +28,8 @@ import {
  * Con exito: cerrar, avisar por toast sobre el `<Toaster/>` que ya monta el layout privado -no se
  * monta otro- y `router.refresh()` con la MISMA URL.
  *
- * Apertura CONTROLADA: quien dispara es la fila. Aqui no hay disparador propio.
+ * Apertura CONTROLADA: quien dispara es la fila. Aqui no hay disparador propio. El cuerpo se
+ * monta solo mientras el popup esta abierto, asi que un rechazo anterior no reaparece.
  */
 
 export const DELETE_CUSTOMER_DIALOG_TESTID = 'delete-customer-dialog';
@@ -63,6 +65,23 @@ export type DeleteCustomerDialogProps = {
 export function DeleteCustomerDialog({ customer, open, onOpenChange }: DeleteCustomerDialogProps) {
   const fieldId = useId();
   const errorId = `${fieldId}-error`;
+  return (
+    <ConfirmDialogFrame
+      open={open}
+      onOpenChange={onOpenChange}
+      testId={DELETE_CUSTOMER_DIALOG_TESTID}
+    >
+      <DeleteCustomerDialogBody customer={customer} onOpenChange={onOpenChange} errorId={errorId} />
+    </ConfirmDialogFrame>
+  );
+}
+
+type DeleteCustomerDialogBodyProps = Omit<DeleteCustomerDialogProps, 'open'> & {
+  readonly errorId: string;
+};
+
+/** Se monta con el popup: cada apertura arranca sin el rechazo de la anterior. */
+function DeleteCustomerDialogBody({ customer, onOpenChange, errorId }: DeleteCustomerDialogBodyProps) {
   const router = useRouter();
   const [state, formAction, isPending] = useActionState(deleteCustomerAction, INITIAL_STATE);
 
@@ -76,8 +95,7 @@ export function DeleteCustomerDialog({ customer, open, onOpenChange }: DeleteCus
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <DeleteConfirmDialog
-      open={open}
+    <DeleteConfirmDialogBody
       onOpenChange={onOpenChange}
       texts={{
         title: TITLE,
@@ -87,7 +105,6 @@ export function DeleteCustomerDialog({ customer, open, onOpenChange }: DeleteCus
         dismiss: DISMISS_LABEL,
       }}
       testIds={{
-        dialog: DELETE_CUSTOMER_DIALOG_TESTID,
         message: DELETE_CUSTOMER_MESSAGE_TESTID,
         dismiss: DELETE_CUSTOMER_DISMISS_TESTID,
         confirm: DELETE_CUSTOMER_CONFIRM_TESTID,
