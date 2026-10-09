@@ -145,21 +145,21 @@ Se conservan los exports, los testids y los textos (R5, R10, R15, R17).
   propio commit;
 - los nombres accesibles siguen P2.
 
-- [ ] **T3a [P]. Clientes.**
-- [ ] **T3b [P]. Presentaciones.**
-- [ ] **T3c [P]. Unidades.**
-- [ ] **T3d [P]. Grupos de trabajo:** `WorkGroupRowActions` con menú y sin su `TOUCH_TARGET` local.
+- [x] **T3a [P]. Clientes.**
+- [x] **T3b [P]. Presentaciones.**
+- [x] **T3c [P]. Unidades.**
+- [x] **T3d [P]. Grupos de trabajo:** `WorkGroupRowActions` con menú y sin su `TOUCH_TARGET` local.
   Usuarios solo adopta `actionsColumn()`.
-- [ ] **T3e [P]. Productos y producto terminado:** `product-row-actions.tsx` (nuevo), y el modo
+- [x] **T3e [P]. Productos y producto terminado:** `product-row-actions.tsx` (nuevo), y el modo
   controlado de `ProductSheet`, `ProductBatchesSheet` y `DeleteProductDialog`.
-- [ ] **T3f [P]. Recetas:** `recipe-row-actions.tsx` (nuevo). La edición es un item enlace. Modo
+- [x] **T3f [P]. Recetas:** `recipe-row-actions.tsx` (nuevo). La edición es un item enlace. Modo
   controlado de `DeleteRecipeDialog`.
-- [ ] **T3g [P]. Catálogo de proveedor:** `catalog-line-row-actions.tsx` (nuevo), y el modo
+- [x] **T3g [P]. Catálogo de proveedor:** `catalog-line-row-actions.tsx` (nuevo), y el modo
   controlado de `CatalogLineSheet` y `DeleteCatalogLineDialog`.
 
 ## Tanda 4 — Listas de asignación y traspasos (depende de la tanda 2; primera en salir si no da el tiempo, P3)
 
-- [ ] **T4a [P]. Listas de asignación** (R27; `design.md > 5`).
+- [x] **T4a [P]. Listas de asignación** (R27; `design.md > 5`).
   - **Qué se hace:** `assignment-list-parts.tsx` (nuevo, interno), y que los conjuntos assigned,
     company, finished y packing deleguen en él. Sus archivos y sus exports se quedan.
   - **Hecho cuando:** `asignacion-paridad.test.tsx` y los tests de `asignaciones-ui` que no son de
