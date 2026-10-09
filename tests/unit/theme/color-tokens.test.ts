@@ -367,7 +367,8 @@ describe('color-tokens', () => {
       'ease-enter': 'cubic-bezier(0, 0, 0.2, 1)',
       'ease-exit': 'cubic-bezier(0.4, 0, 1, 1)',
     };
-    const motionRootStart = css.lastIndexOf(':root {', css.indexOf('--dur-instant'));
+    // ENMIENDA QC-228 (D5): `@theme inline` ya nombra `var(--dur-instant)`; se busca la declaracion.
+    const motionRootStart = css.lastIndexOf(':root {', css.indexOf('--dur-instant:'));
     expect(motionRootStart).toBeGreaterThan(-1);
     const motionRoot = css.slice(motionRootStart, css.indexOf('}', motionRootStart));
     for (const [name, value] of Object.entries(expected)) {
@@ -375,15 +376,32 @@ describe('color-tokens', () => {
     }
   });
 
-  it('R32: no declara movimiento fuera del bloque del login ni la regla global de movimiento reducido', () => {
-    expect(css).not.toMatch(/animation-duration:\s*0\.01ms/);
-    expect(css).not.toMatch(/transition-duration:\s*0\.01ms/);
-    expect(css).not.toMatch(/\*\s*,\s*\*::before\s*,\s*\*::after/);
+  // ENMIENDA QC-228 (D5): la regla global de movimiento reducido y el movimiento fuera del login
+  // son ahora de QC-228 (R19, R21) y dejan de estar prohibidos. Lo que se conserva de este caso
+  // es que el bloque del login siga como lo dejo QC-226 y que nada de fuera lo pise.
+  it('R32 (ENMIENDA QC-228): el bloque del login conserva su movimiento y su regla local de movimiento reducido', () => {
+    const inicio = css.search(/\/\*\s*══[^*]*pantalla de login — INICIO/i);
+    const fin = css.search(/\/\*\s*══[^*]*pantalla de login — FIN/i);
+    expect(inicio).toBeGreaterThan(-1);
+    expect(fin).toBeGreaterThan(inicio);
+    const login = css.slice(inicio, fin).replace(/\s+/g, ' ');
 
+    expect(login).toContain(
+      "[data-login='screen'] [data-slot='card'] { animation: login-card-enter var(--dur-slow) var(--ease-enter) both; }",
+    );
+    expect(login).toContain('animation: login-molecule-float 22s cubic-bezier(0.2, 0, 0, 1) infinite alternate;');
+    expect(login).toContain(
+      'animation: login-molecule-float 30s cubic-bezier(0.2, 0, 0, 1) infinite alternate-reverse;',
+    );
+    expect(login).toContain('animation: login-molecule-float 26s cubic-bezier(0.2, 0, 0, 1) infinite alternate;');
+    expect(login).toContain(
+      "@media (prefers-reduced-motion: reduce) { [data-login='screen'] [data-login='molecule'] { animation: none; } [data-login='screen'] [data-slot='card'] { animation: login-card-fade 150ms linear both; } }",
+    );
+
+    // Fuera del login nadie nombra sus animaciones ni anima en bucle.
     const outside = cssOutsideLoginBlock(css);
-    expect(outside).not.toMatch(/prefers-reduced-motion/);
-    expect(outside).not.toMatch(/@keyframes/);
-    expect(outside).not.toMatch(/(^|[\s;{])animation(-[a-z-]+)?\s*:/m);
-    expect(outside).not.toMatch(/(^|[\s;{])transition(-[a-z-]+)?\s*:/m);
+    expect(outside).not.toMatch(/login-(card|molecule)/);
+    expect(outside).not.toMatch(/\binfinite\b/);
+    expect(outside).not.toMatch(/animation-name\s*:/);
   });
 });

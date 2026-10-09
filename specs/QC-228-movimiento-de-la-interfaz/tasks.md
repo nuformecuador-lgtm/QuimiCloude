@@ -9,7 +9,7 @@ la fase 3 entra. Las demás preguntas tienen propuesta por defecto y no bloquean
 
 ## Fase 1 — Duraciones, curvas y movimiento reducido (sin JavaScript nuevo)
 
-- [ ] **T1. Valores por defecto y regla global de movimiento reducido** (R3, R21, R22)
+- [x] **T1. Valores por defecto y regla global de movimiento reducido** (R3, R21, R22)
   - En `app/globals.css`: `--default-transition-duration` y `--default-transition-timing-function`
     en `@theme inline` (`design.md > 3`) y la regla global de `tokens.css` (`design.md > 7.2`).
   - Enmienda del caso `R32` de `tests/unit/theme/color-tokens.test.ts` con nota
@@ -42,7 +42,7 @@ la fase 3 entra. Las demás preguntas tienen propuesta por defecto y no bloquean
   - **Hecho cuando:** los casos nuevos y los existentes de `data-table-scroll.test.tsx` están verdes
     sin editar los existentes.
 
-- [ ] **T4 [P] (tras T1). Toasts** (R10)
+- [x] **T4 [P] (tras T1). Toasts** (R10)
   - Reglas de `design.md > 6` en `app/globals.css`; caso `R10` en `motion-tokens.test.ts`.
   - **Hecho cuando:** ninguna duración de Sonner calculada supera 400 ms (se comprueba en T9).
 

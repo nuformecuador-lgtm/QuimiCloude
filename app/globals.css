@@ -65,6 +65,10 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  /* Lo que use `transition-*` sin `duration-*` ni `ease-*` propios cae aquí: el hover y el foco
+     de los controles. */
+  --default-transition-duration: var(--dur-instant);
+  --default-transition-timing-function: var(--ease-standard);
 }
 
 :root {
@@ -176,6 +180,38 @@
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-enter: cubic-bezier(0, 0, 0.2, 1);
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* Toasts. Sonner inyecta su hoja en tiempo de ejecución, sin capa, y no se sabe si queda antes o
+   después de esta: por eso se gana por especificidad, con el ancestro delante, y no por orden.
+   Mientras se arrastra, Sonner quita la transición para que el toast siga al dedo; esa regla
+   no se pisa. */
+[data-sonner-toaster] [data-sonner-toast]:not([data-swiping='true']) {
+  transition-property: transform, opacity, height, box-shadow;
+  transition-duration: var(--dur-slow), var(--dur-slow), var(--dur-slow), var(--dur-base);
+  transition-timing-function: var(--ease-enter);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-removed='true']:not([data-swiping='true']),
+[data-sonner-toaster]
+  [data-sonner-toast][data-removed='true'][data-front='false'][data-swipe-out='false'][data-expanded='false'] {
+  transition-property: transform, opacity, height, box-shadow;
+  transition-duration: var(--dur-fast);
+  transition-timing-function: var(--ease-exit);
+}
+
+/* Movimiento reducido, para toda la app. Acorta en vez de quitar: los primitivos esperan a que
+   termine la animación para desmontar, y con 0.01 ms termina en el acto. Una sola iteración
+   también detiene los indicadores de carga en bucle. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Las paradas van en hex porque así las fija la marca: convertirlas a oklch alteraría los valores. */
