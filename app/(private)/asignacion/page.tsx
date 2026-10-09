@@ -169,7 +169,10 @@ export default async function AsignacionPage({
       {vista === 'acondicionados_entregados' ? (
         <Suspense
           fallback={
-            <ConditioningOrdersSkeleton rows={genericListParams.pageSize} list="acondicionados" />
+            <ConditioningOrdersSkeleton
+              rows={genericListParams.pageSize}
+              list="acondicionados_entregados"
+            />
           }
         >
           <DeliveredConditionedOrdersListSection params={genericListParams} />

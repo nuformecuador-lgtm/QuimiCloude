@@ -523,6 +523,21 @@ describe('la tercera vista del acondicionador: «Entregados»', () => {
     expect(fallback.type).toBe(ConditioningOrdersSkeleton);
   });
 
+  it('R20: el esqueleto de «Entregados» anuncia «Cargando pedidos entregados…»', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(ACONDICIONADOR));
+
+    const arbol = await invocar('acondicionados_entregados');
+
+    const [limite] = encontrarPorTipo(arbol, Suspense);
+    const fallback = (limite.props as { fallback: ReactElement }).fallback;
+    expect(fallback.props).toMatchObject({ list: 'acondicionados_entregados' });
+    render(fallback);
+    const esqueleto = screen.getByRole('status');
+    expect(esqueleto).toHaveAttribute('data-list', 'acondicionados_entregados');
+    expect(esqueleto).toHaveTextContent('Cargando pedidos entregados…');
+    expect(esqueleto).not.toHaveTextContent('Cargando pedidos terminados…');
+  });
+
   it.each([ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR])(
     'R20: %s pidiendo `?vista=acondicionados_entregados` cae a su vista por defecto, sin pestaña ni sección',
     async (rol) => {
