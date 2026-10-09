@@ -12,6 +12,9 @@ import {
   readEncryptionKeyRing,
 } from '@/lib/modules/integraciones/adapters/driven/config/encryption-keys-env'
 
+// `lib/composition` arrastra todos los adaptadores del repo: sin cliente Prisma real, sin base.
+vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }))
+
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url))
 
 const ENCRYPTION_VARS = ['INTEGRATIONS_ENCRYPTION_KEYS', 'INTEGRATIONS_ENCRYPTION_ACTIVE'] as const
@@ -231,4 +234,33 @@ describe('versión activa INTEGRATIONS_ENCRYPTION_ACTIVE', () => {
     vi.stubEnv(ACTIVE_VAR, 'v2')
     expect(readActiveKeyVersion(ring)).toBe('v2')
   })
+})
+
+describe('la composición se importa sin las variables del cifrado', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  // Presupuesto propio: importar `lib/composition` transforma el grafo entero de adaptadores.
+  it(
+    'R10/R19: importar @/lib/composition sin ninguna de las dos variables resuelve y expone integraciones',
+    async () => {
+      vi.stubEnv(KEYS_VAR, undefined)
+      vi.stubEnv(ACTIVE_VAR, undefined)
+      vi.resetModules()
+
+      const composition = await import('@/lib/composition')
+      const { secretCipherAesGcm } = await import(
+        '@/lib/modules/integraciones/adapters/driven/security/secret-cipher-aes-gcm'
+      )
+      const { secretDigestSha256 } = await import(
+        '@/lib/modules/integraciones/adapters/driven/security/secret-digest-sha256'
+      )
+
+      expect(Object.keys(composition.integraciones).sort()).toEqual(['secretCipher', 'secretDigest'])
+      expect(composition.integraciones.secretCipher).toBe(secretCipherAesGcm)
+      expect(composition.integraciones.secretDigest).toBe(secretDigestSha256)
+    },
+    60_000,
+  )
 })
