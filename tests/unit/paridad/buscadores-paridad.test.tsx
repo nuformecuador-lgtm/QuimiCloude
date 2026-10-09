@@ -2,10 +2,13 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import type { ReactNode } from 'react';
 
 import { ProductNamePicker } from '@/app/(private)/inventario/components/product-name-picker';
-import { OrderCustomerPicker } from '@/app/(private)/pedidos/components/order-customer-picker';
-import type { OrderCustomerChoice } from '@/app/(private)/pedidos/components/order-customer-label';
-import { PackagingSelect } from '@/app/(private)/pedidos/components/packaging-select';
-import { RecipePicker, type RecipePickerOption } from '@/app/(private)/pedidos/components/recipe-picker';
+import {
+  OrderCustomerPicker,
+  PackagingSelect,
+  RecipePicker,
+  type OrderCustomerChoice,
+  type RecipePickerOption,
+} from '@/app/(private)/pedidos/components';
 import {
   ProductPicker,
   type ProductPickerOption,
