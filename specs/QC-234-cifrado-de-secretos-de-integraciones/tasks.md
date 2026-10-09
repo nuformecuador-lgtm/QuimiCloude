@@ -63,12 +63,12 @@
 
 ## T6–T7 — Cableado y forma del módulo
 
-- [ ] **T6.** Bloque `integraciones` en `lib/composition/index.ts` (`design.md > 7`), y caso de
+- [x] **T6.** Bloque `integraciones` en `lib/composition/index.ts` (`design.md > 7`), y caso de
       R10 que importa `@/lib/composition` sin las variables (`vi.resetModules()` + `import()`).
       **Hecho cuando:** `pnpm run typecheck` pasa, el caso está en verde y
       `guard-arquitectura-modulos` también. Cubre R10 (importar), R19. Depende de: T4, T5.
 
-- [ ] **T7.** Actualizar `tests/unit/integraciones/module-shape.test.ts` según la tabla de
+- [x] **T7.** Actualizar `tests/unit/integraciones/module-shape.test.ts` según la tabla de
       `design.md > 8`: sustituir los dos casos de R11 y los de R12 por R18, R19 y R20, y añadir el
       caso sintético de R18 con `findDomainPurityFindings`. Añadir un caso de R22 que comprueba
       que el diff de la rama contra `dev` no toca `db/`, `package.json`, `pnpm-lock.yaml`,
