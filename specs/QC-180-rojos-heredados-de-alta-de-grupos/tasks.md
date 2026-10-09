@@ -52,7 +52,7 @@
     las tres claves borradas). `pnpm exec vitest run tests/unit/recetas/scope.test.ts
     tests/unit/recetas/module-contract.test.ts tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`
     sale en verde. Cubre R4.
-- [ ] **T6 [P]** Notas de enmienda fechadas en los specs dueños, según D5 (`design.md > 6`).
+- [x] **T6 [P]** Notas de enmienda fechadas en los specs dueños, según D5 (`design.md > 6`).
   - Al final de `specs/QC-25-crud-de-recetas/requirements.md`, `specs/QC-24-modelo-recetas/requirements.md`
     y `specs/QC-35-pantalla-de-pedidos/requirements.md`, sin reescribir nada de lo que ya está.
   - **Hecho:** tres notas fechadas el 2026-10-08 con referencia a QC-180.
