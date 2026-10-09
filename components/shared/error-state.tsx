@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button, buttonVariants } from '@/components/ui/button';
 import type { ErrorState as OperationError } from '@/lib/modules/errores';
+import { cn } from '@/lib/utils';
 
 export type ErrorStateRetry =
   | { readonly kind: 'refresh' }
@@ -42,7 +43,7 @@ function RetryAction({ retry, testId, label }: RetryActionProps) {
         href={retry.href}
         data-slot="button"
         data-testid={testId}
-        className={buttonVariants({ variant: 'outline', touch: true })}
+        className={cn(buttonVariants({ variant: 'outline', touch: true }))}
       >
         {label}
       </Link>

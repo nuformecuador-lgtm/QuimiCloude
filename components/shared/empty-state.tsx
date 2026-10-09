@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 export type EmptyStateLink = {
   readonly href: string;
@@ -30,7 +31,7 @@ function EmptyStateAction({ link }: { readonly link: EmptyStateLink }) {
       href={link.href}
       data-slot="button"
       data-testid={link.testId}
-      className={buttonVariants({ variant: 'outline', touch: true })}
+      className={cn(buttonVariants({ variant: 'outline', touch: true }))}
     >
       {link.label}
     </Link>
