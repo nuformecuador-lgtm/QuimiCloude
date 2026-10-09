@@ -76,6 +76,7 @@ type Montaje = {
       readonly setStatus: ReturnType<typeof vi.fn>
     }
     readonly deliveries: {
+      readonly findByKey: ReturnType<typeof vi.fn>
       readonly create: ReturnType<typeof vi.fn>
       readonly addLines: ReturnType<typeof vi.fn>
       readonly sumDeliveredPackages: ReturnType<typeof vi.fn>
@@ -105,6 +106,9 @@ function montar(
     /** Entregas registradas por `${companyId}:${clave}`; si se da, sustituye a `registrada` y a la
      *  relectura tras la carrera. */
     claves?: ReadonlyMap<string, RegisteredOrderDelivery>
+    /** Lo que devuelve la lectura de la clave dentro de la transaccion, ya con el pedido
+     *  bloqueado; sin el, `null`. Con `claves`, se lee de ahi. */
+    registradaDentro?: RegisteredOrderDelivery | null
   } = {},
 ): Montaje {
   const tx = {
@@ -114,6 +118,11 @@ function montar(
       setStatus: vi.fn(async () => opciones.setStatus ?? 'ok'),
     },
     deliveries: {
+      findByKey: vi.fn(async (deliveryKey: string, scope: { companyId: string }) =>
+        opciones.claves !== undefined
+          ? (opciones.claves.get(`${scope.companyId}:${deliveryKey}`) ?? null)
+          : (opciones.registradaDentro ?? null),
+      ),
       create: vi.fn(async () => opciones.creada ?? { kind: 'created', id: DELIVERY_ID }),
       addLines: vi.fn(async () => undefined),
       sumDeliveredPackages: vi.fn(async () => opciones.entregados ?? ENTREGADOS),
@@ -618,6 +627,27 @@ describe('deliverOrder — clave de entrega ya registrada (R29)', () => {
     }).toEqual(llamadas)
     expect(claves.size).toBe(2)
     expect(entregados.get(PENDING_LINE_ID)).toBe(10)
+  })
+
+  it('R29: si otra peticion confirma la misma clave y deja el pedido ENTREGADO mientras esta espera el bloqueo, responde already_registered con ENTREGADO, no action_not_allowed', async () => {
+    const m = montar({
+      pedido: pedidoTerminado({ status: 'ENTREGADO' }),
+      registradaDentro: { id: DELIVERY_ID, orderId: DELIVERY_ORDER_ID },
+      leido: pedidoTerminado({ status: 'ENTREGADO' }),
+    })
+
+    await expect(createDeliverOrder(m.deps)(deliverInput(), ENTREGADOR)).resolves.toEqual({
+      status: 'already_registered',
+      orderStatus: 'ENTREGADO',
+    })
+    expect(m.tx.deliveries.findByKey).toHaveBeenCalledWith(DELIVERY_KEY, SCOPE)
+    expect(m.tx.deliveries.findByKey.mock.invocationCallOrder[0]).toBeGreaterThan(
+      m.tx.orders.lockAliveById.mock.invocationCallOrder[0] ?? Infinity,
+    )
+    expect(m.tx.deliveries.create).not.toHaveBeenCalled()
+    expect(m.findByKey).toHaveBeenCalledTimes(2)
+    expect(m.lanzoDentro(), 'la senal tiene que deshacer la transaccion').not.toBeNull()
+    nadaEscrito(m)
   })
 
   it('R29: si otra peticion inserta la clave entre la lectura y el INSERT, duplicate_key vuelve a leer la entrega y responde con su pedido', async () => {

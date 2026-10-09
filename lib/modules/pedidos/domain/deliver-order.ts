@@ -59,8 +59,9 @@ const deliverOrderSchema = z
 
 type DeliverOrderInput = z.infer<typeof deliverOrderSchema>;
 
-/** Deshace la transaccion cuando otra peticion inserto la misma clave entre la lectura previa y el
- *  `INSERT`; fuera se vuelve a leer la entrega ya confirmada. */
+/** Deshace la transaccion cuando otra peticion registro la misma clave despues de la lectura previa
+ *  (se ve ya con el pedido bloqueado o choca en el `INSERT`); fuera se vuelve a leer la entrega ya
+ *  confirmada. */
 class DeliveryAlreadyRegisteredSignal extends Error {
   constructor() {
     super('la clave de entrega ya estaba registrada');
@@ -86,14 +87,18 @@ async function deliverInTransaction(
 ): Promise<DeliverOrderResult> {
   const order = await tx.orders.lockAliveById(input.orderId, scope);
   if (order === null) throw new OrderNotFoundError();
+  // La clave antes que el estado, ya con el pedido bloqueado: si otra peticion con la misma clave
+  // confirmo mientras esta esperaba el bloqueo y dejo el pedido ENTREGADO, esta tiene que responder
+  // que ya estaba registrada, no que el pedido ya no admite entregas.
+  if ((await tx.deliveries.findByKey(input.deliveryKey, scope)) !== null) throw new DeliveryAlreadyRegisteredSignal();
   if (order.status !== 'TERMINADO') throw new ActionNotAllowedError();
 
   const lines = await tx.orders.findPresentationLinesForFinish(input.orderId, scope);
   const lineById = new Map<string, FinishPackingLine>(lines.map((line) => [line.id, line]));
   if (input.allocations.some((a) => !lineById.has(a.presentationLineId))) throw new ValidationError();
 
-  // Antes de comprobar el tope: si otra peticion confirmo la misma clave despues de la lectura
-  // previa, tiene que responder que ya estaba registrada, no que ahora excede lo que falta.
+  // Antes de comprobar el tope. La lectura de arriba no basta: la clave es unica por empresa, asi
+  // que otra peticion puede estar insertandola para OTRO pedido sin pasar por este bloqueo.
   const created = await tx.deliveries.create(
     {
       deliveryKey: input.deliveryKey,
