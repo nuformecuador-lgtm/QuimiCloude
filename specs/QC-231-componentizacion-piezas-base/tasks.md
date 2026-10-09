@@ -155,15 +155,15 @@ y se anota en el impl.
 
 ## Tanda 5 — Limpieza, enmiendas y guardia (depende de la tanda 3 y de T10)
 
-- [ ] **T11. Limpieza** (R31): `createUrlPageFetcher`, las reexportaciones de `formatDateLocalISO` y
+- [x] **T11. Limpieza** (R31): `createUrlPageFetcher`, las reexportaciones de `formatDateLocalISO` y
   las de etiquetas del barrel de inventario.
   - **Hecho cuando:** typecheck y lint están en verde y `vitest related` cubre los tests repuntados.
-- [ ] **T12. Enmienda de los 3 tests de contrato táctil** (R8, `design.md > 2`).
+- [x] **T12. Enmienda de los 3 tests de contrato táctil** (R8, `design.md > 2`).
   - **Hecho cuando:** los tres están en verde contra el código migrado. La muestra nueva prueba que
     un `<Button>` sin `touch` ni `touchTarget` **sigue fallando**.
-- [ ] **T13. Enmienda de `migracion-listas-alcance.test.ts:228`** (R32), y la línea fechada en
+- [x] **T13. Enmienda de `migracion-listas-alcance.test.ts:228`** (R32), y la línea fechada en
   `specs/QC-56-…/requirements.md` (`design.md > 14`). La de QC-102 pasa a QC-232 (D11).
-- [ ] **T14. `tests/guards/guard-piezas-base.test.ts`** (R6, R7, R12, R21, R25, R29, R31, R33).
+- [x] **T14. `tests/guards/guard-piezas-base.test.ts`** (R6, R7, R12, R21, R25, R29, R31, R33).
   - **Qué comprueba:** recorre `app/`, `components/` y `hooks/` y busca:
     - constantes con el par táctil;
     - el literal del par;
