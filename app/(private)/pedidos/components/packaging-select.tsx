@@ -3,22 +3,9 @@
 import { CircleAlertIcon } from 'lucide-react';
 import { useCallback, useId, useState } from 'react';
 
-import { Spinner } from '@/components/shared/spinner';
+import { AsyncAutocomplete } from '@/components/shared/async-autocomplete';
 import { ErrorAlert } from '@/components/shared/error-alert';
-
-import {
-  Autocomplete,
-  AutocompleteClear,
-  AutocompleteContent,
-  AutocompleteInput,
-  AutocompleteInputGroup,
-  AutocompleteItem,
-  AutocompleteList,
-} from '@/components/ui/autocomplete';
-import {
-  useAsyncPaginatedOptions,
-  type AsyncPageRequest,
-} from '@/hooks/use-async-paginated-options';
+import type { AsyncPageRequest } from '@/hooks/use-async-paginated-options';
 import {
   PRODUCT_PRESENTATION_UNIT_FILTER,
   PRODUCT_TYPES,
@@ -96,7 +83,6 @@ function optionLabel(option: PackagingOption): string {
 export function PackagingSelect({ unitIds, onSelect, disabled = false }: PackagingSelectProps) {
   const labelId = useId();
   const forbiddenId = useId();
-  const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string | null>(null);
   const [selected, setSelected] = useState<PackagingOption | null>(null);
   const [forbidden, setForbidden] = useState(false);
@@ -150,30 +136,12 @@ export function PackagingSelect({ unitIds, onSelect, disabled = false }: Packagi
     [unitIds],
   );
 
-  const { items, isLoading, isLoadingMore, error: loadError, loadMore } =
-    useAsyncPaginatedOptions<PackagingOption>({
-      fetchPage,
-      query: draft ?? '',
-      pageSize: MAX_PAGE_SIZE,
-      debounceMs: SEARCH_DEBOUNCE_MS,
-      enabled: open && !forbidden,
-    });
-
-  const handleScroll = useCallback(
-    (event: React.UIEvent<HTMLDivElement>) => {
-      const list = event.currentTarget;
-      if (list.scrollHeight - list.scrollTop - list.clientHeight <= SCROLL_THRESHOLD) {
-        loadMore();
-      }
-    },
-    [loadMore],
-  );
-
-  function choose(option: PackagingOption) {
-    if (option.presentationContent === null || option.presentationContent === undefined) return;
+  function choose(option: PackagingOption | null) {
+    if (option === null) {
+      return;
+    }
     setSelected(option);
     setDraft(null);
-    setOpen(false);
     onSelect(option);
   }
 
@@ -186,107 +154,69 @@ export function PackagingSelect({ unitIds, onSelect, disabled = false }: Packagi
     }
   }
 
-  const selectable = forbidden ? [] : items;
-  const displayValue = draft ?? (selected === null ? '' : optionLabel(selected));
-  const loading = isLoading || isLoadingMore;
-  const loadFailure = forbidden || loadError === undefined ? null : failure;
-
   return (
     <div className="flex flex-col gap-2">
       <span id={labelId} className="text-sm font-medium">
         {LABELS.label}
       </span>
 
-      <Autocomplete
-        items={selectable}
-        mode="none"
-        itemToStringValue={(option: PackagingOption) => optionLabel(option)}
-        value={displayValue}
-        onValueChange={handleValueChange}
-        open={open}
-        onOpenChange={setOpen}
-        openOnInputClick
-      >
-        <AutocompleteInputGroup>
-          <AutocompleteInput
-            aria-labelledby={labelId}
-            aria-describedby={forbidden ? forbiddenId : undefined}
-            disabled={disabled}
-            className={`w-full ${touchTarget} ${FIELD_TEXT} pr-8`}
-            placeholder={LABELS.placeholder}
-            data-testid={PACKAGING_SELECT_TESTID}
-          />
-          <AutocompleteClear aria-label={LABELS.clear} className={touchTarget} />
-        </AutocompleteInputGroup>
-
-        <AutocompleteContent className="min-w-56">
-          <div
-            data-testid={PACKAGING_SELECT_POPUP_TESTID}
-            className="overflow-y-auto overscroll-contain"
-            style={{ maxHeight: MAX_LIST_HEIGHT }}
-            onScroll={handleScroll}
-          >
-            {loadFailure === null ? (
-              <>
-                <AutocompleteList>
-                  {(option: PackagingOption, index: number) => (
-                    <AutocompleteItem
-                      key={option.id}
-                      index={index}
-                      value={option}
-                      disabled={option.presentationContent == null}
-                      className={`${touchTarget} ${FIELD_TEXT} flex-col items-start gap-0.5`}
-                      data-testid={PACKAGING_OPTION_TESTID}
-                      data-product-id={option.id}
-                      onClick={() => choose(option)}
-                    >
-                      <span className="w-full truncate">{option.name}</span>
-                      <span className="flex w-full flex-wrap gap-x-2 text-sm text-muted-foreground">
-                        <span data-testid={PACKAGING_OPTION_PRESENTATION_TESTID}>
-                          {option.presentationName ?? ''}
-                        </span>
-                        <span data-testid={PACKAGING_OPTION_AVAILABLE_TESTID}>
-                          {LABELS.available(trimDecimal(option.available ?? '0'))}
-                        </span>
-                      </span>
-                    </AutocompleteItem>
-                  )}
-                </AutocompleteList>
-
-                {selectable.length === 0 && !loading && !forbidden ? (
-                  <p
-                    className="px-2 py-3 text-sm text-muted-foreground"
-                    data-testid={PACKAGING_SELECT_EMPTY_TESTID}
-                  >
-                    {LABELS.empty}
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              <ErrorAlert
-                error={loadFailure}
-                as="p"
-                className="p-2 text-sm text-destructive"
-                testId={PACKAGING_SELECT_LOAD_ERROR_TESTID}
-                renderCatalogued={(error) => error.message}
-              />
-            )}
-
-            <p
-              role="status"
-              aria-live="polite"
-              className="flex items-center justify-center gap-1.5 px-2 text-sm text-muted-foreground empty:hidden"
-            >
-              {loading ? (
-                <>
-                  <Spinner />
-                  <span className="py-2">{LABELS.loading}</span>
-                </>
-              ) : null}
-            </p>
-          </div>
-        </AutocompleteContent>
-      </Autocomplete>
+      <AsyncAutocomplete<PackagingOption>
+        layout="split"
+        fetchPage={fetchPage}
+        getOptionLabel={optionLabel}
+        getOptionKey={(option) => option.id}
+        onSelect={choose}
+        inputValue={draft ?? (selected === null ? '' : optionLabel(selected))}
+        searchQuery={draft ?? ''}
+        onInputValueChange={handleValueChange}
+        queryEnabled={!forbidden}
+        showEmpty={!forbidden}
+        isOptionDisabled={(option) => option.presentationContent == null}
+        disabled={disabled}
+        pageSize={MAX_PAGE_SIZE}
+        debounceMs={SEARCH_DEBOUNCE_MS}
+        maxHeight={MAX_LIST_HEIGHT}
+        scrollThreshold={SCROLL_THRESHOLD}
+        placeholder={LABELS.placeholder}
+        emptyMessage={LABELS.empty}
+        aria-labelledby={labelId}
+        aria-describedby={forbidden ? forbiddenId : undefined}
+        renderLoadError={() =>
+          failure === null ? null : (
+            <ErrorAlert
+              error={failure}
+              as="p"
+              className="p-2 text-sm text-destructive"
+              testId={PACKAGING_SELECT_LOAD_ERROR_TESTID}
+              renderCatalogued={(error) => error.message}
+            />
+          )
+        }
+        renderOption={(option) => (
+          <>
+            <span className="w-full truncate">{option.name}</span>
+            <span className="flex w-full flex-wrap gap-x-2 text-sm text-muted-foreground">
+              <span data-testid={PACKAGING_OPTION_PRESENTATION_TESTID}>
+                {option.presentationName ?? ''}
+              </span>
+              <span data-testid={PACKAGING_OPTION_AVAILABLE_TESTID}>
+                {LABELS.available(trimDecimal(option.available ?? '0'))}
+              </span>
+            </span>
+          </>
+        )}
+        slots={{
+          inputTestId: PACKAGING_SELECT_TESTID,
+          inputClassName: `w-full ${touchTarget} ${FIELD_TEXT} pr-8`,
+          clear: { label: LABELS.clear, className: touchTarget },
+          popupTestId: PACKAGING_SELECT_POPUP_TESTID,
+          optionTestId: PACKAGING_OPTION_TESTID,
+          optionClassName: `${touchTarget} ${FIELD_TEXT} flex-col items-start gap-0.5`,
+          optionDataAttributes: (option) => ({ 'data-product-id': option.id }),
+          emptyTestId: PACKAGING_SELECT_EMPTY_TESTID,
+          loadingLabel: LABELS.loading,
+        }}
+      />
 
       {forbidden ? (
         <p
