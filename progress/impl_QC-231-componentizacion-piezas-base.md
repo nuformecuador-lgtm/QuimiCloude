@@ -432,3 +432,20 @@ A mano, `pnpm exec vitest run tests/unit/configuracion-ui/grupos/alcance.test.ts
       Tests  402 passed | 20 skipped (422)
 ```
 Los 20 saltados son los 18 casos de QC-85 y los 2 de QC-56 (R20 y R28). Saltan con su motivo escrito porque esta no es la rama de su feature.
+
+## Correcciones del review (2026-10-08)
+- **H1** (`ebc1fce7`): los comentarios de `data-table-types.ts` y `data-table.tsx` explican el porqué sin claves. Solo cambian líneas de comentario.
+- **H3** (`1b5e470c` + `ebc1fce7`): R18 y D5 quedan enmendadas en requirements y design. El comentario de `DataTableStates.empty` describe lo que hace el código: se pinta siempre que no hay filas, y el consumidor lo pasa sin búsqueda o, en las 5 listas cuyo vacío propio cubría el «sin resultados», también con búsqueda.
+- **H2** (commit de los diálogos): `ErrorAlert` gana `cataloguedAs?: 'div' | 'p'` (por defecto, lo que valga `as`), que fija la etiqueta solo en la rama de catálogo. Los 4 diálogos de borrado (producto, receta, línea de catálogo y proveedor) migran con el DOM idéntico, y sus paridades pasan sin regenerar. Salen sus 4 exclusiones de la guardia; la regla `compara-inesperado` sigue mordiendo, porque con el diálogo antiguo falla en `delete-supplier-dialog.tsx:84`. `error-alert.test.tsx` gana 7 casos. Si el catálogo va en `p` y no hay `renderCatalogued`, el mensaje sale sin el `<p>` interior. No hay consumidor con esa combinación.
+  - **Sitios de R12 que aún comparan:** solo los de lógica sin pintar (`order-customer-dialog`, `order-distribution-dialog`, `use-order-cost-quote.ts`, `use-order-distribution-availability.ts`, la lógica de `packaging-select.tsx` y `document-upload/labels.ts`).
+- **H4**: T16 queda marcada `[x]`, remitiendo a la nota del leader en `progress/features/QC-231.md > Tandas`.
+
+### Salida tras las correcciones del review (HEAD `0bec4d1b` + bitácora)
+`./init.sh`: `== init OK ==`. Related: 269 de 270 archivos en verde; tests de árbol: 97 de 99. Los 3 rojos están en el baseline: `pantallas-exigen-permiso` (`/pedidos`), `recetas/module-contract` y `recetas/scope`.
+
+A mano, `pnpm exec vitest run tests/guards/guard-piezas-base.test.ts tests/unit/paridad tests/unit/shared-ui`:
+```
+ Test Files  28 passed (28)
+      Tests  312 passed (312)
+```
+Ningún snapshot de paridad ha cambiado (`git status tests/unit/paridad` limpio).
