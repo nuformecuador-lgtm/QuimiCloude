@@ -4,23 +4,12 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
-import { ErrorAlert } from '@/components/shared/error-alert';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import type { UserRow } from '@/lib/modules/identity';
 import {
   deleteUserAction,
   type UserMutationFormState,
 } from '@/lib/modules/identity/adapters/driving/user-actions';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * La confirmacion del borrado de un usuario (R30, R31; `design.md > 9`).
@@ -54,8 +43,6 @@ export const DELETE_USER_ID_TESTID = 'delete-user-id';
 export const DELETE_USER_ID_FIELD = 'id';
 
 const TITLE = 'Eliminar al usuario';
-const CONFIRM_LABEL = 'Eliminar';
-const CONFIRM_PENDING_LABEL = 'Eliminando…';
 const DISMISS_LABEL = 'Volver';
 const DELETE_SUCCESS = 'Usuario eliminado.';
 
@@ -85,52 +72,33 @@ export function DeleteUserDialog({ user, open, onOpenChange }: DeleteUserDialogP
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent data-testid={DELETE_USER_DIALOG_TESTID}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{TITLE}</AlertDialogTitle>
-          <AlertDialogDescription data-testid={DELETE_USER_MESSAGE_TESTID}>
-            Se va a eliminar a {user.displayName}. Esta acción no se puede deshacer.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        {error === undefined ? null : (
-          <ErrorAlert
-            error={error}
-            id={errorId}
-            className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            testId={DELETE_USER_ERROR_TESTID}
-            withDataCode
-            renderCatalogued={(catalogued) => (
-              <p data-testid={DELETE_USER_ERROR_MESSAGE_TESTID}>{catalogued.message}</p>
-            )}
-          />
-        )}
-
-        <form action={formAction} data-testid={DELETE_USER_FORM_TESTID}>
-          <input
-            type="hidden"
-            name={DELETE_USER_ID_FIELD}
-            defaultValue={user.id}
-            data-testid={DELETE_USER_ID_TESTID}
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel className={touchTarget} data-testid={DELETE_USER_DISMISS_TESTID}>
-              {DISMISS_LABEL}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              type="submit"
-              variant="destructive"
-              className={touchTarget}
-              disabled={isPending}
-              aria-busy={isPending}
-              data-testid={DELETE_USER_CONFIRM_TESTID}
-            >
-              {isPending ? CONFIRM_PENDING_LABEL : CONFIRM_LABEL}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </form>
-      </AlertDialogContent>
-    </AlertDialog>
+    <DeleteConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      texts={{
+        title: TITLE,
+        description: (
+          <>Se va a eliminar a {user.displayName}. Esta acción no se puede deshacer.</>
+        ),
+        dismiss: DISMISS_LABEL,
+      }}
+      testIds={{
+        dialog: DELETE_USER_DIALOG_TESTID,
+        message: DELETE_USER_MESSAGE_TESTID,
+        dismiss: DELETE_USER_DISMISS_TESTID,
+        confirm: DELETE_USER_CONFIRM_TESTID,
+        form: DELETE_USER_FORM_TESTID,
+        error: DELETE_USER_ERROR_TESTID,
+        errorMessage: DELETE_USER_ERROR_MESSAGE_TESTID,
+      }}
+      submit={{
+        kind: 'action',
+        action: formAction,
+        hidden: [{ name: DELETE_USER_ID_FIELD, value: user.id, testId: DELETE_USER_ID_TESTID }],
+      }}
+      isPending={isPending}
+      error={error}
+      errorId={errorId}
+    />
   );
 }
