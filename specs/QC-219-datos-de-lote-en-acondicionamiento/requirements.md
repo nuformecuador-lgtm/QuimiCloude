@@ -292,8 +292,10 @@ acondicionador 1 con dos líneas y sus dos lotes de producción:
 [D3, D4, D5, D7, D11, D16]
 
 **R29.** Los E2E existentes de QC-217 (`e2e/acondicionamiento.spec.ts`) y QC-218
-(`e2e/acondicionar-con-equipo.spec.ts`) NO DEBEN cambiar ninguna aserción. El pedido de QC-218 no
-tiene reparto, así que R17 deja terminarlo. [D11, D15]
+(`e2e/acondicionar-con-equipo.spec.ts`) NO DEBEN cambiar ninguna aserción, salvo una: el conteo de pestañas
+de `/asignacion` en `e2e/acondicionamiento.spec.ts` pasa de 2 a 3 y comprueba «Entregados» en tercera
+posición, consecuencia directa de R20 (enmienda aprobada por el humano el 2026-10-09). El pedido de
+QC-218 no tiene reparto, así que R17 deja terminarlo. [D11, D13, D15]
 
 **R30.** El sistema DEBE probar R1–R27 con tests unitarios, de integración y guardias. Esta feature
 NO DEBE añadir ninguna dependencia a `package.json`. [D11, D12]

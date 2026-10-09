@@ -153,8 +153,8 @@
     vencimiento en `/inventario`.
   - **Hecho:**
     - `pnpm exec playwright test e2e/datos-de-lote-en-acondicionamiento.spec.ts` verde;
-    - `e2e/acondicionamiento.spec.ts` y `e2e/acondicionar-con-equipo.spec.ts` verdes sin tocarlos
-      (R29).
+    - `e2e/acondicionamiento.spec.ts` y `e2e/acondicionar-con-equipo.spec.ts` verdes; solo cambia el conteo de pestañas
+      de `acondicionamiento.spec.ts` a 3 (R29).
 
 - [ ] **T18 — Cierre** (leader). Depende de: T17.
   - Mapa `R<n> → test` en `progress/impl_QC-219.md`.

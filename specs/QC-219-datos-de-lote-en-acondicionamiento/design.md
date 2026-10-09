@@ -422,7 +422,7 @@ no cambia ningún adaptador.
 - `tests/unit/inventario/product-batches-panel.test.tsx`;
 - `tests/unit/asignaciones/assignment-views.test.ts`.
 
-**E2E existentes:** sin cambios de aserción (R29). El de QC-218 termina un pedido sin reparto (R17).
+**E2E existentes:** sin cambios de aserción salvo el conteo de pestañas de `e2e/acondicionamiento.spec.ts`, que pasa a 3 con «Entregados» al final (R29, enmienda del 2026-10-09). El de QC-218 termina un pedido sin reparto (R17).
 
 **Cruce con QC-223** (en vuelo, del mismo assignee). Comparten, según su `tasks.md`:
 
