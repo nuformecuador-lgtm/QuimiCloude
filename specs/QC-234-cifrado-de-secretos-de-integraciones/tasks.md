@@ -90,7 +90,7 @@
       Bloque de deuda en `progress/deudas.md` con el texto de `design.md > 10`.
       **Hecho cuando:** el caso en verde. Cubre R22 (`.env.example`). Depende de: —.
 
-- [ ] **T9.** Mapa `R<n> -> test` completo (R1–R23) en
+- [x] **T9.** Mapa `R<n> -> test` completo (R1–R23) en
       `progress/impl_QC-234-cifrado-de-secretos-de-integraciones.md`. R23 se justifica con
       `./init.sh` y el check `gate-completo`.
       **Hecho cuando:** `./init.sh` en verde. Depende de: T1–T8.
