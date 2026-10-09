@@ -14,13 +14,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import {
   deleteOrderAction,
   type OrderMutationFormState,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Confirmacion del borrado de un pedido (R38, R35, `design.md > 8`).
@@ -60,8 +60,6 @@ export const DELETE_ORDER_ID_TESTID = 'delete-order-id';
 
 /** Nombre del campo del `FormData` que lee el adaptador driving (`design.md > 4`). */
 export const DELETE_ORDER_ID_FIELD = 'id';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 const TITLE = 'Eliminar el pedido';
 const CONFIRM_LABEL = 'Eliminar';
@@ -106,21 +104,16 @@ export function DeleteOrderDialog({ order, open, onOpenChange }: DeleteOrderDial
         </AlertDialogHeader>
 
         {error === undefined ? null : (
-          // QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
-          // identificador de la peticion. El CATALOGADO se pinta como siempre y sin identificador.
-          <div
-            role="alert"
+          <ErrorAlert
+            error={error}
             id={errorId}
             className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={DELETE_ORDER_ERROR_TESTID}
-            data-code={error.code}
-          >
-            {error.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={error} />
-            ) : (
-              <p data-testid="delete-order-error-message">{error.message}</p>
+            testId={DELETE_ORDER_ERROR_TESTID}
+            withDataCode
+            renderCatalogued={(catalogued) => (
+              <p data-testid="delete-order-error-message">{catalogued.message}</p>
             )}
-          </div>
+          />
         )}
 
         <form action={formAction} data-testid="delete-order-form">
@@ -131,13 +124,13 @@ export function DeleteOrderDialog({ order, open, onOpenChange }: DeleteOrderDial
             data-testid={DELETE_ORDER_ID_TESTID}
           />
           <AlertDialogFooter>
-            <AlertDialogCancel className={TOUCH_TARGET} data-testid={DELETE_ORDER_DISMISS_TESTID}>
+            <AlertDialogCancel className={touchTarget} data-testid={DELETE_ORDER_DISMISS_TESTID}>
               {DISMISS_LABEL}
             </AlertDialogCancel>
             <AlertDialogAction
               type="submit"
               variant="destructive"
-              className={TOUCH_TARGET}
+              className={touchTarget}
               disabled={isPending}
               aria-busy={isPending}
               data-testid={DELETE_ORDER_CONFIRM_TESTID}
