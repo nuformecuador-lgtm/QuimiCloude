@@ -74,6 +74,35 @@ describe('ProductBatchesPanel', () => {
     expect(within(b3).getByTestId('product-batch-quantity')).toHaveTextContent('3 kg');
   });
 
+  it('R22 — un lote con vencimiento pinta «Vencimiento» con su fecha', () => {
+    const batches: ProductBatchView[] = [
+      lote({ id: 'b1', purchaseDate: '2026-03-05', expiryDate: '2027-03-05' }),
+    ];
+
+    render(<ProductBatchesPanel batches={batches} />);
+
+    const b1 = screen.getByTestId('product-batch-b1');
+    expect(within(b1).getByText('Vencimiento')).toBeVisible();
+    expect(within(b1).getByTestId('product-batch-expiry-date')).toHaveTextContent('2027-03-05');
+  });
+
+  it('R22 — un lote sin vencimiento no pinta «Vencimiento» y se pinta como hoy', () => {
+    const batches: ProductBatchView[] = [
+      lote({ id: 'b1', expiryDate: '2027-01-31' }),
+      lote({ id: 'b2', expiryDate: null }),
+    ];
+
+    render(<ProductBatchesPanel batches={batches} />);
+
+    const b2 = screen.getByTestId('product-batch-b2');
+    expect(within(b2).queryByText('Vencimiento')).toBeNull();
+    expect(within(b2).queryByTestId('product-batch-expiry-date')).toBeNull();
+    expect(within(b2).getByTestId('product-batch-purchase-date')).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('product-batch-b1')).getByTestId('product-batch-expiry-date'),
+    ).toHaveTextContent('2027-01-31');
+  });
+
   it('no convierte: la cantidad pintada es exactamente `batch.stock`, sin catalogo de unidades', () => {
     const batches: ProductBatchView[] = [lote({ id: 'b1', stock: '7' })];
 

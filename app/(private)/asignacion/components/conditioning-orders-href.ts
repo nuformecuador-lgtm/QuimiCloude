@@ -4,11 +4,11 @@ import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 import { PAGE_PARAM, PAGE_SIZE_PARAM, VIEW_PARAM } from './assignment-view-params';
 
 /**
- * Las direcciones de las dos listas del acondicionador, siempre con su vista. Sin `'use client'`:
+ * Las direcciones de las tres listas del acondicionador, siempre con su vista. Sin `'use client'`:
  * las usan la tabla de cliente al paginar y la sección de servidor para volver a la primera página.
  */
 
-export type ConditioningListView = 'por_acondicionar' | 'acondicionados';
+export type ConditioningListView = 'por_acondicionar' | 'acondicionados' | 'acondicionados_entregados';
 
 function listHref(
   view: ConditioningListView,
@@ -27,4 +27,8 @@ export function conditioningOrdersHref(params: Pick<DataTableParams, 'page' | 'p
 
 export function conditionedOrdersHref(params: Pick<DataTableParams, 'page' | 'pageSize'>): string {
   return listHref('acondicionados', params);
+}
+
+export function deliveredConditionedOrdersHref(params: Pick<DataTableParams, 'page' | 'pageSize'>): string {
+  return listHref('acondicionados_entregados', params);
 }

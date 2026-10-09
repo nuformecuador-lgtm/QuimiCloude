@@ -45,6 +45,7 @@ import {
   startPackingAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { assertTransition } from '@/lib/modules/pedidos/domain/order-transitions';
+import { prisma } from '@/lib/shared/db/prisma';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
@@ -165,7 +166,30 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
       transaction: execution.transaction,
       now: () => NOW,
     }),
-    finishConditioning: createFinishConditioning({ orders, now: () => NOW }),
+    // QC-219: este archivo no da de alta lotes de producto terminado (ver `finishPackingAliveById`
+    // arriba), asi que cada linea del reparto se presenta con sus datos de lote ya escritos; se lee
+    // por el proxy de la `tx` del fixture. La
+    // regla de Terminar sin datos se prueba en `finish-conditioning-batch-data.int.test.ts`.
+    finishConditioning: createFinishConditioning({
+      orders,
+      batches: {
+        listOfOrder: async (companyId, orderId) =>
+          (
+            await prisma.orderPresentationLine.findMany({
+              where: { companyId, orderId },
+              select: { id: true, presentationId: true },
+            })
+          ).map((line) => ({
+            batchId: line.id,
+            orderPresentationLineId: line.id,
+            presentationId: line.presentationId,
+            lot: `L-${line.id}`,
+            expiryDate: '2027-03-01',
+            productionDate: '2026-03-01',
+          })),
+      },
+      now: () => NOW,
+    }),
   };
 }
 

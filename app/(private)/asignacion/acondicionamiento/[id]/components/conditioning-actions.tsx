@@ -28,6 +28,10 @@ export type ConditioningActionsProps =
       readonly kind: 'finish';
       readonly orderId: string;
       readonly orderNumber: string;
+      /** Deshabilita «Terminar» sin abrir el modal; el servidor sigue siendo quien rechaza. */
+      readonly blocked?: boolean;
+      /** El aviso que explica por qué está deshabilitado. */
+      readonly describedBy?: string;
     };
 
 export function ConditioningActions(props: ConditioningActionsProps) {
@@ -41,13 +45,16 @@ export function ConditioningActions(props: ConditioningActionsProps) {
   }
 
   const isStart = props.kind === 'start';
+  const blocked = props.kind === 'finish' && props.blocked === true;
 
   return (
     <div className="flex flex-col gap-2">
       <Button
         type="button"
         className={`w-fit ${touchTarget}`}
-        onClick={openDialog}
+        onClick={blocked ? undefined : openDialog}
+        disabled={blocked}
+        aria-describedby={props.kind === 'finish' ? props.describedBy : undefined}
         data-testid={isStart ? CONDITIONING_START_BUTTON_TESTID : CONDITIONING_FINISH_BUTTON_TESTID}
       >
         {isStart ? CONDITIONING_ACTIONS_TEXTS.start : CONDITIONING_ACTIONS_TEXTS.finish}
