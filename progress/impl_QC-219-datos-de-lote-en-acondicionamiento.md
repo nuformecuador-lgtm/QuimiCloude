@@ -118,3 +118,42 @@ del bloque. También se actualizó el comentario del paso 1. Nada más cambia en
 - Línea sin lote de producción (`batchId: null`): `<fieldset disabled>`, sin texto explicativo (el spec no lo define).
 - En `ENTREGADO` la pantalla muestra el estado «Entregado» (texto no listado en design § 6).
 - E2E: `waitForFormHydration` espera la hidratación antes de teclear (en WebKit lo tecleado antes se perdía).
+
+## F2.3 — merge de `origin/dev` (2026-10-09)
+
+Merge `a772757f` (sin rebase). Trae QC-223 (entrega, PR #190) y QC-234. Conflictos, todos resueltos por unión:
+
+| Archivo | Resolución |
+|---|---|
+| `lib/composition/index.ts` | imports de los dos lados (`createFinishedBatchLabels` + `createFinishedGoodsDispatch`/`findDeliverableBatches`) |
+| `error-codes.ts` | cabecera en orden de fecha (QC-223 10-08, QC-234 10-09, QC-219 10-09) y los 6 códigos en `ERROR_CODES` |
+| `error-catalog.ts` | las 6 claves y los 6 textos |
+| `product-prisma.ts` | los dos `import type` (`FinishedBatchLabel…` y `FinishedGoodsDispatchOutcome`) |
+| `guard-identificador-de-request.test.ts` | `MIGRACIONES_ESPERADAS`: las tres de QC-223 (`20261008150050/150100/150200`) y después la nuestra (`20261009120000`), en orden de timestamp |
+| `guard-libro-de-inventario.test.ts` | título del censo con los 8 caminos (`dispatchFinishedGoods` en `CAMINOS_ESPERADOS`, `writeFinishedBatchLabels` en `CAMINOS_SIN_ASIENTO`) |
+| `qc121-alcance.test.ts` | los dos caminos en `CAMINOS_ESPERADOS` y en la fuente fabricada; «siete» → «ocho», «octavo» → «noveno» |
+| `tests/integration/aislamiento.json` | las 4 entradas `commit` (2 de QC-223, 2 nuestras); JSON válido, 103 entradas `commit` |
+| `tests/unit/errores/catalogo.test.ts` | 76 + 3 (QC-223/QC-234) + 3 (QC-219) = **82** |
+| `tests/unit/shared/data-table-alcance.test.ts` | nota de QC-223 y después la nuestra; 32 + 2 = **34** E2E |
+
+**Semántica con QC-223, sin choque:**
+- la entrega deja `ENTREGADO` solo con `setStatus(TERMINADO → ENTREGADO)`, que no toca `conditioned_by`, así que «Entregados» (ENTREGADO + quien acondicionó) los lista;
+- la entrega parcial deja el pedido en `TERMINADO`;
+- la elección de lotes ordena por `purchaseDate` y `lot` y lee `expiryDate`; `writeFinishedBatchLabels` no toca `purchaseDate` ni `stock`;
+- `order_delivery_lines` guarda `batch_id` y no copia el texto del lote, así que corregir el lote tras la entrega no desfasa el registro;
+- en dev nadie más llama a Terminar (solo la composición).
+
+Migraciones: `prisma generate`; `db:migrate` → «No pending migrations to apply» (la base local ya tenía las de QC-223).
+
+Hallazgo menor del reviewer, en su propio commit (`a621e619`): el esqueleto de «Entregados» tiene su entrada
+`acondicionados_entregados` («Cargando pedidos entregados…») y un test en `asignacion-page.test.tsx`.
+
+**Verificación tras el merge:**
+- `pnpm run typecheck` → exit 0. `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)`, los mismos ajenos.
+- `vitest run tests/guards tests/unit/{errores,inventario,inventario-ui,asignaciones,asignaciones-ui,shared,composition,scripts,pedidos,pedidos-ui,identity,recetas-ui,integraciones}` → `Test Files 548 passed (548)` · `Tests 9840 passed | 51 skipped`.
+- Integración (con el `.env` exportado): `tests/integration/asignaciones`, `inventario/{order-batches,finished-batch-labels,product-batch-production-date-migration}`, `tests/integration/scripts` y `pedidos/order-delivery{,-concurrency}` → `Test Files 30 passed (30)` · `Tests 192 passed`.
+- E2E, de uno en uno, chromium y webkit:
+  - `datos-de-lote-en-acondicionamiento` → `2 passed`;
+  - `acondicionamiento` → `8 passed`;
+  - `acondicionar-con-equipo` → `2 passed`;
+  - `entregar-producto-terminado` → `4 passed`.
