@@ -109,7 +109,7 @@ pregunta al leader.
   - el mapa R → test (`design.md > 13`);
   - el resultado de TA;
   - los repuntes de import de R4, si hubo alguno.
-- [x] **T6.** Capturas «después»** (R3). **La hace el leader**, en
+- [x] **T6. Capturas «después»** (R3). **La hace el leader**, en
   `_trabajo/marca/capturas-despues-buscadores/`, con los mismos buscadores, estados, modos y datos
   que T0b.
   - **Hecho cuando:** cada captura «antes» tiene su pareja, y la tabla de parejas queda lista para el
