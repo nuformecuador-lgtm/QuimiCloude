@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
-import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
+import { ConfirmDialogFrame } from '@/components/shared/confirm-dialog';
+import { DeleteConfirmDialogBody } from '@/components/shared/delete-confirm-dialog';
 import type { ErrorCode } from '@/lib/modules/errores';
 import type { PresentationView } from '@/lib/modules/inventario';
 import {
@@ -34,7 +35,9 @@ import {
  * ya monta -**no se monta otro** (R26)- y `router.refresh()` con la MISMA URL, que conserva pagina,
  * orden y filtros.
  *
- * **Apertura CONTROLADA**: quien dispara es la fila. Aqui no hay disparador propio.
+ * **Apertura controlada**: quien dispara es la fila, que lo deja montado tras la primera apertura
+ * para que el cierre anime su salida. El cuerpo se monta solo mientras el popup esta abierto, asi
+ * que cada apertura arranca sin el rechazo de la anterior.
  */
 
 export const DELETE_PRESENTATION_DIALOG_TESTID = 'delete-presentation-dialog';
@@ -79,6 +82,22 @@ export function DeletePresentationDialog({
   open,
   onOpenChange,
 }: DeletePresentationDialogProps) {
+  return (
+    <ConfirmDialogFrame
+      open={open}
+      onOpenChange={onOpenChange}
+      testId={DELETE_PRESENTATION_DIALOG_TESTID}
+    >
+      <DeletePresentationDialogBody presentation={presentation} onOpenChange={onOpenChange} />
+    </ConfirmDialogFrame>
+  );
+}
+
+/** Se monta con el popup: cada apertura arranca sin el rechazo de la anterior. */
+function DeletePresentationDialogBody({
+  presentation,
+  onOpenChange,
+}: Omit<DeletePresentationDialogProps, 'open'>) {
   const fieldId = useId();
   const errorId = `${fieldId}-error`;
   const router = useRouter();
@@ -86,7 +105,7 @@ export function DeletePresentationDialog({
 
   useEffect(() => {
     if (state.status !== 'success') return;
-    // R25, en este orden: cerrar, avisar y poner la lista al dia sin recargar la pantalla.
+    // En este orden: cerrar, avisar y poner la lista al dia sin recargar la pantalla.
     onOpenChange(false);
     toast.success(DELETE_SUCCESS);
     router.refresh();
@@ -95,8 +114,7 @@ export function DeletePresentationDialog({
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <DeleteConfirmDialog
-      open={open}
+    <DeleteConfirmDialogBody
       onOpenChange={onOpenChange}
       texts={{
         title: TITLE,
@@ -108,7 +126,6 @@ export function DeletePresentationDialog({
         dismiss: DISMISS_LABEL,
       }}
       testIds={{
-        dialog: DELETE_PRESENTATION_DIALOG_TESTID,
         message: DELETE_PRESENTATION_MESSAGE_TESTID,
         dismiss: DELETE_PRESENTATION_DISMISS_TESTID,
         confirm: DELETE_PRESENTATION_CONFIRM_TESTID,
