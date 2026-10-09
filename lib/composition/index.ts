@@ -120,6 +120,7 @@ import {
   createReservationQueries,
 } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
+import { createFinishedBatchLabels } from '@/lib/modules/inventario/adapters/driven/persistence/finished-batch-labels-prisma';
 import { listStockGroups } from '@/lib/modules/inventario/adapters/driven/persistence/finished-stock-prisma';
 import {
   claimImport,
@@ -418,6 +419,8 @@ import {
   createListConditionedOrders,
   createGetConditioningOrder,
   createListConditioningTeamCandidates,
+  createListDeliveredConditionedOrders,
+  createSaveConditioningBatchData,
 } from '@/lib/modules/asignaciones';
 import { createConditioningTeamRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/conditioning-team-prisma';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
@@ -1796,6 +1799,7 @@ export const asignaciones = {
   }),
   finishConditioning: createFinishConditioningOrder({
     orders: orderCatalog,
+    batches: createFinishedBatchLabels(),
     now: () => new Date(),
   }),
   listConditioningOrders: createListConditioningOrders({
@@ -1824,11 +1828,26 @@ export const asignaciones = {
     presentations: presentationCatalog,
     units: unitCatalog,
     team: createConditioningTeamRepository(),
+    batches: createFinishedBatchLabels(),
     now: () => new Date(),
   }),
   listConditioningTeamCandidates: createListConditioningTeamCandidates({
     people: peopleDirectory,
     groups: workGroupDirectory,
+    now: () => new Date(),
+  }),
+  listDeliveredConditionedOrders: createListDeliveredConditionedOrders({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    recipes: recipeCatalog,
+    people: peopleDirectory,
+    presentations: presentationCatalog,
+    units: unitCatalog,
+    now: () => new Date(),
+  }),
+  saveConditioningBatchData: createSaveConditioningBatchData({
+    orders: orderCatalog,
+    batches: createFinishedBatchLabels(),
     now: () => new Date(),
   }),
 } as const;
