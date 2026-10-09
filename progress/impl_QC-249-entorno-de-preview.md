@@ -257,3 +257,9 @@ Veredicto: m1 y m5 cerrados, en verde; sin commit.
   100 tests verdes; `vitest run guard` 64 archivos, 862 pasan, 15 saltados.
 - Abierto para el humano: `hostaddr` (nombre exacto) tambien desvia la conexion en libpq y pasa,
   igual que en la guarda de QC-230; bloquearlo exigiria tocar las dos guardas.
+
+## F2.4 (leader, 2026-10-09)
+Tras sincronizar con dev, `./init.sh` dio 1 rojo ajeno por carga de la máquina (3 implementers
+corriendo tests a la vez): `document-upload-strategy.test.tsx` por timeout de 20 s y 4 workers de
+vitest que no arrancaron. Repetidos aislados: 5 archivos, 92 tests en verde. El gate completo lo
+corre CI (`gate-completo`).
