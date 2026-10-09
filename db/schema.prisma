@@ -998,3 +998,50 @@ model OrderConditioningTeamMember {
   @@index([workGroupId], map: "order_conditioning_team_members_work_group_id_idx")
   @@map("order_conditioning_team_members")
 }
+
+enum WhatsappConnectionOrigin {
+  MANUAL
+  EMBEDDED_SIGNUP
+
+  @@map("whatsapp_connection_origin")
+}
+
+enum WhatsappConnectionStatus {
+  PENDING
+  ACTIVE
+  ERROR
+  DISABLED
+
+  @@map("whatsapp_connection_status")
+}
+
+/// Sin `@relation`: las FK de `company_id` y `created_by` estan escritas a mano en la migracion,
+/// igual que los dos indices unicos parciales (una conexion viva por empresa y por
+/// `phone_number_id`), que solo existen alli.
+/// @module integraciones
+model WhatsappConnection {
+  id                 String                   @id @db.Uuid
+  companyId          String                   @map("company_id") @db.Uuid
+  origin             WhatsappConnectionOrigin @default(MANUAL)
+  displayName        String                   @map("display_name")
+  metaAppId          String                   @map("meta_app_id")
+  wabaId             String                   @map("waba_id")
+  phoneNumberId      String                   @map("phone_number_id")
+  displayPhoneNumber String?                  @map("display_phone_number")
+  verifiedName       String?                  @map("verified_name")
+  accessTokenEnc     String                   @map("access_token_enc")
+  appSecretEnc       String                   @map("app_secret_enc")
+  verifyTokenHash    String                   @map("verify_token_hash")
+  status             WhatsappConnectionStatus @default(PENDING)
+  lastError          String?                  @map("last_error")
+  lastCheckedAt      DateTime?                @map("last_checked_at") @db.Timestamptz(6)
+  lastWebhookAt      DateTime?                @map("last_webhook_at") @db.Timestamptz(6)
+  createdById        String                   @map("created_by") @db.Uuid
+  createdAt          DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt          DateTime?                @map("deleted_at") @db.Timestamptz(6)
+
+  @@unique([companyId, id], map: "whatsapp_connections_company_id_id_key")
+  @@index([createdById], map: "whatsapp_connections_created_by_idx")
+  @@map("whatsapp_connections")
+}

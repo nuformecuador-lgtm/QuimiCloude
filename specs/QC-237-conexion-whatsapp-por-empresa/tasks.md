@@ -21,7 +21,7 @@
 
 ## T1–T2 — Base de datos y catálogo
 
-- [ ] **T1.** Esquema y migración (`design.md > 2`): los dos enums y `WhatsappConnection` con
+- [x] **T1.** Esquema y migración (`design.md > 2`): los dos enums y `WhatsappConnection` con
       `/// @module integraciones` al final de `db/schema.prisma`; migración
       `20261009120000_whatsapp_connections` escrita a mano con su `down.sql`; `prisma generate`.
       Tests `tests/integration/integraciones/whatsapp-connection-migration.int.test.ts` (ida, vuelta
@@ -31,14 +31,14 @@
       **Hecho cuando:** `guard-empresa-en-esquema`, `guard-rls-force`, `guard-arquitectura-modulos`
       y el test de migración en verde. Cubre R5. Depende de: —.
 
-- [ ] **T2. [P]** Catálogo (`design.md > 7`): tres códigos al final de `ERROR_CODES` con su línea de
+- [x] **T2. [P]** Catálogo (`design.md > 7`): tres códigos al final de `ERROR_CODES` con su línea de
       enmienda, claves y textos en `error-catalog.ts`; `catalogo.test.ts` a 82 (o `dev` + 3).
       **Hecho cuando:** `catalogo.test.ts` y `guard-catalogo-de-errores` en verde. Cubre parte de
       R3, R6, R7. Depende de: —.
 
 ## T3–T4 — Dominio y puertos
 
-- [ ] **T3.** Tipos, actor, ámbito, errores y saneado (`design.md > 3.1` a `> 3.4`), puertos de
+- [x] **T3.** Tipos, actor, ámbito, errores y saneado (`design.md > 3.1` a `> 3.4`), puertos de
       `> 4.1`, `> 4.3`, `> 4.4`. Tests `connection-view.test.ts` y `graph-failure.test.ts`.
       **Hecho cuando:** los dos tests y `guard-arquitectura-modulos` en verde. Cubre R10 (vista),
       R20. Depende de: T2.

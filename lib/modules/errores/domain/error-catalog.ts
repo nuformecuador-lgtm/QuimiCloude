@@ -84,6 +84,9 @@ export const ERROR_MESSAGE_KEY = {
   delivery_exceeds_remaining: 'errors.delivery_exceeds_remaining',
   delivery_batch_insufficient: 'errors.delivery_batch_insufficient',
   integration_secret_unreadable: 'errors.integration_secret_unreadable',
+  whatsapp_connection_not_found: 'errors.whatsapp_connection_not_found',
+  whatsapp_connection_exists: 'errors.whatsapp_connection_exists',
+  whatsapp_phone_number_taken: 'errors.whatsapp_phone_number_taken',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -215,4 +218,8 @@ export const ERROR_MESSAGES_ES = {
     'Algun lote ya no tiene los envases elegidos: revisa los lotes y confirma de nuevo.',
   'errors.integration_secret_unreadable':
     'No se pudo leer una credencial guardada de la integración. Vuelve a escribirla.',
+  'errors.whatsapp_connection_not_found': 'No se encontró la conexión de WhatsApp.',
+  'errors.whatsapp_connection_exists': 'La empresa ya tiene una conexión de WhatsApp.',
+  'errors.whatsapp_phone_number_taken':
+    'Ese número de WhatsApp ya está conectado en otra cuenta.',
 } as const satisfies Record<ErrorMessageKey, string>;

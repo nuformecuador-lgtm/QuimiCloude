@@ -37,6 +37,7 @@
     "identity/packer-role-migration.int.test.ts",
     "identity/packing-permission-migration.int.test.ts",
     "identity/work-groups-constraints.int.test.ts",
+    "integraciones/whatsapp-connection-migration.int.test.ts",
     "inventario/company-scope.int.test.ts",
     "inventario/inventario-constraints.int.test.ts",
     "inventario/inventory-movements-constraints.int.test.ts",

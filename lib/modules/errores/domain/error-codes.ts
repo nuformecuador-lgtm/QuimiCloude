@@ -27,6 +27,8 @@
  * **2026-10-08**: `conditioning_team_member_not_allowed`, `conditioning_team_empty`.
  * **2026-10-08**: `delivery_exceeds_remaining`, `delivery_batch_insufficient`.
  * **2026-10-09**: `integration_secret_unreadable`.
+ * **2026-10-09**: `whatsapp_connection_not_found`, `whatsapp_connection_exists`,
+ * `whatsapp_phone_number_taken`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -170,6 +172,9 @@ export const ERROR_CODES = [
   // los envases enteros que la entrega le pide.
   'delivery_batch_insufficient',
   'integration_secret_unreadable',
+  'whatsapp_connection_not_found',
+  'whatsapp_connection_exists',
+  'whatsapp_phone_number_taken',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

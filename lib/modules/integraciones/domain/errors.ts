@@ -34,3 +34,45 @@ export class ValidationError extends IntegracionesError {
     super('invalid_input', diagnostic);
   }
 }
+
+export class UnauthorizedError extends IntegracionesError {
+  readonly code = 'unauthorized';
+
+  constructor(diagnostic?: string) {
+    super('unauthorized', diagnostic);
+  }
+}
+
+/** La conexión no existe, está borrada o es de otra empresa: el texto no distingue los tres casos. */
+export class WhatsappConnectionNotFoundError extends IntegracionesError {
+  readonly code = 'whatsapp_connection_not_found';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_connection_not_found', diagnostic);
+  }
+}
+
+export class WhatsappConnectionExistsError extends IntegracionesError {
+  readonly code = 'whatsapp_connection_exists';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_connection_exists', diagnostic);
+  }
+}
+
+/** El texto no nombra a la empresa dueña del número: sería una fuga entre empresas. */
+export class WhatsappPhoneNumberTakenError extends IntegracionesError {
+  readonly code = 'whatsapp_phone_number_taken';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_phone_number_taken', diagnostic);
+  }
+}
+
+export class ActionNotAllowedError extends IntegracionesError {
+  readonly code = 'action_not_allowed';
+
+  constructor(diagnostic?: string) {
+    super('action_not_allowed', diagnostic);
+  }
+}
