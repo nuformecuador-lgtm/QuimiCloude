@@ -301,6 +301,19 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
     },
   },
   {
+    // El detalle del acondicionador: su archivo de `driving/` resuelve las dos caras de la sesion.
+    // La accion captura los errores y devuelve un estado, asi que una entrada invalida no rompe.
+    archivo: 'lib/modules/asignaciones/adapters/driving/order-conditioning-actions.ts',
+    nombre: 'startConditioningAction',
+    invocar: async () => {
+      const formData = new FormData();
+      formData.set('orderId', 'no-es-un-uuid');
+      return (
+        await import('@/lib/modules/asignaciones/adapters/driving/order-conditioning-actions')
+      ).startConditioningAction({ status: 'success' }, formData);
+    },
+  },
+  {
     // La accion captura los errores y devuelve un estado, asi que un `orderId` invalido no rompe
     // la invocacion: lo que esta lista mide es cuantas veces se lee la sesion.
     archivo: 'lib/modules/asignaciones/adapters/driving/execution-trace-actions.ts',

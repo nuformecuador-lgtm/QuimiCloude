@@ -158,7 +158,13 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
     // R27: Comenzar y Terminar, mismos `orders` y mismo reloj que el resto del fixture.
     startPacking: createStartPacking({ orders, ...execution, now: () => NOW }),
     finishPacking: createFinishPacking({ orders, ...execution, now: () => NOW }),
-    startConditioning: createStartConditioning({ orders, now: () => NOW }),
+    startConditioning: createStartConditioning({
+      orders,
+      people: assignmentDirectoryPrisma,
+      groups: assignmentDirectoryPrisma,
+      transaction: execution.transaction,
+      now: () => NOW,
+    }),
     finishConditioning: createFinishConditioning({ orders, now: () => NOW }),
   };
 }
@@ -383,7 +389,7 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
 
       // Comenzar el acondicionamiento: POR_ACONDICIONAR -> EN_ACONDICIONAMIENTO. Tampoco aparece.
-      await startConditioning(actorAcondicionador, { orderId: pedido });
+      await startConditioning(actorAcondicionador, { orderId: pedido, userIds: [operario], workGroupIds: [] });
       expect(await estadoDe()).toBe('EN_ACONDICIONAMIENTO');
       expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
 

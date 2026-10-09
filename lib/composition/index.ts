@@ -289,6 +289,7 @@ import {
   startConditioningAliveOrder,
   startPackingAliveOrder,
   createOrderPackingRepository,
+  createOrderConditioningRepository,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
 import {
@@ -416,7 +417,9 @@ import {
   createListConditioningOrders,
   createListConditionedOrders,
   createGetConditioningOrder,
+  createListConditioningTeamCandidates,
 } from '@/lib/modules/asignaciones';
+import { createConditioningTeamRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/conditioning-team-prisma';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
 import { createExecutionLogRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/execution-log-prisma';
@@ -1599,6 +1602,10 @@ const executionTransaction: ExecutionTransaction = {
           }),
         },
         log: createExecutionLogRepository(tx),
+        conditioning: {
+          startConditioningAliveById: createStartConditioning({ conditioning: createOrderConditioningRepository(tx) }),
+        },
+        team: createConditioningTeamRepository(tx),
       }),
     ),
 };
@@ -1782,6 +1789,9 @@ export const asignaciones = {
   }),
   startConditioning: createStartConditioningOrder({
     orders: orderCatalog,
+    people: peopleDirectory,
+    groups: workGroupDirectory,
+    transaction: executionTransaction,
     now: () => new Date(),
   }),
   finishConditioning: createFinishConditioningOrder({
@@ -1813,6 +1823,12 @@ export const asignaciones = {
     people: peopleDirectory,
     presentations: presentationCatalog,
     units: unitCatalog,
+    team: createConditioningTeamRepository(),
+    now: () => new Date(),
+  }),
+  listConditioningTeamCandidates: createListConditioningTeamCandidates({
+    people: peopleDirectory,
+    groups: workGroupDirectory,
     now: () => new Date(),
   }),
 } as const;

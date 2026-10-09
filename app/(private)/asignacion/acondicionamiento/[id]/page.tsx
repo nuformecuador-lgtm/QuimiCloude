@@ -1,13 +1,25 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { asignaciones, identity } from '@/lib/composition';
-import { OrderNotFoundError, ValidationError, type Actor } from '@/lib/modules/asignaciones';
+import { asignaciones, identity, observabilidad } from '@/lib/composition';
+import {
+  AsignacionesError,
+  OrderNotFoundError,
+  ValidationError,
+  type Actor,
+  type ConditioningTeamCandidates,
+} from '@/lib/modules/asignaciones';
+import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
 import { ConditioningOrderScreen } from './components';
+
+const toErrorState = createErrorStateTranslator(
+  AsignacionesError,
+  observabilidad.readRequestIdHeader,
+);
 
 export const metadata: Metadata = {
   title: `Acondicionamiento · ${BRAND_LABEL}`,
@@ -53,5 +65,27 @@ export default async function ConditioningOrderPage({
     throw error;
   }
 
-  return <ConditioningOrderScreen order={order} />;
+  const canStart = order.status === 'POR_ACONDICIONAR';
+  const canFinish = order.status === 'EN_ACONDICIONAMIENTO' && order.conditionedById === actor.id;
+
+  let candidates: ConditioningTeamCandidates | null = null;
+  let candidatesError: ErrorState | null = null;
+  if (canStart) {
+    try {
+      candidates = await asignaciones.listConditioningTeamCandidates(actor, {});
+    } catch (error) {
+      if (!(error instanceof AsignacionesError)) throw error;
+      candidatesError = await toErrorState(error);
+    }
+  }
+
+  return (
+    <ConditioningOrderScreen
+      order={order}
+      canStart={canStart}
+      canFinish={canFinish}
+      candidates={candidates}
+      candidatesError={candidatesError}
+    />
+  );
 }

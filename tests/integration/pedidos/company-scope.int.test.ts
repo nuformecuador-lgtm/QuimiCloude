@@ -525,6 +525,9 @@ async function vaciarPedidos(tx: Prisma.TransactionClient) {
  * 2026-10-06 (QC-82): `20261006180000_order_execution_entries` anadio una tercera,
  * `order_execution_entries_order_id_company_id_fkey`, con la misma forma; se retira y restaura
  * igual que las otras dos.
+ *
+ * 2026-10-08 (QC-218): `20261008150000_order_conditioning_team` anadio una cuarta,
+ * `order_conditioning_team_members_order_id_company_id_fkey`, con la misma forma.
  */
 const RESERVATION_ORDER_FK =
   'ALTER TABLE "reservation_movements" ADD CONSTRAINT "reservation_movements_order_id_fkey" ' +
@@ -538,6 +541,10 @@ const EXECUTION_ENTRY_ORDER_FK =
   'ALTER TABLE "order_execution_entries" ADD CONSTRAINT "order_execution_entries_order_id_company_id_fkey" ' +
   'FOREIGN KEY ("order_id", "company_id") REFERENCES "orders"("id", "company_id") ' +
   'ON DELETE RESTRICT ON UPDATE CASCADE'
+const CONDITIONING_TEAM_ORDER_FK =
+  'ALTER TABLE "order_conditioning_team_members" ADD CONSTRAINT "order_conditioning_team_members_order_id_company_id_fkey" ' +
+  'FOREIGN KEY ("order_id", "company_id") REFERENCES "orders"("id", "company_id") ' +
+  'ON DELETE RESTRICT ON UPDATE CASCADE'
 
 async function dropForeignKeysDependingOnOrdersCompanyKey(tx: Prisma.TransactionClient) {
   await tx.$executeRawUnsafe(
@@ -549,12 +556,16 @@ async function dropForeignKeysDependingOnOrdersCompanyKey(tx: Prisma.Transaction
   await tx.$executeRawUnsafe(
     'ALTER TABLE "order_execution_entries" DROP CONSTRAINT "order_execution_entries_order_id_company_id_fkey"',
   )
+  await tx.$executeRawUnsafe(
+    'ALTER TABLE "order_conditioning_team_members" DROP CONSTRAINT "order_conditioning_team_members_order_id_company_id_fkey"',
+  )
 }
 
 async function restoreForeignKeysDependingOnOrdersCompanyKey(tx: Prisma.TransactionClient) {
   await tx.$executeRawUnsafe(RESERVATION_ORDER_FK)
   await tx.$executeRawUnsafe(INVENTORY_ORDER_FK)
   await tx.$executeRawUnsafe(EXECUTION_ENTRY_ORDER_FK)
+  await tx.$executeRawUnsafe(CONDITIONING_TEAM_ORDER_FK)
 }
 
 afterAll(async () => {

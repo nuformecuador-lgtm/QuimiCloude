@@ -134,6 +134,7 @@ function montar(opts: {
       async (_companyId: string, workGroupId: string) =>
         gruposVivos.find((g) => g.id === workGroupId) ?? null,
     ),
+    listSnapshotsAliveInCompany: vi.fn(async () => []),
   };
 
   const deps: AssignResponsiblesDeps = {
