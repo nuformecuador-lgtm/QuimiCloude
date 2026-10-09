@@ -39,7 +39,7 @@ Buscado `whatsapp`, `conexión`/`connection`, `graph.facebook`/`Graph`, `phone_n
 |---|---|---|
 | QC-234 (`done`, PR #191) | `integraciones.secretCipher` y `integraciones.secretDigest` en la composición; `SecretContext`; `IntegracionesError`, `SecretUnreadableError`, `ValidationError` | **Se reutiliza entero**. Es la dependencia |
 | QC-221 / QC-222 (`done`) | Permiso `integraciones.modificar`, `WHATSAPP_INTEGRATION_ROUTE`, item de menú y página cascarón `app/(private)/integraciones/whatsapp/page.tsx` con `IntegrationPlaceholder` | La página **se reescribe** (la ficha lo pide). Permiso, ruta y menú **no se tocan** |
-| `APP_BASE_URL` (`.env.example:103`, `identity/adapters/driven/config/mail-config-env.ts`) | URL pública de la app para el enlace de contraseña | **Se reutiliza la variable** con un lector propio en `integraciones` (no se importa un driven de otro módulo). P7 |
+| `APP_BASE_URL` (`.env.example:103`, `identity/adapters/driven/config/mail-config-env.ts`) | URL pública de la app para el enlace de contraseña | **Se reutiliza la variable** con un lector propio en `integraciones` (no se importa un driven de otro módulo). D15 |
 | `documentsE2EDoublesEnabled` (`documentos`) | Patrón de dobles de E2E | **Se copia la forma** con una variable propia, `INTEGRATIONS_E2E_DOUBLES` (§9) |
 | `components/ui/tabs.tsx`, `alert-dialog.tsx`, `card.tsx`, `badge.tsx`, `input.tsx`, `label.tsx`, `button.tsx` | Primitivas shadcn ya instaladas | Se reutilizan; ninguna primitiva nueva |
 | QC-119 `webhook-whatsapp-recepcion` (`cancelled`) | Recepción, épica antigua | Nada que reutilizar |
@@ -159,9 +159,11 @@ model WhatsappConnection {
 - **`appSecretEnc` obligatorio.** El plan lo dejaba nulo para `embedded_signup`, pero esa forma no
   existe en fase 1 y preparar su nulabilidad es infraestructura «por si acaso»
   (`docs/architecture.md > Dominio`). Fase 2 lo relaja con su migración.
-- **Sin `keyVersion`** (P1, recomendación). Si el humano la mantiene, entran **dos** columnas
-  `access_token_key_version` y `app_secret_key_version` (`text NOT NULL`), que escribe el adaptador
-  de persistencia a partir del prefijo `v<n>:` del valor cifrado.
+- **Ninguna columna de versión de clave** (D9). La versión de cada secreto es el prefijo `v<n>:` de
+  su valor cifrado; QC-250 sabe qué filas siguen en una versión vieja con
+  `split_part(access_token_enc, ':', 1)` y `split_part(app_secret_enc, ':', 1)`.
+- **IDs de Meta como `text` sin límite de longitud** (D14): `meta_app_id`, `waba_id` y
+  `phone_number_id` son texto libre no vacío; ni la columna ni zod imponen dígitos ni un máximo.
 - **`createdById`** con `@map("created_by")`, como pide la ficha y como nombra la columna `customers`.
   Sin `updatedBy`: la ficha no lo pide.
 - **Sin `@relation`**: `company_id` y `created_by` son FK escritas a mano (drift), como `customers`,
@@ -178,7 +180,7 @@ Escrita a mano (las FK de drift harían que `migrate dev` propusiera un reset, i
 3. `CREATE UNIQUE INDEX "whatsapp_connections_company_id_id_key" ON (company_id, id)`: clave
    candidata para las FK compuestas de QC-238 (`whatsapp_contacts`, `whatsapp_messages`).
 4. `CREATE UNIQUE INDEX "whatsapp_connections_company_live_key" ON (company_id) WHERE deleted_at IS NULL` (R6, D2).
-5. `CREATE UNIQUE INDEX "whatsapp_connections_phone_number_id_live_key" ON (phone_number_id) WHERE deleted_at IS NULL` (R7, D3, P8).
+5. `CREATE UNIQUE INDEX "whatsapp_connections_phone_number_id_live_key" ON (phone_number_id) WHERE deleted_at IS NULL` (R7, D3, D16).
 6. FK `company_id → companies(id)` y `created_by → users(id)`, `ON DELETE RESTRICT ON UPDATE CASCADE`.
 7. `CREATE INDEX "whatsapp_connections_created_by_idx"`.
 8. `ENABLE ROW LEVEL SECURITY` y `FORCE ROW LEVEL SECURITY`, sin policies, al final.
@@ -271,17 +273,17 @@ tocar un puerto.
 |---|---|---|
 | `getWhatsappConnection` | `(actor) => Promise<WhatsappConnectionView \| null>` | `findLive(scope)` → vista o `null` |
 | `createWhatsappConnection` | `(input, actor) => Promise<CreateResult>` | zod (R24) → `findLive(scope)` ≠ null ⇒ `ConnectionExists` (R6) → **prueba** con el token en claro (R21) → si falla: `{ status: 'test_failed', message }` sin escribir (R23) → si no: `id = random.newId()`, `verifyToken = random.newVerifyToken()`, cifrar los dos secretos con `{companyId, recordId: id, field}` (R9), `digest.digestOf(verifyToken)`, `connections.create(row, scope)` con `PENDING`, número, nombre, `lastCheckedAt = now`, `createdById = actor.id` (R22) → `{ status: 'created', connection: view, verifyToken }` (R14) |
-| `updateWhatsappConnection` | `(id, input, actor) => Promise<UpdateResult>` | zod (secretos opcionales; vacío = ausente, R11) → `findLiveById(id, scope)` o `NotFound` (R3) → si hay secreto nuevo o cambia `phoneNumberId`: token efectivo = el nuevo o `cipher.decrypt` del guardado (R13) → prueba → falla: `{status:'test_failed', message}` sin escribir (R26, P2); buena: patch con R19 y estado de R31 (salvo `DISABLED`, que se conserva) → solo cifra los secretos escritos (R11, R12) → `connections.update` → `{status:'saved', connection}`. Sin secreto ni teléfono: patch de texto, sin Graph (R27) |
+| `updateWhatsappConnection` | `(id, input, actor) => Promise<UpdateResult>` | zod (secretos opcionales; vacío = ausente, R11) → `findLiveById(id, scope)` o `NotFound` (R3) → si hay secreto nuevo o cambia `phoneNumberId`: token efectivo = el nuevo o `cipher.decrypt` del guardado (R13) → prueba → falla: `{status:'test_failed', message}` sin escribir; la fila conserva credenciales, estado y datos (R26, D10); buena: patch con R19 y estado de R31 (salvo `DISABLED`, que se conserva) → solo cifra los secretos escritos (R11, R12) → `connections.update` → `{status:'saved', connection}`. Sin secreto ni teléfono: patch de texto, sin Graph (R27) |
 | `testWhatsappConnection` | `(id, actor) => Promise<TestResult>` | `findLiveById` → `DISABLED` ⇒ `ActionNotAllowed` (R32) → `decrypt` (R13) → prueba → buena: R19 + R31; fallida: `ERROR`, `lastError`, `lastCheckedAt` (R28) → `{status:'tested', ok, connection, message?}` |
-| `setWhatsappConnectionEnabled` | `(id, enabled, actor)` | `false`: `DISABLED` sin Graph; idempotente (R29). `true`: si no está `DISABLED`, no hace nada; si lo está, `decrypt` + prueba → buena: R19 + R31; fallida: sigue `DISABLED` y devuelve `message` (R30, P3) |
+| `setWhatsappConnectionEnabled` | `(id, enabled, actor)` | `false`: `DISABLED` sin Graph; idempotente (R29). `true`: si no está `DISABLED`, no hace nada; si lo está, `decrypt` + prueba → buena: R19 + R31; fallida: sigue `DISABLED` y devuelve `message` (R30, D11) |
 | `regenerateWhatsappVerifyToken` | `(id, actor)` | `findLiveById` → token nuevo → `update({ verifyTokenHash })` sin tocar `status` (R15) → `{status:'regenerated', verifyToken}` |
 
 **R13 en detalle.** Si `decrypt` lanza `SecretUnreadableError`, el caso de uso escribe `ERROR` y
 `lastError = 'No se pudo leer una credencial guardada. Vuelve a escribir el Access Token y el App
 Secret.'` y **relanza** el error, que la acción traduce con el catálogo. En `enable`, la conexión
-sigue `DISABLED` (no pasa a `ERROR`), coherente con P3.
+sigue `DISABLED` (no pasa a `ERROR`), coherente con D11.
 
-**Estado tras prueba buena** (`domain/connection-status.ts`, R31):
+**Estado tras prueba buena** (`domain/connection-status.ts`, R31, D12):
 `statusAfterGoodTest(record) = record.lastWebhookAt === null ? 'PENDING' : 'ACTIVE'`.
 
 **Concurrencia.** El chequeo previo de R6 es para dar un error limpio; la garantía son los índices
@@ -343,6 +345,10 @@ Adaptador real:
 5. Excepción de red o `AbortError` ⇒ `{ ok: false, kind: 'unreachable', message: null }`.
 6. Nunca registra la URL con token (no la lleva), la cabecera ni el cuerpo.
 
+El Phone Number ID es texto libre (D14): `encodeURIComponent` lo deja dentro de su segmento de
+ruta aunque traiga `/`, `?` o `#`, y un ID que Meta no reconoce vuelve como `rejected` con el
+mensaje de Graph (R23, R26).
+
 Base `https://graph.facebook.com` fija en el adaptador: no cambia entre entornos (lo que cambia, la
 versión, va por env; `docs/architecture.md > Principios` n.º 4).
 
@@ -361,7 +367,7 @@ caracteres, 256 bits, R14; sin `+`/`/`/`=` para que se copie y se pegue en Meta 
 | Archivo | Variable | Contrato |
 |---|---|---|
 | `whatsapp-config-env.ts` | `WHATSAPP_GRAPH_API_VERSION` | `readGraphApiVersion(): string`. Ausente/vacía o sin `^v\d+\.\d+$` ⇒ `Error` llano que nombra la variable, no el valor (R18), como `encryption-keys-env.ts` |
-| `public-base-url-env.ts` | `APP_BASE_URL` | `readPublicBaseUrl(): string \| null`. Ausente/vacía ⇒ `null` (R34). Quita la barra final |
+| `public-base-url-env.ts` | `APP_BASE_URL` | `readPublicBaseUrl(): string \| null`. Ausente/vacía ⇒ `null` (R34). Quita la barra final. Lector propio de `integraciones`, no se importa el de `identity` (D15) |
 | `e2e-doubles-env.ts` | `INTEGRATIONS_E2E_DOUBLES` | `integrationsE2EDoublesEnabled(): boolean`, copia de `documentsE2EDoublesEnabled` |
 
 ### 4.6 URL del webhook
@@ -440,7 +446,7 @@ Tres entradas al final de `ERROR_CODES`, con su línea de enmienda (fecha, sin c
 texto en `error-catalog.ts`; `tests/unit/errores/catalogo.test.ts` pasa de **79 a 82** con su línea
 de comentario. Antes de T1 se mide el conteo en `dev`: si otra ficha lo movió, manda `dev` + 3.
 
-| Código | Texto (borrador, P5) |
+| Código | Texto (aprobado, D13) |
 |---|---|
 | `whatsapp_connection_not_found` | «No se encontró la conexión de WhatsApp.» |
 | `whatsapp_connection_exists` | «La empresa ya tiene una conexión de WhatsApp.» |
@@ -477,7 +483,7 @@ app/(private)/integraciones/whatsapp/
 
 Las props son la `WhatsappConnectionView` y `{url, complete}`: nada más (R10).
 
-### 8.3 Comportamiento y textos (borrador, P5)
+### 8.3 Comportamiento y textos (aprobados, D13)
 
 - **Pestañas.** `Tabs` de `components/ui/tabs.tsx` (Base UI). «Plantillas» con `disabled` y el
   texto «Disponible próximamente» **visible** junto a la etiqueta (no en un `title`, que en táctil
@@ -486,14 +492,17 @@ Las props son la `WhatsappConnectionView` y `{url, complete}`: nada más (R10).
   dos secretos; en edición, el texto de ayuda dice «Déjalo vacío para conservar el actual». Etiquetas:
   «Nombre visible», «App ID», «WABA ID», «Phone Number ID», «Access Token», «App Secret». Botón
   «Guardar y probar».
-- **Guía** (`WhatsappSetupGuide`), borrador:
+- **Guía** (`WhatsappSetupGuide`):
   - App ID y App Secret: en developers.facebook.com, tu app › Configuración › Básica.
   - WABA ID y Phone Number ID: tu app › WhatsApp › Configuración de la API.
   - Access Token: business.facebook.com › Configuración › Usuarios del sistema › Generar token,
     con los permisos `whatsapp_business_management` y `whatsapp_business_messaging`.
 - **Tarjeta.** Número (`displayPhoneNumber` o «—»), nombre verificado, estado
-  (`PENDING` «Pendiente de verificar el webhook», `ACTIVE` «Activa», `ERROR` «Con error»,
-  `DISABLED` «Deshabilitada»), última verificación (fecha y hora local) y último error.
+  (`PENDING` «Pendiente», `ACTIVE` «Activa», `ERROR` «Error», `DISABLED` «Deshabilitada») y última
+  verificación (fecha y hora local). El estado es un bloque (`data-testid="whatsapp-connection-status"`)
+  con `WhatsappStatusBadge` y, **con `ERROR`**, el `lastError` justo al lado de la etiqueta «Error»,
+  dentro del mismo bloque (texto visible, no un `title`, que en táctil no se ve). No hay una fila
+  aparte de «último error»: con otro estado, `lastError` no se pinta (R37, D13).
 - **Webhook.** URL en un `Input readOnly` (se puede seleccionar a mano) + botón «Copiar» con
   `navigator.clipboard.writeText` y un aviso «Copiada» en `aria-live`; si el portapapeles falla, el
   texto queda seleccionado. `complete = false` ⇒ aviso «Falta configurar la URL pública de la
@@ -546,7 +555,7 @@ readOnly` es la salida si no. **No se declara ninguna excepción.**
 |---|---|---|
 | `WHATSAPP_GRAPH_API_VERSION` | sí | Vercel (producción y preview). Valor: la versión de Graph que fije el humano al desplegar |
 | `INTEGRATIONS_E2E_DOUBLES` | sí | Solo `playwright.config.ts`. **Nunca** en Vercel |
-| `APP_BASE_URL` | no | Ya existe |
+| `APP_BASE_URL` | no | Ya existe. En Vercel debe fijarse **por entorno** (producción con su dominio; preview con la URL de la preview), para que la URL del webhook de una preview no apunte a producción (D15) |
 | `INTEGRATIONS_ENCRYPTION_KEYS` / `_ACTIVE` | no (QC-234) | **Aún no están en Vercel** (`progress/features/QC-237.md`). Sin ellas, crear una conexión en producción falla con error inesperado. Es condición para desplegar esta ficha, no para mergearla |
 
 ---
@@ -558,13 +567,13 @@ readOnly` es la salida si no. **No se declara ninguna excepción.**
 | Archivo | Cubre |
 |---|---|
 | `tests/unit/integraciones/whatsapp/authorization.test.ts` | R1, R2: cada caso de uso, con actor nulo, sin empresa, sin permiso y con otro permiso, rechaza con `unauthorized` y los puertos (dobles espía) no se llaman; la empresa del alcance es la del actor aunque la entrada traiga `companyId` |
-| `tests/unit/integraciones/whatsapp/create-whatsapp-connection.test.ts` | R6 (chequeo previo), R8, R9 (contexto exacto de cada `encrypt`), R14, R21, R22, R23 (ningún `create` si falla), R24 (cada campo inválido, sin Graph) |
-| `tests/unit/integraciones/whatsapp/update-whatsapp-connection.test.ts` | R3, R11 (sin `encrypt`/`decrypt` del secreto vacío), R12, R25, R26 (fallida: ningún `update`), R27 (sin Graph), R31 |
+| `tests/unit/integraciones/whatsapp/create-whatsapp-connection.test.ts` | R6 (chequeo previo), R8, R9 (contexto exacto de cada `encrypt`), R14, R21, R22, R23 (ningún `create` si falla), R24 (cada campo inválido, sin Graph; IDs con letras o símbolos, p. ej. `abc-1`, se aceptan y llegan a la prueba) |
+| `tests/unit/integraciones/whatsapp/update-whatsapp-connection.test.ts` | R3, R11 (sin `encrypt`/`decrypt` del secreto vacío), R12, R25, R26 (fallida: ningún `update`; la fila guardada no cambia), R27 (sin Graph), R31 |
 | `tests/unit/integraciones/whatsapp/test-and-enable.test.ts` | R13, R19, R28, R29, R30, R31, R32 |
 | `tests/unit/integraciones/whatsapp/regenerate-verify-token.test.ts` | R15 (el resumen viejo deja de casar con `matches`; estado igual) |
 | `tests/unit/integraciones/whatsapp/graph-failure.test.ts` | R20 |
 | `tests/unit/integraciones/whatsapp/connection-view.test.ts` | R10 (vista sin claves de secreto; un campo extra en la fila no aparece en la vista) |
-| `tests/unit/integraciones/whatsapp/whatsapp-graph-client-fetch.test.ts` | R17 (URL exacta, cabecera, token ausente de la URL, `signal`), R18 (sin `fetch`), respuestas 2xx válida/inválida, 400 con `error.message`, red y timeout |
+| `tests/unit/integraciones/whatsapp/whatsapp-graph-client-fetch.test.ts` | R17 (URL exacta, cabecera, token ausente de la URL, `signal`; un Phone Number ID con `/` o `?` queda codificado en su segmento), R18 (sin `fetch`), respuestas 2xx válida/inválida, 400 con `error.message`, red y timeout |
 | `tests/unit/integraciones/whatsapp/whatsapp-config-env.test.ts` | R18, R42 (lectura al llamar; `vi.resetModules` + import sin variables) |
 | `tests/unit/integraciones/whatsapp/whatsapp-webhook-url.test.ts` | R33, R34 |
 | `tests/unit/integraciones/whatsapp/random-source-node.test.ts` | R14 (UUID v4; token base64url de 43 caracteres; dos llamadas distintas) |
@@ -573,6 +582,7 @@ readOnly` es la salida si no. **No se declara ninguna excepción.**
 | `tests/unit/integraciones/whatsapp/whatsapp-connection-actions.test.ts` | R10 (cada estado de cada acción, serializado, no contiene el token, el secret, `Enc` ni el hash), R14/R15 (verify token solo en `created`/`regenerated`), traducción de errores |
 | `tests/integration/integraciones/whatsapp-connection-prisma.int.test.ts` | R2, R3 (empresa B no lee ni actualiza la de A), R5 (RLS forzada en `pg_class`), R6 (segunda viva rechazada, también en paralelo), R7 (mismo teléfono en otra empresa), R9 (las columnas `*_enc` empiezan por `v<n>:` y no contienen el texto en claro; `verify_token_hash` es hex de 64) |
 | `tests/unit/integraciones-ui/whatsapp-page.test.tsx` | R4, R16 (el HTML y las props de la página no contienen el token), R35, R36, R37 |
+| `tests/unit/integraciones-ui/whatsapp-connection-card.test.tsx` | R37: la etiqueta de cada estado («Pendiente», «Activa», «Error», «Deshabilitada»); con `ERROR`, el `lastError` está dentro del bloque `whatsapp-connection-status` junto a «Error»; con otro estado y `lastError` no nulo, no se pinta |
 | `tests/unit/integraciones-ui/whatsapp-connection-form.test.tsx` | R36, R38, R39, R40 (clases de tamaño en inputs y botones) |
 | `tests/unit/integraciones-ui/whatsapp-webhook-panel.test.tsx` | R34, R37 (copiar), R38 |
 | `tests/guards/guard-ambito-empresa-integraciones.test.ts` | R2: calcada de `guard-ambito-empresa-clientes`: cada función de `persistence/` declara `scope: IntegracionesScope` y lo pasa a `./company-scope`; casos de sensibilidad |
@@ -610,7 +620,7 @@ de `whatsapp_connections` de la empresa antes que la empresa). Entra por `loginA
 3. Alta válida: tarjeta `PENDING` con el número y el nombre del doble; verify token y URL visibles.
 4. Recarga: el verify token no aparece en la página (ni en el HTML).
 5. Editar solo el nombre visible: se guarda; el estado no cambia.
-6. Deshabilitar (confirmar) ⇒ «Deshabilitada»; Habilitar ⇒ «Pendiente de verificar el webhook».
+6. Deshabilitar (confirmar) ⇒ «Deshabilitada»; Habilitar ⇒ «Pendiente».
 
 `test.setTimeout(180_000)`, como el resto.
 
@@ -640,7 +650,7 @@ de `whatsapp_connections` de la empresa antes que la empresa). Entra por `loginA
   `id` **sin** empresa (la URL no la trae), que es una decisión de su spec.
 - **QC-242** amplía `WhatsappGraphClient` con las llamadas de plantillas sobre `wabaId`.
 - **QC-243** habilita la pestaña «Plantillas».
-- **QC-250** inventaría versiones de clave con el prefijo del valor cifrado (P1).
+- **QC-250** inventaría versiones de clave con el prefijo del valor cifrado (D9).
 
 ---
 
@@ -650,7 +660,14 @@ de `whatsapp_connections` de la empresa antes que la empresa). Entra por `loginA
    aplicación. Obliga a columnas de secreto nulas o con relleno durante el insert, y a dos
    escrituras por alta. Con el id generado antes, la fila nace completa.
 2. **Una columna `keyVersion` única** (como la ficha). Con dos secretos por fila editables por
-   separado puede mentir sobre uno de ellos, y repite un dato que ya está en el valor cifrado (P1).
+   separado puede mentir sobre uno de ellos, y repite un dato que ya está en el valor cifrado. Dos
+   columnas (`access_token_key_version`, `app_secret_key_version`) serían ciertas pero igual de
+   redundantes. D9 cierra: ninguna.
+10. **IDs de Meta como solo dígitos (1–32).** Evitaba `/` o `?` en la ruta de Graph, pero que los
+    IDs sean siempre numéricos no está verificado; `encodeURIComponent` ya protege la ruta y la
+    prueba contra Graph rechaza un ID malo (D14).
+11. **Habilitar en `ERROR` cuando la prueba falla.** QC-238 recibiría webhooks de una conexión que
+    no pasa la prueba (D11).
 3. **Prueba fallida como error de dominio con código propio.** El traductor saca el texto del
    catálogo y nunca del error; el mensaje de Meta acabaría solo en el log. Un resultado
    `test_failed` con el mensaje saneado es lo que permite mostrarlo (§3.3).

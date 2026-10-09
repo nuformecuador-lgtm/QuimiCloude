@@ -10,8 +10,8 @@
 > - **Modelo** `WhatsappConnection` (`whatsapp_connections`), con `company_id` y las convenciones del
 >   repo: `origin` (`manual`; `embedded_signup` reservado para la fase 2), `displayName`; IDs de
 >   Meta `metaAppId`, `wabaId`, `phoneNumberId` (**único global**), `displayPhoneNumber`,
->   `verifiedName`; secretos `accessTokenEnc` y `appSecretEnc` cifrados con QC-234, `keyVersion`
->   (ver P1) y `verifyTokenHash`; estado `status` (`pending|active|error|disabled`), `lastError`,
+>   `verifiedName`; secretos `accessTokenEnc` y `appSecretEnc` cifrados con QC-234 (la ficha pedía
+>   además `keyVersion`: **retirada**, D9) y `verifyTokenHash`; estado `status` (`pending|active|error|disabled`), `lastError`,
 >   `lastCheckedAt`, `lastWebhookAt` (lo llenará la recepción); auditoría `createdById`, timestamps,
 >   `deletedAt`. **Una conexión por empresa** con índice único parcial
 >   `(company_id) WHERE deleted_at IS NULL`; el modelo admite varias.
@@ -42,7 +42,7 @@
 > la ficha de Jira QC-237, copiadas con dos correcciones del leader (`progress/features/QC-237.md >
 > Decisiones`): el contexto de cifrado es el `SecretContext` de QC-234 (`companyId`, `recordId` =
 > id de la conexión, `field`, serializado en JSON) y no `empresa:conexión:campo`; y `keyVersion` lo
-> decide este spec (P1).
+> decidía este spec (cerrado como D9: no hay columna).
 
 ## Decisiones cerradas (no reabrir)
 
@@ -56,12 +56,18 @@
 | D6 | Probar contra Graph antes de guardar como válida | Un token malo se detecta al configurar, no al primer mensaje. |
 | D7 | URL de webhook por conexión | Cada empresa tiene su `app_secret`; la firma se valida antes de leer el body. |
 | D8 | El contexto de cifrado es `SecretContext {companyId, recordId, field}` de QC-234, con `recordId` = id de la conexión, que existe antes de cifrar | Nota del leader; corrige el `empresa:conexión:campo` de la ficha (ambiguo, QC-234 `design.md > 11.3`). |
+| D9 | Sin columna `keyVersion` (ni una ni dos). QC-250 lee la versión de clave del prefijo `v<n>:` de cada valor cifrado (humano, 2026-10-09; era P1) | Con dos secretos por fila editables por separado, una columna puede mentir sobre uno; el prefijo ya dice la verdad de cada valor. |
+| D10 | Editar con prueba fallida no guarda nada: la conexión conserva sus credenciales y datos anteriores y la pantalla muestra el mensaje de Meta (humano, 2026-10-09; era P2) | La conexión guardada sigue funcionando con lo que tenía. |
+| D11 | Habilitar con prueba fallida deja la conexión `disabled` y la pantalla muestra el mensaje de Meta (humano, 2026-10-09; era P3) | QC-238 no recibe webhooks de una conexión que no pasa la prueba. |
+| D12 | Tras una prueba buena (editar, probar, habilitar): `active` si `lastWebhookAt` no es nulo, `pending` si lo es (humano, 2026-10-09; era P4) | Meta solo hace el handshake al suscribir; un `pending` fijo dejaría así para siempre una conexión que ya recibía. |
+| D13 | Textos de `design.md > 7` y `> 8.3` aprobados como están, con dos cambios: etiqueta de `PENDING` «Pendiente» y de `ERROR` «Error», con el último error (`lastError`) visible junto al estado en la tarjeta (humano, 2026-10-09; era P5) | Etiquetas cortas; el motivo del error se ve donde se ve el estado. |
+| D14 | App ID, WABA ID y Phone Number ID son texto libre no vacío tras recortar, **sin** exigir solo dígitos ni longitud máxima; un ID malo lo detecta la prueba contra Graph (humano, 2026-10-09; era P6) | Que los IDs de Meta sean siempre numéricos no está verificado; la prueba ya valida el que importa. |
+| D15 | La base de la URL del webhook es `APP_BASE_URL`, leída por un lector propio de `integraciones`; si falta, la pantalla avisa (humano, 2026-10-09; era P7) | Variable que ya existe. En Vercel se fija por entorno para que una preview no apunte a producción. |
+| D16 | La unicidad de `phoneNumberId` es un índice único **parcial** `WHERE deleted_at IS NULL` (humano, 2026-10-09; era P8) | Igual que el de empresa; una conexión borrada en el futuro no quema el número. |
 
 ## Requisitos (EARS)
 
-> Entre corchetes, la decisión (**D1**–**D8**) o **[A]** si sale del Alcance, o **[P<n>]** si
-> depende de una pregunta abierta (el requisito recoge la recomendación; si el humano decide otra
-> cosa, se reescribe antes de aprobar).
+> Entre corchetes, la decisión (**D1**–**D16**) o **[A]** si sale del Alcance.
 >
 > Vocabulario:
 >
@@ -72,7 +78,7 @@
 >   con el Access Token de la conexión.
 > - «prueba buena» = Graph responde 2xx con un cuerpo válido; «prueba fallida» = cualquier otro caso
 >   (rechazo de Meta, cuerpo inesperado, red, tiempo agotado).
-> - «el mensaje de Meta» = el texto de error que devuelve Graph, saneado según R16; si no hay texto
+> - «el mensaje de Meta» = el texto de error que devuelve Graph, saneado según R20; si no hay texto
 >   (red o tiempo agotado), un texto fijo.
 
 ### Autorización y ámbito
@@ -104,7 +110,8 @@ un índice único parcial `(company_id) WHERE deleted_at IS NULL`). [D2]
 
 **R7.** MIENTRAS un `phoneNumberId` está en una conexión viva de cualquier empresa, el sistema DEBE
 rechazar crear o editar otra conexión con ese mismo `phoneNumberId` con el error
-`whatsapp_phone_number_taken`, sin revelar a qué empresa pertenece. [D3, P8]
+`whatsapp_phone_number_taken`, sin revelar a qué empresa pertenece (lo garantiza un índice único
+parcial `(phone_number_id) WHERE deleted_at IS NULL`). [D3, D16]
 
 **R8.** El sistema DEBE crear toda conexión de esta ficha con `origin = manual`. [A]
 
@@ -172,9 +179,10 @@ verify token y `createdById` = el actor, y devolver el verify token y la URL del
 el mensaje de Meta para mostrarlo en el formulario, que conserva los campos no secretos. [D6]
 
 **R24.** SI algún campo del formulario es inválido (vacío tras recortar; `displayName` de más de 80
-caracteres; App ID, WABA ID o Phone Number ID que no son solo dígitos de 1 a 32 caracteres; un
-secreto de más de 1024 caracteres), ENTONCES el sistema DEBE rechazar con `invalid_input` sin llamar
-a Graph. [A, P6]
+caracteres; un secreto de más de 1024 caracteres), ENTONCES el sistema DEBE rechazar con
+`invalid_input` sin llamar a Graph. App ID, WABA ID y Phone Number ID DEBEN aceptarse como texto
+libre no vacío tras recortar, contengan o no caracteres que no son dígitos; un ID que Meta no
+reconoce DEBE terminar como prueba fallida (R23, R26). [A, D14]
 
 ### Editar
 
@@ -184,7 +192,8 @@ cada secreto puede ir vacío, R11). [A]
 
 **R26.** SI la edición escribe algún secreto o cambia el Phone Number ID, ENTONCES el sistema DEBE
 ejecutar la prueba con las credenciales resultantes antes de guardar; SI la prueba falla, ENTONCES
-NO DEBE guardar ningún cambio y DEBE devolver el mensaje de Meta. [A, D6, P2]
+NO DEBE guardar ningún cambio (la conexión conserva sus credenciales, su estado y sus datos
+anteriores) y DEBE devolver el mensaje de Meta para mostrarlo en la pantalla. [A, D6, D10]
 
 **R27.** SI la edición solo cambia `displayName`, App ID o WABA ID, ENTONCES el sistema DEBE
 guardar sin llamar a Graph y sin cambiar el estado. [A]
@@ -201,10 +210,11 @@ sin llamar a Graph; deshabilitar una ya deshabilitada no DEBE cambiar nada. [A]
 
 **R30.** CUANDO el Administrador habilita una conexión `disabled`, el sistema DEBE ejecutar la
 prueba; SI es buena, ENTONCES DEBE aplicar R19 y dejar el estado según R31; SI falla, ENTONCES la
-conexión DEBE seguir `disabled` y el sistema DEBE devolver el mensaje de Meta. [A, P3]
+conexión DEBE seguir `disabled` y el sistema DEBE devolver el mensaje de Meta para mostrarlo en la
+pantalla. [A, D11]
 
 **R31.** CUANDO una prueba es buena (al editar, probar o habilitar), el sistema DEBE dejar
-`status = active` si `lastWebhookAt` no es nulo y `status = pending` si lo es. [A, P4]
+`status = active` si `lastWebhookAt` no es nulo y `status = pending` si lo es. [A, D12]
 
 **R32.** SI se pide «Probar conexión» sobre una conexión `disabled`, ENTONCES el sistema DEBE
 rechazar con `action_not_allowed` sin llamar a Graph. [A]
@@ -212,10 +222,10 @@ rechazar con `action_not_allowed` sin llamar a Graph. [A]
 ### URL del webhook
 
 **R33.** El sistema DEBE construir la URL del webhook como `<APP_BASE_URL>/api/integraciones/whatsapp/webhook/<id de la conexión>`,
-con la ruta escrita en un solo sitio del código. [D7, P7]
+con la ruta escrita en un solo sitio del código. [D7, D15]
 
 **R34.** SI `APP_BASE_URL` no está configurada, ENTONCES la pantalla DEBE mostrar la ruta relativa
-del webhook junto a un aviso de que falta la URL pública, sin fallar la página. [D7, P7]
+del webhook junto a un aviso de que falta la URL pública, sin fallar la página. [D7, D15]
 
 ### Pantalla
 
@@ -225,12 +235,14 @@ pestañas, «Conexión» (activa) y «Plantillas», y «Plantillas» DEBE estar 
 
 **R36.** MIENTRAS la empresa no tiene conexión viva, la pestaña «Conexión» DEBE mostrar el
 formulario de alta con los seis campos (los dos secretos como campos de contraseña sin valor
-inicial) y una guía corta de dónde sacar cada dato en Meta. [A, P5]
+inicial) y una guía corta de dónde sacar cada dato en Meta. [A, D13]
 
 **R37.** MIENTRAS la empresa tiene conexión viva, la pestaña «Conexión» DEBE mostrar una tarjeta
-con el número, el nombre verificado, el estado, la última verificación y el último error; la URL
-del webhook con un botón que la copia; y las acciones «Editar», «Probar conexión»,
-«Deshabilitar» o «Habilitar» según el estado, y «Regenerar verify token». [A]
+con el número, el nombre verificado, el estado con su etiqueta («Pendiente», «Activa», «Error» o
+«Deshabilitada») y la última verificación; la URL del webhook con un botón que la copia; y las
+acciones «Editar», «Probar conexión», «Deshabilitar» o «Habilitar» según el estado, y «Regenerar
+verify token». MIENTRAS la conexión está en `error`, la tarjeta DEBE mostrar el último error
+(`lastError`) junto a la etiqueta «Error», dentro del mismo bloque de estado. [A, D13]
 
 **R38.** CUANDO una creación o una regeneración termina bien, la pantalla DEBE mostrar el verify
 token y la URL del webhook en un aviso que dice que el token no se volverá a mostrar. [D5]
@@ -257,35 +269,4 @@ menú. [A, D1]
 
 ## Preguntas abiertas
 
-Cada una con la recomendación que el spec ya recoge; si el humano decide otra cosa, se cambia el
-requisito citado antes de aprobar.
-
-- **P1. Columna `keyVersion`.** La ficha la pide; el leader la marca redundante con el prefijo
-  `v<n>:` del valor cifrado. Además hay **dos** secretos por fila, y editar uno solo deja los dos
-  en versiones distintas: una sola columna no puede decir la verdad de ambos. **Recomendación:
-  quitarla.** QC-250 sabe qué filas siguen en una versión vieja con `split_part(access_token_enc,
-  ':', 1)` y `split_part(app_secret_enc, ':', 1)` (con menos de diez empresas no hace falta
-  índice). Si el humano la quiere, la alternativa es **dos** columnas (`access_token_key_version`,
-  `app_secret_key_version`) escritas por el adaptador a partir del prefijo. El diseño va sin ella.
-- **P2. Edición con prueba fallida** (R26). La ficha solo cierra «al crear, no se guarda nada».
-  **Recomendación:** al editar, tampoco; la conexión guardada sigue funcionando con lo que tenía.
-  Alternativa: guardar y dejar `status = error`.
-- **P3. Habilitar con prueba fallida** (R30). **Recomendación:** sigue `disabled` y se muestra el
-  mensaje de Meta. Alternativa: queda habilitada en `error`, y QC-238 recibiría webhooks de una
-  conexión que no pasa la prueba.
-- **P4. Estado tras una prueba buena** (R31). Ni la ficha ni el plan dicen a dónde vuelve una
-  conexión que estaba en `error`. **Recomendación:** `active` si ya llegó algún webhook
-  (`lastWebhookAt` no nulo), `pending` si no. Meta solo hace el handshake al suscribir, así que un
-  `pending` fijo dejaría en `pending` para siempre una conexión que ya recibía.
-- **P5. Textos** (R35–R38): la guía de dónde sacar cada dato en Meta, las etiquetas de estado y
-  los avisos están en borrador en `design.md > 8.3`. El humano los aprueba o los corrige.
-- **P6. Formato de los IDs de Meta** (R24). Validar App ID, WABA ID y Phone Number ID como solo
-  dígitos (1–32) evita meter `/` o `?` en la ruta de Graph. Que los IDs de Meta sean siempre
-  numéricos no está verificado en `docs/` ni en el código. **Recomendación:** solo dígitos.
-- **P7. URL base del webhook** (R33, R34). Lo que ya existe es `APP_BASE_URL` (la usa `identity`
-  para el enlace de contraseña). **Recomendación:** reutilizar esa variable, leída por un lector
-  propio de `integraciones` (no se importa el de `identity`). Ojo: preview y producción comparten
-  base y variable, así que en una preview la URL mostrada es la de producción.
-- **P8. Unicidad de `phoneNumberId`** (R7). Índice único **parcial** `WHERE deleted_at IS NULL`
-  (recomendado: igual que el de empresa; una conexión borrada en el futuro no quema el número) o
-  total. Las dos cumplen D3 mientras no exista el borrado.
+Ninguna. P1–P8 las cerró el humano el 2026-10-09: son D9–D16.

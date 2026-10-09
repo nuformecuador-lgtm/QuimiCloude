@@ -14,9 +14,8 @@
 > `QC-<n>`, `R<n>`, `design.md` ni «decisión cerrada». En los tests, `R<n>` va en el nombre del
 > caso. Ningún identificador nuevo lleva `password`/`pass`.
 >
-> **Antes de T1.** Las preguntas P1–P8 de `requirements.md` deben estar respondidas en F1.4. Si
-> alguna cambia la recomendación, se reescriben los requisitos citados y el diseño antes de
-> empezar. Sincronizar con `git fetch origin dev && git merge origin/dev` y medir: conteo de
+> **Antes de T1.** Las preguntas P1–P8 están cerradas (humano, 2026-10-09) como D9–D16 de
+> `requirements.md`; no queda ninguna abierta. Sincronizar con `git fetch origin dev && git merge origin/dev` y medir: conteo de
 > `ERROR_CODES` (hoy 79), último timestamp de `db/migrations/` y las listas exactas de
 > `module-shape.test.ts`.
 
@@ -27,7 +26,8 @@
       `20261009120000_whatsapp_connections` escrita a mano con su `down.sql`; `prisma generate`.
       Tests `tests/integration/integraciones/whatsapp-connection-migration.int.test.ts` (ida, vuelta
       e ida) y la parte de R5 (RLS forzada) del `.int` de T5. Se tensa `module-shape.test.ts` R13 a
-      exactamente un modelo.
+      exactamente un modelo. Sin columna de versión de clave (D9); índices únicos parciales de
+      empresa y de `phone_number_id` (D16); IDs de Meta `text` sin límite (D14).
       **Hecho cuando:** `guard-empresa-en-esquema`, `guard-rls-force`, `guard-arquitectura-modulos`
       y el test de migración en verde. Cubre R5. Depende de: —.
 
@@ -47,6 +47,9 @@
       `authorization.test.ts`, `create-whatsapp-connection.test.ts`,
       `update-whatsapp-connection.test.ts`, `test-and-enable.test.ts`,
       `regenerate-verify-token.test.ts`.
+      Validación de IDs de Meta como texto libre no vacío, sin dígitos obligatorios (D14); edición
+      fallida sin escribir (D10); habilitar fallido sigue `DISABLED` (D11); estado tras prueba buena
+      por `lastWebhookAt` (D12).
       **Hecho cuando:** los cinco tests en verde. Cubre R1, R2 (dominio), R3, R6 (chequeo), R8,
       R9, R11–R15, R19, R21–R32. Depende de: T3.
 
@@ -85,9 +88,11 @@
 
 ## T10–T11 — Pantalla
 
-- [ ] **T10.** Componentes de `design.md > 8.1` y `> 8.3` con su barrel. Tests
-      `whatsapp-connection-form.test.tsx` y `whatsapp-webhook-panel.test.tsx`.
-      **Hecho cuando:** los dos tests en verde. Cubre R34, R36–R40. Depende de: T9.
+- [ ] **T10.** Componentes de `design.md > 8.1` y `> 8.3` con su barrel y los textos aprobados
+      (D13: «Pendiente», «Error» con `lastError` junto al estado). Tests
+      `whatsapp-connection-card.test.tsx`, `whatsapp-connection-form.test.tsx` y
+      `whatsapp-webhook-panel.test.tsx`.
+      **Hecho cuando:** los tres tests en verde. Cubre R34, R36–R40. Depende de: T9.
 
 - [ ] **T11.** `page.tsx` reescrita (`design.md > 8.2`). Test `whatsapp-page.test.tsx`. Se tensa
       `integration-pages.test.tsx` (`> 11.3`).
@@ -107,7 +112,8 @@
 - [ ] **T13.** Cierre: mapa `R<n> -> test` completo en `progress/impl_QC-237.md`; comprobar R43
       (`package.json`, permisos, seed y `private-nav.ts` intactos en el diff); `./init.sh` en verde.
       Anotar en el progreso que `WHATSAPP_GRAPH_API_VERSION` e `INTEGRATIONS_ENCRYPTION_*` deben
-      existir en Vercel antes de desplegar (`design.md > 10`).
+      existir en Vercel antes de desplegar, y que `APP_BASE_URL` se fija por entorno para que una
+      preview no apunte a producción (`design.md > 10`, D15).
       **Hecho cuando:** `./init.sh` verde y el mapa sin huecos. Cubre R43. Depende de: T12.
 
 ## Archivos esperados
@@ -177,6 +183,7 @@
 - `tests/unit/composition/integraciones-graph-doubles.test.ts`
 - `tests/unit/integraciones-ui/integration-pages.test.tsx`
 - `tests/unit/integraciones-ui/whatsapp-page.test.tsx`
+- `tests/unit/integraciones-ui/whatsapp-connection-card.test.tsx`
 - `tests/unit/integraciones-ui/whatsapp-connection-form.test.tsx`
 - `tests/unit/integraciones-ui/whatsapp-webhook-panel.test.tsx`
 - `tests/integration/integraciones/whatsapp-connection-prisma.int.test.ts`
