@@ -415,7 +415,12 @@ async function applyOrderStep(
       await asignaciones.finishPacking(await actor(actors.packer), { orderId })
       return
     case 'startConditioning':
-      await asignaciones.startConditioning(await actor(actors.conditioner), { orderId })
+      // El equipo es la propia persona que acondiciona, para que la siembra sea determinista.
+      await asignaciones.startConditioning(await actor(actors.conditioner), {
+        orderId,
+        userIds: [actors.conditioner],
+        workGroupIds: [],
+      })
       return
     case 'finishConditioning':
       await asignaciones.finishConditioning(await actor(actors.conditioner), { orderId })

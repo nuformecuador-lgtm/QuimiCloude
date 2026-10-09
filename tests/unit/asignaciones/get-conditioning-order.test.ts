@@ -13,6 +13,7 @@ import {
 import { ROLE_ADMINISTRADOR, ROLE_EMPACADOR, ROLE_OPERADOR, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity';
 
 import type { AssignedOrderSummary } from '@/lib/modules/pedidos';
+import type { ConditioningTeamMemberRow } from '@/lib/modules/asignaciones/ports/conditioning-team-repository';
 
 import {
   ACONDICIONADOR,
@@ -26,6 +27,7 @@ import {
   persona,
   receta,
   resumen,
+  uuid,
 } from './conditioning-doubles';
 
 const LINEAS = [
@@ -117,10 +119,11 @@ describe('R15 — el detalle muestra la misma fila que la lista', () => {
     const detalle = montarCon(item);
     const lista = montarCon(item);
 
-    const fila = await createGetConditioningOrder(detalle.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const { team, ...fila } = await createGetConditioningOrder(detalle.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
     const [deLaLista] = (await createListConditioningOrders(lista.deps)(ACONDICIONADOR, { page: 1 })).items;
 
     expect(fila).toEqual(deLaLista);
+    expect(team).toEqual([]);
     expect(fila.status).toBe(item.status);
     expect(fila.numberText).toBe('2026-0000007');
     expect(fila.recipeName).toBe('Jabon liquido');
@@ -192,5 +195,86 @@ describe('R17 — el mismo `order_not_found` en todos los casos que el detalle n
     });
     expect(new Set(firmas.map((firma) => JSON.stringify(firma))).size).toBe(1);
     expect(firmas[0]?.[1]).toBe('order_not_found');
+  });
+});
+
+describe('R25 — el detalle trae el equipo guardado (D12)', () => {
+  const CARLA = uuid('c');
+  const DIEGO = uuid('d');
+  const GRUPO = uuid('e');
+  const EQUIPO: readonly ConditioningTeamMemberRow[] = [
+    { userId: BETO, workGroupId: null, workGroupName: null },
+    { userId: CARLA, workGroupId: GRUPO, workGroupName: 'Turno manana' },
+    { userId: DIEGO, workGroupId: GRUPO, workGroupName: 'Turno manana' },
+  ];
+
+  function montarConEquipo(item: AssignedOrderSummary, nombres: ReturnType<typeof persona>[]) {
+    return montar({
+      items: [item],
+      refs: [receta()],
+      people: nombres,
+      units: [{ id: UNIDAD, name: 'Kilogramo', symbol: 'kg', baseUnitId: null, factor: null }],
+      team: EQUIPO,
+    });
+  }
+
+  it.each([
+    ['EN_ACONDICIONAMIENTO', resumen(PEDIDO_1, { status: 'EN_ACONDICIONAMIENTO', conditionedBy: ANA })],
+    [
+      'TERMINADO',
+      resumen(PEDIDO_1, { status: 'TERMINADO', conditionedBy: ANA, finishedAt: new Date('2026-10-02T00:00:00.000Z') }),
+    ],
+  ])('R25: en %s devuelve las sueltas y cada miembro con el grupo y su nombre congelado, en orden', async (_n, item) => {
+    const dobles = montarConEquipo(item, [
+      persona(ANA, 'Ana Lopez'),
+      persona(BETO, 'Beto Ruiz'),
+      persona(CARLA, 'Carla Diaz'),
+      persona(DIEGO, 'Diego Mora'),
+    ]);
+
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(dobles.listTeamByOrderInCompany).toHaveBeenCalledWith(EMPRESA, PEDIDO_1);
+    expect(detalle.team).toEqual([
+      { userId: BETO, displayName: 'Beto Ruiz', origin: { kind: 'direct' } },
+      {
+        userId: CARLA,
+        displayName: 'Carla Diaz',
+        origin: { kind: 'workGroup', workGroupId: GRUPO, workGroupName: 'Turno manana' },
+      },
+      {
+        userId: DIEGO,
+        displayName: 'Diego Mora',
+        origin: { kind: 'workGroup', workGroupId: GRUPO, workGroupName: 'Turno manana' },
+      },
+    ]);
+    expect(detalle.conditionedByName).toBe('Ana Lopez');
+  });
+
+  it('R25: los nombres salen de la lectura que incluye a las personas dadas de baja, la misma de quien acondiciona', async () => {
+    // La lectura incluye a las dadas de baja: Diego ya no esta vivo y sigue teniendo nombre.
+    const dobles = montarConEquipo(resumen(PEDIDO_1, { status: 'EN_ACONDICIONAMIENTO', conditionedBy: ANA }), [
+      persona(ANA, 'Ana Lopez'),
+      persona(BETO, 'Beto Ruiz'),
+      persona(CARLA, 'Carla Diaz'),
+      persona(DIEGO, 'Diego Mora (de baja)'),
+    ]);
+
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(dobles.findRefsIncludingDeletedInCompany).toHaveBeenCalledTimes(1);
+    const [empresa, ids] = dobles.findRefsIncludingDeletedInCompany.mock.calls[0] as unknown as [string, string[]];
+    expect(empresa).toBe(EMPRESA);
+    expect([...ids].sort()).toEqual([ANA, BETO, CARLA, DIEGO].sort());
+    expect(detalle.team.find((miembro) => miembro.userId === DIEGO)?.displayName).toBe('Diego Mora (de baja)');
+  });
+
+  it('R25: en POR_ACONDICIONAR no lee el equipo y lo devuelve vacio', async () => {
+    const dobles = montarConEquipo(resumen(PEDIDO_1), [persona(ANA, 'Ana Lopez')]);
+
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(dobles.listTeamByOrderInCompany).not.toHaveBeenCalled();
+    expect(detalle.team).toEqual([]);
   });
 });

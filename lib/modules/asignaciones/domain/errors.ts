@@ -280,6 +280,26 @@ export class OrderNotConditionableError extends AsignacionesError {
   }
 }
 
+/** Una persona marcada suelta para el equipo de acondicionamiento tiene la cuenta activa pero
+ *  supervisa los pedidos de toda la empresa. Codigo propio porque el equipo no es responsable. */
+export class ConditioningTeamMemberNotAllowedError extends AsignacionesError {
+  readonly code = 'conditioning_team_member_not_allowed';
+
+  constructor(diagnostic?: string) {
+    super('conditioning_team_member_not_allowed', diagnostic);
+  }
+}
+
+/** Tras omitir a quien no es elegible en los grupos, el equipo de acondicionamiento no tiene a
+ *  nadie. */
+export class ConditioningTeamEmptyError extends AsignacionesError {
+  readonly code = 'conditioning_team_empty';
+
+  constructor(diagnostic?: string) {
+    super('conditioning_team_empty', diagnostic);
+  }
+}
+
 /** El pedido esta `POR_EMPACAR` o `EN_EMPAQUE`: sus responsables se congelan igual que en
  *  `ENTREGADO`, con un codigo propio porque la frase que corresponde es otra. */
 export class OrderProducedFrozenError extends AsignacionesError {

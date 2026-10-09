@@ -123,6 +123,50 @@ describe('writeMovement (R6, R12) — recibe la tx, no la abre', () => {
     );
   });
 
+  // QC-223 2026-10-08: el asiento `delivery` lleva su entrega; los demas no nombran la columna.
+  it('QC-223 R24: escribe `orderDeliveryId` cuando el asiento es una entrega, y lo omite si no llega', async () => {
+    const create = vi.fn().mockResolvedValue({ id: 'movimiento-entrega' });
+    const tx = { inventoryMovement: { create } } as unknown as Parameters<typeof writeMovement>[0];
+
+    await writeMovement(
+      tx,
+      {
+        batchId: LOTE_ID,
+        kind: 'delivery',
+        quantity: '-4.0000',
+        reason: null,
+        orderId: 'pedido-1',
+        orderPresentationLineId: null,
+        orderDeliveryId: 'entrega-1',
+        createdBy: ACTOR_ID,
+      },
+      AHORA,
+      AMBITO,
+    );
+    await writeMovement(
+      tx,
+      {
+        batchId: LOTE_ID,
+        kind: 'opening',
+        quantity: '10',
+        reason: null,
+        orderId: null,
+        orderPresentationLineId: null,
+        createdBy: ACTOR_ID,
+      },
+      AHORA,
+      AMBITO,
+    );
+
+    expect(create).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        data: expect.objectContaining({ kind: 'delivery', orderDeliveryId: 'entrega-1', orderId: 'pedido-1' }),
+      }),
+    );
+    expect(create.mock.calls[1]?.[0]?.data).not.toHaveProperty('orderDeliveryId');
+  });
+
   it('R24: un ajuste por total escribe la existencia de antes en stockBefore y el total en countedStock', async () => {
     const create = vi.fn().mockResolvedValue({ id: 'movimiento-4' });
     const tx = { inventoryMovement: { create } } as unknown as Parameters<typeof writeMovement>[0];

@@ -29,13 +29,14 @@
 import { randomUUID } from 'node:crypto';
 
 import { Prisma } from '@prisma/client';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import {
   findAliveRefsInCompany,
   findRefsIncludingDeletedInCompany,
   findSnapshotAliveInCompany,
   listAliveInCompany,
+  listSnapshotsAliveInCompany,
 } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import {
   DOCUMENT_TYPE_CC,
@@ -571,6 +572,131 @@ describe('listAliveInCompany — personas vivas de la empresa, ordenadas y acota
       const refs = await listAliveInCompany(companyId, AHORA, 2, { accountStatus: ['active'] });
 
       expect(refs).toEqual([]);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WorkGroupDirectory.listSnapshotsAliveInCompany — los grupos del selector del equipo
+// ---------------------------------------------------------------------------
+
+describe('listSnapshotsAliveInCompany — grupos vivos de la empresa con sus miembros activos', () => {
+  it('R7: trae solo los grupos VIVOS de esa empresa', async () => {
+    await withTwoCompanies(async (companyA, companyB) => {
+      const vivo = await seedGroup(companyA, `Turno ${randomUUID()}`);
+      const deBaja = await seedGroup(companyA, `Turno ${randomUUID()}`);
+      await prisma.workGroup.update({ where: { id: deBaja }, data: { deletedAt: AHORA } });
+      const ajeno = await seedGroup(companyB, `Turno ${randomUUID()}`);
+
+      const deA = await listSnapshotsAliveInCompany(companyA, AHORA, 25);
+      const deB = await listSnapshotsAliveInCompany(companyB, AHORA, 25);
+
+      expect(deA.map((group) => group.id)).toEqual([vivo]);
+      expect(deB.map((group) => group.id)).toEqual([ajeno]);
+    });
+  });
+
+  it('R7: ordena por nombre normalizado, sin distinguir mayusculas ni tildes', async () => {
+    await withCompany(async (companyId) => {
+      const charlie = await seedGroup(companyId, 'Charlie');
+      const alfa = await seedGroup(companyId, 'alfa');
+      const bravo = await seedGroup(companyId, 'Bravo');
+      const eco = await seedGroup(companyId, 'Éco');
+      const delta = await seedGroup(companyId, 'delta');
+
+      const snapshots = await listSnapshotsAliveInCompany(companyId, AHORA, 25);
+
+      expect(snapshots.map((group) => group.id)).toEqual([alfa, bravo, charlie, delta, eco]);
+      expect(snapshots.map((group) => group.name)).toEqual(['alfa', 'Bravo', 'Charlie', 'delta', 'Éco']);
+    });
+  });
+
+  it('R7: respeta el tope, cortando por el orden de nombre', async () => {
+    await withCompany(async (companyId) => {
+      const tercero = await seedGroup(companyId, 'Ccc');
+      const primero = await seedGroup(companyId, 'Aaa');
+      const segundo = await seedGroup(companyId, 'Bbb');
+
+      const snapshots = await listSnapshotsAliveInCompany(companyId, AHORA, 2);
+
+      expect(snapshots.map((group) => group.id)).toEqual([primero, segundo]);
+      expect(snapshots.map((group) => group.id)).not.toContain(tercero);
+    });
+  });
+
+  it('R7: `activeMemberIds` sigue el estado EFECTIVO, igual que la foto de un solo grupo', async () => {
+    await withCompany(async (companyId) => {
+      const turno = await seedGroup(companyId, 'Aaa turno');
+      const vacio = await seedGroup(companyId, 'Bbb vacio');
+      const otro = await seedGroup(companyId, 'Ccc otro');
+
+      const activoB = await seedUser(companyId, { lastNames: 'Bbb', accountStatus: 'active' });
+      const activoA = await seedUser(companyId, { lastNames: 'Aaa', accountStatus: 'active' });
+      const pendiente = await seedUser(companyId, { lastNames: 'Ccc', accountStatus: 'pending' });
+      const inactivo = await seedUser(companyId, { lastNames: 'Ddd', accountStatus: 'inactive' });
+      const bloqueado = await seedUser(companyId, {
+        lastNames: 'Eee',
+        accountStatus: 'blocked',
+        lockedUntil: PLAZO_VIGENTE,
+      });
+      const activoConPlazoVigente = await seedUser(companyId, {
+        lastNames: 'Fff',
+        accountStatus: 'active',
+        lockedUntil: PLAZO_VIGENTE,
+      });
+      const deBaja = await seedUser(companyId, { lastNames: 'Ggg', deletedAt: AHORA });
+
+      for (const userId of [activoB, activoA, pendiente, inactivo, bloqueado, activoConPlazoVigente, deBaja]) {
+        await addMember(companyId, turno, userId);
+      }
+      await addMember(companyId, otro, activoA);
+      await addMember(companyId, otro, bloqueado);
+
+      const ahora = await listSnapshotsAliveInCompany(companyId, AHORA, 25);
+      expect(ahora).toEqual([
+        { id: turno, name: 'Aaa turno', activeMemberIds: [activoA, activoB] },
+        { id: vacio, name: 'Bbb vacio', activeMemberIds: [] },
+        { id: otro, name: 'Ccc otro', activeMemberIds: [activoA] },
+      ]);
+      for (const snapshot of ahora) {
+        expect(snapshot).toEqual(await findSnapshotAliveInCompany(companyId, snapshot.id, AHORA));
+      }
+
+      // Mismo dato, otro reloj: los dos bloqueos con plazo vencen y vuelven, sin escribir nada.
+      const despues = await listSnapshotsAliveInCompany(companyId, DESPUES_DEL_PLAZO, 25);
+      expect(despues[0]?.activeMemberIds).toEqual([activoA, activoB, bloqueado, activoConPlazoVigente]);
+      expect(despues[2]?.activeMemberIds).toEqual([activoA, bloqueado]);
+    });
+  });
+
+  it('R7: hace exactamente dos consultas, sea cual sea el numero de grupos', async () => {
+    await withCompany(async (companyId) => {
+      for (const nombre of ['Aaa', 'Bbb', 'Ccc', 'Ddd']) {
+        const groupId = await seedGroup(companyId, nombre);
+        await addMember(companyId, groupId, await seedUser(companyId));
+        await addMember(companyId, groupId, await seedUser(companyId));
+      }
+
+      const espias = [
+        vi.spyOn(prisma.workGroup, 'findMany'),
+        vi.spyOn(prisma.workGroup, 'findFirst'),
+        vi.spyOn(prisma.workGroupMember, 'findMany'),
+        vi.spyOn(prisma.user, 'findMany'),
+        vi.spyOn(prisma, '$queryRaw'),
+        vi.spyOn(prisma, '$queryRawUnsafe'),
+      ];
+      try {
+        const snapshots = await listSnapshotsAliveInCompany(companyId, AHORA, 25);
+        expect(snapshots).toHaveLength(4);
+        expect(snapshots.every((snapshot) => snapshot.activeMemberIds.length === 2)).toBe(true);
+
+        const llamadas = espias.reduce((total, espia) => total + espia.mock.calls.length, 0);
+        expect(llamadas).toBe(2);
+        expect(espias[0]?.mock.calls).toHaveLength(1);
+        expect(espias[4]?.mock.calls).toHaveLength(1);
+      } finally {
+        for (const espia of espias) espia.mockRestore();
+      }
     });
   });
 });

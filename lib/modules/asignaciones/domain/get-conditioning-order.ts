@@ -8,14 +8,16 @@
 import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
-import { composeConditioningOrderRows, type ConditioningOrderRow } from './conditioning-order-view';
+import { composeConditioningOrderDetail, type ConditioningOrderDetail } from './conditioning-order-view';
 import { OrderNotFoundError, ValidationError } from './errors';
 
 import type { ComposeOrderRowsDeps } from './compose-order-rows';
+import type { ConditioningTeamRepository } from '../ports/conditioning-team-repository';
 
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 
 const DETAIL_STATUSES = ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const;
+const TEAM_STATUSES: ReadonlySet<string> = new Set(['EN_ACONDICIONAMIENTO', 'TERMINADO']);
 
 const getConditioningOrderSchema = z.strictObject({
   orderId: z.string().uuid(),
@@ -23,15 +25,16 @@ const getConditioningOrderSchema = z.strictObject({
 
 export type GetConditioningOrderDeps = ComposeOrderRowsDeps & {
   readonly orders: OrderCatalog;
+  readonly team: ConditioningTeamRepository;
 };
 
 export function createGetConditioningOrder(
   deps: GetConditioningOrderDeps,
-): (actor: Actor | null | undefined, input: unknown) => Promise<ConditioningOrderRow> {
+): (actor: Actor | null | undefined, input: unknown) => Promise<ConditioningOrderDetail> {
   return async function getConditioningOrder(
     actor: Actor | null | undefined,
     input: unknown,
-  ): Promise<ConditioningOrderRow> {
+  ): Promise<ConditioningOrderDetail> {
     // Autorizar va antes de validar la entrada y antes de tocar ningun puerto.
     requirePermission(actor, 'acondicionamiento.modificar');
 
@@ -44,8 +47,11 @@ export function createGetConditioningOrder(
     if (summary === undefined) throw new OrderNotFoundError();
     if (summary.status === 'TERMINADO' && summary.conditionedBy !== actor.id) throw new OrderNotFoundError();
 
-    const [row] = await composeConditioningOrderRows(deps, actor.companyId, [summary]);
-    if (row === undefined) throw new OrderNotFoundError();
-    return row;
+    const team = TEAM_STATUSES.has(summary.status)
+      ? await deps.team.listByOrderInCompany(actor.companyId, orderId)
+      : [];
+    const detail = await composeConditioningOrderDetail(deps, actor.companyId, summary, team);
+    if (detail === undefined) throw new OrderNotFoundError();
+    return detail;
   };
 }

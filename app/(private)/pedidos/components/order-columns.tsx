@@ -157,6 +157,8 @@ export type OrderColumnsDeps = {
   readonly canEditDistribution?: boolean;
   /** Si el actor puede cambiar el cliente del pedido; lo resuelve el servidor. */
   readonly canEditCustomer?: boolean;
+  /** Si el actor puede entregar pedidos; lo resuelve el servidor. */
+  readonly canDeliver?: boolean;
 };
 
 /**
@@ -180,6 +182,7 @@ export function buildOrderColumns({
   coverageByOrder = {},
   canEditDistribution = false,
   canEditCustomer = false,
+  canDeliver = false,
 }: OrderColumnsDeps): readonly DataTableColumn<OrderSummary>[] {
   return [
     {
@@ -330,6 +333,7 @@ export function buildOrderColumns({
           coverage={coverageByOrder[order.id]}
           canEditDistribution={canEditDistribution}
           canEditCustomer={canEditCustomer}
+          canDeliver={canDeliver}
         />
       ),
     },

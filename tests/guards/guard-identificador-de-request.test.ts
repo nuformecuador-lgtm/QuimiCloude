@@ -64,6 +64,14 @@ export const E2E_ESPERADOS = [
   // borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
   // identificador ni sobre `reference`, asi que ese diferimiento sigue INTACTO.
   'acondicionamiento.spec.ts',
+  // Alta el 2026-10-09 por el MISMO motivo y en el MISMO sitio que las demas: la lista es CERRADA
+  // y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el archivo
+  // se nombra, uno a uno-. Lo que ejercita: el acondicionador comienza desde el detalle con una
+  // persona y un grupo tras la espera de 5 s, otro acondicionador no puede tocar el pedido, y el
+  // primero lo termina y lo encuentra en «Terminados». NO ejercita el cruce borde -> accion del
+  // identificador de peticion: el spec no lee ni afirma nada sobre el identificador ni sobre
+  // `reference`, asi que ese diferimiento sigue INTACTO.
+  'acondicionar-con-equipo.spec.ts',
   'aislamiento-inventario.spec.ts',
   // Alta por el MISMO motivo y en el MISMO sitio que las demas: esta lista es CERRADA y su punto
   // de extension por diseno es darse de alta en ella. El ancla NO se relaja -el archivo se nombra,
@@ -321,6 +329,11 @@ export const E2E_ESPERADOS = [
   // y cancelar con motivo desde la ejecucion. No lee ni afirma nada sobre el identificador de
   // peticion.
   'registro-ejecucion.spec.ts',
+  // Alta el 2026-10-08 (QC-223) por el mismo motivo que las demas. Recorre la entrega de un pedido
+  // terminado desde el menu de fila: borrador que sobrevive a la recarga, entrega parcial a otro
+  // cliente, entrega que completa y usuario sin permiso. No lee ni afirma nada sobre el
+  // identificador de peticion ni sobre `reference`.
+  'entregar-producto-terminado.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -509,6 +522,13 @@ export const MIGRACIONES_ESPERADAS = [
   '20261007120100_order_terminated_finished_index',
   // El permiso integraciones.modificar y su asignacion al Administrador; no toca el identificador.
   '20261008120843_integrations_permission',
+  // El equipo de acondicionamiento; no toca el identificador.
+  '20261008150000_order_conditioning_team',
+  // QC-223 2026-10-08: la entrega de producto terminado (valor de enum, tablas y permiso); ninguna
+  // toca el identificador.
+  '20261008150050_inventory_movement_kind_delivery',
+  '20261008150100_order_deliveries',
+  '20261008150200_delivery_permission',
 ] as const
 
 export function hallazgosDeMigraciones(

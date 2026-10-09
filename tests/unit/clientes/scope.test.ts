@@ -291,7 +291,15 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
 describe('R28 — los UNICOS E2E que nombran clientes son e2e/clientes.spec.ts y la excepcion de QC-156', () => {
   // Lista cerrada. La segunda entrada es el E2E de R40 de QC-156: su nombre lo fija
   // specs/QC-156-pedido-con-cliente/design.md > 10 e importa el barrel de `clientes`.
-  const E2E_PERMITIDOS: ReadonlySet<string> = new Set(['clientes.spec.ts', 'pedido-con-cliente.spec.ts'])
+  // QC-223 2026-10-08: entra `entregar-producto-terminado.spec.ts`, el E2E de la entrega. Siembra
+  // dos clientes por Prisma -la entrega exige uno y el recorrido lo cambia- con la normalizacion
+  // del barrel de `clientes`, la unica definicion. No recorre la pantalla de clientes. La lista
+  // sigue CERRADA.
+  const E2E_PERMITIDOS: ReadonlySet<string> = new Set([
+    'clientes.spec.ts',
+    'pedido-con-cliente.spec.ts',
+    'entregar-producto-terminado.spec.ts',
+  ])
   const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
 
   /** Archivos de e2e/, por nombre o por contenido, que delatan clientes fuera de los specs
@@ -507,10 +515,13 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
       })
       .map((entry) => entry.name)
       .sort()
+    // QC-223 2026-10-08: + `order_deliveries`, que solo REFERENCIA `customers` con una FK
+    // compuesta desde la tabla nueva; no altera `customers`.
     expect(tocanCustomers).toEqual([
       '20260924120000_customers',
       '20260924200000_customers_search_normalized',
       '20261006160000_orders_customer',
+      '20261008150100_order_deliveries',
     ])
   })
 

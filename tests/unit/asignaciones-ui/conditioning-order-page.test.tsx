@@ -2,8 +2,12 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import ConditioningOrderPage from '@/app/(private)/asignacion/acondicionamiento/[id]/page';
-import { CONDITIONING_ORDER_SCREEN_TESTID } from '@/app/(private)/asignacion/acondicionamiento/[id]/components';
-import { OrderNotFoundError, ValidationError } from '@/lib/modules/asignaciones';
+import {
+  CONDITIONING_ACTIONS_TEXTS,
+  CONDITIONING_ORDER_CANDIDATES_ERROR_TESTID,
+  CONDITIONING_ORDER_SCREEN_TESTID,
+} from '@/app/(private)/asignacion/acondicionamiento/[id]/components';
+import { OrderNotFoundError, UnauthorizedError, ValidationError } from '@/lib/modules/asignaciones';
 import {
   ROLE_ACONDICIONAMIENTO,
   ROLE_ADMINISTRADOR,
@@ -17,11 +21,18 @@ import {
  * para todo lo que el caso de uso no deja ver.
  */
 
-const { getSessionUserMock, getSessionContextMock, getConditioningOrderMock, notFoundMock } = vi.hoisted(
+const {
+  getSessionUserMock,
+  getSessionContextMock,
+  getConditioningOrderMock,
+  listConditioningTeamCandidatesMock,
+  notFoundMock,
+} = vi.hoisted(
   () => ({
     getSessionUserMock: vi.fn<() => Promise<unknown>>(),
     getSessionContextMock: vi.fn<() => Promise<unknown>>(),
     getConditioningOrderMock: vi.fn<(actor: unknown, input: unknown) => Promise<unknown>>(),
+    listConditioningTeamCandidatesMock: vi.fn<(actor: unknown, input: unknown) => Promise<unknown>>(),
     // `notFound()` está tipada `(): never` y LANZA. El doble hace lo mismo para que el corte se
     // detenga donde lo haría en producción.
     notFoundMock: vi.fn<() => never>(() => {
@@ -37,7 +48,10 @@ vi.mock('next/navigation', async (importOriginal) => ({
 
 vi.mock('@/lib/composition', () => ({
   identity: { getSessionUser: getSessionUserMock, getSessionContext: getSessionContextMock },
-  asignaciones: { getConditioningOrder: getConditioningOrderMock },
+  asignaciones: {
+    getConditioningOrder: getConditioningOrderMock,
+    listConditioningTeamCandidates: listConditioningTeamCandidatesMock,
+  },
   observabilidad: { readRequestIdHeader: vi.fn(async (): Promise<string | null> => null) },
 }));
 
@@ -65,6 +79,12 @@ const ROW = {
   status: 'POR_ACONDICIONAR',
   conditionedByName: null,
   conditionedById: null,
+  team: [],
+};
+
+const CANDIDATES = {
+  people: [{ id: '44444444-4444-4444-8444-444444444444', displayName: 'Carla Gómez' }],
+  workGroups: [],
 };
 
 function invocar(id: string = ORDER_ID) {
@@ -79,6 +99,7 @@ afterEach(() => {
 beforeEach(() => {
   getSessionContextMock.mockResolvedValue({ companyId: 'company-1' });
   getSessionUserMock.mockResolvedValue(sesionCon(SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO] ?? []));
+  listConditioningTeamCandidatesMock.mockResolvedValue(CANDIDATES);
 });
 
 describe('con el permiso, la página pinta el detalle', () => {
@@ -135,5 +156,85 @@ describe('sin el permiso, 404 antes de leer ningún pedido', () => {
 
     await expect(invocar()).rejects.toThrow();
     expect(getConditioningOrderMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('qué acción se ofrece y qué se lee para ella', () => {
+  it('R1: en POR_ACONDICIONAR pide los candidatos con el actor y ofrece «Acondicionar»', async () => {
+    getConditioningOrderMock.mockResolvedValue(ROW);
+
+    render(await invocar());
+
+    expect(listConditioningTeamCandidatesMock).toHaveBeenCalledTimes(1);
+    expect(listConditioningTeamCandidatesMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: ACTOR_ID, companyId: 'company-1' }),
+      {},
+    );
+    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeNull();
+  });
+
+  it('R2: en EN_ACONDICIONAMIENTO del propio actor ofrece «Terminar» sin pedir candidatos', async () => {
+    getConditioningOrderMock.mockResolvedValue({
+      ...ROW,
+      status: 'EN_ACONDICIONAMIENTO',
+      conditionedById: ACTOR_ID,
+      conditionedByName: 'Acondicionador de Prueba',
+    });
+
+    render(await invocar());
+
+    expect(listConditioningTeamCandidatesMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeNull();
+  });
+
+  it('R3: en EN_ACONDICIONAMIENTO de otra persona no ofrece nada ni pide candidatos', async () => {
+    getConditioningOrderMock.mockResolvedValue({
+      ...ROW,
+      status: 'EN_ACONDICIONAMIENTO',
+      conditionedById: '22222222-2222-4222-8222-222222222222',
+      conditionedByName: 'Berta Ruiz',
+    });
+
+    render(await invocar());
+
+    expect(listConditioningTeamCandidatesMock).not.toHaveBeenCalled();
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(screen.getByText('Lo acondiciona Berta Ruiz.')).toBeInTheDocument();
+  });
+
+  it('R3: en TERMINADO no ofrece nada ni pide candidatos, aunque lo terminara el propio actor', async () => {
+    getConditioningOrderMock.mockResolvedValue({
+      ...ROW,
+      status: 'TERMINADO',
+      conditionedById: ACTOR_ID,
+      conditionedByName: 'Acondicionador de Prueba',
+    });
+
+    render(await invocar());
+
+    expect(listConditioningTeamCandidatesMock).not.toHaveBeenCalled();
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+  });
+
+  it('R1: si los candidatos fallan con un error del módulo, pinta el detalle sin «Acondicionar» y con el aviso', async () => {
+    getConditioningOrderMock.mockResolvedValue(ROW);
+    listConditioningTeamCandidatesMock.mockRejectedValue(new UnauthorizedError());
+
+    render(await invocar());
+
+    expect(screen.getByTestId(CONDITIONING_ORDER_SCREEN_TESTID)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeNull();
+    const aviso = screen.getByTestId(CONDITIONING_ORDER_CANDIDATES_ERROR_TESTID);
+    expect(aviso).toHaveAttribute('role', 'alert');
+    expect(aviso).toHaveAttribute('data-code', 'unauthorized');
+  });
+
+  it('un error inesperado de los candidatos no se disfraza de aviso', async () => {
+    getConditioningOrderMock.mockResolvedValue(ROW);
+    listConditioningTeamCandidatesMock.mockRejectedValue(new Error('fallo de base de datos'));
+
+    await expect(invocar()).rejects.toThrow('fallo de base de datos');
   });
 });

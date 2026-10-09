@@ -190,7 +190,7 @@ describe('ExecutionLogRepository: solo anexar (R31)', () => {
 })
 
 describe('ExecutionTransaction: los escritores que recibe el trabajo (R24)', () => {
-  it('R24: `run` entrega exactamente `orders`, `packing` y `log`, y devuelve lo que devuelve `work`', async () => {
+  it('R24: `run` entrega exactamente `orders`, `packing`, `log`, `conditioning` y `team`, y devuelve lo que devuelve `work`', async () => {
     const writers: ExecutionWriters = {
       orders: {
         transitionAliveById: () => Promise.resolve('ok'),
@@ -201,11 +201,13 @@ describe('ExecutionTransaction: los escritores que recibe el trabajo (R24)', () 
         finishPackingAliveById: () => Promise.resolve({ kind: 'ok', finishedGoods: [] }),
       },
       log: new RegistroDoble(),
+      conditioning: { startConditioningAliveById: () => Promise.resolve('ok') },
+      team: { insertAll: () => Promise.resolve(0), listByOrderInCompany: () => Promise.resolve([]) },
     }
     const transaccion: ExecutionTransaction = { run: (work) => work(writers) }
 
     const claves = await transaccion.run((w) => Promise.resolve(Object.keys(w).sort()))
-    expect(claves).toEqual(['log', 'orders', 'packing'])
+    expect(claves).toEqual(['conditioning', 'log', 'orders', 'packing', 'team'])
   })
 })
 

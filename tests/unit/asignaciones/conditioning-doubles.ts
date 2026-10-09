@@ -4,6 +4,10 @@ import { vi } from 'vitest';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { ComposeOrderRowsDeps } from '@/lib/modules/asignaciones/domain/compose-order-rows';
+import type {
+  ConditioningTeamMemberRow,
+  ConditioningTeamRepository,
+} from '@/lib/modules/asignaciones/ports/conditioning-team-repository';
 import type { OrderAssignmentRowWithOrder } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
 import type { PersonRef } from '@/lib/modules/identity';
 import type { PresentationCatalog, PresentationRef } from '@/lib/modules/inventario';
@@ -71,6 +75,7 @@ type Opciones = {
   readonly people?: readonly PersonRef[];
   readonly presentations?: readonly PresentationRef[];
   readonly units?: readonly UnitRef[];
+  readonly team?: readonly ConditioningTeamMemberRow[];
 };
 
 function pagina(
@@ -101,6 +106,7 @@ export function montar(options?: Opciones) {
   const findRefsIncludingDeletedInCompany = vi.fn(async () => options?.people ?? []);
   const findRefsPresentations = vi.fn(async () => options?.presentations ?? []);
   const findRefsUnits = vi.fn(async () => options?.units ?? []);
+  const listTeamByOrderInCompany = vi.fn<ConditioningTeamRepository['listByOrderInCompany']>(async () => options?.team ?? []);
 
   const deps = {
     assignments: {
@@ -116,8 +122,12 @@ export function montar(options?: Opciones) {
     people: { findRefsIncludingDeletedInCompany },
     presentations: { findRefs: findRefsPresentations } as unknown as PresentationCatalog,
     units: { findRefs: findRefsUnits } as unknown as UnitCatalog,
+    team: { insertAll: vi.fn(), listByOrderInCompany: listTeamByOrderInCompany },
     now: () => AHORA,
-  } as unknown as ComposeOrderRowsDeps & { readonly orders: OrderCatalog };
+  } as unknown as ComposeOrderRowsDeps & {
+    readonly orders: OrderCatalog;
+    readonly team: ConditioningTeamRepository;
+  };
 
   return {
     deps,
@@ -128,6 +138,7 @@ export function montar(options?: Opciones) {
     findRefsIncludingDeletedInCompany,
     findRefsPresentations,
     findRefsUnits,
+    listTeamByOrderInCompany,
     todos: [
       listAliveSummariesInCompany,
       listAliveSummariesByIds,
@@ -136,6 +147,7 @@ export function montar(options?: Opciones) {
       findRefsIncludingDeletedInCompany,
       findRefsPresentations,
       findRefsUnits,
+      listTeamByOrderInCompany,
     ],
   };
 }

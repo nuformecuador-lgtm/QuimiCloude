@@ -77,6 +77,8 @@ export const CODIGOS_QC74 = [
   'empresas.modificar',
   'acondicionamiento.modificar',
   'integraciones.modificar',
+  // QC-223 2026-10-08
+  'entregas.modificar',
 ] as const;
 
 /** Los modulos de negocio del ERP, en el orden en que cada uno entro al catalogo. */
@@ -162,6 +164,8 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
         'empresas',
         'acondicionamiento',
         'integraciones',
+        // QC-223 2026-10-08: `entregas` tampoco es carpeta de `lib/modules/` y solo escribe.
+        'entregas',
       ]),
     ].sort();
     expect(modulos).toEqual(esperados);

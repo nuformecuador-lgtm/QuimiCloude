@@ -61,6 +61,7 @@ async function deleteCompany(company: string): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: scope })
   await prisma.inventoryMovement.deleteMany({ where: scope })
   await prisma.orderPresentationLine.deleteMany({ where: scope })
+  await prisma.orderConditioningTeamMember.deleteMany({ where: scope })
   await prisma.order.deleteMany({ where: scope })
   await prisma.productBatch.deleteMany({ where: scope })
   await prisma.recipeLine.deleteMany({ where: { recipe: scope } })

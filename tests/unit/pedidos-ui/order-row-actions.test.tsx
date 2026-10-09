@@ -28,6 +28,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ORDER_ACTION_CUSTOMER_TESTID,
+  ORDER_ACTION_DELIVER_TESTID,
   ORDER_ACTION_DISTRIBUTION_TESTID,
   OrderRowActions,
   acceptsDistributionEdit,
@@ -465,6 +466,61 @@ describe('la accion «Cliente»', () => {
       RESPONSABLES_TESTID,
       ORDER_ACTION_CUSTOMER_TESTID,
       ORDER_ACTION_DISTRIBUTION_TESTID,
+    ]);
+  });
+});
+
+describe('la accion «Entregar»', () => {
+  const NO_ENTREGABLES = ORDER_STATUS_VALUES.filter((status) => status !== 'TERMINADO');
+
+  it('R4: los otros nueve estados del contrato no admiten la entrega', () => {
+    expect(NO_ENTREGABLES).toHaveLength(9);
+  });
+
+  it('R4: con canDeliver aparece en TERMINADO, habilitada, y emite su enganche con la fila', async () => {
+    const onDeliver = vi.fn();
+    render(<OrderRowActions order={pedido('TERMINADO')} canDeliver onDeliver={onDeliver} />);
+
+    abrirMenu();
+
+    const item = await screen.findByTestId(ORDER_ACTION_DELIVER_TESTID);
+    expect(item).not.toHaveAttribute('aria-disabled');
+    fireEvent.click(item);
+    expect(onDeliver).toHaveBeenCalledExactlyOnceWith(pedido('TERMINADO'));
+  });
+
+  it.each(NO_ENTREGABLES)('R4: con canDeliver no aparece en %s', async (status) => {
+    render(<OrderRowActions order={pedido(status)} canDeliver onDeliver={vi.fn()} />);
+
+    abrirMenu();
+
+    await screen.findByTestId('order-action-edit');
+    expect(screen.queryByTestId(ORDER_ACTION_DELIVER_TESTID)).toBeNull();
+  });
+
+  it.each(ORDER_STATUS_VALUES)('R4: sin canDeliver no esta en el DOM en %s', async (status) => {
+    render(<OrderRowActions order={pedido(status)} onDeliver={vi.fn()} />);
+
+    abrirMenu();
+
+    await screen.findByTestId('order-action-edit');
+    expect(screen.queryByTestId(ORDER_ACTION_DELIVER_TESTID)).toBeNull();
+    expect(document.querySelector(`[data-testid="${ORDER_ACTION_DELIVER_TESTID}"]`)).toBeNull();
+  });
+
+  it('R4: va al final del menu', async () => {
+    render(<OrderRowActions order={pedido('TERMINADO')} canEditCustomer canDeliver />);
+
+    abrirMenu();
+    await screen.findByTestId(ORDER_ACTION_DELIVER_TESTID);
+
+    expect(screen.getAllByRole('menuitem').map((item) => item.getAttribute('data-testid'))).toEqual([
+      'order-action-edit',
+      'order-action-cancel',
+      'order-action-delete',
+      RESPONSABLES_TESTID,
+      ORDER_ACTION_CUSTOMER_TESTID,
+      ORDER_ACTION_DELIVER_TESTID,
     ]);
   });
 });

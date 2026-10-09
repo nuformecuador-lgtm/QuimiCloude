@@ -597,7 +597,8 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     expect(catches.length).toBeGreaterThan(0)
     // Uno por action, sin ninguno de mas y sin ninguno de menos.
     expect(traducciones.length).toBe(catches.length)
-    expect(catches.length).toBe(13)
+    // QC-223 2026-10-08: 15 y no 13, entran `getOrderDeliveryAction` y `deliverOrderAction`.
+    expect(catches.length).toBe(15)
     expect(source, 'hay un catch vacio').not.toMatch(/catch\s*\([^)]*\)\s*\{\s*\}/)
   })
 })
@@ -900,9 +901,13 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
       ['cancelOrderAction', 2],
       ['createOrderAction', 2],
       ['deleteOrderAction', 2],
+      // QC-223 2026-10-08: registrar una entrega, argumento ya tipado.
+      ['deliverOrderAction', 1],
       ['getOrderAction', 1],
       // QC-156: el cliente que trae la direccion del filtro.
       ['getOrderCustomerFilterOptionAction', 1],
+      // QC-223 2026-10-08: lo que pinta el sheet de entrega.
+      ['getOrderDeliveryAction', 1],
       // La cobertura de la pagina, argumento ya tipado, ningun `FormData`.
       ['listOrderCoverageAction', 1],
       ['listOrdersAction', 1],
@@ -935,6 +940,9 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
       setOrderCustomerAction: 'id: string, input: unknown',
       searchOrderCustomersAction: 'query: unknown, purpose: OrderCustomerSearchPurpose',
       getOrderCustomerFilterOptionAction: 'id: string',
+      // QC-223 2026-10-08
+      getOrderDeliveryAction: 'orderId: string',
+      deliverOrderAction: 'input: unknown',
     }
     for (const [nombre, parametros] of Object.entries(FIRMAS)) {
       const desde = source.indexOf(`export async function ${nombre}(`)
