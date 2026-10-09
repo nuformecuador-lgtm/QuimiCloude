@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 
-import type { DataTableColumn } from '@/components/shared/data-table';
+import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
 import type { RecipeSummary } from '@/lib/modules/recetas';
 import { formatCivilDate } from '@/lib/shared/ui/date-civil';
@@ -31,7 +31,7 @@ export type RecipeColumnId =
 export type RecipeColumn = DataTableColumn<RecipeSummary> & { readonly id: RecipeColumnId };
 
 export type RecipeColumnsDeps = {
-  /** Slot: quien monta la tabla enchufa el enlace de edicion y el dialogo de borrado. */
+  /** Slot: quien monta la tabla enchufa el menu de acciones de la fila. */
   readonly rowActions: (recipe: RecipeSummary) => ReactNode;
 };
 
@@ -88,11 +88,8 @@ export function buildRecipeColumns({ rowActions }: RecipeColumnsDeps): readonly 
       cell: (recipe) => formatCivilDate(recipe.updatedAt),
     },
     {
+      ...actionsColumn<RecipeSummary>({ label: ACTIONS_COLUMN_LABEL, cell: rowActions }),
       id: ACTIONS_COLUMN_ID,
-      label: ACTIONS_COLUMN_LABEL,
-      align: 'end',
-      pinnable: false,
-      cell: (recipe) => <div className="flex justify-end gap-1">{rowActions(recipe)}</div>,
     },
   ];
 }

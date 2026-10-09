@@ -2,7 +2,7 @@
 
 import { Trash2Icon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useRef, useState, useTransition } from 'react';
+import { useEffect, useEffectEvent, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
 import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
@@ -29,14 +29,25 @@ function versionsNotice(count: number): string | null {
   return `También se borrarán sus ${count} versiones.`;
 }
 
+export type DeleteRecipeDialogProps = {
+  readonly recipe: { readonly id: string; readonly name: string };
+  readonly kind?: DeleteKind;
+  /** Con `open` no se monta el disparador propio: la apertura la decide quien lo pasa. */
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
+};
+
 export function DeleteRecipeDialog({
   recipe,
   kind = 'recipe',
-}: {
-  readonly recipe: { readonly id: string; readonly name: string };
-  readonly kind?: DeleteKind;
-}) {
-  const [open, setOpen] = useState(false);
+  open: controlledOpen,
+  onOpenChange,
+}: DeleteRecipeDialogProps) {
+  const isControlled = controlledOpen !== undefined;
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = isControlled ? controlledOpen : uncontrolledOpen;
+  // En modo controlado la apertura llega por prop y no por un evento del dialogo.
+  const [seenOpen, setSeenOpen] = useState(false);
   // El error entero y no una copia de `{ code, message }`: la copia perdería el `reference` del
   // error inesperado. El render estrecha por `code`.
   const [error, setError] = useState<ErrorState | null>(null);
@@ -48,9 +59,21 @@ export function DeleteRecipeDialog({
 
   const isVersion = kind === 'version';
 
-  const startCount = () => {
+  const setOpen = (next: boolean) => {
+    if (!isControlled) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
+
+  if (isControlled && open !== seenOpen) {
+    setSeenOpen(open);
+    if (open) {
+      setError(null);
+      if (!isVersion) setVersionCount({ status: 'loading' });
+    }
+  }
+
+  const requestCount = () => {
     const requestId = ++countRequestRef.current;
-    setVersionCount({ status: 'loading' });
     void listRecipeVersionsAction(recipe.id).then((result) => {
       if (requestId !== countRequestRef.current) return;
       if (result.status === 'error') {
@@ -61,6 +84,17 @@ export function DeleteRecipeDialog({
       setVersionCount({ status: 'ready', count: result.data.length });
     });
   };
+
+  const startCount = () => {
+    setVersionCount({ status: 'loading' });
+    requestCount();
+  };
+
+  const requestCountOnOpen = useEffectEvent(requestCount);
+
+  useEffect(() => {
+    if (isControlled && open && !isVersion) requestCountOnOpen();
+  }, [isControlled, open, isVersion]);
 
   const handleConfirm = () => {
     startTransition(async () => {
@@ -86,25 +120,29 @@ export function DeleteRecipeDialog({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (next) {
+        if (next && !isControlled) {
           setError(null);
           if (!isVersion) startCount();
-        } else {
+        } else if (!next) {
           countRequestRef.current++;
           setVersionCount({ status: 'idle' });
         }
       }}
-      trigger={{
-        render: (
-          <Button
-            variant="ghost"
-            touch
-            aria-label={`Borrar ${recipe.name}`}
-            data-testid="recipe-delete-open"
-          />
-        ),
-        children: <Trash2Icon />,
-      }}
+      trigger={
+        isControlled
+          ? undefined
+          : {
+              render: (
+                <Button
+                  variant="ghost"
+                  touch
+                  aria-label={`Borrar ${recipe.name}`}
+                  data-testid="recipe-delete-open"
+                />
+              ),
+              children: <Trash2Icon />,
+            }
+      }
       texts={{
         title: isVersion ? 'Borrar versión' : 'Borrar receta',
         description: (
