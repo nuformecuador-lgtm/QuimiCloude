@@ -118,7 +118,9 @@ jobs:
 
     services:
       postgres:
-        image: postgres:17
+        # Espejo publico de AWS de la imagen oficial: Docker Hub limita las descargas anonimas
+        # del runner (`toomanyrequests`, 2026-10-09, PR #193). Misma imagen, otro registro.
+        image: public.ecr.aws/docker/library/postgres:17
         env:
           # Superusuario a proposito: la integracion hace CREATE/DROP DATABASE y
           # pg_advisory_lock contra la base `postgres` (tests/helpers/test-database.ts).
@@ -291,7 +293,9 @@ jobs:
 
     services:
       postgres:
-        image: postgres:17
+        # Espejo publico de AWS de la imagen oficial: Docker Hub limita las descargas anonimas
+        # del runner (`toomanyrequests`, 2026-10-09, PR #193). Misma imagen, otro registro.
+        image: public.ecr.aws/docker/library/postgres:17
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
