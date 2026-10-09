@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { useActionState, useEffect, useId } from 'react';
 import { useFormStatus } from 'react-dom';
 
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { PRESENTATION_FIELD, PresentationSelect } from '@/components/shared/presentation-select';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,7 +23,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import {
   createCatalogLineSchema,
   updateCatalogLineSchema,
@@ -36,10 +36,9 @@ import {
 import type { UnitRef } from '@/lib/modules/unidades';
 import { SUPPLIERS_ROUTE } from '@/lib/shared/routes';
 import { trimDecimal } from '@/lib/shared/ui/decimal-display';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { NO_UNIT_VALUE, UNIT_FIELD, UnitSelect } from './unit-select';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /** 16 px en TODOS los anchos: el primitivo baja a 14 px en `md`, y R48 no distingue por ancho. */
 const FIELD_TEXT = 'text-base md:text-base';
@@ -490,40 +489,34 @@ export function CatalogLineForm({ supplierId, line, units, onSaved }: CatalogLin
         />
 
         {formError === undefined ? null : (
-          // Region de error del formulario (R32): aqui van los rechazos que no senalan campo.
-          //
-          // QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
-          // identificador de la peticion. El CATALOGADO se pinta como siempre y sin identificador.
-          <div
-            role="alert"
+          // Region de error del formulario: aqui van los rechazos que no senalan campo.
+          <ErrorAlert
+            error={formError}
             id={formErrorId}
             className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid="catalog-line-form-error"
-          >
-            {formError.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={formError} />
-            ) : (
+            testId="catalog-line-form-error"
+            renderCatalogued={(catalogued) => (
               <>
-                <p data-testid="catalog-line-form-error-message">{formError.message}</p>
+                <p data-testid="catalog-line-form-error-message">{catalogued.message}</p>
                 <p className="text-xs" data-testid="catalog-line-form-error-code">
-                  {formError.code}
+                  {catalogued.code}
                 </p>
               </>
             )}
-            {isMissing ? (
-              // `catalog_line_not_found` o `supplier_not_found`: la linea o el proveedor dejaron
-              // de existir mientras el panel estaba abierto. Cual de las dos cosas paso lo dice
-              // el mensaje del catalogo, arriba. El destino sale de la constante de ruta, nunca
-              // de un literal (R2).
-              <Link
-                href={SUPPLIERS_ROUTE}
-                className={`${TOUCH_TARGET} inline-flex items-center underline underline-offset-4`}
-                data-testid="catalog-line-form-back-to-list"
-              >
-                {BACK_TO_LIST_LABEL}
-              </Link>
-            ) : null}
-          </div>
+            after={
+              isMissing ? (
+                // La linea o el proveedor dejaron de existir mientras el panel estaba abierto;
+                // cual de las dos lo dice el mensaje de arriba.
+                <Link
+                  href={SUPPLIERS_ROUTE}
+                  className={`${touchTarget} inline-flex items-center underline underline-offset-4`}
+                  data-testid="catalog-line-form-back-to-list"
+                >
+                  {BACK_TO_LIST_LABEL}
+                </Link>
+              ) : null
+            }
+          />
         )}
 
         <CatalogField
@@ -720,7 +713,7 @@ function CatalogField({
         pattern={pattern}
         required={required}
         defaultValue={defaultValue}
-        className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+        className={`${touchTarget} ${FIELD_TEXT}`}
         aria-invalid={error === undefined ? undefined : true}
         aria-describedby={error === undefined ? undefined : errorId}
         data-testid={`catalog-field-${name}`}
@@ -766,7 +759,7 @@ function MeasurementUnitSelect({ name, label, defaultValue, error }: Measurement
           aria-labelledby={labelId}
           aria-invalid={error === undefined ? undefined : true}
           aria-describedby={error === undefined ? undefined : errorId}
-          className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT}`}
+          className={`w-full ${touchTarget} ${FIELD_TEXT}`}
           data-testid={`catalog-field-${name}`}
         >
           <SelectValue />
@@ -805,7 +798,7 @@ function FormActions() {
           <Button
             type="button"
             variant="outline-dashed"
-            className={TOUCH_TARGET}
+            className={touchTarget}
             data-testid="catalog-line-form-cancel"
           />
         }
@@ -828,7 +821,7 @@ function SaveButton() {
   return (
     <Button
       type="submit"
-      className={TOUCH_TARGET}
+      touch
       disabled={pending}
       aria-busy={pending}
       data-testid="catalog-line-form-submit"

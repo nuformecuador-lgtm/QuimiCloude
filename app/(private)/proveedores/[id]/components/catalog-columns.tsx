@@ -9,7 +9,9 @@ import type {
   CatalogLineMeasurements,
   CatalogLineView,
 } from '@/lib/modules/proveedores';
+import { formatCivilDate } from '@/lib/shared/ui/date-civil';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
 import {
   resolvePresentationName,
@@ -55,8 +57,8 @@ import {
  * precarga con `trimDecimal`, que no redondea. Mismo criterio que la tabla de pedidos.
  */
 
-/** Marca de «sin dato» de las columnas opcionales. Constante para que ningun test dependa del glifo. */
-export const EMPTY_CELL = '—';
+// Solo la importa `supplier-detail-header.tsx`.
+export const EMPTY_CELL = EMPTY_MARK;
 
 /**
  * Marca de «no resuelto» de presentacion y unidad (R22). Es **distinta** de `EMPTY_CELL` en
@@ -99,15 +101,6 @@ export const CATALOG_IMAGE_COLUMN_LABEL = 'Imagen';
 
 /** Encabezado de la columna de acciones. Constante para que ningun test dependa del literal. */
 export const CATALOG_ACTIONS_COLUMN_LABEL = 'Acciones';
-
-/**
- * Fecha en `YYYY-MM-DD` y en UTC, **no con `toLocaleDateString`**: el Server Component y el
- * navegador tienen husos y locales distintos, y una fecha formateada con el local del entorno
- * produce una discrepancia de hidratacion que nadie relaciona con la tabla.
- */
-function formatDate(value: Date): string {
-  return value.toISOString().slice(0, 10);
-}
 
 /**
  * Texto compacto de las medidas de una linea, p. ej. «Ø 7.5 cm · alto 12 cm · boca 28/410».
@@ -202,7 +195,7 @@ export function buildCatalogColumns({
       */
       cell: (line) =>
         line.unitId === null
-          ? EMPTY_CELL
+          ? EMPTY_MARK
           : resolvedOrMarker('unitId', resolveUnitLabel(directories, line.unitId)),
     },
     {
@@ -223,7 +216,7 @@ export function buildCatalogColumns({
       sortable: true,
       cell: (line) =>
         line.minPurchase === null ? (
-          EMPTY_CELL
+          EMPTY_MARK
         ) : (
           <span title={exactDecimalTitle(line.minPurchase)}>
             {formatDecimalDisplay(line.minPurchase)}
@@ -236,28 +229,28 @@ export function buildCatalogColumns({
       align: 'end',
       sortable: true,
       filter: { kind: 'numberRange' },
-      cell: (line) => (line.deliveryTime === null ? EMPTY_CELL : String(line.deliveryTime)),
+      cell: (line) => (line.deliveryTime === null ? EMPTY_MARK : String(line.deliveryTime)),
     },
     {
       id: 'material',
       label: 'Material',
       align: 'start',
       // Sin `sortable` ni `filter`: no entra en la lista blanca del backend.
-      cell: (line) => line.material ?? EMPTY_CELL,
+      cell: (line) => line.material ?? EMPTY_MARK,
     },
     {
       id: 'measurements',
       label: 'Medidas',
       align: 'start',
       // Sin `sortable` ni `filter`: no entra en la lista blanca del backend.
-      cell: (line) => formatMeasurements(line.measurements) ?? EMPTY_CELL,
+      cell: (line) => formatMeasurements(line.measurements) ?? EMPTY_MARK,
     },
     {
       id: 'createdAt',
       label: 'Creado',
       align: 'start',
       sortable: true,
-      cell: (line) => formatDate(line.createdAt),
+      cell: (line) => formatCivilDate(line.createdAt),
     },
     {
       id: 'updatedAt',
@@ -265,7 +258,7 @@ export function buildCatalogColumns({
       align: 'start',
       // `updatedAt` NO esta en `SUPPLIER_CATALOG_LINE_QUERYABLE.sortable`: se muestra, no se
       // ordena. Declararlo ordenable seria pintar un control que el backend ignora.
-      cell: (line) => formatDate(line.updatedAt),
+      cell: (line) => formatCivilDate(line.updatedAt),
     },
     {
       id: ACTIONS_COLUMN_ID,

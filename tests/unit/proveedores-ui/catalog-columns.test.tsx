@@ -10,13 +10,13 @@ import { describe, expect, it } from 'vitest';
 import {
   CATALOG_TABLE_TEXTS,
   EMPTY_CATALOG_DIRECTORIES,
-  EMPTY_CELL,
   buildCatalogColumns,
 } from '@/app/(private)/proveedores/[id]/components';
 import { DataTable, type DataTableParams } from '@/components/shared/data-table';
 import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
 import type { CatalogLineListItem } from '@/lib/modules/proveedores';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
 function parametros(): DataTableParams {
   return { page: 1, pageSize: DEFAULT_PAGE_SIZE, sort: null, filters: {}, search: '' };
@@ -149,8 +149,8 @@ describe('catalogo del proveedor — celdas de material y medidas (R28)', () => 
   it('sin material ni medidas, las dos celdas pintan la marca de «sin dato»', async () => {
     montar([linea({ material: null, measurements: null })]);
 
-    expect(await screen.findByTestId('data-table-cell-material')).toHaveTextContent(EMPTY_CELL);
-    expect(screen.getByTestId('data-table-cell-measurements')).toHaveTextContent(EMPTY_CELL);
+    expect(await screen.findByTestId('data-table-cell-material')).toHaveTextContent(EMPTY_MARK);
+    expect(screen.getByTestId('data-table-cell-measurements')).toHaveTextContent(EMPTY_MARK);
   });
 });
 

@@ -24,8 +24,7 @@ import {
   deleteCatalogLineAction,
   type CatalogLineMutationFormState,
 } from '@/lib/modules/proveedores/adapters/driving/supplier-catalog-actions';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 const DELETE_SUCCESS = 'Línea de catálogo dada de baja.';
 
@@ -75,7 +74,7 @@ export function DeleteCatalogLineDialog({ line }: { readonly line: CatalogLineVi
         render={
           <Button
             variant="ghost"
-            className={TOUCH_TARGET}
+            className={touchTarget}
             aria-label={`Dar de baja ${line.name}`}
             data-testid="catalog-line-delete-open"
           />
@@ -121,13 +120,13 @@ export function DeleteCatalogLineDialog({ line }: { readonly line: CatalogLineVi
             data-testid="delete-catalog-line-id"
           />
           <AlertDialogFooter>
-            <AlertDialogCancel className={TOUCH_TARGET} data-testid="delete-catalog-line-cancel">
+            <AlertDialogCancel className={touchTarget} data-testid="delete-catalog-line-cancel">
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
               type="submit"
               variant="destructive"
-              className={TOUCH_TARGET}
+              touch
               data-testid="delete-catalog-line-confirm"
             >
               Dar de baja
