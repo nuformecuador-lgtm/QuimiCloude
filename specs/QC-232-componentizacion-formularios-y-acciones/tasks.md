@@ -106,25 +106,25 @@ Se conservan los exports, los testids y los textos (R5, R10, R15, R17).
 - sus tests están en verde **sin editarlos**, salvo un repunte de import (R4 a), que se anota en el
   impl.
 
-- [ ] **T2a [P]. `clientes`.**
-- [ ] **T2b [P]. `configuracion/presentaciones`.**
-- [ ] **T2c [P]. `configuracion/unidades`.**
-- [ ] **T2d [P]. `configuracion/usuarios`:** usuario, grupo (con `disabled` y la envoltura del pie),
+- [x] **T2a [P]. `clientes`.**
+- [x] **T2b [P]. `configuracion/presentaciones`.**
+- [x] **T2c [P]. `configuracion/unidades`.**
+- [x] **T2d [P]. `configuracion/usuarios`:** usuario, grupo (con `disabled` y la envoltura del pie),
   borrar usuario y grupo, estado de usuario y cerrar sesiones.
-- [ ] **T2e [P]. `inventario`:** producto, borrar producto (con su disparador propio), fecha de lote
+- [x] **T2e [P]. `inventario`:** producto, borrar producto (con su disparador propio), fecha de lote
   e `import-dialog-parts`.
-- [ ] **T2f [P]. `produccion/formulas`:** borrar receta, con su transición y su disparador propio.
-- [ ] **T2g [P]. `proveedores/[id]` y `components/shared/supplier`:** línea de catálogo, proveedor,
+- [x] **T2f [P]. `produccion/formulas`:** borrar receta, con su transición y su disparador propio.
+- [x] **T2g [P]. `proveedores/[id]` y `components/shared/supplier`:** línea de catálogo, proveedor,
   sus dos borrados y `UnitSelect`.
-- [ ] **T2h [P]. `pedidos`, solo si TA no lo saca:** pedido (con `canSave`/`busy`), `OrderField`,
+- [x] **T2h [P]. `pedidos`, solo si TA no lo saca:** pedido (con `canSave`/`busy`), `OrderField`,
   el select local, y borrar y cancelar pedido. La excepción de `order-form.tsx` en
   `guard-identificador-de-request` debe seguir en verde **sin tocar** esa guardia.
-- [ ] **T2i [P]. `asignacion` (fuera de los archivos de QC-217):**
+- [x] **T2i [P]. `asignacion` (fuera de los archivos de QC-217):**
   - `order-cancel-dialog` pasa a `ConfirmDialog`;
   - los 3 consumidores de `ConfirmActionDialog` pasan a `ConfirmDialog` sin form;
   - se borra `components/shared/confirm-action-dialog.tsx`.
-- [ ] **T2j [P]. `DatePicker` del filtro de la tabla. Solo si P6 es sí.**
-- [ ] **T2k. Diálogos siempre montados** (R33, enmienda del 2026-10-09). `user-table`,
+- [x] **T2j [P]. `DatePicker` del filtro de la tabla. Solo si P6 es sí.**
+- [x] **T2k. Diálogos siempre montados** (R33, enmienda del 2026-10-09). `user-table`,
   `work-group-table` y `order-sheet` dejan de montar sus diálogos de baja/confirmación solo al
   abrirse. Los `*-row-actions` de clientes, presentaciones y unidades lo hacen en la tanda 3.
   - **Test:** `tests/unit/shared-ui/confirm-dialog-montado.test.tsx`: tras cerrarse, el diálogo
