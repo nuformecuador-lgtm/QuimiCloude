@@ -1,21 +1,31 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  CONDITIONING_ACTIONS_TEXTS,
   CONDITIONING_ORDER_BACK_LINK_TESTID,
+  CONDITIONING_ORDER_CANDIDATES_ERROR_TESTID,
   CONDITIONING_ORDER_CONDITIONER_TESTID,
   CONDITIONING_ORDER_DISTRIBUTION_TESTID,
   CONDITIONING_ORDER_NUMBER_TESTID,
   CONDITIONING_ORDER_QUANTITY_TESTID,
   CONDITIONING_ORDER_RECIPE_TESTID,
   CONDITIONING_ORDER_STATUS_TESTID,
+  CONDITIONING_TEAM_LIST_GROUP_NAME_TESTID,
+  CONDITIONING_TEAM_LIST_GROUP_TESTID,
+  CONDITIONING_TEAM_LIST_TESTID,
   ConditioningOrderScreen,
 } from '@/app/(private)/asignacion/acondicionamiento/[id]/components';
 import { buildConditioningOrdersColumns } from '@/app/(private)/asignacion/components';
-import type { ConditioningOrderRow } from '@/lib/modules/asignaciones';
+import type { ConditioningOrderDetail, ConditioningTeamCandidates } from '@/lib/modules/asignaciones';
+
+vi.mock('@/lib/modules/asignaciones/adapters/driving/order-conditioning-actions', () => ({
+  startConditioningAction: vi.fn(),
+  finishConditioningAction: vi.fn(),
+}));
 
 afterEach(() => {
   cleanup();
@@ -23,7 +33,7 @@ afterEach(() => {
 
 const SCREEN_DIR = path.join(process.cwd(), 'app', '(private)', 'asignacion', 'acondicionamiento', '[id]');
 
-const ROW: ConditioningOrderRow = {
+const ROW: ConditioningOrderDetail = {
   id: 'order-a',
   numberText: '2026-0000040',
   recipeName: 'Jarabe simple',
@@ -37,6 +47,12 @@ const ROW: ConditioningOrderRow = {
   status: 'EN_ACONDICIONAMIENTO',
   conditionedByName: 'Berta Ruiz',
   conditionedById: 'user-2',
+  team: [],
+};
+
+const CANDIDATES: ConditioningTeamCandidates = {
+  people: [{ id: 'user-3', displayName: 'Carla Gómez' }],
+  workGroups: [],
 };
 
 describe('el detalle muestra los datos del pedido', () => {
@@ -98,18 +114,132 @@ describe('el detalle muestra los datos del pedido', () => {
   });
 });
 
-describe('solo lectura, con un enlace de vuelta según el estado', () => {
-  it.each(['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const)(
-    'R16: en %s no hay ningún botón ni formulario',
-    (status) => {
-      const { container } = render(<ConditioningOrderScreen order={{ ...ROW, status }} />);
+describe('las acciones del detalle', () => {
+  function botones(): string[] {
+    return screen.queryAllByRole('button').map((boton) => boton.textContent ?? '');
+  }
 
-      expect(screen.queryAllByRole('button')).toHaveLength(0);
-      expect(container.querySelectorAll('button')).toHaveLength(0);
-      expect(container.querySelectorAll('form')).toHaveLength(0);
+  it('R1: en POR_ACONDICIONAR ofrece solo «Acondicionar»', () => {
+    render(
+      <ConditioningOrderScreen
+        order={{ ...ROW, status: 'POR_ACONDICIONAR', conditionedByName: null, conditionedById: null }}
+        canStart
+        candidates={CANDIDATES}
+      />,
+    );
+
+    expect(botones()).toEqual([CONDITIONING_ACTIONS_TEXTS.start]);
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeNull();
+  });
+
+  it('R2: en EN_ACONDICIONAMIENTO de quien lo acondiciona ofrece solo «Terminar»', () => {
+    render(<ConditioningOrderScreen order={ROW} canFinish />);
+
+    expect(botones()).toEqual([CONDITIONING_ACTIONS_TEXTS.finish]);
+    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeNull();
+  });
+
+  it('R3: en EN_ACONDICIONAMIENTO con otra persona no ofrece ninguna acción y dice quién lo acondiciona', () => {
+    const { container } = render(<ConditioningOrderScreen order={ROW} />);
+
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(container.querySelectorAll('form')).toHaveLength(0);
+    expect(screen.getByTestId(CONDITIONING_ORDER_CONDITIONER_TESTID)).toHaveTextContent(
+      'Lo acondiciona Berta Ruiz.',
+    );
+  });
+
+  it('R3: en TERMINADO no ofrece ninguna acción', () => {
+    const { container } = render(<ConditioningOrderScreen order={{ ...ROW, status: 'TERMINADO' }} />);
+
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(container.querySelectorAll('form')).toHaveLength(0);
+  });
+
+  it('R1: sin candidatos no ofrece «Acondicionar» y pinta el error del catálogo en role="alert"', () => {
+    render(
+      <ConditioningOrderScreen
+        order={{ ...ROW, status: 'POR_ACONDICIONAR', conditionedByName: null, conditionedById: null }}
+        canStart
+        candidates={null}
+        candidatesError={{ status: 'error', code: 'unauthorized', message: 'No tienes permiso.' }}
+      />,
+    );
+
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    const alerta = screen.getByTestId(CONDITIONING_ORDER_CANDIDATES_ERROR_TESTID);
+    expect(alerta).toHaveAttribute('role', 'alert');
+    expect(alerta).toHaveTextContent('No tienes permiso.');
+  });
+});
+
+describe('el equipo guardado', () => {
+  const TEAM: ConditioningOrderDetail['team'] = [
+    { userId: 'user-3', displayName: 'Carla Gómez', origin: { kind: 'direct' } },
+    {
+      userId: 'user-4',
+      displayName: 'Dario Pérez',
+      origin: { kind: 'workGroup', workGroupId: 'group-1', workGroupName: 'Turno mañana' },
+    },
+    { userId: 'user-5', displayName: 'Elena Sanz', origin: { kind: 'direct' } },
+    {
+      userId: 'user-6',
+      displayName: 'Fermín Ruiz',
+      origin: { kind: 'workGroup', workGroupId: 'group-1', workGroupName: 'Turno mañana' },
+    },
+  ];
+
+  function nombres(grupo: HTMLElement): (string | null)[] {
+    return within(grupo)
+      .getAllByRole('listitem')
+      .map((li) => li.textContent);
+  }
+
+  it.each(['EN_ACONDICIONAMIENTO', 'TERMINADO'] as const)(
+    'R25: en %s pinta «Equipo» con las sueltas juntas y cada grupo con su nombre al comenzar',
+    (status) => {
+      render(<ConditioningOrderScreen order={{ ...ROW, status, team: TEAM }} />);
+
+      const equipo = screen.getByTestId(CONDITIONING_TEAM_LIST_TESTID);
+      expect(within(equipo).getByRole('heading', { name: 'Equipo' })).toBeInTheDocument();
+      const [sueltas, grupo, ...resto] = within(equipo).getAllByTestId(CONDITIONING_TEAM_LIST_GROUP_TESTID);
+      if (sueltas === undefined || grupo === undefined) throw new Error('faltan grupos');
+      expect(resto).toHaveLength(0);
+      expect(sueltas).toHaveAttribute('data-kind', 'direct');
+      expect(nombres(sueltas)).toEqual(['Carla Gómez', 'Elena Sanz']);
+      expect(within(grupo).getByTestId(CONDITIONING_TEAM_LIST_GROUP_NAME_TESTID)).toHaveTextContent(
+        'Turno mañana',
+      );
+      expect(nombres(grupo)).toEqual(['Dario Pérez', 'Fermín Ruiz']);
+      expect(within(equipo).queryAllByRole('button')).toHaveLength(0);
     },
   );
 
+  it('R25: pinta el nombre que trae el equipo, también el de una persona dada de baja', () => {
+    render(
+      <ConditioningOrderScreen
+        order={{
+          ...ROW,
+          team: [{ userId: 'user-9', displayName: 'Persona de baja', origin: { kind: 'direct' } }],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId(CONDITIONING_TEAM_LIST_TESTID)).toHaveTextContent('Persona de baja');
+  });
+
+  it('R25: sin equipo no pinta la sección', () => {
+    render(
+      <ConditioningOrderScreen
+        order={{ ...ROW, status: 'POR_ACONDICIONAR', conditionedByName: null, conditionedById: null }}
+      />,
+    );
+
+    expect(screen.queryByTestId(CONDITIONING_TEAM_LIST_TESTID)).toBeNull();
+  });
+});
+
+describe('enlace de vuelta según el estado', () => {
   it.each(['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO'] as const)(
     'R16: en %s la vuelta es «Volver a «Por acondicionar»», con 44 px',
     (status) => {
@@ -131,7 +261,7 @@ describe('solo lectura, con un enlace de vuelta según el estado', () => {
     expect(back).toHaveAttribute('href', '/asignacion?vista=acondicionados');
   });
 
-  it('R16: ni la pantalla ni la página importan una Server Action ni un adaptador driving', () => {
+  it('R1 R2: ni la página ni la pantalla son Server Actions ni llaman a una; las acciones viven en los modales', () => {
     const fuentes = [
       readFileSync(path.join(SCREEN_DIR, 'page.tsx'), 'utf8'),
       readFileSync(path.join(SCREEN_DIR, 'components', 'conditioning-order-screen.tsx'), 'utf8'),
@@ -140,7 +270,6 @@ describe('solo lectura, con un enlace de vuelta según el estado', () => {
     for (const fuente of fuentes) {
       expect(fuente).not.toContain("'use server'");
       expect(fuente).not.toMatch(/adapters\/driving\/(?!require-page-permission)/);
-      expect(fuente).not.toMatch(/import[^;]*\w+Action\b/);
       expect(fuente).not.toMatch(/\w+Action\(/);
       expect(fuente).not.toContain('<form');
     }

@@ -126,7 +126,7 @@
   - sigue deshabilitado si `disabled`;
   - una `key` nueva reinicia la cuenta.
 
-- [ ] **T13. Selector y modal de Acondicionar** (R5–R9, R28) [T10, T12].
+- [x] **T13. Selector y modal de Acondicionar** (R5–R9, R28) [T10, T12].
   `conditioning-team-picker.tsx` y `start-conditioning-dialog.tsx` (`design.md > 5.2`, N2, N3).
   **Hecho:** `tests/unit/asignaciones-ui/start-conditioning-dialog.test.tsx` cubre:
   - los cuatro elementos de R5;
@@ -137,14 +137,14 @@
   - el error en `role="alert"` con lo marcado conservado;
   - la cuenta reiniciada al reabrir.
 
-- [ ] **T14. Modal de Terminar** (R10, R26, R28) [T10, T12].
+- [x] **T14. Modal de Terminar** (R10, R26, R28) [T10, T12].
   `finish-conditioning-dialog.tsx` sobre `AlertDialog` (`design.md > 5.3`).
   **Hecho:** `tests/unit/asignaciones-ui/finish-conditioning-dialog.test.tsx` cubre:
   - confirmar deshabilitado durante la espera;
   - «Cancelar» no envía;
   - el error en `role="alert"` con el modal abierto.
 
-- [ ] **T15. Detalle y aviso** (R1–R4, R25, R27) [T9, T13, T14].
+- [x] **T15. Detalle y aviso** (R1–R4, R25, R27) [T9, T13, T14].
   `conditioning-actions.tsx`, `conditioning-team-list.tsx` (D12), `conditioning-order-screen.tsx` y
   el `page.tsx` del detalle (`canStart`, `canFinish` y candidatos solo con `canStart`, `design.md >
   5.1`). Además, `ConditionedOrderNotice` en `/asignacion` y en el barrel de

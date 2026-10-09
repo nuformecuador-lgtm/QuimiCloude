@@ -11,6 +11,7 @@ import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/r
 import { ASSIGNED_ORDERS_LABEL, BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import {
   CANCELLED_ORDER_PARAM,
+  CONDITIONED_ORDER_PARAM,
   DELIVERED_ORDER_PACKAGES_PARAM,
   DELIVERED_ORDER_PARAM,
   DELIVERED_ORDER_PRODUCT_PARAM,
@@ -25,6 +26,7 @@ import {
   AssignmentViewTabs,
   CompanyOrdersListSection,
   CompanyOrdersSkeleton,
+  ConditionedOrderNotice,
   ConditionedOrdersListSection,
   ConditioningOrdersListSection,
   ConditioningOrdersSkeleton,
@@ -79,6 +81,7 @@ export default async function AsignacionPage({
     resolvedSearchParams[DELIVERED_ORDER_PRODUCT_PARAM],
   );
   const packedOrderNumber = firstSearchParamValue(resolvedSearchParams[PACKED_ORDER_PARAM]);
+  const conditionedOrderNumber = firstSearchParamValue(resolvedSearchParams[CONDITIONED_ORDER_PARAM]);
   const cancelledOrderNumber = firstSearchParamValue(resolvedSearchParams[CANCELLED_ORDER_PARAM]);
 
   const assignedOrdersParams = parseAssignedOrdersListParams(resolvedSearchParams);
@@ -104,6 +107,9 @@ export default async function AsignacionPage({
       ) : null}
       {vista === 'por_empacar' && packedOrderNumber !== undefined ? (
         <PackedOrderNotice orderNumber={packedOrderNumber} />
+      ) : null}
+      {vista === 'por_acondicionar' && conditionedOrderNumber !== undefined ? (
+        <ConditionedOrderNotice orderNumber={conditionedOrderNumber} />
       ) : null}
       {views.length > 1 ? <AssignmentViewTabs current={vista} views={views} /> : null}
       {vista === 'asignados' ? (
