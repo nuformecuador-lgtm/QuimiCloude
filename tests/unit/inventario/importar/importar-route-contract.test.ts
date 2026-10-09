@@ -445,13 +445,14 @@ describe('contrato de la ruta de importacion de inventario', () => {
         '    <>',
         '      <Button data-testid="sin-eje" variant="outline">x</Button>',
         '      <Button data-testid="ontouch" ontouchstart={f}>x</Button>',
+        '      <Button data-testid="eje-apagado" touch={false}>x</Button>',
         '      <Link data-slot="button" data-testid="enlace-sin" href="/x" className={buttonVariants({ variant: \'outline\', touch: false })}>x</Link>',
         '    </>',
         '  );',
         '}',
       ].join('\n');
       const { fallos } = incumplimientosMultiplataforma('sin-la-talla.tsx', sinLaTalla);
-      for (const testId of ['sin-eje', 'ontouch', 'enlace-sin']) {
+      for (const testId of ['sin-eje', 'ontouch', 'eje-apagado', 'enlace-sin']) {
         expect(fallos.some((f) => f.includes(`"${testId}"`) && f.includes('min-h-11'))).toBe(true);
       }
     });

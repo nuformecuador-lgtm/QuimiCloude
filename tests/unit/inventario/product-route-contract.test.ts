@@ -985,6 +985,7 @@ describe('contrato de la ruta de inventario', () => {
     const sinLaTalla = [
       '<Button data-testid="sin-eje" variant="outline">',
       '<Button data-testid="ontouch" ontouchstart={f}>',
+      '<Button data-testid="eje-apagado" touch={false}>',
       '<Input className="w-full text-base">',
       "<Link data-slot=\"button\" className={buttonVariants({ variant: 'outline', touch: false })}>",
     ];
