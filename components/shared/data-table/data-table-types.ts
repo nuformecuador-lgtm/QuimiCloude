@@ -163,8 +163,8 @@ export type DataTableTexts = {
 };
 
 /**
- * Las piezas compartidas que sustituyen a TODA la tabla, barras incluidas, en cada estado
- * (QC-231 R16-R18). Cada clave es opcional: la que falta deja ese estado como hoy (R19).
+ * Las piezas compartidas que sustituyen a TODA la tabla, barras incluidas, en cada estado.
+ * Cada clave es opcional: la que falta deja ese estado con el render interno de la tabla.
  *
  * `error` reutiliza `ErrorStateProps` tal cual: sus props de reintento son una union, y un `Omit`
  * la aplanaria.
@@ -172,7 +172,12 @@ export type DataTableTexts = {
 export type DataTableStates = {
   readonly loading?: TableSkeletonProps;
   readonly error?: ErrorStateProps;
-  /** Solo sin búsqueda ni filtro activos: el «sin resultados» sigue dentro de la tabla (D5). */
+  /**
+   * Se pinta siempre que no haya filas, y se lleva las barras: la tabla no distingue «vacio» de
+   * «sin resultados». Pasalo sin busqueda ni filtro activos, o tambien con busqueda en la lista
+   * cuyo vacio propio ya cubria el «sin resultados». Sin la clave, sale el vacio interno de la
+   * tabla, con sus barras.
+   */
   readonly empty?: EmptyStateProps;
 };
 
@@ -209,6 +214,6 @@ export type DataTableProps<TRow> = {
    * una cadena.
    */
   readonly searchable?: boolean;
-  /** Ausente = los estados internos de siempre (R19). */
+  /** Ausente = los estados internos de siempre, para que ningun consumidor existente cambie. */
   readonly states?: DataTableStates;
 };

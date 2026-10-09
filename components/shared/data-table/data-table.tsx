@@ -274,7 +274,8 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
   // un `resize` (ver `contentKey` en `DataTableScrollNav`).
   const scrollContentKey = `${columns.length}:${rowCount}:${visibleState}`;
 
-  // Despues de todos los hooks: sustituye a toda la tabla, barras y paginacion incluidas (R16-R18).
+  // Despues de todos los hooks, para no cambiar su orden entre renders: la pieza sustituye a toda
+  // la tabla, barras y paginacion incluidas.
   if (visibleState === 'loading' && states?.loading !== undefined) {
     return <TableSkeleton {...states.loading} />;
   }
