@@ -47,7 +47,7 @@ pregunta al leader.
 
 ## Tanda 1 — `AsyncAutocomplete` ampliado (depende de T0)
 
-- [ ] **T1. Contrato ampliado** (R8-R17, R19; `design.md > 3`).
+- [x] **T1. Contrato ampliado** (R8-R17, R19; `design.md > 3`).
   - **Qué se toca:** `components/shared/async-autocomplete.tsx`. El `layout="split"` pinta exactamente
     el bloque común de los cinco buscadores.
   - **Test:** `tests/unit/shared-ui/async-autocomplete-ampliado.test.tsx`, con un caso por R de R8 a
