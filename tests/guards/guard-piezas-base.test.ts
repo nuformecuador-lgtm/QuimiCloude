@@ -184,21 +184,6 @@ export const EXCLUSIONES: readonly Exclusion[] = [
     reglas: ['compara-inesperado'],
     motivo: 'R12: `UnexpectedErrorNotice` es la otra pieza que la spec deja comparar',
   },
-  // R12: comparan y pintan porque la ETIQUETA cambia segun la rama (div para el inesperado, p para
-  // el de catalogo). `ErrorAlert` tiene `as`, pero reproducirlo exigiria volver a meter la
-  // comparacion en el consumidor para elegir `as`. Lo unifica QC-227/QC-232.
-  ...[
-    'app/(private)/produccion/formulas/components/delete-recipe-dialog.tsx',
-    'app/(private)/inventario/components/delete-product-dialog.tsx',
-    'app/(private)/proveedores/[id]/components/delete-catalog-line-dialog.tsx',
-    'app/(private)/proveedores/[id]/components/delete-supplier-dialog.tsx',
-  ].map(
-    (archivo): Exclusion => ({
-      archivo,
-      reglas: ['compara-inesperado'],
-      motivo: 'R12: la etiqueta del contenedor cambia segun la rama (div/p); se conserva la comparacion',
-    }),
-  ),
   // R31: alias de EMPTY_MARK que importan archivos fuera de Archivos esperados.
   {
     archivo: 'app/(private)/inventario/components/product-columns.tsx',

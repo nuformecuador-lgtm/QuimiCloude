@@ -187,3 +187,95 @@ describe('ErrorAlert — la etiqueta del contenedor', () => {
     expect(alerta).toContainElement(screen.getByTestId(UNEXPECTED_ERROR_NOTICE_TESTID));
   });
 });
+
+describe('ErrorAlert — la etiqueta de la rama de catalogo', () => {
+  it('R11 — sin cataloguedAs la rama de catalogo usa la etiqueta de as', () => {
+    render(<ErrorAlert error={CATALOGADO} as="p" testId="alerta" />);
+
+    const alerta = screen.getByTestId('alerta');
+    expect(alerta.tagName).toBe('P');
+    expect(alerta.children).toHaveLength(0);
+    expect(alerta).toHaveTextContent(CATALOGADO.message);
+  });
+
+  it('R11 — cataloguedAs no cambia el default: sin as ni cataloguedAs, div con un p dentro', () => {
+    const { container: conProp } = render(
+      <ErrorAlert error={CATALOGADO} cataloguedAs="div" testId="alerta" />,
+    );
+    const html = conProp.innerHTML;
+    cleanup();
+    const { container: sinProp } = render(<ErrorAlert error={CATALOGADO} testId="alerta" />);
+
+    expect(sinProp.innerHTML).toBe(html);
+    expect(sinProp.innerHTML).toBe(
+      `<div role="alert" data-testid="alerta"><p>${CATALOGADO.message}</p></div>`,
+    );
+  });
+
+  it('R10 R11 — cataloguedAs="p" con un error de catalogo pinta el mensaje pelado en un p', () => {
+    const { container } = render(
+      <ErrorAlert
+        error={CATALOGADO}
+        cataloguedAs="p"
+        className="text-sm text-destructive"
+        testId="delete-product-error"
+      />,
+    );
+
+    expect(container.innerHTML).toBe(
+      `<p role="alert" class="text-sm text-destructive" data-testid="delete-product-error">${CATALOGADO.message}</p>`,
+    );
+  });
+
+  it('R10 R11 — cataloguedAs="p" no toca la rama inesperada: sigue siendo un div con el aviso', () => {
+    render(
+      <ErrorAlert
+        error={INESPERADO}
+        cataloguedAs="p"
+        className="text-sm text-destructive"
+        testId="delete-product-error"
+      />,
+    );
+
+    const alerta = screen.getByTestId('delete-product-error');
+    expect(alerta.tagName).toBe('DIV');
+    expect(alerta).toHaveAttribute('role', 'alert');
+    expect(alerta).toHaveAttribute('class', 'text-sm text-destructive');
+    expect(alerta.children).toHaveLength(1);
+    expect(alerta.firstElementChild).toBe(screen.getByTestId(UNEXPECTED_ERROR_NOTICE_TESTID));
+    expect(screen.getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toHaveTextContent(
+      REFERENCIA,
+    );
+  });
+
+  it('R11 — cataloguedAs="p" sin testId ni className pinta un p con solo el rol', () => {
+    const { container } = render(<ErrorAlert error={CATALOGADO} cataloguedAs="p" />);
+
+    expect(container.innerHTML).toBe(`<p role="alert">${CATALOGADO.message}</p>`);
+  });
+
+  it('R11 — cataloguedAs="p" respeta un renderCatalogued explicito', () => {
+    render(
+      <ErrorAlert
+        error={CATALOGADO}
+        cataloguedAs="p"
+        testId="alerta"
+        renderCatalogued={(error) => <span data-testid="rama-catalogo">{error.code}</span>}
+      />,
+    );
+
+    const alerta = screen.getByTestId('alerta');
+    expect(alerta.tagName).toBe('P');
+    expect(alerta.firstElementChild).toBe(screen.getByTestId('rama-catalogo'));
+  });
+
+  it('R11 — as="p" y cataloguedAs="div": cada rama usa su etiqueta', () => {
+    render(<ErrorAlert error={CATALOGADO} as="p" cataloguedAs="div" testId="alerta" />);
+    expect(screen.getByTestId('alerta').tagName).toBe('DIV');
+    expect(screen.getByTestId('alerta').firstElementChild?.tagName).toBe('P');
+    cleanup();
+
+    render(<ErrorAlert error={INESPERADO} as="p" cataloguedAs="div" testId="alerta" />);
+    expect(screen.getByTestId('alerta').tagName).toBe('P');
+  });
+});
