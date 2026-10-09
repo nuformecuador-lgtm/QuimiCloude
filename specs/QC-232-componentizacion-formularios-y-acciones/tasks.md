@@ -164,7 +164,7 @@ Se conservan los exports, los testids y los textos (R5, R10, R15, R17).
     company, finished y packing deleguen en él. Sus archivos y sus exports se quedan.
   - **Hecho cuando:** `asignacion-paridad.test.tsx` y los tests de `asignaciones-ui` que no son de
     QC-217 pasan **sin regenerar ni editar**.
-- [ ] **T4b [P]. Traspasos de QC-231** (R26; `design.md > 6`).
+- [x] **T4b [P]. Traspasos de QC-231** (R26; `design.md > 6`).
   - **Qué se hace:**
     - se borran los alias `EMPTY_CELL`, y `product-batches-panel.tsx` y `supplier-detail-header.tsx`
       pasan a `EMPTY_MARK`;
@@ -224,7 +224,6 @@ lista aquí, para que `archivos-en-vuelo` no lo lea como ruta de esta feature. L
 - `components/shared/data-table/actions-column.tsx`
 - `components/shared/data-table/index.ts`
 - `components/shared/data-table/data-table-filter-date.tsx` (P6)
-- `components/shared/step-reader/step-document-view.tsx` (P5)
 - `components/shared/supplier/supplier-form.tsx`
 - `components/shared/supplier/supplier-sheet.tsx`
 - `components/shared/supplier/supplier-field.tsx`
