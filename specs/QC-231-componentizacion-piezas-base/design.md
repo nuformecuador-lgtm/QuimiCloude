@@ -520,6 +520,12 @@ librerías nuevas.
 Los tests de convenciones por ruta que enumeran archivos (`*-convenciones.test.ts`,
 `*-route-contract.test.ts`) se ajustan **solo** para quitar de sus listas los archivos borrados.
 
+**Enmienda del 2026-10-08 (decisión del humano, `progress/features/QC-231.md > Decisiones`).** Hay
+dos tests de alcance basados en diff: `tests/unit/configuracion-ui/grupos/alcance.test.ts` (QC-85) y
+`tests/unit/shared/data-table-alcance.test.ts` (QC-56). Ambos creían estar en la rama de su feature
+porque el diff de QC-231 traía archivos compartidos. Se endurecen sus anclas: cada uno se activa
+solo en la rama de su feature, y el diff usa `--diff-filter=d`. Ningún caso se debilita.
+
 ## 14. Enmiendas a specs cerrados
 
 | Spec | Qué | Dónde se anota |

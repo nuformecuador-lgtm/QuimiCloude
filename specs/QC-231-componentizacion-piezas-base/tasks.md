@@ -256,7 +256,7 @@ y se anota en el impl.
 - `app/(private)/inventario/components/product-table-skeleton.tsx`
 - `app/(private)/inventario/components/product-list-empty.tsx`
 - `app/(private)/inventario/components/product-list-error.tsx`
-- `app/(private)/inventario/components/product-columns.tsx`
+- `app/(private)/inventario/components/product-columns.tsx` (su alias `EMPTY_CELL` pasa a QC-232: decisión del humano del 2026-10-08)
 - `app/(private)/inventario/components/finished-stock-list-section.tsx`
 - `app/(private)/inventario/components/finished-stock-table.tsx`
 - `app/(private)/inventario/components/finished-stock-columns.tsx`
@@ -358,7 +358,7 @@ y se anota en el impl.
 - `app/(private)/proveedores/[id]/components/catalog-table-skeleton.tsx`
 - `app/(private)/proveedores/[id]/components/catalog-list-empty.tsx`
 - `app/(private)/proveedores/[id]/components/catalog-list-error.tsx`
-- `app/(private)/proveedores/[id]/components/catalog-columns.tsx`
+- `app/(private)/proveedores/[id]/components/catalog-columns.tsx` (su alias `EMPTY_CELL` pasa a QC-232: decisión del humano del 2026-10-08)
 - `app/(private)/proveedores/[id]/components/catalog-line-sheet.tsx`
 - `app/(private)/proveedores/[id]/components/catalog-line-form.tsx`
 - `app/(private)/proveedores/[id]/components/unit-select.tsx`
@@ -509,6 +509,12 @@ y se anota en el impl.
 - `tests/unit/shared-ui/responsible-avatars.test.tsx`
 - `tests/unit/shared/data-table-viewport.test.tsx`
 - `tests/unit/shared/data-table-filter-date.test.tsx`
+
+### Tests de alcance con el ancla endurecida (decisión del humano del 2026-10-08, `progress/features/QC-231.md > Decisiones`)
+- `tests/unit/configuracion-ui/grupos/alcance.test.ts`: solo se activa en la rama de QC-85, y su
+  diff usa `--diff-filter=d`.
+- `tests/unit/shared/data-table-alcance.test.ts`: solo se activa en la rama de QC-56, y su diff usa
+  `--diff-filter=d`.
 
 ### Specs enmendados
 - `specs/QC-56-migrar-listas-a-tabla-compartida/requirements.md`
