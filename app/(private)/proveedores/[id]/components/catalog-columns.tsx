@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 
-import type { DataTableColumn } from '@/components/shared/data-table';
+import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
 import type {
   CatalogLineListItem,
@@ -147,8 +147,8 @@ export type CatalogColumnsDeps = {
   /** Diccionarios id -> nombre, construidos UNA vez por render de la seccion (R22, R46). */
   readonly directories: CatalogDirectories;
   /**
-   * Acciones de la fila (editar, dar de baja). Es un **slot**: la declaracion de columnas no
-   * importa el panel lateral ni el dialogo, los enchufa quien monta la tabla.
+   * Acciones de la fila (el menu de editar y dar de baja). Es un **slot**: la declaracion de
+   * columnas no importa el panel lateral ni el dialogo, los enchufa quien monta la tabla.
    */
   readonly rowActions: (line: CatalogLineListItem) => ReactNode;
 };
@@ -261,11 +261,12 @@ export function buildCatalogColumns({
       cell: (line) => formatCivilDate(line.updatedAt),
     },
     {
+      ...actionsColumn<CatalogLineListItem>({
+        id: ACTIONS_COLUMN_ID,
+        label: CATALOG_ACTIONS_COLUMN_LABEL,
+        cell: (line) => rowActions(line),
+      }),
       id: ACTIONS_COLUMN_ID,
-      label: CATALOG_ACTIONS_COLUMN_LABEL,
-      align: 'end',
-      pinnable: false,
-      cell: (line) => <div className="flex justify-end gap-1">{rowActions(line)}</div>,
     },
   ];
 }
