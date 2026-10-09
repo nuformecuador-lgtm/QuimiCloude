@@ -4,24 +4,13 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { ErrorAlert } from '@/components/shared/error-alert';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import type { ErrorCode } from '@/lib/modules/errores';
 import type { PresentationView } from '@/lib/modules/inventario';
 import {
   deletePresentationAction,
   type PresentationMutationFormState,
 } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Confirmacion del borrado de una presentacion (R27, R28, R25, `design.md > 7`).
@@ -73,8 +62,6 @@ export const DELETE_PRESENTATION_ID_FIELD = 'id';
 export const PRESENTATION_IN_USE_CODE = 'presentation_in_use' satisfies ErrorCode;
 
 const TITLE = 'Eliminar la presentación';
-const CONFIRM_LABEL = 'Eliminar';
-const CONFIRM_PENDING_LABEL = 'Eliminando…';
 const DISMISS_LABEL = 'Volver';
 const DELETE_SUCCESS = 'Presentación eliminada.';
 
@@ -108,55 +95,41 @@ export function DeletePresentationDialog({
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent data-testid={DELETE_PRESENTATION_DIALOG_TESTID}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{TITLE}</AlertDialogTitle>
-          <AlertDialogDescription data-testid={DELETE_PRESENTATION_MESSAGE_TESTID}>
+    <DeleteConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      texts={{
+        title: TITLE,
+        description: (
+          <>
             Se va a eliminar la presentación {presentation.name}. Esta acción no se puede deshacer.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        {error === undefined ? null : (
-          <ErrorAlert
-            error={error}
-            id={errorId}
-            className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            testId={DELETE_PRESENTATION_ERROR_TESTID}
-            withDataCode
-            renderCatalogued={(catalogued) => (
-              <p data-testid={DELETE_PRESENTATION_ERROR_MESSAGE_TESTID}>{catalogued.message}</p>
-            )}
-          />
-        )}
-
-        <form action={formAction} data-testid={DELETE_PRESENTATION_FORM_TESTID}>
-          <input
-            type="hidden"
-            name={DELETE_PRESENTATION_ID_FIELD}
-            defaultValue={presentation.id}
-            data-testid={DELETE_PRESENTATION_ID_TESTID}
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              className={touchTarget}
-              data-testid={DELETE_PRESENTATION_DISMISS_TESTID}
-            >
-              {DISMISS_LABEL}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              type="submit"
-              variant="destructive"
-              className={touchTarget}
-              disabled={isPending}
-              aria-busy={isPending}
-              data-testid={DELETE_PRESENTATION_CONFIRM_TESTID}
-            >
-              {isPending ? CONFIRM_PENDING_LABEL : CONFIRM_LABEL}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </form>
-      </AlertDialogContent>
-    </AlertDialog>
+          </>
+        ),
+        dismiss: DISMISS_LABEL,
+      }}
+      testIds={{
+        dialog: DELETE_PRESENTATION_DIALOG_TESTID,
+        message: DELETE_PRESENTATION_MESSAGE_TESTID,
+        dismiss: DELETE_PRESENTATION_DISMISS_TESTID,
+        confirm: DELETE_PRESENTATION_CONFIRM_TESTID,
+        form: DELETE_PRESENTATION_FORM_TESTID,
+        error: DELETE_PRESENTATION_ERROR_TESTID,
+        errorMessage: DELETE_PRESENTATION_ERROR_MESSAGE_TESTID,
+      }}
+      submit={{
+        kind: 'action',
+        action: formAction,
+        hidden: [
+          {
+            name: DELETE_PRESENTATION_ID_FIELD,
+            value: presentation.id,
+            testId: DELETE_PRESENTATION_ID_TESTID,
+          },
+        ],
+      }}
+      isPending={isPending}
+      error={error}
+      errorId={errorId}
+    />
   );
 }

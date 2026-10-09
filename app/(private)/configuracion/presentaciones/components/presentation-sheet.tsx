@@ -1,12 +1,10 @@
 'use client';
 
 import { PlusIcon } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
-import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
+import { useEntitySheet } from '@/hooks/use-entity-sheet';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
@@ -77,27 +75,12 @@ export function PresentationSheet({
   open,
   onOpenChange,
 }: PresentationSheetProps) {
-  const [selfOpen, setSelfOpen] = useState(false);
-  const router = useRouter();
   const isEdit = presentation !== undefined;
-  const isControlled = open !== undefined;
-  const isOpen = open ?? selfOpen;
-
-  const changeOpen = useCallback(
-    (next: boolean) => {
-      if (!isControlled) setSelfOpen(next);
-      onOpenChange?.(next);
-    },
-    [isControlled, onOpenChange],
-  );
-
-  const handleSaved = useCallback(() => {
-    changeOpen(false);
-    toast.success(isEdit ? UPDATE_SUCCESS : CREATE_SUCCESS);
-    // Vuelve a ejecutar el Server Component de la lista con la MISMA URL: ni `push` ni `replace`,
-    // asi que pagina, tamano, orden y busqueda siguen siendo los de antes de abrir (R21, R25).
-    router.refresh();
-  }, [changeOpen, isEdit, router]);
+  const { isOpen, isControlled, changeOpen, handleSaved } = useEntitySheet({
+    open,
+    onOpenChange,
+    successMessage: isEdit ? UPDATE_SUCCESS : CREATE_SUCCESS,
+  });
 
   return (
     <Sheet open={isOpen} onOpenChange={changeOpen}>
