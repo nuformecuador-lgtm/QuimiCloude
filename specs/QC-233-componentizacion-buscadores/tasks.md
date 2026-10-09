@@ -105,7 +105,7 @@ pregunta al leader.
 
 ## Tanda 4 — Cierre (depende de todo lo anterior)
 
-- [ ] **T5. `./init.sh` en verde**, y `progress/impl_QC-233-componentizacion-buscadores.md` con:
+- [x] **T5. `./init.sh` en verde**, y `progress/impl_QC-233-componentizacion-buscadores.md` con:
   - el mapa R → test (`design.md > 13`);
   - el resultado de TA;
   - los repuntes de import de R4, si hubo alguno.
