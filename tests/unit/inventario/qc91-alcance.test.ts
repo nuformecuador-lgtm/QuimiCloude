@@ -481,10 +481,10 @@ describe('QC-91 R21 — calcular y dejar de escribir la existencia no toca ningu
     expect(llamaAUpdateFueraDe(leer(PRODUCT_CATALOG_PRISMA), 'adjustBatchStock')).toBe(false);
   });
 
-  it('R21: el alta y el agregado de lote siguen creando; el unico update vive en adjustBatchStock', () => {
+  it('R21: el alta y el agregado de lote siguen creando; los unicos update viven en adjustBatchStock y writeFinishedBatchLabels', () => {
     const fuente = leer(PRODUCT_PRISMA);
     expect(fuente).toMatch(/tx\.productBatch\.create\s*\(/);
-    expect(llamaAUpdateFueraDe(fuente, 'adjustBatchStock')).toBe(false);
+    expect(llamaAUpdateFueraDeLas(fuente, UPDATES_PERMITIDOS)).toBe(false);
   });
 
   it('R21, R30: el unico updateMany vive en consumeBatchStock -el decremento condicional del consumo-', () => {
@@ -660,5 +660,85 @@ describe('QC-91 — los extractores de bloques no se confunden con codigo pareci
     expect(cuerpo).not.toBeNull();
     expect(cuerpo).toMatch(/\bstock\s+Int\b/);
     expect(cuerpoDeModelo(fuente, 'Product')).not.toContain('stock');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// QC-219 R27 — UN SEGUNDO update NOMBRADO: LA ETIQUETA DEL LOTE, SIN TOCAR SU EXISTENCIA
+// ---------------------------------------------------------------------------------------------
+
+// Nota (2026-10-09, QC-219): `productBatch.update` se admite en `adjustBatchStock` Y en
+// `writeFinishedBatchLabels`, que escribe lote, vencimiento y dia de produccion de un lote de
+// produccion. Sigue prohibido en cualquier OTRA funcion, y `writeFinishedBatchLabels` no puede
+// escribir `stock` (ni `stock:` ni `increment`/`decrement`). Lo demas de R21 no cambia.
+
+/** Las funciones donde `productBatch.update` esta permitido, por su nombre exacto. */
+const UPDATES_PERMITIDOS = ['adjustBatchStock', 'writeFinishedBatchLabels'] as const;
+
+/** Como `llamaAUpdateFueraDe`, pero con varias funciones permitidas: quita el cuerpo de cada una y
+ *  busca el `update` en lo que queda. */
+export function llamaAUpdateFueraDeLas(fuente: string, permitidas: readonly string[]): boolean {
+  let resto = stripComments(fuente);
+  for (const nombre of permitidas) {
+    const cuerpo = cuerpoDeFuncion(fuente, nombre);
+    if (cuerpo !== null) resto = resto.replace(stripComments(cuerpo), '');
+  }
+  return /\.productBatch\.update\s*\(/.test(resto);
+}
+
+/** `stock:` en cualquier objeto, o un `increment`/`decrement`, dentro del cuerpo. */
+export function escribeStock(cuerpo: string): boolean {
+  return declaraCampoStockPlano(cuerpo) || /\b(?:increment|decrement)\b/.test(cuerpo);
+}
+
+describe('QC-219 R27 — writeFinishedBatchLabels: un update nombrado que no escribe la existencia', () => {
+  it('R27: writeFinishedBatchLabels existe en product-prisma.ts y no escribe stock', () => {
+    const cuerpo = cuerpoDeFuncion(leer(PRODUCT_PRISMA), 'writeFinishedBatchLabels');
+    expect(cuerpo, 'writeFinishedBatchLabels no existe con esa forma: el sujeto de esta prueba cambio').not.toBeNull();
+    expect(cuerpo as string).toMatch(/\.productBatch\.update\s*\(/);
+    expect(escribeStock(cuerpo as string)).toBe(false);
+  });
+
+  it('R27: product-catalog-prisma.ts tampoco tiene un update fuera de las dos funciones permitidas', () => {
+    expect(llamaAUpdateFueraDeLas(leer(PRODUCT_CATALOG_PRISMA), UPDATES_PERMITIDOS)).toBe(false);
+  });
+
+  it('R27: un update en cualquiera de las dos funciones permitidas no es hallazgo', () => {
+    const fuente = [
+      'export async function adjustBatchStock(batchId) {',
+      '  return tx.productBatch.update({ where: { id: batchId } });',
+      '}',
+      'export async function writeFinishedBatchLabels(tx, input, scope) {',
+      '  return tx.productBatch.update({ where: { id: 1 }, data: { lot } });',
+      '}',
+    ].join('\n');
+    expect(llamaAUpdateFueraDeLas(fuente, UPDATES_PERMITIDOS)).toBe(false);
+  });
+
+  it('R27: el MISMO update en una tercera funcion si es hallazgo (mutacion)', () => {
+    const fuente = [
+      'export async function writeFinishedBatchLabels(tx, input, scope) {',
+      '  return tx.productBatch.update({ where: { id: 1 }, data: { lot } });',
+      '}',
+      'export async function relabelElsewhere(tx) {',
+      '  return tx.productBatch.update({ where: { id: 1 }, data: { lot } });',
+      '}',
+    ].join('\n');
+    expect(llamaAUpdateFueraDeLas(fuente, UPDATES_PERMITIDOS)).toBe(true);
+    // Y la lista vieja, de una sola funcion, tambien lo veria: el permiso es por nombre exacto.
+    expect(llamaAUpdateFueraDe(fuente, 'adjustBatchStock')).toBe(true);
+  });
+
+  it('R27: un stock: o un increment/decrement dentro de writeFinishedBatchLabels da rojo (mutacion)', () => {
+    for (const data of ['{ lot, stock: 0 }', '{ lot, stock: { increment: 1 } }', '{ lot, otra: { decrement: 1 } }']) {
+      const fuente = [
+        'export async function writeFinishedBatchLabels(tx, input, scope) {',
+        `  return tx.productBatch.update({ where: { id: 1 }, data: ${data} });`,
+        '}',
+      ].join('\n');
+      const cuerpo = cuerpoDeFuncion(fuente, 'writeFinishedBatchLabels');
+      expect(cuerpo).not.toBeNull();
+      expect(escribeStock(cuerpo as string), data).toBe(true);
+    }
   });
 });
