@@ -357,7 +357,7 @@ describe('los tres estados son mutuamente excluyentes y se distinguen por data-t
     expect(screen.getByTestId(UNIT_LIST_EMPTY_TESTID)).toBeInTheDocument();
     // El alta vive en la cabecera de la pagina (decision humana 2026-10-02), no en el estado
     // vacio de la lista: por eso sigue en el DOM aqui. Lo que aparta a esta pantalla de su
-    // hermana es que `UnitListEmpty` en si no lleva ningun slot de «crear la primera».
+    // hermana es que el vacio en si no lleva ningun slot de «crear la primera».
     expect(screen.getByTestId(UNIT_CREATE_OPEN_TESTID)).toBeInTheDocument();
     // Sin termino y en la primera pagina, tampoco se ofrece limpiar ni volver: no aplican.
     expect(screen.queryByTestId(UNIT_LIST_CLEAR_SEARCH_TESTID)).toBeNull();

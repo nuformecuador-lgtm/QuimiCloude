@@ -6,11 +6,13 @@ import { useMemo } from 'react';
 import {
   DataTable,
   type DataTableParams,
+  type DataTableStates,
   type DataTableTexts,
 } from '@/components/shared/data-table';
+import type { ErrorState } from '@/lib/modules/errores';
 import type { UnitView } from '@/lib/modules/unidades';
 
-import { createUnitColumns, type UnitBaseIndex } from './unit-columns';
+import { UNIT_COLUMN_COUNT, createUnitColumns, type UnitBaseIndex } from './unit-columns';
 import { unitListHref } from './unit-list-params';
 
 /**
@@ -33,10 +35,6 @@ import { unitListHref } from './unit-list-params';
  * **`searchable` AUSENTE (= `true`)**, porque `UNIT_QUERYABLE.searchable` es `true`; y el texto de
  * la caja de busqueda dice **por nombre**, porque el adaptador compara contra `nameNormalized` y
  * nada mas (R18): una caja que insinuara «nombre o simbolo» mentiria.
- *
- * **`status` es SIEMPRE `'idle'`**: los tres estados de R24/R25/R26 se pintan fuera de
- * `<DataTable>`, con copy y acciones propias, y el «cargando» lo aporta el `<Suspense>` del
- * servidor. Aqui solo llegan filas ya resueltas.
  *
  * **El desbordamiento horizontal lo absorbe el primitivo** (R27): `components/ui/table.tsx` ya
  * envuelve la tabla en un contenedor con `overflow-x-auto`, asi que con cuatro columnas —y la de
@@ -75,7 +73,36 @@ export const UNIT_TABLE_TEXTS: DataTableTexts = {
   lastYear: 'Último año',
 };
 
-export type UnitTableProps = {
+export const UNIT_LIST_SKELETON_TESTID = 'unit-list-skeleton';
+export const UNIT_ROW_SKELETON_TESTID = 'unit-row-skeleton';
+export const UNIT_SKELETON_COLUMN_COUNT = UNIT_COLUMN_COUNT;
+
+export const UNIT_LIST_EMPTY_TESTID = 'unit-list-empty';
+export const UNIT_LIST_EMPTY_MESSAGE_TESTID = 'unit-list-empty-message';
+export const UNIT_LIST_CLEAR_SEARCH_TESTID = 'unit-list-clear-search';
+export const UNIT_LIST_FIRST_PAGE_TESTID = 'unit-list-first-page';
+
+export const UNIT_LIST_ERROR_TESTID = 'unit-list-error';
+export const UNIT_LIST_ERROR_MESSAGE_TESTID = 'unit-list-error-message';
+export const UNIT_LIST_ERROR_CODE_TESTID = 'unit-list-error-code';
+export const UNIT_LIST_RETRY_TESTID = 'unit-list-retry';
+
+type UnitTableStatusProps =
+  | { readonly status?: 'idle' | 'loading'; readonly error?: undefined }
+  | { readonly status: 'error'; readonly error: ErrorState };
+
+/**
+ * El vacio de unidades no ofrece «crear la primera»: las unidades de sistema estan siempre en el
+ * ambito, asi que una lista vacia solo puede venir del termino o de la pagina pedidos.
+ */
+export type UnitTableEmpty = {
+  /** Solo si habia termino de busqueda. */
+  readonly clearSearchHref?: string;
+  /** Solo si la pagina pedida era mayor que el total. */
+  readonly firstPageHref?: string;
+};
+
+export type UnitTableProps = UnitTableStatusProps & {
   /** Las filas **ya resueltas** por la consulta, en el orden en que las entrega (R18, R19). */
   readonly units: readonly UnitView[];
   /**
@@ -89,9 +116,80 @@ export type UnitTableProps = {
   /** Los parametros vigentes, los mismos con los que se pidio la lista. */
   readonly params: DataTableParams;
   readonly totalPages: number;
+  /** Presente solo con cero filas: el vacio sustituye a toda la tabla. */
+  readonly empty?: UnitTableEmpty;
 };
 
-export function UnitTable({ units, baseIndex, baseUnits, params, totalPages }: UnitTableProps) {
+function buildStates(
+  params: DataTableParams,
+  error: ErrorState | undefined,
+  empty: UnitTableEmpty | undefined,
+): DataTableStates {
+  return {
+    loading: {
+      columns: UNIT_SKELETON_COLUMN_COUNT,
+      rows: params.pageSize,
+      label: UNIT_TABLE_TEXTS.loading,
+      testId: UNIT_LIST_SKELETON_TESTID,
+      rowTestId: UNIT_ROW_SKELETON_TESTID,
+      headCellClassName: 'h-4 w-full',
+    },
+    ...(error === undefined
+      ? {}
+      : {
+          error: {
+            error,
+            title: UNIT_TABLE_TEXTS.error,
+            testId: UNIT_LIST_ERROR_TESTID,
+            messageTestId: UNIT_LIST_ERROR_MESSAGE_TESTID,
+            codeTestId: UNIT_LIST_ERROR_CODE_TESTID,
+            retry: { kind: 'refresh' },
+            retryTestId: UNIT_LIST_RETRY_TESTID,
+          },
+        }),
+    ...(empty === undefined
+      ? {}
+      : {
+          empty: {
+            testId: UNIT_LIST_EMPTY_TESTID,
+            messageTestId: UNIT_LIST_EMPTY_MESSAGE_TESTID,
+            message:
+              empty.clearSearchHref === undefined
+                ? 'No hay unidades que coincidan con lo que se está pidiendo.'
+                : 'La búsqueda no encontró ninguna unidad.',
+            ...(empty.clearSearchHref === undefined
+              ? {}
+              : {
+                  clearSearch: {
+                    href: empty.clearSearchHref,
+                    label: 'Limpiar la búsqueda',
+                    testId: UNIT_LIST_CLEAR_SEARCH_TESTID,
+                  },
+                }),
+            ...(empty.firstPageHref === undefined
+              ? {}
+              : {
+                  firstPage: {
+                    href: empty.firstPageHref,
+                    label: 'Volver a la primera página',
+                    testId: UNIT_LIST_FIRST_PAGE_TESTID,
+                  },
+                }),
+          },
+        }),
+  };
+}
+
+export function UnitTable({
+  units,
+  baseIndex,
+  baseUnits,
+  params,
+  totalPages,
+  status = 'idle',
+  error,
+  empty,
+}: UnitTableProps) {
   const router = useRouter();
   // Las columnas se rearman solo cuando cambian los datos que resuelven sus celdas.
   const columns = useMemo(() => createUnitColumns(baseIndex, baseUnits), [baseIndex, baseUnits]);
@@ -105,7 +203,8 @@ export function UnitTable({ units, baseIndex, baseUnits, params, totalPages }: U
       params={params}
       totalPages={totalPages}
       onParamsChange={(next) => router.push(unitListHref(next))}
-      status="idle"
+      status={status}
+      states={buildStates(params, error, empty)}
       texts={UNIT_TABLE_TEXTS}
     />
   );

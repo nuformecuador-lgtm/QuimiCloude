@@ -3,7 +3,7 @@
 //
 // Sin `'use client'`: la frontera cliente/servidor se declara en CADA archivo de componente, nunca
 // aqui. Asi `page.tsx` sigue siendo Server Component aunque importe desde el barrel, y
-// `unit-list-error.tsx` (cliente) convive con `unit-list-section.tsx` (servidor).
+// `unit-table.tsx` (cliente) convive con `unit-list-section.tsx` (servidor).
 //
 // La pagina y todo consumidor de fuera de la carpeta importan SIEMPRE desde aqui, nunca por ruta
 // profunda. Entre hermanos de la propia carpeta los importes siguen siendo RELATIVOS: entrar por el
@@ -71,22 +71,6 @@ export {
 } from './unit-form';
 export { UNITS_LABEL } from './unit-labels';
 export {
-  UNIT_LIST_CLEAR_SEARCH_TESTID,
-  UNIT_LIST_EMPTY_MESSAGE_TESTID,
-  UNIT_LIST_EMPTY_TESTID,
-  UNIT_LIST_FIRST_PAGE_TESTID,
-  UnitListEmpty,
-  type UnitListEmptyProps,
-} from './unit-list-empty';
-export {
-  UNIT_LIST_ERROR_CODE_TESTID,
-  UNIT_LIST_ERROR_MESSAGE_TESTID,
-  UNIT_LIST_ERROR_TESTID,
-  UNIT_LIST_RETRY_TESTID,
-  UnitListError,
-  type UnitListErrorProps,
-} from './unit-list-error';
-export {
   FIRST_PAGE,
   PAGE_PARAM,
   PAGE_SIZE_PARAM,
@@ -100,12 +84,6 @@ export {
 } from './unit-list-params';
 export { UNIT_LIST_TESTID, UnitListSection, type UnitListSectionProps } from './unit-list-section';
 export {
-  UNIT_LIST_SKELETON_TESTID,
-  UNIT_ROW_SKELETON_TESTID,
-  UNIT_SKELETON_COLUMN_COUNT,
-  UnitListSkeleton,
-} from './unit-list-skeleton';
-export {
   UNIT_ACTION_DELETE_TESTID,
   UNIT_ACTION_EDIT_TESTID,
   UNIT_ROW_ACTIONS_TESTID,
@@ -115,4 +93,21 @@ export {
   type UnitRowActionsProps,
 } from './unit-row-actions';
 export { UNIT_CREATE_OPEN_TESTID, UnitSheet, type UnitSheetProps } from './unit-sheet';
-export { UNIT_TABLE_ID, UNIT_TABLE_TEXTS, UnitTable, type UnitTableProps } from './unit-table';
+export {
+  UNIT_LIST_CLEAR_SEARCH_TESTID,
+  UNIT_LIST_EMPTY_MESSAGE_TESTID,
+  UNIT_LIST_EMPTY_TESTID,
+  UNIT_LIST_ERROR_CODE_TESTID,
+  UNIT_LIST_ERROR_MESSAGE_TESTID,
+  UNIT_LIST_ERROR_TESTID,
+  UNIT_LIST_FIRST_PAGE_TESTID,
+  UNIT_LIST_RETRY_TESTID,
+  UNIT_LIST_SKELETON_TESTID,
+  UNIT_ROW_SKELETON_TESTID,
+  UNIT_SKELETON_COLUMN_COUNT,
+  UNIT_TABLE_ID,
+  UNIT_TABLE_TEXTS,
+  UnitTable,
+  type UnitTableEmpty,
+  type UnitTableProps,
+} from './unit-table';
