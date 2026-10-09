@@ -33,6 +33,7 @@ import {
   USER_STATUS_ID_TESTID,
   UserTable,
   WORK_GROUP_ACTION_DELETE_TESTID,
+  WORK_GROUP_ROW_ACTIONS_TESTID,
   WorkGroupTable,
 } from '@/app/(private)/configuracion/usuarios/components';
 import {
@@ -390,7 +391,10 @@ describe('grupos de trabajo: borrado (R33)', () => {
       <WorkGroupTable groups={GRUPOS} params={parametros()} totalPages={1} canModify />,
     );
     const fila = screen.getByTestId(`data-table-row-${GRUPOS[0]!.id}`);
-    await user.click(within(fila).getByTestId(WORK_GROUP_ACTION_DELETE_TESTID));
+    await user.click(within(fila).getByTestId(WORK_GROUP_ROW_ACTIONS_TESTID));
+    await user.click(
+      await esperarInteractiva(await screen.findByTestId(WORK_GROUP_ACTION_DELETE_TESTID)),
+    );
     await screen.findByTestId(DELETE_WORK_GROUP_DIALOG_TESTID);
 
     salidaEnCurso();
