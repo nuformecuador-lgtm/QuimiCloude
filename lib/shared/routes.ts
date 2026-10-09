@@ -298,8 +298,6 @@ export const CANCELLED_ORDER_PARAM = 'cancelado';
  */
 export const CUSTOMERS_ROUTE = '/clientes';
 
-// Aun fuera de `PRIVATE_ROUTE_PREFIXES`: esa lista solo admite rutas con pantalla, y el corte por
-// permiso lo pondra cada pagina cuando exista.
 export const AI_PROVIDER_INTEGRATION_ROUTE = '/integraciones/proveedor-ia';
 export const INVENTORY_INTEGRATION_ROUTE = '/integraciones/inventarios';
 export const WHATSAPP_INTEGRATION_ROUTE = '/integraciones/whatsapp';
@@ -348,4 +346,7 @@ export const PRIVATE_ROUTE_PREFIXES = [
   // segmentos ya cubriria cualquier subcamino. Cubre SESION; el permiso `clientes.consultar` lo
   // exige la propia pantalla.
   CUSTOMERS_ROUTE,
+  AI_PROVIDER_INTEGRATION_ROUTE,
+  INVENTORY_INTEGRATION_ROUTE,
+  WHATSAPP_INTEGRATION_ROUTE,
 ] as const;

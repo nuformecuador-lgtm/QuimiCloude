@@ -97,8 +97,6 @@ export type FileFieldProps = {
   readonly testIdPrefix: string;
 };
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 /** Estado visual de la zona: reposo, arrastre encima, trabajando y error. */
 const DROPZONE_BASE =
   'relative flex min-h-36 cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors focus-within:ring-3 focus-within:ring-ring/50';
@@ -342,7 +340,8 @@ export function FileField({
         <Button
           type="button"
           variant="outline"
-          className={`${TOUCH_TARGET} self-start`}
+          touch
+          className="self-start"
           data-testid={`${testIdPrefix}-clear`}
           onClick={handleClear}
         >

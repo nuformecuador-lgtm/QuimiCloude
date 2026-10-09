@@ -10,8 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 export type ConfirmActionDialogTexts = {
   readonly title: string;
@@ -51,12 +50,12 @@ export function ConfirmActionDialog({
           <AlertDialogDescription>{texts.description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel className={TOUCH_TARGET} data-testid={`${testId}-cancel`}>
+          <AlertDialogCancel className={touchTarget} data-testid={`${testId}-cancel`}>
             {texts.cancel}
           </AlertDialogCancel>
           <AlertDialogAction
             type="button"
-            className={TOUCH_TARGET}
+            className={touchTarget}
             data-testid={confirmTestId}
             onClick={() => {
               onOpenChange(false);

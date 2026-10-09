@@ -4,8 +4,6 @@ import type { UnitRef } from '@/lib/modules/unidades';
 
 import { buildCatalogDirectories } from './catalog-directories';
 import { CatalogLineSheet } from './catalog-line-sheet';
-import { CatalogListEmpty } from './catalog-list-empty';
-import { CatalogListError } from './catalog-list-error';
 import { FIRST_PAGE, catalogListHref } from './catalog-list-params';
 import { CatalogTable } from './catalog-table';
 
@@ -55,24 +53,37 @@ export async function CatalogListSection({
   const result = await listCatalogLinesAction(supplierId, params);
 
   if (result.status === 'error') {
-    return <CatalogListError error={result} />;
+    return (
+      <CatalogTable
+        status="error"
+        error={result}
+        lines={[]}
+        params={params}
+        totalPages={0}
+        supplierId={supplierId}
+        units={units}
+      />
+    );
   }
 
   const { items, page: currentPage, totalPages } = result.data;
 
+  // Con busqueda activa tambien: el catalogo no tiene estado «sin resultados» propio.
   if (items.length === 0) {
     return (
-      <CatalogListEmpty
-        firstPageHref={
-          currentPage > FIRST_PAGE
-            ? catalogListHref(supplierId, { ...params, page: FIRST_PAGE })
-            : undefined
-        }
-      >
-        {/* R23 — lo unico util en un catalogo vacio es anadir la primera linea, y se ofrece a
-            mano. El estado vacio no conoce el panel: lo recibe como slot. */}
-        <CatalogLineSheet supplierId={supplierId} units={units} />
-      </CatalogListEmpty>
+      <CatalogTable
+        lines={items}
+        params={params}
+        totalPages={totalPages}
+        supplierId={supplierId}
+        units={units}
+        empty={{
+          firstPageHref:
+            currentPage > FIRST_PAGE
+              ? catalogListHref(supplierId, { ...params, page: FIRST_PAGE })
+              : undefined,
+        }}
+      />
     );
   }
 

@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useId } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +14,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import {
   createCustomerSchema,
   CUSTOMER_FIRST_NAMES_MAX_LENGTH,
@@ -100,8 +100,6 @@ export const CUSTOMER_ERROR_TESTIDS: Readonly<Record<CustomerFieldName, string>>
   email: 'customer-error-email',
   address: 'customer-error-address',
 };
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /** 16 px en TODOS los anchos: por debajo, iOS hace zoom al enfocar el campo. */
 const FIELD_TEXT = 'text-base md:text-base';
@@ -288,24 +286,21 @@ export function CustomerForm({ customer, onSaved }: CustomerFormProps) {
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
         {formError === undefined ? null : (
-          <div
-            role="alert"
+          <ErrorAlert
+            error={formError}
             id={formErrorId}
             className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={CUSTOMER_FORM_ERROR_TESTID}
-            data-code={formError.code}
-          >
-            {formError.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={formError} />
-            ) : (
+            testId={CUSTOMER_FORM_ERROR_TESTID}
+            withDataCode
+            renderCatalogued={(catalogued) => (
               <>
-                <p>{formError.message}</p>
+                <p>{catalogued.message}</p>
                 <p className="text-xs" data-testid={CUSTOMER_FORM_ERROR_CODE_TESTID}>
-                  {formError.code}
+                  {catalogued.code}
                 </p>
               </>
             )}
-          </div>
+          />
         )}
 
         {CUSTOMER_BUSINESS_FIELDS.map((field) => (
@@ -390,7 +385,7 @@ function FormActions() {
           <Button
             type="button"
             variant="outline-dashed"
-            className={TOUCH_TARGET}
+            touch
             data-testid={CUSTOMER_FORM_CANCEL_TESTID}
           />
         }
@@ -412,7 +407,7 @@ function SaveButton() {
   return (
     <Button
       type="submit"
-      className={TOUCH_TARGET}
+      touch
       disabled={pending}
       aria-busy={pending}
       data-testid={CUSTOMER_FORM_SUBMIT_TESTID}

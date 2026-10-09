@@ -5,6 +5,7 @@ import { useEffect, useState, type RefObject } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
 /**
@@ -29,9 +30,6 @@ import { cn } from '@/lib/utils';
 /** Etiquetas internas cuando `texts.scrollLeft/scrollRight` no llegan (opcionales, `data-table-types.ts`). */
 export const SCROLL_LEFT_FALLBACK = 'Desplazar la tabla a la izquierda';
 export const SCROLL_RIGHT_FALLBACK = 'Desplazar la tabla a la derecha';
-
-/** Objetivo tactil minimo (44 px), mismo criterio que `data-table-header-menu.tsx` (R27). */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /** Cuanto avanza cada pulsacion: tres cuartos del ancho visible, con un minimo para tablas angostas. */
 const SCROLL_FRACTION = 0.75;
@@ -142,7 +140,7 @@ export function DataTableScrollNav({
    */
   const arrowClass = cn(
     'pointer-events-auto sticky top-[50vh] z-20 -translate-y-1/2 rounded-full border bg-background/95 shadow-md backdrop-blur transition-colors active:not-aria-[haspopup]:-translate-y-1/2',
-    TOUCH_TARGET,
+    touchTarget,
   );
 
   /*

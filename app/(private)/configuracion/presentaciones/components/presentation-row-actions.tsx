@@ -16,7 +16,7 @@ import { PresentationSheet } from './presentation-sheet';
  *
  * **Siempre visibles y siempre en el DOM.** Nada se descubre con `:hover` -que en tactil no
  * existe- y nada vive dentro de un desplegable que los esconda (R19, R34): los dos controles
- * estan pintados desde el primer render y cada uno mide al menos 44x44 px (`TOUCH_TARGET`).
+ * estan pintados desde el primer render y cada uno mide al menos 44x44 px.
  *
  * **Cada boton NOMBRA la presentacion sobre la que actua** en su `aria-label` (R19). Con varias
  * filas en pantalla, «Editar» a secas no dice cual: quien navega con lector de pantalla oiria
@@ -37,9 +37,6 @@ import { PresentationSheet } from './presentation-sheet';
  * accion limpio: un `presentation_in_use` de un intento anterior no reaparece, y el arbol de una
  * fila cerrada no contiene ningun formulario de borrado.
  */
-
-/** Objetivo tactil minimo (44x44 px) de R34. Los primitivos miden 32 px de alto por defecto. */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 export const PRESENTATION_ROW_ACTIONS_TESTID = 'presentation-row-actions';
 export const PRESENTATION_ACTION_EDIT_TESTID = 'presentation-action-edit';
@@ -79,7 +76,7 @@ export function PresentationRowActions({ presentation, units }: PresentationRowA
         type="button"
         variant="ghost"
         size="icon"
-        className={TOUCH_TARGET}
+        touch
         aria-label={editPresentationLabel(presentation.name)}
         data-testid={PRESENTATION_ACTION_EDIT_TESTID}
         onClick={() => setEditOpen(true)}
@@ -91,7 +88,7 @@ export function PresentationRowActions({ presentation, units }: PresentationRowA
         type="button"
         variant="ghost"
         size="icon"
-        className={TOUCH_TARGET}
+        touch
         aria-label={deletePresentationLabel(presentation.name)}
         data-testid={PRESENTATION_ACTION_DELETE_TESTID}
         onClick={() => setDeleteOpen(true)}

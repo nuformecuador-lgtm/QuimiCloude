@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 
 import { previewFormulaImportAction } from '@/lib/modules/documentos/adapters/driving/formula-import-actions';
-import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorState } from '@/lib/modules/errores';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
@@ -12,7 +12,7 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { FORMULAS_ROUTE } from '@/lib/shared/routes';
 import { cn } from '@/lib/utils';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { buttonVariants } from '@/components/ui/button';
 
 import { FormulaImportReview } from './components';
@@ -31,32 +31,31 @@ const FIRST_PAGE = 1;
  */
 function ImportErrorNotice({ error }: { readonly error: ErrorState }) {
   return (
-    <div
-      role="alert"
+    <ErrorAlert
+      error={error}
       className="flex flex-col items-start gap-3 rounded-lg border border-destructive/40 p-4"
-      data-testid="formula-import-error"
-    >
-      {error.code === UNEXPECTED_ERROR_CODE ? (
-        <UnexpectedErrorNotice state={error} />
-      ) : (
+      testId="formula-import-error"
+      renderCatalogued={(catalogued) => (
         <>
           <p className="text-sm text-muted-foreground" data-testid="formula-import-error-message">
             No se pudo abrir esta revisión.
           </p>
           <p className="text-xs text-muted-foreground" data-testid="formula-import-error-code">
-            {error.code}
+            {catalogued.code}
           </p>
         </>
       )}
-      <Link
-        href={FORMULAS_ROUTE}
-        data-slot="button"
-        className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11 min-w-11')}
-        data-testid="formula-import-error-back-link"
-      >
-        Volver al listado
-      </Link>
-    </div>
+      after={
+        <Link
+          href={FORMULAS_ROUTE}
+          data-slot="button"
+          className={cn(buttonVariants({ variant: 'outline', touch: true }))}
+          data-testid="formula-import-error-back-link"
+        >
+          Volver al listado
+        </Link>
+      }
+    />
   );
 }
 

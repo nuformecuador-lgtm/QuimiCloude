@@ -5,7 +5,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
 import { PresentationUnitSelect } from '@/components/shared/presentation-unit-select';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -30,6 +30,7 @@ import {
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import type { UnitView } from '@/lib/modules/unidades';
 import { trimDecimal } from '@/lib/shared/ui/decimal-display';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { BlockedOrderDialog } from './blocked-order-dialog';
 import { compatibleUnitIds } from './compatible-unit-ids';
@@ -46,8 +47,6 @@ export const ORDER_DISTRIBUTION_DIALOG_TESTID = 'order-distribution-dialog';
 export const ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID = 'order-distribution-dialog-submit';
 export const ORDER_DISTRIBUTION_DIALOG_DISMISS_TESTID = 'order-distribution-dialog-dismiss';
 export const ORDER_DISTRIBUTION_DIALOG_ERROR_TESTID = 'order-distribution-dialog-error';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 const WOULD_BLOCK_CODE = 'order_would_block' satisfies ErrorCode;
 
@@ -215,18 +214,12 @@ export function OrderDistributionDialog({
           />
 
           {error === null ? null : (
-            <div
-              role="alert"
+            <ErrorAlert
+              error={error}
               className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-              data-testid={ORDER_DISTRIBUTION_DIALOG_ERROR_TESTID}
-              data-code={error.code}
-            >
-              {error.code === UNEXPECTED_ERROR_CODE ? (
-                <UnexpectedErrorNotice state={error} />
-              ) : (
-                <p>{error.message}</p>
-              )}
-            </div>
+              testId={ORDER_DISTRIBUTION_DIALOG_ERROR_TESTID}
+              withDataCode
+            />
           )}
 
           <DialogFooter className="pb-[max(1rem,env(safe-area-inset-bottom))]">
@@ -235,7 +228,7 @@ export function OrderDistributionDialog({
                 <Button
                   type="button"
                   variant="outline"
-                  className={TOUCH_TARGET}
+                  className={touchTarget}
                   data-testid={ORDER_DISTRIBUTION_DIALOG_DISMISS_TESTID}
                 />
               }
@@ -244,7 +237,7 @@ export function OrderDistributionDialog({
             </DialogClose>
             <Button
               type="submit"
-              className={TOUCH_TARGET}
+              className={touchTarget}
               disabled={!canSave}
               data-testid={ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID}
             >

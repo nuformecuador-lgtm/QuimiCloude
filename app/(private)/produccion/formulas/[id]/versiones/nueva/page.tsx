@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { ErrorState } from '@/components/shared/error-state';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { errorMessage } from '@/lib/modules/errores';
 import { PRODUCT_TYPES } from '@/lib/modules/inventario';
@@ -10,14 +11,25 @@ import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-ac
 import { BRAND_LABEL, RECIPES_LABEL } from '@/lib/shared/navigation/private-nav';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { FORMULAS_ROUTE } from '@/lib/shared/routes';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
-import { RecipeListError, RecipeVersionForm } from '../../../components';
+import { RecipeVersionForm } from '../../../components';
 
 export const metadata: Metadata = {
   title: `Nueva versión · ${RECIPES_LABEL} · ${BRAND_LABEL}`,
 };
 
 const FIRST_PAGE = 1;
+
+// Los mismos testids que el error de la lista: los vigila el E2E de errores.
+const LOAD_ERROR = {
+  title: 'No se pudo cargar el catálogo.',
+  testId: 'recipe-list-error',
+  messageTestId: 'recipe-list-error-message',
+  codeTestId: 'recipe-list-error-code',
+  retry: { kind: 'refresh' },
+  retryTestId: 'recipe-list-retry',
+} as const;
 
 export default async function NuevaVersionPage({
   params,
@@ -65,7 +77,7 @@ export default async function NuevaVersionPage({
           </p>
           <Link
             href={FORMULAS_ROUTE}
-            className="min-h-11 min-w-11 text-sm underline"
+            className={`${touchTarget} text-sm underline`}
             data-testid="recipe-not-found-link"
           >
             Volver a la lista
@@ -78,7 +90,7 @@ export default async function NuevaVersionPage({
   if (recipeResult.status === 'error') {
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-        <RecipeListError error={recipeResult} />
+        <ErrorState error={recipeResult} {...LOAD_ERROR} />
       </div>
     );
   }
@@ -86,7 +98,7 @@ export default async function NuevaVersionPage({
   if (unitsResult.status === 'error') {
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-        <RecipeListError error={unitsResult} />
+        <ErrorState error={unitsResult} {...LOAD_ERROR} />
       </div>
     );
   }
@@ -94,7 +106,7 @@ export default async function NuevaVersionPage({
   if (productsResult.status === 'error') {
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-        <RecipeListError error={productsResult} />
+        <ErrorState error={productsResult} {...LOAD_ERROR} />
       </div>
     );
   }
@@ -102,7 +114,7 @@ export default async function NuevaVersionPage({
   if (machinesResult.status === 'error') {
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-        <RecipeListError error={machinesResult} />
+        <ErrorState error={machinesResult} {...LOAD_ERROR} />
       </div>
     );
   }

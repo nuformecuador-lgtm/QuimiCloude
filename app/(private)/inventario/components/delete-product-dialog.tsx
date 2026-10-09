@@ -16,16 +16,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import {
   deleteProductAction,
   type ProductMutationFormState,
 } from '@/lib/modules/inventario/adapters/driving/product-actions';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import type { ProductView } from '@/lib/modules/inventario';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 const DELETE_SUCCESS = 'Producto borrado.';
 
@@ -70,7 +68,7 @@ export function DeleteProductDialog({ product }: { readonly product: ProductView
         render={
           <Button
             variant="ghost"
-            className={TOUCH_TARGET}
+            touch
             aria-label={`Borrar ${product.name}`}
             data-testid="product-delete-open"
           />
@@ -86,32 +84,25 @@ export function DeleteProductDialog({ product }: { readonly product: ProductView
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        {/*
-          QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
-          identificador de la peticion -y necesita un contenedor de bloque, de ahi el `div`-. El
-          CATALOGADO se pinta exactamente como siempre: mismo `<p>`, mismo `data-testid`, sin
-          identificador ninguno.
-        */}
-        {state.status !== 'error' ? null : state.code === UNEXPECTED_ERROR_CODE ? (
-          <div role="alert" className="text-sm text-destructive" data-testid="delete-product-error">
-            <UnexpectedErrorNotice state={state} />
-          </div>
-        ) : (
-          <p role="alert" className="text-sm text-destructive" data-testid="delete-product-error">
-            {state.message}
-          </p>
+        {state.status !== 'error' ? null : (
+          <ErrorAlert
+            error={state}
+            cataloguedAs="p"
+            className="text-sm text-destructive"
+            testId="delete-product-error"
+          />
         )}
 
         <form action={formAction}>
           <input type="hidden" name="id" defaultValue={product.id} data-testid="delete-product-id" />
           <AlertDialogFooter>
-            <AlertDialogCancel className={TOUCH_TARGET} data-testid="delete-product-cancel">
+            <AlertDialogCancel className={touchTarget} data-testid="delete-product-cancel">
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
               type="submit"
               variant="destructive"
-              className={TOUCH_TARGET}
+              touch
               data-testid="delete-product-confirm"
             >
               Borrar

@@ -116,6 +116,10 @@ export const E2E_ESPERADOS = [
   // afirma nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71
   // R21 sigue INTACTO.
   'ajuste-de-inventario.spec.ts',
+  // Alta el 2026-10-08 (QC-226) por el MISMO motivo que las demas. Lo que ejercita: sin sesion,
+  // el manifest, los iconos y la imagen OG responden 2xx sin redirigir, y el <head> de /login los
+  // enlaza. No lee ni afirma nada sobre el identificador de peticion.
+  'brand-assets.spec.ts',
   // QC-101 T10 / R17: la E2E del cierre de TODAS las sesiones de otra persona desde la pantalla.
   // Alta por el MISMO motivo y en el MISMO sitio que las de QC-49, QC-67, QC-79, QC-85 y QC-102:
   // esta lista es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO
@@ -181,6 +185,16 @@ export const E2E_ESPERADOS = [
   // sigue INTACTO.
   'formula-desde-pdf.spec.ts',
   'grupos-de-trabajo.spec.ts',
+  // Alta el 2026-10-08 (QC-222 R21) por el MISMO motivo y en el MISMO sitio que las demas: la
+  // lista es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se
+  // relaja -el archivo se nombra, uno a uno-. Lo que ejercita: el Administrador ve el grupo
+  // «Integraciones» del menu privado, lo despliega, abre cada una de sus tres paginas con su
+  // titulo y su estado vacio, y cada ruta pedida por URL responde 200; cada rol del seed sin
+  // `integraciones.modificar` no recibe el grupo ni sus hijos en el HTML y cada ruta por URL
+  // responde 404 con la pantalla de no encontrado y la salida presente. NO ejercita el cruce
+  // borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
+  // identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
+  'integraciones.spec.ts',
   'inventario.spec.ts',
   'login-skin.spec.ts',
   'login.spec.ts',

@@ -73,7 +73,7 @@ describe('la seccion Configuración existe una sola vez y su item sigue en pie (
     // por decision humana (es operacion, no configuracion). Lo que esta task promete y sigue
     // vigente es lo mismo: la seccion es UNA y su item **no se sustituyo ni se reordeno**; sigue
     // siendo el PRIMERO.
-    expect(secciones[0]?.items).toHaveLength(2);
+    expect(secciones[0]?.items).toHaveLength(3);
     expect((secciones[0]?.items[0] as NavLink | undefined)?.href).toBe(PRESENTATIONS_ROUTE);
   });
 

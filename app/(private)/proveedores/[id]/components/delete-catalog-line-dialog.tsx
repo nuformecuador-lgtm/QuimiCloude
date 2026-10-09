@@ -16,16 +16,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import type { CatalogLineView } from '@/lib/modules/proveedores';
 import {
   deleteCatalogLineAction,
   type CatalogLineMutationFormState,
 } from '@/lib/modules/proveedores/adapters/driving/supplier-catalog-actions';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 const DELETE_SUCCESS = 'Línea de catálogo dada de baja.';
 
@@ -75,7 +73,7 @@ export function DeleteCatalogLineDialog({ line }: { readonly line: CatalogLineVi
         render={
           <Button
             variant="ghost"
-            className={TOUCH_TARGET}
+            className={touchTarget}
             aria-label={`Dar de baja ${line.name}`}
             data-testid="catalog-line-delete-open"
           />
@@ -91,26 +89,13 @@ export function DeleteCatalogLineDialog({ line }: { readonly line: CatalogLineVi
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        {/*
-          QC-71 (R17, R18): el INESPERADO lo pinta el componente compartido -que necesita un
-          contenedor de bloque-; el CATALOGADO, exactamente como siempre y sin identificador.
-        */}
-        {state.status !== 'error' ? null : state.code === UNEXPECTED_ERROR_CODE ? (
-          <div
-            role="alert"
+        {state.status !== 'error' ? null : (
+          <ErrorAlert
+            error={state}
+            cataloguedAs="p"
             className="text-sm text-destructive"
-            data-testid="delete-catalog-line-error"
-          >
-            <UnexpectedErrorNotice state={state} />
-          </div>
-        ) : (
-          <p
-            role="alert"
-            className="text-sm text-destructive"
-            data-testid="delete-catalog-line-error"
-          >
-            {state.message}
-          </p>
+            testId="delete-catalog-line-error"
+          />
         )}
 
         <form action={formAction}>
@@ -121,13 +106,13 @@ export function DeleteCatalogLineDialog({ line }: { readonly line: CatalogLineVi
             data-testid="delete-catalog-line-id"
           />
           <AlertDialogFooter>
-            <AlertDialogCancel className={TOUCH_TARGET} data-testid="delete-catalog-line-cancel">
+            <AlertDialogCancel className={touchTarget} data-testid="delete-catalog-line-cancel">
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
               type="submit"
               variant="destructive"
-              className={TOUCH_TARGET}
+              touch
               data-testid="delete-catalog-line-confirm"
             >
               Dar de baja

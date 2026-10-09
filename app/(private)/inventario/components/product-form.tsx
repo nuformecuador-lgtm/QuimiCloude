@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useId, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -13,7 +13,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import {
   createProductSchema,
   updateProductSchema,
@@ -24,7 +24,9 @@ import {
   type ProductType,
 } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { formatDateLocalISO } from '@/lib/shared/ui/date-civil';
 import { trimDecimal } from '@/lib/shared/ui/decimal-display';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import {
   createProductAction,
   updateProductAction,
@@ -35,13 +37,11 @@ import { PresentationUnitSelect } from '@/components/shared/presentation-unit-se
 import { SharedSelect } from '@/components/shared/shared-select';
 
 import { sanitizeQuantityInput } from './product-cost-amount';
-import { ProductBatchDateField, formatDateLocalISO } from './product-batch-date-field';
+import { ProductBatchDateField } from './product-batch-date-field';
 import { ProductCostFields } from './product-cost-fields';
 import { ProductField } from './product-field';
 import { ProductNamePicker, type ProductNameOption } from './product-name-picker';
-import { EMPTY_CELL, productUnitLabel } from './product-columns';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
+import { productUnitLabel } from './product-columns';
 
 /**
  * Campos de texto del producto.
@@ -544,7 +544,7 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
   // Solo en la edicion: en el alta la unidad del selector puede cambiar y la etiqueta mentiria.
   const editUnitLabel = product === undefined ? null : productUnitLabel(product, units);
   const qtyAlertLabel =
-    editUnitLabel === null || editUnitLabel === EMPTY_CELL
+    editUnitLabel === null || editUnitLabel === EMPTY_MARK
       ? FIELD_LABELS.qtyAlert
       : `${FIELD_LABELS.qtyAlert} (${editUnitLabel})`;
 
@@ -604,28 +604,21 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
       {formError === undefined ? null : (
-        // Region de error del formulario (R20): aqui van los rechazos que no senalan un campo.
-        //
-        // El error INESPERADO lo pinta el componente compartido, que anade el
-        // identificador de la peticion. El error DEL CATALOGO se pinta exactamente como siempre
-        // -mismos `data-testid`, mismo marcado- y sin identificador ninguno.
-        <div
-          role="alert"
+        // Aqui van los rechazos que no senalan un campo.
+        <ErrorAlert
+          error={formError}
           id={formErrorId}
           className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-          data-testid="product-form-error"
-        >
-          {formError.code === UNEXPECTED_ERROR_CODE ? (
-            <UnexpectedErrorNotice state={formError} />
-          ) : (
+          testId="product-form-error"
+          renderCatalogued={(catalogued) => (
             <>
-              <p data-testid="product-form-error-message">{formError.message}</p>
+              <p data-testid="product-form-error-message">{catalogued.message}</p>
               <p className="text-xs" data-testid="product-form-error-code">
-                {formError.code}
+                {catalogued.code}
               </p>
             </>
           )}
-        </div>
+        />
       )}
 
       {/*
@@ -886,7 +879,7 @@ function FormActions() {
           <Button
             type="button"
             variant="outline-dashed"
-            className={TOUCH_TARGET}
+            touch
             data-testid="product-form-cancel"
           />
         }
@@ -909,7 +902,7 @@ function SaveButton() {
   return (
     <Button
       type="submit"
-      className={TOUCH_TARGET}
+      touch
       disabled={pending}
       aria-busy={pending}
       data-testid="product-form-submit"

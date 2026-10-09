@@ -65,7 +65,7 @@ function MissingList({
               <Button
                 type="button"
                 variant="outline"
-                className="min-h-11 min-w-11"
+                touch
                 disabled={disabled}
                 aria-label={missingCreateAriaLabel(entry.name)}
                 data-testid={MISSING_CREATE_TESTID}

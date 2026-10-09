@@ -47,6 +47,8 @@ máximo 4 preguntas por tanda, y pon siempre como primera opción lo que el repo
    plataforma (móvil, iOS)?
 4. **Verificación:**
    - comandos de typecheck, lint y tests;
+   - qué tests recorren el árbol de archivos en vez de importar lo que vigilan (contratos, alcance):
+     sus patrones van a `gate.siempre` para que el gate rápido los corra (mide el tiempo que suman);
    - cómo se aíslan los tests de integración (base propia, contenedores, dobles);
    - qué flujos son críticos y exigen E2E;
    - qué servicios externos se doblan en tests.
@@ -71,7 +73,7 @@ En modo revisión, por cada doc del perfil:
 ## 3. Escribe
 
 - **`arnes.config.json`:** `arnes_version` (la de `arnes.config.example.json` si existe),
-  `jira` (`site`, `project`, `estados`), `ramas`, `cupos_por_persona` y `perfil` (`max_dias_sin_revisar`, `docs`).
+  `jira` (`site`, `project`, `estados`), `ramas`, `cupos_por_persona`, `gate` (`siempre`, con `"guard"` como mínimo) y `perfil` (`max_dias_sin_revisar`, `docs`).
 - **`.github/workflows/gate.yml`:** pon las dos `ramas` en `on.pull_request.branches` y la de
   producción en el `github.base_ref == '<rama>'` del job E2E. GitHub no lee el JSON;
   `scripts/check-perfil.mjs` hace fallar `./init.sh` si difieren.

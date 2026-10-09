@@ -6,11 +6,10 @@ import { useCallback, useRef, useState } from 'react';
 import { listShowcaseLinesAction } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
 import type { ShowcaseRow as ShowcaseRowData } from '@/lib/modules/proveedores';
 import { supplierDetailRoute } from '@/lib/shared/routes';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { ShowcaseLineCard } from './showcase-line-card';
 import { appendWithoutDuplicates } from './supplier-showcase-params';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 type SupplierShowcaseRowProps = {
   readonly row: ShowcaseRowData;
@@ -60,7 +59,7 @@ export function SupplierShowcaseRow({ row, productSearch }: SupplierShowcaseRowP
       */}
       <Link
         href={supplierDetailRoute(row.id)}
-        className="inline-flex min-h-11 min-w-11 max-w-full items-center justify-start rounded-lg font-medium underline-offset-4 hover:underline"
+        className={`inline-flex ${touchTarget} max-w-full items-center justify-start rounded-lg font-medium underline-offset-4 hover:underline`}
         aria-label={`Ver el detalle de ${row.name}`}
         data-testid="supplier-detail-link"
       >
@@ -72,7 +71,7 @@ export function SupplierShowcaseRow({ row, productSearch }: SupplierShowcaseRowP
           Sin productos todavía.{' '}
           <Link
             href={supplierDetailRoute(row.id)}
-            className="inline-flex min-h-11 min-w-11 items-center underline-offset-4 hover:underline"
+            className={`inline-flex ${touchTarget} items-center underline-offset-4 hover:underline`}
           >
             Ver ficha del proveedor
           </Link>
@@ -91,7 +90,7 @@ export function SupplierShowcaseRow({ row, productSearch }: SupplierShowcaseRowP
           {hasMoreLines && !failed ? (
             <button
               type="button"
-              className={TOUCH_TARGET}
+              className={touchTarget}
               aria-label={`Cargar más productos de ${row.name}`}
               aria-busy={loading}
               disabled={loading}
@@ -107,7 +106,7 @@ export function SupplierShowcaseRow({ row, productSearch }: SupplierShowcaseRowP
               <p className="text-sm text-muted-foreground">No se pudieron cargar más productos.</p>
               <button
                 type="button"
-                className={TOUCH_TARGET}
+                className={touchTarget}
                 aria-label={`Reintentar carga de productos de ${row.name}`}
                 aria-busy={loading}
                 disabled={loading}

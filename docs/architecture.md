@@ -201,6 +201,18 @@ lote de producto terminado en la misma operacion, pero ahora deja el pedido `POR
 `ENTREGADO`. El Empacador lo **comienza** (`EN_EMPAQUE`, a su nombre) y lo **termina**, y es
 Terminar quien deja el pedido `ENTREGADO` con su fecha de terminado, sin tocar inventario.
 Detalle en `specs/QC-168-estado-por-empacar/requirements.md`.
+**Avanza el 2026-10-06 (acotacion de QC-215 a QC-219): el vencimiento gana su primer
+escritor.** Tras el empaque entra el acondicionamiento (`POR_ACONDICIONAR` →
+`EN_ACONDICIONAMIENTO` → `ENTREGADO`): Terminar el empaque deja el pedido `POR_ACONDICIONAR`,
+ya no `ENTREGADO`. **Entregado el 2026-10-08:** los estados y sus transiciones (QC-215) y la
+pestaña «Por acondicionar» (QC-217). **Sin implementar todavia:** el rol (QC-216), comenzar y
+terminar con equipo (QC-218) y los datos de lote (QC-219). Con QC-219, el Administrador de
+acondicionamiento escribira, por cada lote de producto terminado del pedido, el **lote real**
+(sustituye al automatico y sigue siendo unico por empresa), la **fecha de vencimiento**
+(posterior a hoy) y el **dia de produccion** (hoy o antes). La pregunta **sigue abierta** para
+los insumos: nada consume el vencimiento todavia (QC-196). Detalle en
+`specs/QC-215-estados-de-acondicionamiento/requirements.md` y
+`specs/QC-219-datos-de-lote-en-acondicionamiento/requirements.md`.
 
 **4. Contabilidad e impuestos.** **CERRADA el 2026-09-03 (QC-33).** El ERP **no factura ni
 liquida impuestos**. Texto original: «El dinero **si** entra al modelo —el precio de venta del

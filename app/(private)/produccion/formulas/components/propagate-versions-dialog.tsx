@@ -14,8 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { RecipeVersionSummary } from '@/lib/modules/recetas';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 const DESCRIPTION = 'Marca las versiones que deben recibir este cambio en sus líneas.';
 const PROPAGATE_LABEL = 'Guardar y propagar';
@@ -82,11 +81,11 @@ export function PropagateVersionsDialog({
             return (
               <li key={version.id}>
                 <label
-                  className={`flex ${TOUCH_TARGET} cursor-pointer items-center gap-3 text-base`}
+                  className={`flex ${touchTarget} cursor-pointer items-center gap-3 text-base`}
                   data-testid="propagate-version-row"
                 >
                   <Checkbox
-                    className={`${TOUCH_TARGET} shrink-0`}
+                    className={`${touchTarget} shrink-0`}
                     aria-labelledby={labelId}
                     checked={checked.has(version.id)}
                     onCheckedChange={(isChecked: boolean) => toggle(version.id, isChecked)}
@@ -101,13 +100,13 @@ export function PropagateVersionsDialog({
         </ul>
 
         <AlertDialogFooter>
-          <AlertDialogCancel className={TOUCH_TARGET} data-testid="propagate-versions-cancel">
+          <AlertDialogCancel className={touchTarget} data-testid="propagate-versions-cancel">
             {CANCEL_LABEL}
           </AlertDialogCancel>
           <Button
             type="button"
             variant="outline"
-            className={TOUCH_TARGET}
+            touch
             onClick={() => onSave([])}
             data-testid="propagate-versions-skip"
           >
@@ -115,7 +114,7 @@ export function PropagateVersionsDialog({
           </Button>
           <Button
             type="button"
-            className={TOUCH_TARGET}
+            touch
             disabled={selectedIds.length === 0}
             onClick={() => onSave(selectedIds)}
             data-testid="propagate-versions-confirm"

@@ -10,13 +10,14 @@ import { listProductFormUnitsAction } from '@/lib/modules/inventario/adapters/dr
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import { INVENTORY_IMPORT_ROUTE } from '@/lib/shared/routes';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
 import {
   parseProductListParams,
   ProductListSection,
   ProductSheet,
-  ProductTableSkeleton,
+  ProductTable,
   type ProductListSearchParams,
 } from './components';
 
@@ -100,7 +101,7 @@ export default async function InventarioPage({
               href={INVENTORY_IMPORT_ROUTE}
               data-slot="button"
               data-testid="inventory-import-link"
-              className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11 min-w-11')}
+              className={cn(buttonVariants({ variant: 'outline' }), touchTarget)}
             >
               Importar
             </Link>
@@ -117,7 +118,9 @@ export default async function InventarioPage({
         vuelo, anuncia y atenua la tabla SIN desmontarla. El `fallback` de aqui sigue cubriendo la
         primera carga.
       */}
-      <Suspense fallback={<ProductTableSkeleton rows={params.pageSize} />}>
+      <Suspense
+        fallback={<ProductTable status="loading" products={[]} params={params} totalPages={0} />}
+      >
         <ProductListSection params={params} units={units} formUnits={formUnits} />
       </Suspense>
     </div>

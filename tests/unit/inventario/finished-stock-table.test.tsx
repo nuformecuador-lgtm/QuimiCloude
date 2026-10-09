@@ -2,7 +2,6 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  EMPTY_CELL,
   FinishedStockTable,
   packagedStockLabel,
 } from '@/app/(private)/inventario/components';
@@ -14,6 +13,7 @@ import {
   type ProductView,
 } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 
 /**
@@ -199,7 +199,7 @@ describe('fila de pedido', () => {
     expect(within(fila).getByTestId('finished-stock-order-number')).toHaveTextContent(
       /^2026-0007$/,
     );
-    expect(within(fila).getByTestId('finished-stock-name')).toHaveTextContent(EMPTY_CELL);
+    expect(within(fila).getByTestId('finished-stock-name')).toHaveTextContent(EMPTY_MARK);
   });
 
   it('la columna «# Pedido» va entre la imagen y «Nombre» y queda vacia en las sub-filas', async () => {
@@ -221,7 +221,7 @@ describe('fila de pedido', () => {
     montar([pedido({ packagedStock: null })]);
     const fila = filaDeGrupo('order-1');
     expect(within(fila).queryByTestId('finished-stock-packaged')).toBeNull();
-    expect(within(fila).getByTestId('data-table-cell-stock')).toHaveTextContent(EMPTY_CELL);
+    expect(within(fila).getByTestId('data-table-cell-stock')).toHaveTextContent(EMPTY_MARK);
   });
 
   it('no ofrece acciones de producto, solo el control de desplegar', () => {
@@ -331,7 +331,7 @@ describe('fila «Sin pedido»', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
     const sub = screen.getByTestId('data-table-row-without-product-2--product-2');
-    expect(within(sub).getByTestId('data-table-cell-qtyAlert')).toHaveTextContent(EMPTY_CELL);
+    expect(within(sub).getByTestId('data-table-cell-qtyAlert')).toHaveTextContent(EMPTY_MARK);
     await user.click(await esperarInteractiva(within(sub).getByTestId('product-batches-open')));
 
     expect(await screen.findByTestId('product-batches-sheet')).toBeInTheDocument();

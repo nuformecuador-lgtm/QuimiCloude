@@ -7,7 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DataTable } from '@/components/shared/data-table/data-table'
 import { createDefaultParams } from '@/components/shared/data-table/data-table-params'
-import { computeDateShortcutRange, formatDateLocalISO } from '@/components/shared/data-table/data-table-filter-date'
+import { computeDateShortcutRange } from '@/components/shared/data-table/data-table-filter-date'
+import { formatDateLocalISO } from '@/lib/shared/ui/date-civil'
 import type {
   DataTableColumn,
   DataTableParams,

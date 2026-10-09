@@ -13,7 +13,7 @@ export function ImportTemplateButton({ label = TEMPLATE_BUTTON_LABEL }: { readon
     <Button
       type="button"
       variant="outline"
-      className="min-h-11 min-w-11"
+      touch
       data-testid={TEMPLATE_BUTTON_TESTID}
       onClick={() => downloadFile(buildInventoryImportTemplate())}
     >

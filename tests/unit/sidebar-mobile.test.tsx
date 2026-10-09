@@ -95,8 +95,7 @@ const RUTA_SIN_COINCIDENCIA = '/ruta-que-no-esta-en-la-navegacion';
 
 const testId = {
   sidebar: 'private-sidebar',
-  brandLong: 'private-brand-long',
-  brandShort: 'private-brand-short',
+  brandLink: 'private-brand-link',
   toggle: 'private-sidebar-toggle',
 } as const;
 
@@ -283,9 +282,12 @@ describe('barra lateral privada en viewport angosto (panel superpuesto)', () => 
     expect(dialogo).not.toHaveAttribute('data-state', 'collapsed');
     expect(document.querySelector('[data-collapsible="icon"]')).toBeNull();
 
-    // Las etiquetas de texto siguen visibles: marca larga, no la corta.
-    expect(within(dialogo).getByTestId(testId.brandLong)).toBeInTheDocument();
-    expect(screen.queryByTestId(testId.brandShort)).toBeNull();
+    // Marca larga, no la corta. ENMIENDA QC-226 (R12): la larga es el logo horizontal y la
+    // corta, el isotipo.
+    const imagenesDeMarca = within(dialogo).getByTestId(testId.brandLink).querySelectorAll('img');
+    expect(imagenesDeMarca).toHaveLength(1);
+    expect(imagenesDeMarca[0]).toHaveAttribute('src', '/brand/logo-horizontal-dark.svg');
+    expect(imagenesDeMarca[0]).toHaveAttribute('height', '28');
 
     // Y los hijos de submenu siguen siendo alcanzables inline, no por menu flotante.
     const grupo = primerGrupo();

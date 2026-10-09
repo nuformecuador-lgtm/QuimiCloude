@@ -14,14 +14,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Textarea } from '@/components/ui/textarea';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode } from '@/lib/modules/errores';
+import type { ErrorCode } from '@/lib/modules/errores';
 import { cancelOrderSchema, formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import {
   cancelOrderAction,
   type OrderMutationFormState,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Dialogo de cancelacion de un pedido, con su MOTIVO (R37, R35, R34, `design.md > 8`).
@@ -71,7 +72,6 @@ export const CANCEL_ORDER_ID_TESTID = 'cancel-order-id';
 export const CANCEL_ORDER_ID_FIELD = 'id';
 export const CANCEL_ORDER_REASON_FIELD = 'reason';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 /** 16 px en TODOS los anchos: por debajo, Safari en iOS hace zoom al enfocar el campo (R45). */
 const FIELD_TEXT = 'text-base md:text-base';
 
@@ -189,34 +189,26 @@ export function CancelOrderDialog({ order, open, onOpenChange }: CancelOrderDial
 
           {/* Region de error del DIALOGO (`design.md > 8`): aqui aterriza `not_cancellable`. */}
           {error === undefined ? null : (
-            <div
-              role="alert"
+            <ErrorAlert
+              error={error}
               id={errorId}
               className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-              data-testid={CANCEL_ORDER_ERROR_TESTID}
-              data-code={error.code}
-            >
-              {/*
-                QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade
-                el identificador de la peticion. El CATALOGADO -`not_cancellable` entre otros- se
-                pinta como siempre y sin identificador.
-              */}
-              {error.code === UNEXPECTED_ERROR_CODE ? (
-                <UnexpectedErrorNotice state={error} />
-              ) : (
-                <p data-testid="cancel-order-error-message">{error.message}</p>
+              testId={CANCEL_ORDER_ERROR_TESTID}
+              withDataCode
+              renderCatalogued={(catalogued) => (
+                <p data-testid="cancel-order-error-message">{catalogued.message}</p>
               )}
-            </div>
+            />
           )}
 
           <AlertDialogFooter>
-            <AlertDialogCancel className={TOUCH_TARGET} data-testid={CANCEL_ORDER_DISMISS_TESTID}>
+            <AlertDialogCancel className={touchTarget} data-testid={CANCEL_ORDER_DISMISS_TESTID}>
               {DISMISS_LABEL}
             </AlertDialogCancel>
             <AlertDialogAction
               type="submit"
               variant="destructive"
-              className={TOUCH_TARGET}
+              className={touchTarget}
               disabled={isEmpty || isPending}
               aria-busy={isPending}
               data-testid={CANCEL_ORDER_CONFIRM_TESTID}

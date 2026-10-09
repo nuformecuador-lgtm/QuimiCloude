@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
 
 import { previewCatalogImportAction } from '@/lib/modules/documentos/adapters/driving/catalog-import-actions';
-import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorState } from '@/lib/modules/errores';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { getSupplierAction } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { BRAND_LABEL, SUPPLIERS_LABEL } from '@/lib/shared/navigation/private-nav';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 
 import { CatalogImportReview } from './components';
 
@@ -25,24 +25,21 @@ export const metadata: Metadata = {
  */
 function ImportErrorNotice({ error }: { readonly error: ErrorState }) {
   return (
-    <div
-      role="alert"
+    <ErrorAlert
+      error={error}
       className="flex flex-col items-start gap-2 rounded-lg border border-destructive/40 p-4"
-      data-testid="catalog-import-error"
-    >
-      {error.code === UNEXPECTED_ERROR_CODE ? (
-        <UnexpectedErrorNotice state={error} />
-      ) : (
+      testId="catalog-import-error"
+      renderCatalogued={(catalogued) => (
         <>
           <p className="text-sm text-muted-foreground" data-testid="catalog-import-error-message">
-            {error.message}
+            {catalogued.message}
           </p>
           <p className="text-xs text-muted-foreground" data-testid="catalog-import-error-code">
-            {error.code}
+            {catalogued.code}
           </p>
         </>
       )}
-    </div>
+    />
   );
 }
 

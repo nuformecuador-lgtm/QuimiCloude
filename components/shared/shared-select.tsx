@@ -10,9 +10,9 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { CircleAlertIcon } from 'lucide-react';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base md:text-base';
 
 type SharedSelectOption = {
@@ -62,7 +62,7 @@ export function SharedSelect({
                 <button
                   type="button"
                   aria-label={`Qué es ${label}`}
-                  className={`flex ${TOUCH_TARGET} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
+                  className={`flex ${touchTarget} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
                   data-testid={`shared-select-helper-${name}`}
                 />
               }
@@ -86,7 +86,7 @@ export function SharedSelect({
       >
         <SelectTrigger
           id={inputId}
-          className={`${TOUCH_TARGET} ${FIELD_TEXT} w-full`}
+          className={`${touchTarget} ${FIELD_TEXT} w-full`}
           aria-invalid={error === undefined ? undefined : true}
           aria-describedby={error === undefined ? undefined : errorId}
         >

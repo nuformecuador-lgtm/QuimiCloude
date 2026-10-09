@@ -63,6 +63,10 @@ el grupo cuyo `testId` es `nav-produccion`.
 `lib/shared/navigation/private-nav.ts` ya exportaba antes de esta ficha, salvo las cuatro
 constantes y los cuatro ítems que R1–R3 retiran.
 
+> **ENMIENDA DEL 2026-10-08 (QC-226).** `BRAND_SHORT_LABEL` y `BRAND_TAGLINE` se retiran de
+> `lib/shared/navigation/private-nav.ts` (QC-226 D19, R34). `BRAND_LABEL` se conserva con el valor
+> `QuimiCloude`. El resto de R7 sigue.
+
 ### La guardia de serialización sigue mordiendo
 
 **R8.** El sistema DEBE seguir exponiendo `PRIVATE_NAV_ITEMS` como una estructura que sobrevive

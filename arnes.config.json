@@ -42,6 +42,12 @@
       "ui",
       "node",
       "integration"
+    ],
+    "siempre": [
+      "guard",
+      "module-contract",
+      "route-contract",
+      "scope.test"
     ]
   }
 }

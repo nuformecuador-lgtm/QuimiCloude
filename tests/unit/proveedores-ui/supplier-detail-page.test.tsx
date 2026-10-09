@@ -24,7 +24,6 @@ import {
   CATALOG_SORT_PARAM,
   CATALOG_SORT_SEPARATOR,
   EMPTY_CATALOG_DIRECTORIES,
-  EMPTY_CELL,
   UNRESOLVED_CELL,
   buildCatalogColumns,
 } from '@/app/(private)/proveedores/[id]/components';
@@ -42,6 +41,7 @@ import type {
 } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
 import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { SUPPLIERS_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
 import { PERMISSIONS } from '@/lib/modules/identity';
 
@@ -445,8 +445,8 @@ describe('pagina de detalle — datos del proveedor (R19, R46)', () => {
 
     await renderPantalla();
 
-    expect(screen.getByTestId(testId.telefono)).toHaveTextContent(EMPTY_CELL);
-    expect(screen.getByTestId(testId.correo)).toHaveTextContent(EMPTY_CELL);
+    expect(screen.getByTestId(testId.telefono)).toHaveTextContent(EMPTY_MARK);
+    expect(screen.getByTestId(testId.correo)).toHaveTextContent(EMPTY_MARK);
   });
 
   it('las unidades se piden UNA sola vez en el servidor y bajan por props', async () => {
@@ -670,14 +670,14 @@ describe('catalogo — columnas y celdas (R21, R22, R12, R30, R41)', () => {
     // R22 + R40 — la unidad es opcional (QC-52), asi que su ausencia es una eleccion valida del
     // usuario y NO un dato perdido. Las dos celdas se distinguen por testid (R47) y ademas por su
     // glifo, para que la diferencia tambien exista en pantalla.
-    expect(UNRESOLVED_CELL).not.toBe(EMPTY_CELL);
+    expect(UNRESOLVED_CELL).not.toBe(EMPTY_MARK);
 
     listCatalogLinesActionMock.mockResolvedValue(paginaDeLineas([linea({ unitId: null })]));
 
     await renderPantalla();
 
     const celda = screen.getByTestId('data-table-cell-unitId');
-    expect(celda.textContent).toBe(EMPTY_CELL);
+    expect(celda.textContent).toBe(EMPTY_MARK);
     // Sin unidad NO es «no se pudo resolver»: el marcador de R22 no aparece.
     expect(screen.queryByTestId('catalog-unresolved-unitId')).toBeNull();
   });
@@ -748,8 +748,8 @@ describe('catalogo — columnas y celdas (R21, R22, R12, R30, R41)', () => {
 
     await renderPantalla();
 
-    expect(screen.getByTestId('data-table-cell-minPurchase').textContent).toBe(EMPTY_CELL);
-    expect(screen.getByTestId('data-table-cell-deliveryTime').textContent).toBe(EMPTY_CELL);
+    expect(screen.getByTestId('data-table-cell-minPurchase').textContent).toBe(EMPTY_MARK);
+    expect(screen.getByTestId('data-table-cell-deliveryTime').textContent).toBe(EMPTY_MARK);
   });
 
   it('la tabla no muestra identificadores ni autoria de la linea', async () => {

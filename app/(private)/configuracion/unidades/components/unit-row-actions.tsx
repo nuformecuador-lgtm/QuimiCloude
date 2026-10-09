@@ -33,9 +33,6 @@ import { UnitSheet } from './unit-sheet';
  * datos, ni se pide nada por cuenta propia.
  */
 
-/** Objetivo tactil minimo (44x44 px) de R48. Los primitivos miden 32 px de alto por defecto. */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 export const UNIT_ROW_ACTIONS_TESTID = 'unit-row-actions';
 export const UNIT_ACTION_EDIT_TESTID = 'unit-action-edit';
 export const UNIT_ACTION_DELETE_TESTID = 'unit-action-delete';
@@ -83,7 +80,7 @@ export function UnitRowActions({ unit, baseUnits }: UnitRowActionsProps) {
         type="button"
         variant="ghost"
         size="icon"
-        className={TOUCH_TARGET}
+        touch
         aria-label={editUnitLabel(unit.name)}
         data-testid={UNIT_ACTION_EDIT_TESTID}
         onClick={() => setEditOpen(true)}
@@ -95,7 +92,7 @@ export function UnitRowActions({ unit, baseUnits }: UnitRowActionsProps) {
         type="button"
         variant="ghost"
         size="icon"
-        className={TOUCH_TARGET}
+        touch
         aria-label={deleteUnitLabel(unit.name)}
         data-testid={UNIT_ACTION_DELETE_TESTID}
         onClick={() => setDeleteOpen(true)}

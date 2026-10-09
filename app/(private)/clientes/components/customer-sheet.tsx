@@ -37,8 +37,6 @@ export const CUSTOMER_CREATE_OPEN_TESTID = 'customer-create-open';
  */
 export { CUSTOMER_SHEET_TESTID } from './customer-form';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 const CREATE_LABEL = 'Nuevo cliente';
 const CREATE_SUCCESS = 'Cliente creado.';
 const UPDATE_SUCCESS = 'Cliente actualizado.';
@@ -79,7 +77,7 @@ export function CustomerSheet({ customer, open, onOpenChange }: CustomerSheetPro
           render={
             <Button
               variant="default"
-              className={TOUCH_TARGET}
+              touch
               data-testid={CUSTOMER_CREATE_OPEN_TESTID}
             />
           }

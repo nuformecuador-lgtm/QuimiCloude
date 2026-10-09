@@ -1,15 +1,12 @@
 import type { DataTableParams } from '@/components/shared/data-table';
 import { listCustomersAction } from '@/lib/modules/clientes/adapters/driving/customer-actions';
 
-import { CustomerListEmpty } from './customer-list-empty';
-import { CustomerListError } from './customer-list-error';
 import {
   FIRST_PAGE,
   clearSearchAndFilters,
   customerListHref,
   hasActiveSearchOrFilter,
 } from './customer-list-params';
-import { CustomerSheet } from './customer-sheet';
 import { CustomerTable } from './customer-table';
 
 /**
@@ -43,7 +40,16 @@ export async function CustomerListSection({ params, canModify }: CustomerListSec
   const result = await listCustomersAction(params);
 
   if (result.status === 'error') {
-    return <CustomerListError error={result} retryHref={customerListHref(params)} />;
+    return (
+      <CustomerTable
+        status="error"
+        error={result}
+        customers={[]}
+        params={params}
+        totalPages={0}
+        canModify={canModify}
+      />
+    );
   }
 
   const { items, page: currentPage, totalPages } = result.data;
@@ -52,16 +58,17 @@ export async function CustomerListSection({ params, canModify }: CustomerListSec
 
   if (items.length === 0 && !active) {
     // Vacio de verdad, o la pagina que se quedo atras sin termino ni filtro: es la unica
-    // situacion en la que se ofrece «dar de alta el primer cliente». El disparador de alta es
-    // `<CustomerSheet />`, hijo de este estado y no de la tabla, porque con cero clientes la
-    // tabla ni llega a montarse.
+    // situacion en la que se ofrece «dar de alta el primer cliente».
     return (
-      <CustomerListEmpty
+      <CustomerTable
+        customers={items}
+        params={params}
+        totalPages={totalPages}
         canModify={canModify}
-        firstPageHref={outOfRange ? customerListHref({ ...params, page: FIRST_PAGE }) : undefined}
-      >
-        <CustomerSheet />
-      </CustomerListEmpty>
+        empty={{
+          firstPageHref: outOfRange ? customerListHref({ ...params, page: FIRST_PAGE }) : undefined,
+        }}
+      />
     );
   }
 

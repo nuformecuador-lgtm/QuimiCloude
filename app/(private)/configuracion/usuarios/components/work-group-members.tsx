@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorState } from '@/lib/modules/errores';
 import type { Page, WorkGroupMemberRow } from '@/lib/modules/identity';
 import {
   addWorkGroupMemberAction,
@@ -95,8 +95,6 @@ export {
   WORK_GROUP_CANDIDATES_LOADING_TESTID,
   WORK_GROUP_MEMBER_ID_FIELD,
 };
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 const MEMBERS_TITLE = 'Miembros del grupo';
 const REMOVE_LABEL = 'Quitar del grupo';
@@ -299,7 +297,7 @@ function MembersList({
             <Button
               type="button"
               variant="outline"
-              className={TOUCH_TARGET}
+              touch
               disabled={busy}
               aria-label={`${REMOVE_LABEL}: ${member.displayName}`}
               data-testid={WORK_GROUP_MEMBER_REMOVE_TESTID}
@@ -316,7 +314,7 @@ function MembersList({
         <Button
           type="button"
           variant="outline"
-          className={TOUCH_TARGET}
+          touch
           disabled={data.page <= 1}
           aria-label={PREVIOUS_LABEL}
           data-testid={WORK_GROUP_MEMBERS_PREVIOUS_TESTID}
@@ -337,7 +335,7 @@ function MembersList({
         <Button
           type="button"
           variant="outline"
-          className={TOUCH_TARGET}
+          touch
           disabled={data.page >= data.totalPages}
           aria-label={NEXT_LABEL}
           data-testid={WORK_GROUP_MEMBERS_NEXT_TESTID}
@@ -357,17 +355,11 @@ function MembersList({
  */
 function ErrorRegion({ state, testId }: { readonly state: ErrorState; readonly testId: string }) {
   return (
-    <div
-      role="alert"
+    <ErrorAlert
+      error={state}
       className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-      data-testid={testId}
-      data-code={state.code}
-    >
-      {state.code === UNEXPECTED_ERROR_CODE ? (
-        <UnexpectedErrorNotice state={state} />
-      ) : (
-        <p>{state.message}</p>
-      )}
-    </div>
+      testId={testId}
+      withDataCode
+    />
   );
 }

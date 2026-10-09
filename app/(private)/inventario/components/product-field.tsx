@@ -6,8 +6,7 @@ import { useId, type ChangeEventHandler, type ReactNode } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /** 16 px en TODOS los anchos: el primitivo baja a 14 px en `md` y R31 no distingue por ancho. */
 const FIELD_TEXT = 'text-base md:text-base';
@@ -103,7 +102,7 @@ export function ProductField({
                   // Crece el blanco de toque; el icono dibujado sigue en `size-4` y queda centrado,
                   // pegado a la etiqueta dentro del `flex items-center gap-1.5` del padre.
                   // `shrink-0` impide que el flex le recorte los 44 px de ancho.
-                  className={`flex ${TOUCH_TARGET} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
+                  className={`flex ${touchTarget} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
                   data-testid={`product-helper-${name}`}
                 />
               }
@@ -127,7 +126,7 @@ export function ProductField({
         defaultValue={isControlled ? undefined : defaultValue}
         value={value}
         onChange={onChange}
-        className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+        className={`${touchTarget} ${FIELD_TEXT}`}
         aria-invalid={error === undefined ? undefined : true}
         aria-describedby={error === undefined ? undefined : errorId}
         data-testid={`product-field-${name}`}

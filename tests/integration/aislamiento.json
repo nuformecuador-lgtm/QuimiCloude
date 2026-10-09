@@ -556,6 +556,11 @@
       "archivo": "asignaciones/start-conditioning-team.int.test.ts",
       "motivo": "QC-218 T7 (R12, R13, R22, R24, R29): Comenzar con equipo con la composicion real: 'withExecutionTransaction' (execution-transaction-prisma.ts) abre su PROPIA 'prisma.$transaction' sobre el cliente GLOBAL y lo que se mide es que su ROLLBACK deshaga pedido y equipo, y la carrera de dos Comenzar reales con equipos distintos, asi que una transaccion del test no la envolveria. Cada caso fabrica su empresa efimera con randomUUID y la borra en un 'finally' por 'company_id' en orden de FK (equipo -> responsables -> pedidos -> receta -> miembros de grupo -> grupo -> usuarios -> permisos de rol -> roles -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-08"
+    },
+    {
+      "archivo": "scripts/seed-demo.int.test.ts",
+      "motivo": "Corre el seed de demostracion (scripts/seed-demo) dos veces con su gateway real, que escribe por los casos de uso de 'lib/composition'; esos casos de uso abren sus PROPIAS transacciones sobre el cliente Prisma GLOBAL, asi que una transaccion del test con ROLLBACK no los envolveria. Corre sobre una empresa efimera (randomUUID) con su Administrador, creada en 'beforeAll', y la borra entera en 'afterAll' por su company_id, en el orden que exigen las FK; no toca la empresa inicial de la plantilla. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-08"
     }
   ]
 }
