@@ -24,7 +24,7 @@ hace push y el leader vuelve a correr `archivos-en-vuelo`.
 
 ## Antes de empezar (leader)
 
-- [ ] **TA. Comprobar los choques** (P1, R32).
+- [x] **TA. Comprobar los choques** (P1, R32).
   - **Qué se corre:**
     - `node scripts/archivos-en-vuelo.mjs --candidata QC-232`;
     - `git diff --name-only origin/dev...origin/<rama>` de `feature/QC-223-entregar-producto-terminado`,
