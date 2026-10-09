@@ -24,6 +24,7 @@
  * **Decimoquinta enmienda, 2026-10-01**: `order_would_block`, `order_blocked`.
  * **2026-10-05**: `order_unit_not_convertible`.
  * **2026-10-07**: `order_conditioning_taken`, `order_not_conditionable`.
+ * **2026-10-08**: `conditioning_team_member_not_allowed`, `conditioning_team_empty`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -154,6 +155,12 @@ export const ERROR_CODES = [
   // Distinto de `invalid_input`: el motivo es uno de los validos, pero no para el sentido del
   // ajuste.
   'adjustment_reason_not_allowed',
+  // Distinto de `user_cannot_be_responsible`: el equipo de acondicionamiento no es responsable del
+  // pedido, y el texto no puede decir que lo es.
+  'conditioning_team_member_not_allowed',
+  // Distinto de `invalid_input`: la entrada marca personas o grupos, pero ninguna persona elegible
+  // queda en el equipo.
+  'conditioning_team_empty',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

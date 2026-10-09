@@ -915,3 +915,27 @@ model OrderExecutionEntry {
   @@index([userId], map: "order_execution_entries_user_id_idx")
   @@map("order_execution_entries")
 }
+
+/// El equipo que acompano un acondicionamiento: constancia, no da acceso al pedido. Una fila por
+/// persona, escrita al comenzar y nunca actualizada ni borrada, por eso no hay `updated_at` ni
+/// `deleted_at`. `workGroupName` es la foto del nombre del grupo al comenzar. Sin `@relation`: las
+/// tres FK son compuestas con `company_id` y estan escritas a mano en la migracion, igual que sus
+/// dos CHECK; hay que borrar su `DROP CONSTRAINT` de toda migracion generada.
+/// @module asignaciones
+model OrderConditioningTeamMember {
+  orderId       String   @map("order_id") @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  workGroupId   String?  @map("work_group_id") @db.Uuid
+  workGroupName String?  @map("work_group_name")
+  /// Orden de la persona dentro del equipo, desde 0: todas las filas de un equipo comparten
+  /// `created_at`, y el orden de composicion es el que se muestra.
+  position      Int
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@id([orderId, userId], map: "order_conditioning_team_members_pkey")
+  @@unique([orderId, position], map: "order_conditioning_team_members_order_id_position_key")
+  @@index([userId], map: "order_conditioning_team_members_user_id_idx")
+  @@index([workGroupId], map: "order_conditioning_team_members_work_group_id_idx")
+  @@map("order_conditioning_team_members")
+}
