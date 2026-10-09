@@ -38,9 +38,15 @@ const RAIZ = join(__dirname, '..', '..', '..');
 
 const PERMISO = 'integraciones.modificar';
 
-const PAGINAS = [
+// WhatsApp dejo de ser cascaron: su pantalla la cubre `whatsapp-page.test.tsx`. Aqui sigue en el
+// corte por permiso, que es el mismo para las tres.
+const PAGINAS_CASCARON = [
   { ruta: AI_PROVIDER_INTEGRATION_ROUTE, Pagina: AiProviderIntegrationPage },
   { ruta: INVENTORY_INTEGRATION_ROUTE, Pagina: InventoryIntegrationPage },
+] as const;
+
+const PAGINAS = [
+  ...PAGINAS_CASCARON,
   { ruta: WHATSAPP_INTEGRATION_ROUTE, Pagina: WhatsappIntegrationPage },
 ] as const;
 
@@ -101,7 +107,7 @@ describe('la pagina cascaron de cada integracion', () => {
     expect(INTEGRATION_EMPTY_MESSAGE).toBe('Próximamente podrás configurar esta integración.');
   });
 
-  it.each(PAGINAS)(
+  it.each(PAGINAS_CASCARON)(
     'R9: $ruta con el permiso muestra la etiqueta del menu como titulo y el estado vacio',
     async ({ ruta, Pagina }) => {
       getSessionUserMock.mockResolvedValue(sesionCon([PERMISO]));
@@ -116,7 +122,7 @@ describe('la pagina cascaron de cada integracion', () => {
     },
   );
 
-  it.each(PAGINAS)(
+  it.each(PAGINAS_CASCARON)(
     'R10: $ruta no pinta formulario, campo, selector ni boton',
     async ({ Pagina }) => {
       getSessionUserMock.mockResolvedValue(sesionCon([PERMISO]));
@@ -129,7 +135,7 @@ describe('la pagina cascaron de cada integracion', () => {
     },
   );
 
-  it.each(PAGINAS)(
+  it.each(PAGINAS_CASCARON)(
     'R10: $ruta no declara params ni searchParams y solo importa lo de la pagina cascaron',
     ({ ruta }) => {
       const fuente = sinComentarios(fuenteDe(ruta));
@@ -144,6 +150,14 @@ describe('la pagina cascaron de cada integracion', () => {
       expect(fuente).toMatch(/^import type \{ Metadata \} from 'next';/m);
     },
   );
+
+  it('R9: whatsapp ya no es cascaron: su pagina no importa IntegrationPlaceholder ni el barrel compartido', () => {
+    const fuente = sinComentarios(fuenteDe(WHATSAPP_INTEGRATION_ROUTE));
+
+    expect(fuente).not.toMatch(/\bIntegrationPlaceholder\b/);
+    expect(fuente).not.toMatch(/from '\.\.\/components'/);
+    expect(fuente).toMatch(/from '\.\/components'/);
+  });
 
   it.each(PAGINAS)(
     'R11: $ruta exige integraciones.modificar una sola vez y como primera sentencia',

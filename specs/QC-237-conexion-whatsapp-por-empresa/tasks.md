@@ -88,13 +88,13 @@
 
 ## T10–T11 — Pantalla
 
-- [ ] **T10.** Componentes de `design.md > 8.1` y `> 8.3` con su barrel y los textos aprobados
+- [x] **T10.** Componentes de `design.md > 8.1` y `> 8.3` con su barrel y los textos aprobados
       (D13: «Pendiente», «Error» con `lastError` junto al estado). Tests
       `whatsapp-connection-card.test.tsx`, `whatsapp-connection-form.test.tsx` y
       `whatsapp-webhook-panel.test.tsx`.
       **Hecho cuando:** los tres tests en verde. Cubre R34, R36–R40. Depende de: T9.
 
-- [ ] **T11.** `page.tsx` reescrita (`design.md > 8.2`). Test `whatsapp-page.test.tsx`. Se tensa
+- [x] **T11.** `page.tsx` reescrita (`design.md > 8.2`). Test `whatsapp-page.test.tsx`. Se tensa
       `integration-pages.test.tsx` (`> 11.3`).
       **Hecho cuando:** los dos tests, `guard-pantallas-exigen-permiso` y
       `guard-rutas-privadas-cubiertas` en verde. Cubre R4, R16, R35, R36, R37. Depende de: T10.

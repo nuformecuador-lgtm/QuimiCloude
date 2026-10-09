@@ -401,8 +401,16 @@ describe('la forma del modulo integraciones', () => {
     expect(hallazgos.join('\n')).toContain('node:crypto')
   })
 
-  it('R19: el unico archivo de produccion fuera del modulo que lo importa es lib/composition/index.ts', () => {
-    expect(filesImportingTheModule()).toEqual(['lib/composition/index.ts'])
+  it('R19: fuera del modulo solo lo importan lib/composition/index.ts y, por ruta exacta, la pantalla de WhatsApp y sus componentes', () => {
+    expect(filesImportingTheModule()).toEqual([
+      'lib/composition/index.ts',
+      'app/(private)/integraciones/whatsapp/components/whatsapp-connection-actions.tsx',
+      'app/(private)/integraciones/whatsapp/components/whatsapp-connection-card.tsx',
+      'app/(private)/integraciones/whatsapp/components/whatsapp-connection-form.tsx',
+      'app/(private)/integraciones/whatsapp/components/whatsapp-status-badge.tsx',
+      'app/(private)/integraciones/whatsapp/components/whatsapp-webhook-panel.tsx',
+      'app/(private)/integraciones/whatsapp/page.tsx',
+    ])
   })
 
   it('R12: el detector reconoce un import por contrato, uno profundo y uno relativo, y no uno ajeno', () => {
