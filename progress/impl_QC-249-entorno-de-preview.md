@@ -196,3 +196,9 @@ Veredicto: T2 y T3 hechas y en verde.
 - `git diff .env.example | grep '^-[^-]'`: sin salida.
 
 Veredicto: T6 y T7 hechas y en verde; falta T8 (gate local) y T9 (humano).
+
+## T8 (leader, 2026-10-09)
+`./init.sh` (rápido) en el worktree, con Docker arrancado y el `.env` local del checkout principal
+cargado en el entorno (apunta a localhost; no se copió ningún archivo): `== init OK ==`.
+Unit/ui/node: 309 archivos, 4755 tests en verde (2 skipped). Guardias: 102 archivos, 1413 tests en
+verde (32 skipped). Integración relacionada (incluida `identity-seed.int.test.ts`) en verde.
