@@ -105,10 +105,12 @@ entrada. [D3]
 
 **R11.** El módulo NO DEBE contener casos de uso. Su contrato (`index.ts`) NO DEBE exportar
 ningún símbolo, y `domain/`, `ports/` y `adapters/` NO DEBEN contener ningún archivo `.ts` ni
-`.tsx`. [D3]
+`.tsx`. *(QC-234 enmienda este requisito: el módulo gana el cifrado de secretos y su cableado.)*
+[D3]
 
 **R12.** Ningún archivo fuera del módulo DEBE importar el módulo, ni por su contrato ni por una
-ruta profunda. `lib/composition/` NO DEBE cablear nada suyo. [D3]
+ruta profunda. `lib/composition/` NO DEBE cablear nada suyo. *(QC-234 enmienda este requisito: el
+módulo gana el cifrado de secretos y su cableado.)* [D3]
 
 **R13.** Esta feature NO DEBE añadir a `db/schema.prisma` ningún modelo, campo ni anotación
 `/// @module integraciones`. [D3, A]

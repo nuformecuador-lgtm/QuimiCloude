@@ -258,10 +258,18 @@ export function escrituraDestructivaDeLotes(fuente: string): string[] {
  * `nombreFuncionPermitida`. Aisla ese cuerpo con `cuerpoDeFuncion` y busca en el resto, para que
  * una llamada movida a otra funcion -o una nueva, en cualquier sitio distinto- siga dando rojo.
  */
-function llamaAMetodoFueraDe(fuente: string, metodo: string, nombreFuncionPermitida: string): boolean {
-  const codigo = stripComments(fuente);
-  const cuerpoPermitido = cuerpoDeFuncion(fuente, nombreFuncionPermitida);
-  const resto = cuerpoPermitido === null ? codigo : codigo.replace(stripComments(cuerpoPermitido), '');
+// QC-223 2026-10-08: admite VARIAS funciones permitidas (cada cuerpo se aisla por separado), para
+// el `updateMany` de `dispatchFinishedGoods`; con un solo nombre se comporta exactamente igual.
+function llamaAMetodoFueraDe(
+  fuente: string,
+  metodo: string,
+  nombresPermitidos: string | readonly string[],
+): boolean {
+  let resto = stripComments(fuente);
+  for (const nombre of typeof nombresPermitidos === 'string' ? [nombresPermitidos] : nombresPermitidos) {
+    const cuerpoPermitido = cuerpoDeFuncion(fuente, nombre);
+    if (cuerpoPermitido !== null) resto = resto.replace(stripComments(cuerpoPermitido), '');
+  }
   return new RegExp(`\\.productBatch\\.${metodo}\\s*\\(`).test(resto);
 }
 
@@ -270,11 +278,17 @@ export function llamaAUpdateFueraDe(fuente: string, nombreFuncionPermitida: stri
   return llamaAMetodoFueraDe(fuente, 'update', nombreFuncionPermitida);
 }
 
-/** El `updateMany` del decremento condicional del consumo: sigue viviendo SOLO en
- *  `consumeBatchStock`. */
-export function llamaAUpdateManyFueraDe(fuente: string, nombreFuncionPermitida: string): boolean {
-  return llamaAMetodoFueraDe(fuente, 'updateMany', nombreFuncionPermitida);
+/** El `updateMany` del decremento condicional: vive SOLO en `consumeBatchStock` y, desde
+ *  QC-223 2026-10-08, en `dispatchFinishedGoods` (la salida de producto terminado). */
+export function llamaAUpdateManyFueraDe(
+  fuente: string,
+  nombresPermitidos: string | readonly string[],
+): boolean {
+  return llamaAMetodoFueraDe(fuente, 'updateMany', nombresPermitidos);
 }
+
+/** QC-223 2026-10-08: las dos funciones donde el decremento condicional es legitimo. */
+const UPDATE_MANY_PERMITIDO = ['consumeBatchStock', 'dispatchFinishedGoods'] as const;
 
 // ---------------------------------------------------------------------------------------------
 // R1 — LA EXISTENCIA SE DERIVA DE LOS LOTES; `sumStockByUnit` ES EL UNICO SITIO QUE SUMA
@@ -487,9 +501,12 @@ describe('QC-91 R21 — calcular y dejar de escribir la existencia no toca ningu
     expect(llamaAUpdateFueraDeLas(fuente, UPDATES_PERMITIDOS)).toBe(false);
   });
 
-  it('R21, R30: el unico updateMany vive en consumeBatchStock -el decremento condicional del consumo-', () => {
+  // QC-223 2026-10-08: el updateMany se admite tambien en dispatchFinishedGoods (decremento
+  // condicional de la entrega). Solo consumeBatchStock ya NO basta: el real tiene los dos.
+  it('R21, R30: los unicos updateMany viven en consumeBatchStock y dispatchFinishedGoods -los decrementos condicionales-', () => {
     const fuente = leer(PRODUCT_PRISMA);
-    expect(llamaAUpdateManyFueraDe(fuente, 'consumeBatchStock')).toBe(false);
+    expect(llamaAUpdateManyFueraDe(fuente, UPDATE_MANY_PERMITIDO)).toBe(false);
+    expect(llamaAUpdateManyFueraDe(fuente, 'consumeBatchStock')).toBe(true);
   });
 
   it('R21: el detector de escrituras destructivas muerde con fuentes fabricadas y no con una limpia', () => {
@@ -607,6 +624,27 @@ describe('QC-91 R21 — calcular y dejar de escribir la existencia no toca ningu
       ].join('\n');
       expect(llamaAUpdateFueraDe(fuente, 'adjustBatchStock')).toBe(false);
       expect(llamaAUpdateManyFueraDe(fuente, 'consumeBatchStock')).toBe(false);
+    });
+
+    // QC-223 2026-10-08: con dos funciones permitidas, un tercer updateMany sigue en rojo.
+    it('R30: updateMany en consumeBatchStock y dispatchFinishedGoods no es hallazgo; uno en una tercera funcion si', () => {
+      const permitidas = [
+        'export async function consumeBatchStock(batchId) {',
+        '  return tx.productBatch.updateMany({ where: { id: batchId, stock: { gte: q } } });',
+        '}',
+        'export async function dispatchFinishedGoods(batchId) {',
+        '  return tx.productBatch.updateMany({ where: { id: batchId, stock: { gte: q } } });',
+        '}',
+      ].join('\n');
+      expect(llamaAUpdateManyFueraDe(permitidas, UPDATE_MANY_PERMITIDO)).toBe(false);
+
+      const conTercera = [
+        permitidas,
+        'export async function rogueDecrement(batchId) {',
+        '  return tx.productBatch.updateMany({ where: { id: batchId } });',
+        '}',
+      ].join('\n');
+      expect(llamaAUpdateManyFueraDe(conTercera, UPDATE_MANY_PERMITIDO)).toBe(true);
     });
   });
 });

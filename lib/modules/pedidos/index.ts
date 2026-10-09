@@ -269,3 +269,30 @@ export { createSearchOrderCustomers } from './domain/search-order-customer-optio
 export type { SearchOrderCustomersDeps } from './domain/search-order-customer-options';
 export { createGetOrderCustomerFilterOption } from './domain/get-order-customer-filter-option';
 export type { GetOrderCustomerFilterOptionDeps } from './domain/get-order-customer-filter-option';
+
+/** La entrega de producto terminado: la regla pura que comparten el sheet y el servidor, los dos
+ *  casos de uso y sus errores propios. */
+export {
+  DELIVERY_MAX_ALLOCATIONS,
+  checkDelivery,
+  remainingPackages,
+} from './domain/order-delivery';
+export type {
+  DeliveryAllocation,
+  DeliveryBatchState,
+  DeliveryCheck,
+  DeliveryLineState,
+} from './domain/order-delivery';
+export { createGetOrderDelivery } from './domain/get-order-delivery';
+export type {
+  GetOrderDeliveryDeps,
+  OrderDeliveryLineView,
+  OrderDeliveryView,
+} from './domain/get-order-delivery';
+export { createDeliverOrder } from './domain/deliver-order';
+export type { DeliverOrderDeps, DeliverOrderResult } from './domain/deliver-order';
+export {
+  DeliveryBatchInsufficientError,
+  DeliveryBatchNotFoundError,
+  DeliveryExceedsRemainingError,
+} from './domain/errors';

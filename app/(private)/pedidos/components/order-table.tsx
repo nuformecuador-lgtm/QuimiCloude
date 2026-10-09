@@ -127,6 +127,8 @@ export type OrderTableProps = {
   readonly canEditDistribution?: boolean;
   /** Si el actor puede cambiar el cliente; lo resuelve el servidor. */
   readonly canEditCustomer?: boolean;
+  /** Si el actor puede entregar pedidos; lo resuelve el servidor. */
+  readonly canDeliver?: boolean;
   /** El valor del filtro de cliente, ya resuelto por el servidor a partir de la direccion. */
   readonly customerFilter?: OrderCustomerChoice | null;
   /**
@@ -148,6 +150,7 @@ export function OrderTable({
   coverageByOrder,
   canEditDistribution,
   canEditCustomer,
+  canDeliver,
   customerFilter = null,
   noMatches,
 }: OrderTableProps) {
@@ -194,6 +197,7 @@ export function OrderTable({
         coverageByOrder,
         canEditDistribution,
         canEditCustomer,
+        canDeliver,
       }),
     [
       recipes,
@@ -204,6 +208,7 @@ export function OrderTable({
       coverageByOrder,
       canEditDistribution,
       canEditCustomer,
+      canDeliver,
     ],
   );
 

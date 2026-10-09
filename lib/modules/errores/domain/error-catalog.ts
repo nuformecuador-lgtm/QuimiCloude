@@ -84,6 +84,9 @@ export const ERROR_MESSAGE_KEY = {
   batch_expiry_not_future: 'errors.batch_expiry_not_future',
   batch_production_date_future: 'errors.batch_production_date_future',
   conditioning_batch_data_missing: 'errors.conditioning_batch_data_missing',
+  delivery_exceeds_remaining: 'errors.delivery_exceeds_remaining',
+  delivery_batch_insufficient: 'errors.delivery_batch_insufficient',
+  integration_secret_unreadable: 'errors.integration_secret_unreadable',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -212,4 +215,10 @@ export const ERROR_MESSAGES_ES = {
   'errors.batch_expiry_not_future': 'La fecha de vencimiento debe ser posterior a hoy.',
   'errors.batch_production_date_future': 'El dia de produccion no puede ser posterior a hoy.',
   'errors.conditioning_batch_data_missing': 'Faltan datos de lote en alguna linea del pedido.',
+  'errors.delivery_exceeds_remaining':
+    'La entrega supera los envases que faltan por entregar en alguna presentacion.',
+  'errors.delivery_batch_insufficient':
+    'Algun lote ya no tiene los envases elegidos: revisa los lotes y confirma de nuevo.',
+  'errors.integration_secret_unreadable':
+    'No se pudo leer una credencial guardada de la integración. Vuelve a escribirla.',
 } as const satisfies Record<ErrorMessageKey, string>;

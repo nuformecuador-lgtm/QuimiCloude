@@ -565,11 +565,17 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // centinela pasa de TREINTA Y UNO a TREINTA Y DOS; la lista sigue CERRADA, y un spec mas que
   // referencie `data-table` vuelve a ponerla en rojo.
   //
+  // 2026-10-08: entra `e2e/entregar-producto-terminado.spec.ts` (QC-223), y no afloja la lista. No
+  // estrena pantalla: recorre la lista de pedidos, ya en esta lista, y localiza la fila del pedido
+  // por `data-table-row-<id>` para abrir «Entregar» y leer su estado. El centinela pasa de TREINTA
+  // Y DOS a TREINTA Y TRES; la lista sigue CERRADA, y un spec mas que referencie `data-table`
+  // vuelve a ponerla en rojo.
+  //
   // 2026-10-09: entra `e2e/datos-de-lote-en-acondicionamiento.spec.ts` (QC-219), y no afloja la
   // lista. No estrena tabla: al final recorre `/inventario`, ya en esta lista, y localiza el
   // producto terminado por `data-table-row-<id>` y `data-table-cell-name`. El centinela pasa de
-  // TREINTA Y DOS a TREINTA Y TRES; la lista sigue CERRADA.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos treinta y tres', () => {
+  // TREINTA Y TRES a TREINTA Y CUATRO; la lista sigue CERRADA.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos treinta y cuatro', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -579,7 +585,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos treinta y tres E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos treinta y cuatro E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
       'e2e/acondicionamiento.spec.ts',
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
@@ -607,6 +613,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // Ver la nota de arriba (2026-09-25, QC-168). Va antes que `grupos-de-trabajo` porque la
       // lista esta ORDENADA y 'e' precede a 'g'.
       'e2e/empaque.spec.ts',
+      // Ver la nota de arriba (2026-10-08, QC-223). Entre `empaque` y `grupos-de-trabajo` porque la
+      // lista esta ORDENADA: 'm' precede a 'n', y 'e' precede a 'g'.
+      'e2e/entregar-producto-terminado.spec.ts',
       // La OCTAVA la trae QC-85 el 2026-09-12 (R42): ver la nota de arriba.
       'e2e/grupos-de-trabajo.spec.ts',
       // QC-199: ver la nota de arriba.

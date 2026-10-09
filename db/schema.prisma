@@ -359,6 +359,7 @@ enum InventoryMovementKind {
   adjustment
   consumption
   production
+  delivery
 }
 
 /// Un asiento no se corrige: se corrige con otro. Sin `updatedAt` ni `deletedAt`, a proposito.
@@ -384,6 +385,10 @@ model InventoryMovement {
   /// `@relation`: `OrderPresentationLine` es de `pedidos`; su FK esta escrita a mano y es drift.
   orderPresentationLineId String? @map("order_presentation_line_id") @db.Uuid
 
+  /// La entrega de un asiento `delivery`, y solo de ese. Sin `@relation`: `OrderDelivery` es de
+  /// `pedidos`; FK compuesta con `companyId` escrita a mano, drift.
+  orderDeliveryId String? @map("order_delivery_id") @db.Uuid
+
   /// Solo en un ajuste: la existencia leida con el lote bloqueado y el total contado. Van los
   /// dos o ninguno, y `countedStock = stockBefore + quantity`; los `CHECK` son drift.
   stockBefore   Decimal? @map("stock_before") @db.Decimal(14, 4)
@@ -396,6 +401,7 @@ model InventoryMovement {
   @@index([createdBy], map: "inventory_movements_created_by_idx")
   @@index([orderId], map: "inventory_movements_order_id_idx")
   @@index([orderPresentationLineId], map: "inventory_movements_order_presentation_line_id_idx")
+  @@index([orderDeliveryId], map: "inventory_movements_order_delivery_id_idx")
   @@map("inventory_movements")
 }
 
@@ -724,6 +730,7 @@ model Order {
   customerId          String?       @map("customer_id") @db.Uuid
 
   presentationLines OrderPresentationLine[]
+  deliveries        OrderDelivery[]
 
   @@unique([companyId, orderYear, orderSequence], map: "orders_company_year_sequence_key")
   @@unique([id, companyId], map: "orders_id_company_id_key")
@@ -761,13 +768,65 @@ model OrderPresentationLine {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  order         Order               @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  deliveryLines OrderDeliveryLine[]
 
   @@unique([orderId, presentationId], map: "order_presentation_lines_order_id_presentation_id_key")
+  @@unique([id, companyId], map: "order_presentation_lines_id_company_id_key")
   @@index([companyId], map: "order_presentation_lines_company_id_idx")
   @@index([presentationId], map: "order_presentation_lines_presentation_id_idx")
   @@index([packagingProductId], map: "order_presentation_lines_packaging_product_id_idx")
   @@map("order_presentation_lines")
+}
+
+/// Una entrega al cliente del producto terminado de un pedido. Solo de insercion: sin `updatedAt`
+/// ni `deletedAt`. `deliveryKey` la hace idempotente por empresa. `customerId`, `createdBy` y
+/// `companyId` no llevan `@relation`: `Customer`, `User` y `Company` son de otros modulos; sus FK
+/// estan escritas a mano y son drift, y las del cliente y del autor son compuestas con `companyId`. La FK de
+/// `order` tambien es compuesta en la base (`(order_id, company_id)`).
+/// @module pedidos
+model OrderDelivery {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  orderId     String   @map("order_id") @db.Uuid
+  customerId  String   @map("customer_id") @db.Uuid
+  deliveryKey String   @map("delivery_key") @db.Uuid
+  createdBy   String   @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  order Order               @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  lines OrderDeliveryLine[]
+
+  @@unique([id, companyId], map: "order_deliveries_id_company_id_key")
+  @@unique([companyId, deliveryKey], map: "order_deliveries_company_key_unique")
+  @@index([orderId], map: "order_deliveries_order_id_idx")
+  @@index([companyId, customerId], map: "order_deliveries_customer_id_idx")
+  @@index([createdBy], map: "order_deliveries_created_by_idx")
+  @@map("order_deliveries")
+}
+
+/// Un lote dentro de una entrega: cuantos envases salen de el para una linea del reparto y su
+/// cantidad. Solo de insercion. `batchId` no lleva `@relation`: `ProductBatch` es de `inventario`;
+/// FK compuesta con `companyId` escrita a mano, drift. Las FK de `delivery` y `presentationLine`
+/// tambien son compuestas en la base. Los CHECK de positivos son drift.
+/// @module pedidos
+model OrderDeliveryLine {
+  id                      String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId               String  @map("company_id") @db.Uuid
+  deliveryId              String  @map("delivery_id") @db.Uuid
+  orderPresentationLineId String  @map("order_presentation_line_id") @db.Uuid
+  batchId                 String  @map("batch_id") @db.Uuid
+  packages                Int
+  quantity                Decimal @db.Decimal(14, 4)
+
+  delivery         OrderDelivery         @relation(fields: [deliveryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  presentationLine OrderPresentationLine @relation(fields: [orderPresentationLineId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([deliveryId, batchId], map: "order_delivery_lines_delivery_batch_unique")
+  @@index([companyId], map: "order_delivery_lines_company_id_idx")
+  @@index([orderPresentationLineId], map: "order_delivery_lines_presentation_line_id_idx")
+  @@index([batchId], map: "order_delivery_lines_batch_id_idx")
+  @@map("order_delivery_lines")
 }
 
 /// Las tres FK y el CHECK van escritos a mano y sin `@relation`, porque los padres son de otros

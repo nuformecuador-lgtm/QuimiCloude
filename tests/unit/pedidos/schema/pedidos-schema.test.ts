@@ -218,8 +218,11 @@ describe('db/schema.prisma — modelo de pedido', () => {
 
     // La UNICA lista de `Order` es el reparto por presentacion, y apunta a `OrderPresentationLine`.
     const listas = order.fields.filter((candidate) => candidate.isList)
-    expect(listas.map((candidate) => candidate.name)).toEqual(['presentationLines'])
+    // QC-223 2026-10-08: `Order` gana una segunda lista, `deliveries` (las entregas al cliente, de
+    // `pedidos`). Tampoco es un item de receta; el reparto sigue siendo la primera.
+    expect(listas.map((candidate) => candidate.name)).toEqual(['presentationLines', 'deliveries'])
     expect(listas[0]?.type).toBe('OrderPresentationLine')
+    expect(listas[1]?.type).toBe('OrderDelivery')
     // Y la receta sigue siendo UNA: un escalar, no una coleccion.
     expect(field(order, 'recipeId').isList).toBe(false)
     expect(field(order, 'recipeId').type).toBe('String')
@@ -620,7 +623,8 @@ describe('db/schema.prisma — modelo de pedido', () => {
       .filter(([, moduleName]) => moduleName === 'pedidos')
       .map(([modelName]) => modelName)
       .sort()
-    expect(pedidosModels).toEqual(['Order', 'OrderPresentationLine'])
+    // QC-223 2026-10-08: + `OrderDelivery` y `OrderDeliveryLine`, la entrega y sus lotes.
+    expect(pedidosModels).toEqual(['Order', 'OrderDelivery', 'OrderDeliveryLine', 'OrderPresentationLine'])
     expect(owners.get('Recipe')).toBe('recetas')
     expect(owners.get('Unit')).toBe('unidades')
     expect(owners.get('User')).toBe('identity')
@@ -728,7 +732,8 @@ describe('db/schema.prisma — modelo de pedido', () => {
       .map((match) => match[2])
       .filter((modelName): modelName is string => modelName !== undefined)
       .sort()
-    expect(pedidosModels).toEqual(['Order', 'OrderPresentationLine'])
+    // QC-223 2026-10-08: + `OrderDelivery` y `OrderDeliveryLine`, la entrega y sus lotes.
+    expect(pedidosModels).toEqual(['Order', 'OrderDelivery', 'OrderDeliveryLine', 'OrderPresentationLine'])
     // `import` aqui es «importe». `InventoryImport` (QC-209, 2026-10-06) es el registro de una
     // importacion de archivo, sin dinero: se exime solo ese nombre; el patron sigue entero.
     const IMPORTACION_DE_ARCHIVO = new Set(['InventoryImport'])

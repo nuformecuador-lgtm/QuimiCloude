@@ -22,6 +22,8 @@ const CAMINOS_ESPERADOS = [
   'consumeBatchStock',
   'receiveFinishedGoods',
   'addImportedFinishedGoodsBatch',
+  // QC-223 2026-10-08: la salida de producto terminado hacia un cliente, septimo camino.
+  'dispatchFinishedGoods',
 ] as const;
 // Nota (2026-10-09, QC-219 R27): excepcion nombrada a «todo camino asienta con writeMovement».
 // `writeFinishedBatchLabels` cambia la etiqueta del lote (lote, vencimiento, dia de produccion),
@@ -253,7 +255,9 @@ describe('guardia: censo de caminos de escritura de product_batches bajo lib/ (R
     ).toBeGreaterThan(50);
   });
 
-  it('el censo de caminos de escritura es exactamente { createWithFirstBatch, addBatchToAlive, adjustBatchStock, consumeBatchStock, receiveFinishedGoods, addImportedFinishedGoodsBatch, writeFinishedBatchLabels }', () => {
+  // QC-223 2026-10-08: + dispatchFinishedGoods en el titulo, igual que en CAMINOS_ESPERADOS.
+  // QC-219 2026-10-09: + writeFinishedBatchLabels, de CAMINOS_SIN_ASIENTO.
+  it('el censo de caminos de escritura es exactamente { createWithFirstBatch, addBatchToAlive, adjustBatchStock, consumeBatchStock, receiveFinishedGoods, addImportedFinishedGoodsBatch, dispatchFinishedGoods, writeFinishedBatchLabels }', () => {
     const real = censoReal();
     expect(
       real,
