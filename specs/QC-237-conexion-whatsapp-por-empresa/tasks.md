@@ -43,7 +43,7 @@
       **Hecho cuando:** los dos tests y `guard-arquitectura-modulos` en verde. Cubre R10 (vista),
       R20. Depende de: T2.
 
-- [ ] **T4.** Los seis casos de uso (`design.md > 3.5`) con dobles de los puertos. Tests
+- [x] **T4.** Los seis casos de uso (`design.md > 3.5`) con dobles de los puertos. Tests
       `authorization.test.ts`, `create-whatsapp-connection.test.ts`,
       `update-whatsapp-connection.test.ts`, `test-and-enable.test.ts`,
       `regenerate-verify-token.test.ts`.
