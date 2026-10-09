@@ -183,7 +183,7 @@ y se anota en el impl.
 
 ## Tanda 6 — Cierre (depende de todo lo anterior)
 
-- [ ] **T15. `./init.sh` en verde**, y `progress/impl_QC-231-componentizacion-piezas-base.md` con:
+- [x] **T15. `./init.sh` en verde**, y `progress/impl_QC-231-componentizacion-piezas-base.md` con:
   - el mapa R → test (`design.md > 18`);
   - el inventario de T3;
   - las excepciones de D4;
