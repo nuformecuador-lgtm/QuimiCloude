@@ -80,13 +80,13 @@ pregunta al leader.
   `guard-identificador-de-request`, `guard-piezas-base`, `recipe-route-contract` y
   `inventario/module-contract` **sin tocar**.
 
-- [ ] **T2a [P]. `ProductPicker`:** `initialPage`, `excludedKeys` + `keepKey` y «hay más».
-- [ ] **T2b [P]. `RecipePicker`:** `initialPage` y borrar. **Además**, el test de `RecipePicker`
+- [x] **T2a [P]. `ProductPicker`:** `initialPage`, `excludedKeys` + `keepKey` y «hay más».
+- [x] **T2b [P]. `RecipePicker`:** `initialPage` y borrar. **Además**, el test de `RecipePicker`
   sobre «escribir otra cosa retira» pasa sin editar (R14).
-- [ ] **T2c [P]. `PackagingSelect`:** `queryEnabled`, `showEmpty`, `isOptionDisabled`,
+- [x] **T2c [P]. `PackagingSelect`:** `queryEnabled`, `showEmpty`, `isOptionDisabled`,
   `renderLoadError` → `ErrorAlert`, `renderOption` y borrar. `unexpectedFromRejection` se queda.
-- [ ] **T2d [P]. `ProductNamePicker`:** `resetKey={productType}`. El input espejo `sr-only` se queda.
-- [ ] **T2e [P]. `PresentationSelect`:** `leadingOptions`, `isOptionDisabled` y `renderOption`. La
+- [x] **T2d [P]. `ProductNamePicker`:** `resetKey={productType}`. El input espejo `sr-only` se queda.
+- [x] **T2e [P]. `PresentationSelect`:** `leadingOptions`, `isOptionDisabled` y `renderOption`. La
   resolución de `defaultLabel`, la ayuda y **todo** el alta en línea se quedan.
 
 ## Tanda 3 — Guardia y enmienda (depende de la tanda 2)
@@ -99,7 +99,7 @@ pregunta al leader.
     - por diff, y solo en esta rama (con `skip` ruidoso fuera), los archivos de R21 y R4 y
       `package.json`.
   - **Hecho cuando:** está en verde y tiene una muestra que muerde por regla.
-- [ ] **T4 [P]. Enmienda de QC-35** (R23). **Solo si P3 es sí:** una línea fechada bajo §9.1 de
+- [x] **T4 [P]. Enmienda de QC-35** (R23). **Solo si P3 es sí:** una línea fechada bajo §9.1 de
   `specs/QC-35-pantalla-de-pedidos/design.md`.
   - **Hecho cuando:** la línea existe y cita QC-233. Si P3 es no, la task se tacha con el motivo.
 
