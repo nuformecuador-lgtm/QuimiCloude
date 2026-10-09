@@ -83,3 +83,63 @@ Ningún BLOQUEANTE.
 ## Veredicto
 
 **OK.** Recomendación al humano: valorar m1 antes de T9 (primer despliegue real).
+
+## Vuelta 2 (acotada a 549821fd..d4f5fc29)
+
+Commits: 8ff83083 (candado estricto del ref, m1; trim de `VERCEL_ENV`, m5) y d4f5fc29 (rechazo
+de `?host=`, ampliación aprobada por el humano).
+
+### Checklist
+
+- [x] m1 cerrado: `PREVIEW_SUPABASE_REF` exige `/^[a-z]{20}$/` (recortado) y cada URL lleva el ref
+  en su posición (`postgres.<ref>` como usuario o `db.<ref>.supabase.co` como host en las de base;
+  `<ref>.supabase.co` como host en storage).
+- [x] m5 cerrado: `pasosDelBuild` compara `VERCEL_ENV` recortado.
+- [x] `?host=` rechazado en las tres URL (sin mirar mayúsculas, vacío, codificado `h%6Fst`); `ghost`
+  y `hostaddr` no se rechazan (lo segundo es deuda declarada, no se pide aquí).
+- [x] Enmiendas fechadas como adiciones puras (+N −0) en `requirements.md` (R9), `design.md > 4`,
+  `docs/architecture.md` y el comentario de `.env.example`; no se reescribe texto previo.
+- [x] `lib/composition/index.ts` (+3 −0) y `.env.example` (+21 −0) siguen siendo solo adiciones
+  respecto a `origin/dev`.
+- [x] Mensajes sin valores: probado con ref y `host=prod.example` reales en el env; el texto del
+  problema no contiene ninguno de los dos.
+- [x] R8: `pasosDelBuild` con `VERCEL_ENV=production` y fuera de Vercel devuelve los mismos pasos
+  y motivo que antes (migrate, generate, seed, next build).
+- [x] Tests relacionados: 87/87 verdes (`entorno-de-preview`, `build`, `seed-demo-guard`); eslint
+  limpio sobre los 5 archivos; `tsc --noEmit` limpio.
+
+### Sondas (probe local, sin tocar el repo)
+
+Con las URL de producción: ref `supabase`, `postgres`, truncado a 19, en mayúsculas -> rechazan
+solo `PREVIEW_SUPABASE_REF`. Ref válido solo como subcadena (nombre de la base, contraseña,
+parámetro, path de storage, `x<ref>.supabase.co`, `<ref>.supabase.co.evil.com`) -> rechaza la
+variable. URL ilegible -> rechaza. Ref con espacios alrededor -> pasa (recortado, correcto).
+
+### Mutaciones (aplicadas y revertidas; árbol limpio al final)
+
+Todas matadas: forma laxa del ref (5 rojos), sin rechazo de `host` (5), `host` sensible a
+mayúsculas (5), `host` como subcadena (1, el de `ghost`), usuario como subcadena (3), host de
+storage como subcadena (2), host directo como subcadena (2), sin `trim` de `VERCEL_ENV` (1),
+variable sin regla pasa (1).
+
+### Efecto colateral declarado
+
+`' production '` ahora migra en Vercel. Coherente con la guarda del seed, que ya recortaba, y
+Vercel no emite ese valor con espacios; un valor así solo podría venir de una variable puesta a mano
+y su intención es inequívoca. Aceptado. `Production` (mayúscula) sigue sin migrar: lado seguro.
+
+### Hallazgos
+
+- **v2-m1 — menor.** La rama del usuario del pooler no ata el host: `postgres.<ref_preview>@db.<ref_prod>.supabase.co`
+  pasa el candado. Es conforme a la enmienda («usuario del pooler **o** host directo») y no es
+  explotable en la práctica (la conexión directa de Supabase no tiene el rol `postgres.<ref>`,
+  así que falla al autenticar, no escribe en producción). Si se quiere cerrar, exigir que con usuario
+  `postgres.<ref>` el host termine en `.pooler.supabase.com`; otra ficha, no bloquea.
+- **v2-m2 — menor (informativo).** `DB.<REF>.SUPABASE.CO` en mayúsculas pasa (se compara el host en
+  minúsculas): correcto, los hosts no distinguen mayúsculas.
+
+Ningún bloqueante. Ninguna regresión sobre la vuelta 1.
+
+### Veredicto vuelta 2
+
+**OK.**
