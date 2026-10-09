@@ -9,7 +9,7 @@
 
 ## Base de datos
 
-- [ ] **T1 — Migración del día de producción** (backend). Depende de: nada.
+- [x] **T1 — Migración del día de producción** (backend). Depende de: nada.
   - Columna `productionDate` en `ProductBatch` de `db/schema.prisma`.
   - `db/migrations/20261009120000_product_batches_production_date/` con su `migration.sql` y su
     `down.sql` (design § 1.2).
@@ -22,7 +22,7 @@
 
 ## `inventario`
 
-- [ ] **T2 — Contrato `FinishedBatchLabels`** (backend). Depende de: nada. `[P]` con T1.
+- [x] **T2 — Contrato `FinishedBatchLabels`** (backend). Depende de: nada. `[P]` con T1.
   - `domain/finished-batch-labels.ts` con los tipos de design § 2.1.
   - Exportar en `index.ts` el contrato, `typedLotSchema` y `civilDateSchema`, sacados de
     `product-batch-input.ts` sin cambiar su comportamiento.
@@ -30,7 +30,7 @@
     - typecheck verde;
     - los tests de `product-batch-input.test.ts` siguen verdes sin tocar ninguna aserción.
 
-- [ ] **T3 — Adaptador y escritura** (backend). Depende de: T1, T2.
+- [x] **T3 — Adaptador y escritura** (backend). Depende de: T1, T2.
   - `writeFinishedBatchLabels` en `product-prisma.ts`.
   - `finished-batch-labels-prisma.ts` con `listOfOrder` y `writeForOrder` (design § 2.2).
   - **Hecho:** integración contra base real de:
@@ -41,7 +41,7 @@
     - dos escrituras simultáneas del mismo lote: una gana y la otra no escribe nada (R11);
     - `listOfOrder` con ámbito de empresa.
 
-- [ ] **T4 — Guardias del inventario** (backend). Depende de: T3.
+- [x] **T4 — Guardias del inventario** (backend). Depende de: T3.
   - `guard-libro-de-inventario.test.ts` y `qc91-alcance.test.ts` admiten `writeFinishedBatchLabels`
     por su nombre, con nota fechada y la aserción «no escribe `stock`».
   - **Hecho:**
@@ -51,20 +51,20 @@
 
 ## `asignaciones`: dominio
 
-- [ ] **T5 — Errores y catálogo** (backend). Depende de: nada. `[P]` con T1–T2.
+- [x] **T5 — Errores y catálogo** (backend). Depende de: nada. `[P]` con T1–T2.
   - Tres códigos nuevos en `error-codes.ts` y `error-catalog.ts`.
   - Cinco clases en `asignaciones/domain/errors.ts`, con `batchId` de diagnóstico (design § 3.5).
   - **Hecho:**
     - typecheck verde;
     - los tests del catálogo verdes.
 
-- [ ] **T6 — `conditioning-batch-data.ts`** (backend, puro). Depende de: T2. `[P]` con T3.
+- [x] **T6 — `conditioning-batch-data.ts`** (backend, puro). Depende de: T2. `[P]` con T3.
   - `missingBatchDataLines`, con la clave `presentationId`.
   - **Hecho:** unit:
     - línea sin lote, línea sin datos y línea con datos;
     - pedido sin líneas = 0 (R17).
 
-- [ ] **T7 — Caso de uso de guardar** (backend). Depende de: T2, T5.
+- [x] **T7 — Caso de uso de guardar** (backend). Depende de: T2, T5.
   - `save-conditioning-batch-data.ts` (design § 3.1).
   - **Hecho:** unit con puertos simulados, uno por regla:
     - permiso antes de todo (R13);
@@ -77,7 +77,7 @@
     - éxito en `EN_ACONDICIONAMIENTO` y en `TERMINADO` (R18);
     - en `ENTREGADO` (D13).
 
-- [ ] **T8 — Terminar exige los datos** (backend). Depende de: T5, T6.
+- [x] **T8 — Terminar exige los datos** (backend). Depende de: T5, T6.
   - `finish-conditioning.ts` gana `batches` (design § 3.2).
   - **Hecho:** unit:
     - faltan datos → `conditioning_batch_data_missing` sin llamar a la transición (R15);
@@ -86,20 +86,20 @@
 
     Integración: el pedido queda `EN_ACONDICIONAMIENTO`, sin `finishedAt` y con su equipo.
 
-- [ ] **T9 — Detalle con `batchData`** (backend). Depende de: T6.
+- [x] **T9 — Detalle con `batchData`** (backend). Depende de: T6.
   - `get-conditioning-order.ts` y `conditioning-order-view.ts` (design § 3.3).
   - **Hecho:** unit:
     - `batchData` `null` en `POR_ACONDICIONAR` y para un acondicionador ajeno (R3);
     - con líneas y `missingCount` en `EN_ACONDICIONAMIENTO` y `TERMINADO`;
     - `ENTREGADO` propio sí, y el ajeno `order_not_found` (D13).
 
-- [ ] **T10 — «Entregados» (D13)** (backend). Depende de: nada. `[P]` con T5–T9.
+- [x] **T10 — «Entregados» (D13)** (backend). Depende de: nada. `[P]` con T5–T9.
   - `list-delivered-conditioned-orders.ts` y la vista en `assignment-views.ts` (design § 3.4).
   - **Hecho:**
     - unit del listado: solo `ENTREGADO` propios, orden, permiso;
     - `assignment-views.test.ts` con las tres vistas (R20).
 
-- [ ] **T11 — Composición** (backend). Depende de: T3, T7, T8, T9 (y T10).
+- [x] **T11 — Composición** (backend). Depende de: T3, T7, T8, T9 (y T10).
   - `lib/composition/index.ts` cablea `createFinishedBatchLabels()` en guardar, terminar y detalle,
     más el listado de «Entregados».
   - **Hecho:**
@@ -108,14 +108,14 @@
 
 ## Server Action y pantalla
 
-- [ ] **T12 — Server Action de guardar** (backend). Depende de: T11.
+- [x] **T12 — Server Action de guardar** (backend). Depende de: T11.
   - `saveConditioningBatchDataAction` en `order-conditioning-actions.ts` (design § 4).
   - **Hecho:** unit:
     - emparejado por posición y omisión de líneas vacías;
     - `revalidatePath` en el éxito;
     - `ErrorState` con `batchId` en el error.
 
-- [ ] **T13 — Formulario «Datos de lote»** (frontend). Depende de: T12 (contra la action simulada
+- [x] **T13 — Formulario «Datos de lote»** (frontend). Depende de: T12 (contra la action simulada
   puede empezar tras T9). `[P]` con T14.
   - `conditioning-batch-data-form.tsx` y su entrada en el barrel (design § 5.2).
   - **Hecho:** test de componente con:
@@ -124,7 +124,7 @@
     - etiquetas, `text-base`, `min-h-11`, `type="date"` (R5);
     - error en `role="alert"` con `aria-invalid` en la línea culpable y lo escrito conservado (R5).
 
-- [ ] **T14 — Pantalla y Terminar bloqueado** (frontend). Depende de: T9. `[P]` con T13.
+- [x] **T14 — Pantalla y Terminar bloqueado** (frontend). Depende de: T9. `[P]` con T13.
   - `conditioning-order-screen.tsx`, `conditioning-actions.tsx` y `page.tsx`.
   - **Hecho:** tests de pantalla y página:
     - sección presente o ausente según R1 y R3;
@@ -132,18 +132,18 @@
     - «Terminar» `disabled` mientras falten (R4);
     - `ENTREGADO` sin acciones y con su enlace de vuelta (R21).
 
-- [ ] **T15 — Vencimiento en `/inventario`** (frontend). Depende de: nada. `[P]` con T13–T14.
+- [x] **T15 — Vencimiento en `/inventario`** (frontend). Depende de: nada. `[P]` con T13–T14.
   - `product-batches-panel.tsx` (design § 5.3).
   - **Hecho:** `product-batches-panel.test.tsx`: con vencimiento se pinta «Vencimiento», y sin él
     no se pinta (R22).
 
-- [ ] **T16 — Pestaña «Entregados» (D13)** (frontend). Depende de: T10, T11.
+- [x] **T16 — Pestaña «Entregados» (D13)** (frontend). Depende de: T10, T11.
   - `/asignacion/page.tsx`, la sección nueva, `conditioning-orders-href.ts` y el barrel.
   - **Hecho:** tests de la sección y de las pestañas: tres pestañas, vacío y enlace al detalle (R20).
 
 ## Verificación
 
-- [ ] **T17 — E2E** (frontend). Depende de: T1–T16.
+- [x] **T17 — E2E** (frontend). Depende de: T1–T16.
   - `e2e/datos-de-lote-en-acondicionamiento.spec.ts` (R28). Fixture con prisma:
     - un pedido `EN_ACONDICIONAMIENTO` del acondicionador 1, con dos líneas, sus dos lotes y sus
       asientos `production`;
