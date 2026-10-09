@@ -72,7 +72,7 @@ Archivos esperados no tocados: `lib/shared/routes.ts` (no hizo falta).
 | R26 | `identity/roles/acondicionamiento-rol.test.ts`; `composition/asignaciones-facade.test.ts`; `list-delivered-conditioned-orders.test.ts` |
 | R27 | `guards/guard-libro-de-inventario.test.ts` y `inventario/qc91-alcance.test.ts` (bloques nuevos con mutación); `inventario/qc121-alcance.test.ts` |
 | R28 | `e2e/datos-de-lote-en-acondicionamiento.spec.ts` |
-| R29 | `e2e/acondicionar-con-equipo.spec.ts` verde; `e2e/acondicionamiento.spec.ts` **rojo en `:388`** (ver Bloqueo) |
+| R29 | `e2e/acondicionar-con-equipo.spec.ts` verde sin tocar; `e2e/acondicionamiento.spec.ts` verde 8/8 con la única aserción que permite la enmienda (`c6a8fb9f`) |
 | R30 | sin cambios en `package.json` |
 
 ## Salida de la verificación (árbol completo, tras el último commit)
@@ -99,6 +99,15 @@ Archivos esperados no tocados: `lib/shared/routes.ts` (no hizo falta).
 `e2e/acondicionamiento.spec.ts`, cuyo `:388` exige exactamente dos pestañas. No se ha tocado el archivo. Opciones:
 (a) enmendar R29 y pasar `:388` a tres pestañas (más la aserción de la tercera), o (b) otra decisión del humano.
 CI (E2E en el PR a producción) lo dará rojo hasta entonces.
+
+**Resuelto (2026-10-09).** El humano aprobó enmendar R29 (`54cbf3c7`): se permite un único cambio de aserción.
+En `c6a8fb9f`, `e2e/acondicionamiento.spec.ts` pasa de `toHaveCount(2)` a `toHaveCount(3)` y afirma que `tabs.nth(2)`
+tiene el testid `${ASSIGNMENT_VIEW_TAB_TESTID_PREFIX}acondicionados_entregados` y el texto exacto «Entregados».
+Se usa el prefijo que ya define el spec, en vez de importar la constante del componente, así el diff se queda dentro
+del bloque. También se actualizó el comentario del paso 1. Nada más cambia en ese archivo ni en
+`acondicionar-con-equipo.spec.ts`.
+- `pnpm exec playwright test e2e/acondicionamiento.spec.ts` → `8 passed (1.5m)` (4 chromium + 4 webkit).
+- `pnpm run typecheck` → exit 0. `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)`, los mismos ajenos.
 
 ## Decisiones menores a revisar
 
