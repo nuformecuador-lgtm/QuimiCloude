@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import DashboardPage from '@/app/(private)/dashboard/page';
+import RecorridoPage from '@/app/(private)/dashboard/recorrido/[id]/page';
 import InventarioPage from '@/app/(private)/inventario/page';
 import PedidosPage from '@/app/(private)/pedidos/page';
 import EditarRecetaPage from '@/app/(private)/produccion/formulas/[id]/page';
@@ -50,6 +51,12 @@ import { LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
  * El archivo es `.tsx` para caer en el proyecto `ui` de `vitest.config.mts` (jsdom), que es el que
  * incluye `tests/**\/*.test.tsx`: los módulos de página arrastran componentes de cliente en su
  * cierre de imports.
+ *
+ * Nota del 2026-10-08 (QC-167 T12, R20): el dashboard deja de ser la pantalla sin lecturas;
+ * recibe `searchParams` para acotar la lista del recorrido, asi que se invoca con una promesa
+ * espia y pasa a `leeAlgo: true`. Entra `/dashboard/recorrido/[id]`, que lee `params`,
+ * `searchParams` y `getExecutionTraceAction`; las dos acciones del recorrido se espian como las
+ * demas.
  */
 
 const { getSessionUserMock, notFoundMock, redirectMock, actions } = vi.hoisted(() => ({
@@ -62,6 +69,9 @@ const { getSessionUserMock, notFoundMock, redirectMock, actions } = vi.hoisted((
     listUnitsAction: vi.fn(),
     listProductsAction: vi.fn(),
     listProductFormUnitsAction: vi.fn(),
+    // 2026-10-08: las dos lecturas del recorrido de ejecucion.
+    listExecutionTracesAction: vi.fn(),
+    getExecutionTraceAction: vi.fn(),
   },
 }));
 
@@ -102,6 +112,11 @@ vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
 vi.mock('@/lib/modules/unidades/adapters/driving/unit-actions', () => ({
   listUnitsAction: actions.listUnitsAction,
   getMassVolumeBridgeAction: vi.fn(),
+}));
+
+vi.mock('@/lib/modules/asignaciones/adapters/driving/execution-trace-actions', () => ({
+  listExecutionTracesAction: actions.listExecutionTracesAction,
+  getExecutionTraceAction: actions.getExecutionTraceAction,
 }));
 
 vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({
@@ -154,9 +169,9 @@ type CasoDePagina = {
   readonly permiso: PermissionCode;
   readonly invocar: () => Promise<unknown>;
   /**
-   * `false` solo para el dashboard, que no tiene `params`, `searchParams` ni ninguna lectura: con
-   * permiso no hay nada que espiar. En las otras siete el caso «con permiso» exige que sí se leyó,
-   * que es lo que impide que el espía se quede mudo y el caso «sin permiso» pase por vacuidad.
+   * El caso «con permiso» exige que sí se leyó, que es lo que impide que el espía se quede mudo y
+   * el caso «sin permiso» pase por vacuidad. Desde el 2026-10-08 ninguna pantalla lo tiene a
+   * `false`: el dashboard, que era la excepcion, lee `searchParams`.
    */
   readonly leeAlgo: boolean;
 };
@@ -165,8 +180,20 @@ const PAGINAS: readonly CasoDePagina[] = [
   {
     ruta: '/dashboard',
     permiso: 'dashboard.consultar',
-    invocar: () => DashboardPage(),
-    leeAlgo: false,
+    // Enmendado el 2026-10-08 (QC-167 T12, R20): antes `DashboardPage()` y `leeAlgo: false`.
+    invocar: () => DashboardPage({ searchParams: parametroEspia('/dashboard', {}) }),
+    leeAlgo: true,
+  },
+  {
+    // Anadido el 2026-10-08 (QC-167 T12, R20).
+    ruta: '/dashboard/recorrido/[id]',
+    permiso: 'dashboard.consultar',
+    invocar: () =>
+      RecorridoPage({
+        params: parametroEspia('/dashboard/recorrido/[id]', { id: 'ID-DEL-FIXTURE' }),
+        searchParams: parametroEspia('/dashboard/recorrido/[id]', {}),
+      }),
+    leeAlgo: true,
   },
   {
     ruta: '/inventario',

@@ -93,8 +93,7 @@ describe('hay DOS columnas de datos y una de acciones, y ninguna mas (R12)', () 
   });
 
   it('el esqueleto de carga pinta tantas celdas como columnas declara la tabla', () => {
-    // El esqueleto lo renderiza un Server Component y por eso no importa el modulo de cliente de
-    // las columnas. Este ancla es lo que impide que el numero se quede atras en silencio.
+    // Este ancla es lo que impide que el numero del esqueleto se quede atras en silencio.
     expect(WORK_GROUP_SKELETON_COLUMN_COUNT).toBe(WORK_GROUP_COLUMN_COUNT);
   });
 });

@@ -26,7 +26,13 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { setupUser } from '../../helpers/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { OrderRowActions, isFinalOrderStatus } from '@/app/(private)/pedidos/components';
+import {
+  ORDER_ACTION_CUSTOMER_TESTID,
+  ORDER_ACTION_DISTRIBUTION_TESTID,
+  OrderRowActions,
+  acceptsDistributionEdit,
+  isFinalOrderStatus,
+} from '@/app/(private)/pedidos/components';
 import {
   ORDER_STATUS_VALUES,
   formatOrderNumber,
@@ -79,6 +85,7 @@ function pedido(status: OrderStatus, overrides: Partial<OrderSummary> = {}): Ord
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    customer: null,
     ...overrides,
   };
 }
@@ -258,11 +265,65 @@ describe('con el pedido en estado final las tres acciones estan deshabilitadas (
 });
 
 describe('el predicado de estado final es UNO solo y sale del contrato (R24, R42)', () => {
-  it('exactamente `ENTREGADO`, `CANCELADO`, `POR_EMPACAR` y `EN_EMPAQUE` de los valores que publica `pedidos`', () => {
+  it('R22: exactamente `ENTREGADO`, `CANCELADO`, `POR_EMPACAR`, `EN_EMPAQUE`, `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO` y `TERMINADO` de los valores que publica `pedidos`', () => {
     const finales = ORDER_STATUS_VALUES.filter((status) => isFinalOrderStatus(status));
 
-    expect(finales).toEqual(['ENTREGADO', 'CANCELADO', 'POR_EMPACAR', 'EN_EMPAQUE']);
+    expect(finales).toEqual([
+      'ENTREGADO',
+      'CANCELADO',
+      'POR_EMPACAR',
+      'EN_EMPAQUE',
+      'POR_ACONDICIONAR',
+      'EN_ACONDICIONAMIENTO',
+      'TERMINADO',
+    ]);
   });
+});
+
+describe('los estados de acondicionamiento son finales y no admiten la edicion de reparto', () => {
+  const ESTADOS_DE_ACONDICIONAMIENTO = ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const;
+
+  it.each(ESTADOS_DE_ACONDICIONAMIENTO)('R22: %s es final y no acepta la edicion acotada de reparto', (status) => {
+    expect(isFinalOrderStatus(status)).toBe(true);
+    expect(acceptsDistributionEdit(status)).toBe(false);
+  });
+
+  it.each(ESTADOS_DE_ACONDICIONAMIENTO)(
+    'R22: con un pedido %s, editar, cancelar y eliminar deshabilitados, sin «Reparto y unidad» y con «Responsables» activa',
+    async (status) => {
+      const enganches = enganchesQueFallan();
+      const onResponsibles = vi.fn();
+      render(
+        <OrderRowActions
+          order={pedido(status)}
+          {...enganches}
+          onResponsibles={onResponsibles}
+          canEditDistribution
+          onDistribution={vi.fn(() => {
+            throw new Error('no se debe abrir el reparto de un pedido en acondicionamiento');
+          })}
+        />,
+      );
+
+      abrirMenu();
+      for (const testId of CONTROLES) {
+        expect(await screen.findByTestId(testId)).toHaveAttribute('aria-disabled', 'true');
+      }
+      expect(screen.queryByTestId(ORDER_ACTION_DISTRIBUTION_TESTID)).toBeNull();
+
+      for (const testId of CONTROLES) {
+        fireEvent.click(screen.getByTestId(testId));
+      }
+      expect(enganches.onEdit).not.toHaveBeenCalled();
+      expect(enganches.onCancel).not.toHaveBeenCalled();
+      expect(enganches.onDelete).not.toHaveBeenCalled();
+
+      const responsables = screen.getByTestId(RESPONSABLES_TESTID);
+      expect(responsables).not.toHaveAttribute('aria-disabled');
+      fireEvent.click(responsables);
+      expect(onResponsibles).toHaveBeenCalledExactlyOnceWith(pedido(status));
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -331,4 +392,79 @@ describe('QC-102 — la entrada propia «Responsables» (R24)', () => {
       expect(enganches.onDelete).not.toHaveBeenCalled();
     },
   );
+});
+
+describe('la accion «Cliente»', () => {
+  const CLIENTE_CERRADO = ['ENTREGADO', 'CANCELADO'] as const satisfies readonly OrderStatus[];
+  const CLIENTE_ABIERTO = ORDER_STATUS_VALUES.filter(
+    (status) => !(CLIENTE_CERRADO as readonly OrderStatus[]).includes(status),
+  );
+
+  it('R39: los diez estados del contrato quedan repartidos entre abiertos y cerrados', () => {
+    expect(ORDER_STATUS_VALUES).toHaveLength(10);
+    expect(CLIENTE_ABIERTO).toEqual([
+      'PENDIENTE',
+      'EN_CURSO',
+      'POR_EMPACAR',
+      'EN_EMPAQUE',
+      'BLOQUEADO',
+      'POR_ACONDICIONAR',
+      'EN_ACONDICIONAMIENTO',
+      'TERMINADO',
+    ]);
+  });
+
+  it.each(CLIENTE_ABIERTO)('R39: con canEditCustomer aparece y esta habilitada en %s', async (status) => {
+    const onCustomer = vi.fn();
+    render(<OrderRowActions order={pedido(status)} canEditCustomer onCustomer={onCustomer} />);
+
+    abrirMenu();
+
+    const item = await screen.findByTestId(ORDER_ACTION_CUSTOMER_TESTID);
+    expect(item).not.toHaveAttribute('aria-disabled');
+    fireEvent.click(item);
+    expect(onCustomer).toHaveBeenCalledExactlyOnceWith(pedido(status));
+  });
+
+  it.each(CLIENTE_CERRADO)(
+    'R39: con canEditCustomer aparece deshabilitada en %s y pulsarla no emite',
+    async (status) => {
+      const onCustomer = vi.fn(() => {
+        throw new Error('no se debe abrir el cambio de cliente de un pedido entregado o cancelado');
+      });
+      render(<OrderRowActions order={pedido(status)} canEditCustomer onCustomer={onCustomer} />);
+
+      abrirMenu();
+
+      const item = await screen.findByTestId(ORDER_ACTION_CUSTOMER_TESTID);
+      expect(item).toHaveAttribute('aria-disabled', 'true');
+      fireEvent.click(item);
+      expect(onCustomer).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(ORDER_STATUS_VALUES)('R39: sin canEditCustomer no aparece en %s', async (status) => {
+    render(<OrderRowActions order={pedido(status)} />);
+
+    abrirMenu();
+
+    await screen.findByTestId('order-action-edit');
+    expect(screen.queryByTestId(ORDER_ACTION_CUSTOMER_TESTID)).toBeNull();
+  });
+
+  it('va detras de «Responsables» y delante de «Reparto y unidad»', async () => {
+    render(<OrderRowActions order={pedido('POR_EMPACAR')} canEditCustomer canEditDistribution />);
+
+    abrirMenu();
+    await screen.findByTestId(ORDER_ACTION_CUSTOMER_TESTID);
+
+    expect(screen.getAllByRole('menuitem').map((item) => item.getAttribute('data-testid'))).toEqual([
+      'order-action-edit',
+      'order-action-cancel',
+      'order-action-delete',
+      RESPONSABLES_TESTID,
+      ORDER_ACTION_CUSTOMER_TESTID,
+      ORDER_ACTION_DISTRIBUTION_TESTID,
+    ]);
+  });
 });

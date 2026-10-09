@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { ErrorState } from '@/components/shared/error-state';
 import { identity } from '@/lib/composition';
 import { canUploadDocuments } from '@/lib/modules/documentos';
 import type { ErrorCode } from '@/lib/modules/errores';
@@ -10,10 +11,9 @@ import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-ac
 import { BRAND_LABEL, SUPPLIERS_LABEL } from '@/lib/shared/navigation/private-nav';
 
 import {
-  CatalogListError,
   CatalogListSection,
   CatalogPdfUpload,
-  CatalogTableSkeleton,
+  CatalogTable,
   SupplierDetailHeader,
   SupplierNotFound,
   parseCatalogListParams,
@@ -30,6 +30,16 @@ export const metadata: Metadata = {
  * en el catalogo cerrado de `lib/modules/errores`, asi que escribirlo mal no compila (R2).
  */
 const SUPPLIER_NOT_FOUND_CODE = 'supplier_not_found' satisfies ErrorCode;
+
+// Mismo marcado que el error del catalogo: la pantalla tiene un solo estado de error.
+const PAGE_ERROR_STATE = {
+  title: 'No se pudo cargar la información del proveedor.',
+  testId: 'catalog-list-error',
+  messageTestId: 'catalog-list-error-message',
+  codeTestId: 'catalog-list-error-code',
+  retry: { kind: 'refresh' },
+  retryTestId: 'catalog-list-retry',
+} as const;
 
 /**
  * Pagina de detalle de un proveedor (R1, R7, R19, R20, R24, `design.md > 6.1`).
@@ -94,7 +104,7 @@ export default async function ProveedorDetallePage({
         {supplierResult.code === SUPPLIER_NOT_FOUND_CODE ? (
           <SupplierNotFound />
         ) : (
-          <CatalogListError error={supplierResult} />
+          <ErrorState error={supplierResult} {...PAGE_ERROR_STATE} />
         )}
       </div>
     );
@@ -106,7 +116,7 @@ export default async function ProveedorDetallePage({
     // da la pagina de edicion de receta al mismo fallo.
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-        <CatalogListError error={unitsResult} />
+        <ErrorState error={unitsResult} {...PAGE_ERROR_STATE} />
       </div>
     );
   }
@@ -124,7 +134,18 @@ export default async function ProveedorDetallePage({
         filtros y con ella el foco-. La senal de R24 llega desde dentro de `CatalogTable` mientras
         la navegacion esta en vuelo; el `fallback` cubre la primera carga.
       */}
-      <Suspense fallback={<CatalogTableSkeleton rows={listParams.pageSize} />}>
+      <Suspense
+        fallback={
+          <CatalogTable
+            status="loading"
+            lines={[]}
+            params={listParams}
+            totalPages={0}
+            supplierId={supplierResult.data.id}
+            units={unitsResult.data}
+          />
+        }
+      >
         <CatalogListSection
           supplierId={supplierResult.data.id}
           params={listParams}

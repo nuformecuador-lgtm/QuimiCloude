@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId, useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import {
   Dialog,
   DialogContent,
@@ -23,7 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import {
   adjustBatchStockAction,
   type AdjustBatchStockFormState,
@@ -43,10 +42,10 @@ import {
   formatDecimalDisplay,
   trimDecimal,
 } from '@/lib/shared/ui/decimal-display';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { movementReasonLabel } from './batch-history';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base md:text-base';
 
 const BATCH_ID_FIELD = 'batchId';
@@ -260,7 +259,7 @@ function AdjustBatchDialogContent({
         render={
           <Button
             variant="outline"
-            className={TOUCH_TARGET}
+            touch
             data-testid="adjust-batch-open"
           />
         }
@@ -345,19 +344,16 @@ function AdjustBatchDialogContent({
         ) : null}
 
         {error === undefined ? null : (
-          <div
-            role="alert"
+          <ErrorAlert
+            error={error}
             id={errorId}
             className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid="adjust-batch-error"
-            data-code={error.code}
-          >
-            {error.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={error} />
-            ) : (
-              <p data-testid="adjust-batch-error-message">{error.message}</p>
+            testId="adjust-batch-error"
+            withDataCode
+            renderCatalogued={(catalogued) => (
+              <p data-testid="adjust-batch-error-message">{catalogued.message}</p>
             )}
-          </div>
+          />
         )}
 
         <form action={formAction} onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -400,7 +396,7 @@ function AdjustBatchDialogContent({
               autoComplete="off"
               value={counted}
               onChange={(event) => handleCountedChange(event.currentTarget.value)}
-              className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+              className={`${touchTarget} ${FIELD_TEXT}`}
               aria-invalid={zeroError || countedError || wholeError || undefined}
               aria-describedby={countedDescribedBy === '' ? undefined : countedDescribedBy}
               data-testid="adjust-batch-counted"
@@ -438,7 +434,7 @@ function AdjustBatchDialogContent({
               <SelectTrigger
                 aria-labelledby={reasonLabelId}
                 aria-describedby={reasonError ? reasonErrorId : undefined}
-                className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT}`}
+                className={`w-full ${touchTarget} ${FIELD_TEXT}`}
                 data-testid="adjust-batch-reason"
               >
                 <SelectValue>
@@ -461,7 +457,7 @@ function AdjustBatchDialogContent({
             <Button
               type="button"
               variant="ghost"
-              className={TOUCH_TARGET}
+              touch
               onClick={() => setRequestedOpen(false)}
               data-testid="adjust-batch-cancel"
             >
@@ -469,7 +465,7 @@ function AdjustBatchDialogContent({
             </Button>
             <Button
               type="submit"
-              className={TOUCH_TARGET}
+              touch
               disabled={isPending}
               aria-busy={isPending}
               data-testid="adjust-batch-confirm"

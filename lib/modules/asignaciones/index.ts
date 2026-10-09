@@ -59,8 +59,12 @@ export {
   OrderPackingTakenError,
   OrderNotPackableError,
   OrderProducedFrozenError,
+  OrderConditioningTakenError,
+  OrderNotConditionableError,
   OrderBlockedError,
   OrderWithoutDistributionError,
+  ConditioningTeamMemberNotAllowedError,
+  ConditioningTeamEmptyError,
 } from './domain/errors';
 
 // Los TRES esquemas del borde (R14, R29, R31, R32, R42) y sus tipos inferidos. Se publican para
@@ -207,3 +211,82 @@ export {
   type FinishPackingDeps,
   type FinishPackingResult,
 } from './domain/finish-packing';
+
+// ---------------------------------------------------------------------------------------
+// El registro de ejecucion. Bloque NUEVO al final: no reordena ni reformatea nada de lo de
+// arriba. Los puertos del registro y de la transaccion no salen por aqui: `lib/composition` los
+// importa por su ruta exacta, como el de asignacion.
+// ---------------------------------------------------------------------------------------
+export {
+  createCancelAssignedOrder,
+  type CancelAssignedOrderDeps,
+  type CancelAssignedOrderResult,
+} from './domain/cancel-assigned-order';
+export { createRecordStepMove, type RecordStepMoveDeps } from './domain/record-step-move';
+export type { ExecutionAction, NewExecutionEntry } from './domain/execution-entry';
+export type { StartedOrderExecution } from './domain/assigned-order-execution-view';
+export { NotCancellableError } from './domain/errors';
+
+// ---------------------------------------------------------------------------------------
+// El recorrido de ejecucion: la lista de pedidos ejecutados y el recorrido de uno. Bloque NUEVO
+// al final: no reordena ni reformatea nada de lo de arriba.
+// ---------------------------------------------------------------------------------------
+export {
+  createListExecutionTraces,
+  type ExecutionTraceList,
+  type ExecutionTraceListInput,
+  type ExecutionTracePerson,
+  type ExecutionTraceRow,
+  type ListExecutionTracesDeps,
+} from './domain/list-execution-traces';
+export {
+  createGetExecutionTrace,
+  type ExecutionTraceDetail,
+  type ExecutionTraceDetailStep,
+  type GetExecutionTraceDeps,
+} from './domain/get-execution-trace';
+export type { ExecutionTrace, TraceDuration, TraceStep } from './domain/execution-trace';
+
+// ---------------------------------------------------------------------------------------
+// El acondicionamiento: Comenzar y Terminar. Bloque NUEVO al final.
+// ---------------------------------------------------------------------------------------
+export { createStartConditioning, type StartConditioningDeps } from './domain/start-conditioning';
+export {
+  createFinishConditioning,
+  type FinishConditioningDeps,
+  type FinishConditioningResult,
+} from './domain/finish-conditioning';
+
+// ---------------------------------------------------------------------------------------
+// Las pestanas del acondicionador y su detalle, de solo lectura. Bloque NUEVO al final.
+// ---------------------------------------------------------------------------------------
+export {
+  composeConditioningOrderRows,
+  type ConditioningOrderRow,
+  type ConditioningOrderDetail,
+  type ConditioningTeamMemberView,
+} from './domain/conditioning-order-view';
+export {
+  createListConditioningOrders,
+  type ListConditioningOrdersDeps,
+} from './domain/list-conditioning-orders';
+export {
+  createListConditionedOrders,
+  type ListConditionedOrdersDeps,
+} from './domain/list-conditioned-orders';
+export {
+  createGetConditioningOrder,
+  type GetConditioningOrderDeps,
+} from './domain/get-conditioning-order';
+
+// ---------------------------------------------------------------------------------------
+// El equipo de acondicionamiento: la entrada de Comenzar y los candidatos del modal.
+// ---------------------------------------------------------------------------------------
+export { startConditioningSchema, type StartConditioningInput } from './domain/conditioning-team';
+export {
+  createListConditioningTeamCandidates,
+  type ConditioningTeamCandidateGroup,
+  type ConditioningTeamCandidatePerson,
+  type ConditioningTeamCandidates,
+  type ListConditioningTeamCandidatesDeps,
+} from './domain/list-conditioning-team-candidates';

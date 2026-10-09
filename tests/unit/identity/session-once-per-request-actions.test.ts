@@ -248,6 +248,33 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         page: 1,
       }),
   },
+  // QC-156: las tres acciones del cliente del pedido resuelven el actor con `currentActor()`.
+  {
+    archivo: 'lib/modules/pedidos/adapters/driving/order-actions.ts',
+    nombre: 'setOrderCustomerAction',
+    invocar: async () =>
+      (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).setOrderCustomerAction(
+        '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+        { customerId: null },
+      ),
+  },
+  {
+    archivo: 'lib/modules/pedidos/adapters/driving/order-actions.ts',
+    nombre: 'searchOrderCustomersAction',
+    invocar: async () =>
+      (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).searchOrderCustomersAction(
+        { search: '', page: 1 },
+        'assign',
+      ),
+  },
+  {
+    archivo: 'lib/modules/pedidos/adapters/driving/order-actions.ts',
+    nombre: 'getOrderCustomerFilterOptionAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/pedidos/adapters/driving/order-actions')
+      ).getOrderCustomerFilterOptionAction('7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31'),
+  },
   {
     // Anadido el 2026-09-17 por QC-63, que estrena la pantalla de ejecucion: su archivo de
     // `driving/` resuelve las dos caras de la sesion, asi que el censo tiene que cubrirlo o R15
@@ -272,6 +299,29 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         await import('@/lib/modules/asignaciones/adapters/driving/order-packing-actions')
       ).startPackingAction({ status: 'success' }, formData);
     },
+  },
+  {
+    // El detalle del acondicionador: su archivo de `driving/` resuelve las dos caras de la sesion.
+    // La accion captura los errores y devuelve un estado, asi que una entrada invalida no rompe.
+    archivo: 'lib/modules/asignaciones/adapters/driving/order-conditioning-actions.ts',
+    nombre: 'startConditioningAction',
+    invocar: async () => {
+      const formData = new FormData();
+      formData.set('orderId', 'no-es-un-uuid');
+      return (
+        await import('@/lib/modules/asignaciones/adapters/driving/order-conditioning-actions')
+      ).startConditioningAction({ status: 'success' }, formData);
+    },
+  },
+  {
+    // La accion captura los errores y devuelve un estado, asi que un `orderId` invalido no rompe
+    // la invocacion: lo que esta lista mide es cuantas veces se lee la sesion.
+    archivo: 'lib/modules/asignaciones/adapters/driving/execution-trace-actions.ts',
+    nombre: 'getExecutionTraceAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/asignaciones/adapters/driving/execution-trace-actions')
+      ).getExecutionTraceAction('no-es-un-uuid'),
   },
   {
     // La accion captura los errores y devuelve un estado, asi que una entrada invalida no rompe

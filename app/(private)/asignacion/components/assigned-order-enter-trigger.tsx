@@ -19,8 +19,6 @@ export function assignedOrderBlockedNoticeText(): string {
   return 'Falta material: no se puede iniciar';
 }
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 export function AssignedOrderEnterTrigger({
   order,
 }: {
@@ -39,7 +37,7 @@ export function AssignedOrderEnterTrigger({
           disabled
           aria-describedby={noticeId}
           data-testid={ASSIGNED_ORDER_ENTER_TESTID}
-          className={TOUCH_TARGET}
+          touch
         >
           Entrar
         </Button>
@@ -64,7 +62,7 @@ export function AssignedOrderEnterTrigger({
           data-slot="button"
           aria-describedby={noticeId}
           data-testid={ASSIGNED_ORDER_ENTER_TESTID}
-          className={cn(buttonVariants({ variant: 'outline' }), TOUCH_TARGET)}
+          className={cn(buttonVariants({ variant: 'outline', touch: true }))}
         >
           Entrar
         </Link>

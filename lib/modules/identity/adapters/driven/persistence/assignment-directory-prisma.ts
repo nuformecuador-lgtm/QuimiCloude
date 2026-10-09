@@ -240,6 +240,57 @@ export async function findSnapshotAliveInCompany(
   };
 }
 
+type GroupMemberRow = {
+  readonly work_group_id: string;
+  readonly user_id: string;
+  readonly account_status: UserAccountStatus;
+  readonly locked_until: Date | null;
+};
+
+/**
+ * Dos consultas en total, sea cual sea el numero de grupos: los grupos y, en una sola, los
+ * miembros vivos de todos ellos. `work_group_members` no declara relacion con `users` en el
+ * esquema, de ahi el SQL. El orden de los miembros es el de `listMembersAliveInCompany`, y el
+ * filtro de cuenta activa es el mismo `isEffectivelyActive` que usa la foto de un solo grupo.
+ */
+export async function listSnapshotsAliveInCompany(
+  companyId: string,
+  now: Date,
+  limit: number,
+): Promise<readonly WorkGroupSnapshot[]> {
+  const groups = await prisma.workGroup.findMany({
+    where: { companyId, deletedAt: null },
+    select: { id: true, name: true },
+    orderBy: [{ nameNormalized: 'asc' }, { id: 'asc' }],
+    take: limit,
+  });
+  if (groups.length === 0) return [];
+
+  const groupIds = groups.map((group) => group.id);
+  const members = await prisma.$queryRaw<ReadonlyArray<GroupMemberRow>>(Prisma.sql`
+    SELECT m."work_group_id"::text AS "work_group_id", u."id"::text AS "user_id",
+           u."account_status"::text AS "account_status", u."locked_until"
+    FROM "work_group_members" m
+    JOIN "users" u ON u."id" = m."user_id" AND u."company_id" = m."company_id"
+    WHERE m."company_id" = ${companyId}::uuid
+      AND m."work_group_id" = ANY(${groupIds}::uuid[])
+      AND u."deleted_at" IS NULL
+    ORDER BY u."last_names" ASC, u."first_names" ASC, u."id" ASC
+  `);
+
+  const activeByGroup = new Map<string, string[]>(groupIds.map((id) => [id, []]));
+  for (const member of members) {
+    const view = { accountStatus: member.account_status, lockedUntil: member.locked_until };
+    if (isEffectivelyActive(view, now)) activeByGroup.get(member.work_group_id)?.push(member.user_id);
+  }
+
+  return groups.map((group) => ({
+    id: group.id,
+    name: group.name,
+    activeMemberIds: activeByGroup.get(group.id) ?? [],
+  }));
+}
+
 /**
  * El objeto que `lib/composition` cablea (R47). Se declara con el tipo de las DOS interfaces para
  * que quitar un metodo —o cambiarle la firma— no compile, en vez de romper en produccion.
@@ -249,4 +300,5 @@ export const assignmentDirectoryPrisma: PeopleDirectory & WorkGroupDirectory = {
   findRefsIncludingDeletedInCompany,
   listAliveInCompany,
   findSnapshotAliveInCompany,
+  listSnapshotsAliveInCompany,
 };

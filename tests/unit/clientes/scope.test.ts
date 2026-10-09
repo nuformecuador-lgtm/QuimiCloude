@@ -113,11 +113,15 @@ describe('R20 — el modulo clientes nace con la forma hexagonal', () => {
     // o de menos la pone roja igual que antes.
     const ARCHIVOS_ESPERADOS = [
       'adapters/driven/persistence/company-scope.ts',
+      // QC-156: el adaptador del servicio que `clientes` ofrece a otros modulos.
+      'adapters/driven/persistence/customer-catalog-prisma.ts',
       'adapters/driven/persistence/customer-prisma.ts',
       'adapters/driven/persistence/list-query-sql.ts',
       'adapters/driving/customer-actions.ts',
       'domain/actor.ts',
       'domain/create-customer.ts',
+      // QC-156: el contrato de ese servicio.
+      'domain/customer-catalog.ts',
       'domain/customer-id.ts',
       'domain/customer-input.ts',
       'domain/customer-queryable.ts',
@@ -284,24 +288,26 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
 // R28 — ningun test E2E nombra clientes
 // ---------------------------------------------------------------------------------------------
 
-describe('R28 — el UNICO E2E que nombra clientes es e2e/clientes.spec.ts', () => {
-  const E2E_DE_CLIENTES = 'clientes.spec.ts'
+describe('R28 — los UNICOS E2E que nombran clientes son e2e/clientes.spec.ts y la excepcion de QC-156', () => {
+  // Lista cerrada. La segunda entrada es el E2E de R40 de QC-156: su nombre lo fija
+  // specs/QC-156-pedido-con-cliente/design.md > 10 e importa el barrel de `clientes`.
+  const E2E_PERMITIDOS: ReadonlySet<string> = new Set(['clientes.spec.ts', 'pedido-con-cliente.spec.ts'])
   const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
 
-  /** Archivos de e2e/, por nombre o por contenido, que delatan clientes fuera del unico spec
-   *  permitido. Parametrizado por directorio para que la sensibilidad pueda fabricar su propio
+  /** Archivos de e2e/, por nombre o por contenido, que delatan clientes fuera de los specs
+   *  permitidos. Parametrizado por directorio para que la sensibilidad pueda fabricar su propio
    *  arbol en un tmpdir. */
   function e2eAjenosAClientes(e2eDir: string = join(repoRoot, 'e2e')): string[] {
     return filesIn(e2eDir)
       .map((ruta) => relative(e2eDir, ruta).split(sep).join('/'))
-      .filter((relativa) => relativa !== E2E_DE_CLIENTES)
+      .filter((relativa) => !E2E_PERMITIDOS.has(relativa))
       .filter(
         (relativa) => /cliente/i.test(relativa) || MARCADORES_DE_CLIENTES.test(leer(join(e2eDir, relativa))),
       )
   }
 
   it('ningun otro archivo de e2e/, ni por nombre ni por contenido, nombra clientes', () => {
-    // Se compara TODO archivo de e2e/ salvo `e2e/clientes.spec.ts`: cualquier otro spec que
+    // Se compara TODO archivo de e2e/ salvo los de E2E_PERMITIDOS: cualquier otro spec que
     // nombre clientes es un hallazgo.
     const hallazgos = e2eAjenosAClientes()
     expect(hallazgos, `spec E2E ajeno con marca de clientes: ${hallazgos.join(', ')}`).toEqual([])
@@ -313,6 +319,21 @@ describe('R28 — el UNICO E2E que nombra clientes es e2e/clientes.spec.ts', () 
       const relativoFabricado = 'otro-clientes.spec.ts'
       writeFileSync(join(raiz, relativoFabricado), "test('nombra clientes', () => {})\n")
       expect(e2eAjenosAClientes(raiz)).toContain(relativoFabricado)
+    } finally {
+      rmSync(raiz, { recursive: true, force: true })
+    }
+  })
+
+  it('la excepcion es exacta: un fabricado e2e/pedido-con-cliente-otro.spec.ts dispara', () => {
+    const raiz = mkdtempSync(join(tmpdir(), 'qc156-scope-'))
+    try {
+      const permitido = 'pedido-con-cliente.spec.ts'
+      const relativoFabricado = 'pedido-con-cliente-otro.spec.ts'
+      writeFileSync(join(raiz, permitido), "import '@/lib/modules/clientes'\n")
+      writeFileSync(join(raiz, relativoFabricado), "test('nombra clientes', () => {})\n")
+      const hallazgos = e2eAjenosAClientes(raiz)
+      expect(hallazgos).toContain(relativoFabricado)
+      expect(hallazgos).not.toContain(permitido)
     } finally {
       rmSync(raiz, { recursive: true, force: true })
     }
@@ -472,7 +493,7 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
     ])
   })
 
-  it('solo dos migraciones del repo tocan la tabla customers: la de QC-153 y la de esta ficha', () => {
+  it('solo tres migraciones del repo tocan la tabla customers: la de QC-153, la de esta ficha y la de QC-156', () => {
     const migracionesDir = join(repoRoot, 'db', 'migrations')
     const tocanCustomers = readdirSync(migracionesDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
@@ -486,7 +507,11 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
       })
       .map((entry) => entry.name)
       .sort()
-    expect(tocanCustomers).toEqual(['20260924120000_customers', '20260924200000_customers_search_normalized'])
+    expect(tocanCustomers).toEqual([
+      '20260924120000_customers',
+      '20260924200000_customers_search_normalized',
+      '20261006160000_orders_customer',
+    ])
   })
 
   it('el censo de campos dispara con un campo fabricado de mas', () => {
@@ -550,12 +575,18 @@ describe('R38 (QC-154), R37 (QC-155) — solo bajo app/(private)/clientes/ nombr
 // R40 — clientes no nombra pedidos, ni pedidos nombra clientes
 // ---------------------------------------------------------------------------------------------
 
-describe('R40 — clientes no nombra pedidos ni pedidos nombra clientes', () => {
+describe('R40 — clientes no nombra pedidos, y pedidos solo usa clientes por su contrato (QC-156 R36)', () => {
   const PEDIDOS_DIR = join(repoRoot, 'lib', 'modules', 'pedidos')
 
   /** Especificador de import de otro modulo, sea barrel o ruta profunda: `@/lib/modules/<x>`. */
   function importaModulo(fuente: string, modulo: string): boolean {
     return new RegExp(`@/lib/modules/${modulo}\\b`).test(fuente)
+  }
+
+  /** Solo la ruta profunda: `@/lib/modules/<x>/` seguido de algo. Desde QC-156 `pedidos` puede
+   *  importar el barrel de `clientes`, nunca lo que hay detras de el. */
+  function importaModuloEnProfundidad(fuente: string, modulo: string): boolean {
+    return new RegExp(`@/lib/modules/${modulo}/[^'"\\s]`).test(fuente)
   }
 
   /** El modelo de Prisma (`prisma.<modelo>`) o el nombre de tabla de la otra entidad, sin pasar
@@ -577,16 +608,43 @@ describe('R40 — clientes no nombra pedidos ni pedidos nombra clientes', () => 
     }
     for (const archivo of filesIn(pedidosDir, /\.tsx?$/)) {
       const fuente = leer(archivo)
-      if (importaModulo(fuente, 'clientes') || nombraModeloOTabla(fuente, 'customer', 'customers')) {
+      if (importaModuloEnProfundidad(fuente, 'clientes') || nombraModeloOTabla(fuente, 'customer', 'customers')) {
         hallazgos.push(archivo)
       }
     }
     return hallazgos
   }
 
-  it('ningun archivo de clientes importa pedidos, y ninguno de pedidos importa clientes', () => {
+  it('ningun archivo de clientes importa pedidos, y ninguno de pedidos importa clientes por ruta profunda', () => {
     const hallazgos = hallazgosDeAcoplamiento()
     expect(hallazgos, `acoplamiento entre clientes y pedidos: ${hallazgos.join(', ')}`).toEqual([])
+  })
+
+  it('QC-156 R36 — un import del barrel de clientes desde pedidos no dispara', () => {
+    const raiz = mkdtempSync(join(tmpdir(), 'qc156-scope-'))
+    try {
+      const rutaFabricada = join(raiz, 'domain', '__sensibilidad_barrel__.ts')
+      mkdirSync(dirname(rutaFabricada), { recursive: true })
+      writeFileSync(rutaFabricada, "import type { CustomerRef } from '@/lib/modules/clientes'\nexport type { CustomerRef }\n")
+      expect(hallazgosDeAcoplamiento(moduloDir, raiz)).not.toContain(rutaFabricada)
+    } finally {
+      rmSync(raiz, { recursive: true, force: true })
+    }
+  })
+
+  it('QC-156 R36 — un import por ruta profunda de clientes desde pedidos si dispara', () => {
+    const raiz = mkdtempSync(join(tmpdir(), 'qc156-scope-'))
+    try {
+      const rutaFabricada = join(raiz, 'domain', '__sensibilidad_profundo__.ts')
+      mkdirSync(dirname(rutaFabricada), { recursive: true })
+      writeFileSync(
+        rutaFabricada,
+        "import type { CustomerRef } from '@/lib/modules/clientes/domain/customer-catalog'\nexport type { CustomerRef }\n",
+      )
+      expect(hallazgosDeAcoplamiento(moduloDir, raiz)).toContain(rutaFabricada)
+    } finally {
+      rmSync(raiz, { recursive: true, force: true })
+    }
   })
 
   it('el detector dispara con un import fabricado de pedidos desde clientes', () => {

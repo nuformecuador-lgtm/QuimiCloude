@@ -1,0 +1,78 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`paridad de la alerta de error > R1 — bloque sin rol con prefijo (order-cost-quote), error de catalogo 1`] = `
+"
+div role=generic aria-busy="false" data-testid="order-cost-quote" class="flex flex-col gap-1"
+  span role=generic class="font-medium text-sm"
+    "Coste estimado de producción"
+  div role=status aria-live="polite" class="flex flex-col gap-1 text-sm"
+    div role=generic class="flex gap-1.5 items-center"
+    div role=generic data-testid="order-cost-quote-error" class="text-destructive"
+      span role=generic
+        "No se pudo cotizar: La entrada recibida no es valida."
+"
+`;
+
+exports[`paridad de la alerta de error > R1 — bloque sin rol con prefijo (order-cost-quote), error inesperado 1`] = `
+"
+div role=generic aria-busy="false" data-testid="order-cost-quote" class="flex flex-col gap-1"
+  span role=generic class="font-medium text-sm"
+    "Coste estimado de producción"
+  div role=status aria-live="polite" class="flex flex-col gap-1 text-sm"
+    div role=generic class="flex gap-1.5 items-center"
+    div role=generic data-testid="order-cost-quote-error" class="text-destructive"
+      div role=generic data-code="unexpected" data-testid="unexpected-error-notice" class="flex flex-col gap-1"
+        p role=paragraph data-testid="unexpected-error-notice-message"
+          "Ocurrio un error inesperado. Intentalo de nuevo."
+        p role=paragraph data-testid="unexpected-error-notice-reference" class="text-xs"
+          "Código para soporte:"
+          span role=generic class="break-all font-mono select-all"
+            "7b1c9f2e-4d3a-4f5b-9c0d-1e2f3a4b5c6d"
+"
+`;
+
+exports[`paridad de la alerta de error > R1 — region de error con data-code (work-group-form), error de catalogo 1`] = `
+"
+div role=alert data-code="invalid_input" data-testid="work-group-form-error" class="border border-destructive/40 flex flex-col gap-2 p-3 rounded-lg text-destructive text-sm"
+  p role=paragraph
+    "La entrada recibida no es valida."
+  p role=paragraph data-testid="work-group-form-error-code" class="text-xs"
+    "invalid_input"
+"
+`;
+
+exports[`paridad de la alerta de error > R1 — region de error con data-code (work-group-form), error inesperado 1`] = `
+"
+div role=alert data-code="unexpected" data-testid="work-group-form-error" class="border border-destructive/40 flex flex-col gap-2 p-3 rounded-lg text-destructive text-sm"
+  div role=generic data-code="unexpected" data-testid="unexpected-error-notice" class="flex flex-col gap-1"
+    p role=paragraph data-testid="unexpected-error-notice-message"
+      "Ocurrio un error inesperado. Intentalo de nuevo."
+    p role=paragraph data-testid="unexpected-error-notice-reference" class="text-xs"
+      "Código para soporte:"
+      span role=generic class="break-all font-mono select-all"
+        "7b1c9f2e-4d3a-4f5b-9c0d-1e2f3a4b5c6d"
+"
+`;
+
+exports[`paridad de la alerta de error > R1 — region de error con mensaje y codigo (product-form), error de catalogo 1`] = `
+"
+div role=alert data-testid="product-form-error" class="border border-destructive/40 p-3 rounded-lg text-destructive text-sm"
+  p role=paragraph data-testid="product-form-error-message"
+    "La entrada recibida no es valida."
+  p role=paragraph data-testid="product-form-error-code" class="text-xs"
+    "invalid_input"
+"
+`;
+
+exports[`paridad de la alerta de error > R1 — region de error con mensaje y codigo (product-form), error inesperado 1`] = `
+"
+div role=alert data-testid="product-form-error" class="border border-destructive/40 p-3 rounded-lg text-destructive text-sm"
+  div role=generic data-code="unexpected" data-testid="unexpected-error-notice" class="flex flex-col gap-1"
+    p role=paragraph data-testid="unexpected-error-notice-message"
+      "Ocurrio un error inesperado. Intentalo de nuevo."
+    p role=paragraph data-testid="unexpected-error-notice-reference" class="text-xs"
+      "Código para soporte:"
+      span role=generic class="break-all font-mono select-all"
+        "7b1c9f2e-4d3a-4f5b-9c0d-1e2f3a4b5c6d"
+"
+`;

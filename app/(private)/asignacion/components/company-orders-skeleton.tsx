@@ -10,7 +10,9 @@ import {
 
 /**
  * Copia a mano el numero de columnas de `buildCompanyOrdersColumns()` SIN la fecha de terminado;
- * un test ata las dos. Con el filtro exactamente `ENTREGADO` se suma una columna mas.
+ * un test ata las dos. Con el filtro exactamente `ENTREGADO` o exactamente `TERMINADO` se suma una
+ * columna mas: quien lo pinta pasa `showFinishedAt` desde `isExactlyDelivered`, la misma regla que
+ * usa la tabla.
  */
 export const COMPANY_ORDERS_SKELETON_BASE_COLUMN_COUNT = 7;
 

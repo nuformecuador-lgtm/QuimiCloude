@@ -9,8 +9,11 @@ import {
   RecipeWithoutLinesError,
   ValidationError,
 } from './errors';
+import { ExecutionAbortedError, isExecutionSuccess } from './execution-entry';
 import { assertOrderAcceptsWrites } from './order-state';
 
+import type { ExecutionLogRepository } from '../ports/execution-log-repository';
+import type { ExecutionTransaction } from '../ports/execution-transaction';
 import type {
   NewAssignment,
   OrderAssignmentRepository,
@@ -25,6 +28,7 @@ import { formatOrderNumber, type OrderAssignmentTarget, type OrderCatalog } from
 
 const finishAssignedOrderSchema = z.strictObject({
   orderId: z.string().uuid(),
+  stepPosition: z.number().int().min(1).nullable(),
 });
 
 export type FinishAssignedOrderDeps = {
@@ -32,6 +36,8 @@ export type FinishAssignedOrderDeps = {
   readonly orders: OrderCatalog;
   readonly people: PeopleDirectory;
   readonly groups: WorkGroupDirectory;
+  readonly log: ExecutionLogRepository;
+  readonly transaction: ExecutionTransaction;
   readonly now?: () => Date;
 };
 
@@ -148,8 +154,8 @@ async function compensatePackerAssignments(
 
 /**
  * Deja el pedido en `POR_EMPACAR`, no en `ENTREGADO`: el Empacador lo entrega despues, con
- * Terminar. No recibe ni admite ningun dato de lo marcado: la entrada es solo el identificador
- * del pedido, y nada de lo recorrido en pantalla se persiste.
+ * Terminar. No recibe ni admite ningun dato de lo marcado: la entrada es el pedido y la posicion
+ * del paso en que se finaliza, que se anota con la transicion en la misma transaccion.
  *
  * Devuelve el numero visible del pedido para que la lista, al volver, pueda confirmar que
  * queda por empacar, junto con los envases y el producto terminado que recibio el lote. Se lee
@@ -161,8 +167,8 @@ async function compensatePackerAssignments(
  * propias de este modulo para que el adaptador driving las traduzca con su propio `instanceof`.
  *
  * Antes de transicionar asegura filas de responsable para los empacadores vinculados al pedido
- * (ver `ensurePackerAssignments`): si la transicion falla despues, compensa lo creado y propaga
- * el error original.
+ * (ver `ensurePackerAssignments`): si la transaccion falla despues -por la transicion o por la
+ * anotacion-, compensa lo creado y propaga el error original.
  */
 export function createFinishAssignedOrder(
   deps: FinishAssignedOrderDeps,
@@ -175,7 +181,7 @@ export function createFinishAssignedOrder(
 
     const parsed = finishAssignedOrderSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const { orderId } = parsed.data;
+    const { orderId, stepPosition } = parsed.data;
 
     const ids = await deps.assignments.listOrderIdsByUserInCompany(actor.companyId, actor.id);
     if (!ids.includes(orderId)) throw new OrderNotFoundError();
@@ -203,21 +209,36 @@ export function createFinishAssignedOrder(
     // `stale` solo repite la transicion. Si esta falla despues, se compensa lo creado.
     const createdPackerIds = await ensurePackerAssignments(deps, actor.companyId, orderId, now);
     for (;;) {
-      const result = await deps.orders.transitionAliveById(
-        orderId,
-        actor.companyId,
-        order.status,
-        'POR_EMPACAR',
-        actor.id,
-        now,
-      );
-      if (result === 'ok') return { numberText };
-      // La transicion fallo con el pedido aun `EN_CURSO`: se deshace lo creado y se propaga
-      // el error original, con el mismo mapeo de siempre.
-      await compensatePackerAssignments(deps, actor.companyId, orderId, createdPackerIds);
-      if (result === 'not_found') throw new OrderNotFoundError();
-      if (result === 'insufficient_material') throw new MaterialShortageError();
-      if (result === 'recipe_without_lines') throw new RecipeWithoutLinesError();
+      const from = order.status;
+      try {
+        await deps.transaction.run(async ({ orders, log }) => {
+          const outcome = await orders.transitionAliveById(
+            orderId,
+            actor.companyId,
+            from,
+            'POR_EMPACAR',
+            actor.id,
+            now,
+          );
+          if (!isExecutionSuccess(outcome)) throw new ExecutionAbortedError(outcome);
+          await log.append({
+            action: 'finish',
+            companyId: actor.companyId,
+            orderId,
+            userId: actor.id,
+            stepPosition,
+            occurredAt: now,
+          });
+        });
+        return { numberText };
+      } catch (error) {
+        await compensatePackerAssignments(deps, actor.companyId, orderId, createdPackerIds);
+        if (!(error instanceof ExecutionAbortedError)) throw error;
+        if (error.outcome === 'not_found') throw new OrderNotFoundError();
+        if (error.outcome === 'insufficient_material') throw new MaterialShortageError();
+        if (error.outcome === 'recipe_without_lines') throw new RecipeWithoutLinesError();
+        if (error.outcome !== 'stale') throw error;
+      }
       // 'stale': alguien lo movio entre la lectura y esta llamada. Se relee y se reintenta
       // contra el estado real.
       order = await deps.orders.findAliveById(orderId, actor.companyId);

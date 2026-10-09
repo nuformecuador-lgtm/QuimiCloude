@@ -293,6 +293,29 @@ describe('reviewBlockedOrders — concurrencia y fallos', () => {
     }
   });
 
+  it('R23 - solo desbloquea BLOQUEADO: un pedido POR_ACONDICIONAR, EN_ACONDICIONAMIENTO o TERMINADO no se toca, ni al leerlo ni bajo el candado', async () => {
+    for (const status of ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const) {
+      // Al leerlo: ni candado, ni apartado, ni escritura.
+      const leido = montar({ filas: new Map([[PEDIDO_1, bloqueado(PEDIDO_1, { status })]]) });
+
+      expect(await leido.review({ companyId: EMPRESA_A, now: AHORA }), status).toEqual({ unblocked: 0, failed: [] });
+      expect(leido.lockAliveById, status).not.toHaveBeenCalled();
+      expect(leido.syncForOrder, status).not.toHaveBeenCalled();
+      expect(leido.setStatus, status).not.toHaveBeenCalled();
+      expect(leido.setIngredientsCost, status).not.toHaveBeenCalled();
+      expect(leido.setReservedAt, status).not.toHaveBeenCalled();
+
+      // Bajo el candado: si paso al estado nuevo entre la lista y el candado, tampoco.
+      const bloqueadoAntes = montar({ bloqueadas: new Map([[PEDIDO_1, bloqueado(PEDIDO_1, { status })]]) });
+
+      expect(await bloqueadoAntes.review({ companyId: EMPRESA_A, now: AHORA }), status).toEqual({ unblocked: 0, failed: [] });
+      expect(bloqueadoAntes.syncForOrder, status).not.toHaveBeenCalled();
+      expect(bloqueadoAntes.setStatus, status).not.toHaveBeenCalled();
+      expect(bloqueadoAntes.setIngredientsCost, status).not.toHaveBeenCalled();
+      expect(bloqueadoAntes.setReservedAt, status).not.toHaveBeenCalled();
+    }
+  });
+
   it('R24: si al bloquear la fila ya no existe (borrada), no se toca', async () => {
     const m = montar({ bloqueadas: new Map([[PEDIDO_1, null]]) });
 

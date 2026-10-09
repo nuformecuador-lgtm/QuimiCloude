@@ -376,7 +376,7 @@ test.describe('la lista de pedidos asignados del Operador (R38)', () => {
  * Los estados se leen de la base, no de la pantalla: lo unico que demuestra que el 404 no movio el
  * pedido es la fila de `orders`.
  *
- * `packed_by` se siembra solo en `ENTREGADO` (el CHECK `orders_packed_by_matches_status` lo
+ * `packed_by` se siembra solo en `TERMINADO` y `ENTREGADO` (el CHECK `orders_packed_by_matches_status` lo
  * prohibe en `PENDIENTE`/`EN_CURSO`) y con personas de la misma empresa (FK compuesta
  * `(packed_by, company_id)`). Por esa FK los pedidos se borran antes que las personas.
  */
@@ -518,9 +518,10 @@ async function createPackerFixtureUser(user: Credentials, roleId: string): Promi
 /** El ano sale del reloj: el CHECK `orders_order_year_matches_created_at` lo ata a `created_at`. */
 async function seedPackerOrder(params: {
   sequence: number;
-  status: 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO';
+  status: 'PENDIENTE' | 'EN_CURSO' | 'ENTREGADO' | 'TERMINADO';
   finishedAt?: Date | null;
   packedBy?: string | null;
+  conditionedBy?: string | null;
 }): Promise<SeededOrder> {
   if (!packerCompanyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
   if (!packerRecipeId) throw new Error('la receta del fixture no existe: fallo el beforeAll');
@@ -536,6 +537,7 @@ async function seedPackerOrder(params: {
       status: params.status,
       finishedAt: params.finishedAt ?? null,
       packedBy: params.packedBy ?? null,
+      conditionedBy: params.conditionedBy ?? null,
     },
     select: { id: true },
   });
@@ -557,6 +559,7 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
     const orphanCompanyIds = orphanCompanies.map((company) => company.id);
     if (orphanCompanyIds.length > 0) {
       await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+      await prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
       await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
       await prisma.recipe.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     }
@@ -599,17 +602,20 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
         seedPackerOrder({ sequence: SEQUENCE_HIDDEN_PENDING, status: 'PENDIENTE' }),
         seedPackerOrder({ sequence: SEQUENCE_HIDDEN_IN_PROGRESS, status: 'EN_CURSO' }),
         seedPackerOrder({ sequence: SEQUENCE_EXECUTABLE, status: 'PENDIENTE' }),
+        // «Terminados» es solo `TERMINADO`, que exige empacador y quien acondiciona.
         seedPackerOrder({
           sequence: SEQUENCE_DELIVERED_OWN,
-          status: 'ENTREGADO',
+          status: 'TERMINADO',
           finishedAt: FINISHED_AT,
           packedBy: empacadorUserId,
+          conditionedBy: packerOperatorUserId,
         }),
         seedPackerOrder({
           sequence: SEQUENCE_DELIVERED_OTHER,
-          status: 'ENTREGADO',
+          status: 'TERMINADO',
           finishedAt: FINISHED_AT,
           packedBy: otherEmpacadorUserId,
+          conditionedBy: packerOperatorUserId,
         }),
         // Entregado anterior al empaque: sin empacador registrado.
         seedPackerOrder({
@@ -639,6 +645,10 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
       () =>
         scopedCompanyId
           ? prisma.orderAssignment.deleteMany({ where: { companyId: scopedCompanyId } })
+          : Promise.resolve(),
+      () =>
+        scopedCompanyId
+          ? prisma.orderExecutionEntry.deleteMany({ where: { companyId: scopedCompanyId } })
           : Promise.resolve(),
       () =>
         scopedCompanyId
@@ -749,7 +759,7 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
     expect((await orderState(executable.id)).status).toBe('EN_CURSO');
   });
 
-  test('R20 - en «Terminados» el Empacador ve el ENTREGADO que empaco el y no el empacado por otro ni el que no tiene empacador', async ({
+  test('R20 - en «Terminados» el Empacador ve el TERMINADO que empaco el y no el empacado por otro ni el que no tiene empacador', async ({
     page,
   }) => {
     expect(deliveredOwn, 'el fixture no existe: fallo el beforeAll').not.toBeNull();

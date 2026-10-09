@@ -1,0 +1,22 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`paridad de la imagen del formulario de pedido > R1 — con una receta con imagen 1`] = `
+"
+div role=generic class="aspect-square bg-muted border flex items-center justify-center overflow-hidden rounded-xl w-full"
+  img role=img name="Barniz mate" alt="Barniz mate" data-testid="order-recipe-image" decoding="async" loading="lazy" src="https://ejemplo.test/barniz.png" class="h-full object-contain w-full"
+"
+`;
+
+exports[`paridad de la imagen del formulario de pedido > R1 — con una receta sin imagen, el marcador se queda 1`] = `
+"
+div role=generic class="aspect-square bg-muted border flex items-center justify-center overflow-hidden rounded-xl w-full"
+  img role=img name="Esmalte azul" alt="Esmalte azul" data-missing="true" data-testid="order-recipe-image" decoding="async" loading="lazy" src="/inv_not_found.png" class="h-full object-contain w-full"
+"
+`;
+
+exports[`paridad de la imagen del formulario de pedido > R1 — sin receta elegida, con el marcador 1`] = `
+"
+div role=generic class="aspect-square bg-muted border flex items-center justify-center overflow-hidden rounded-xl w-full"
+  img role=img name="Sin receta elegida" alt="Sin receta elegida" data-missing="true" data-testid="order-recipe-image" decoding="async" loading="lazy" src="/inv_not_found.png" class="h-full object-contain w-full"
+"
+`;

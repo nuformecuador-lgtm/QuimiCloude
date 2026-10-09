@@ -86,8 +86,12 @@ describe('la navegacion privada lleva a clientes (R4)', () => {
     expect(proveedores?.section).toBe(NAV_SECTION_CHAIN);
   });
 
-  it('el item es el ULTIMO de todo el array', () => {
-    expect(PRIVATE_NAV_ITEMS[PRIVATE_NAV_ITEMS.length - 1]).toBe(ITEMS_DE_CLIENTES[0]);
+  it('el item es el PENULTIMO de todo el array, y el ultimo es el grupo nav-integraciones', () => {
+    expect(PRIVATE_NAV_ITEMS[PRIVATE_NAV_ITEMS.length - 2]).toBe(ITEMS_DE_CLIENTES[0]);
+
+    const ultimo = PRIVATE_NAV_ITEMS[PRIVATE_NAV_ITEMS.length - 1];
+    expect(ultimo?.kind).toBe('group');
+    expect(ultimo?.testId).toBe('nav-integraciones');
   });
 
   it('su icono tiene fila en NAV_ICONS', () => {

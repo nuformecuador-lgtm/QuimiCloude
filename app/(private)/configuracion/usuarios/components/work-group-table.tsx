@@ -6,12 +6,14 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   DataTable,
   type DataTableParams,
+  type DataTableStates,
   type DataTableTexts,
 } from '@/components/shared/data-table';
+import type { ErrorState } from '@/lib/modules/errores';
 import type { WorkGroupRow } from '@/lib/modules/identity';
 
 import { DeleteWorkGroupDialog } from './delete-work-group-dialog';
-import { createWorkGroupColumns } from './work-group-columns';
+import { WORK_GROUP_COLUMN_COUNT, createWorkGroupColumns } from './work-group-columns';
 import { workGroupListHref } from './work-group-list-params';
 import { WorkGroupSheet } from './work-group-sheet';
 
@@ -40,8 +42,9 @@ import { WorkGroupSheet } from './work-group-sheet';
  * **El selector de tamano y la paginacion son los del componente compartido** (R13): 10 y 25 salen
  * de `PAGE_SIZE_OPTIONS`, el defecto es 10, y la pagina actual y el total los pinta su indicador.
  *
- * **`status` es SIEMPRE `'idle'`**: los tres estados de R18/R19 se pintan fuera de `<DataTable>`,
- * con copy y acciones propias, y el «cargando» lo aporta el `<Suspense>` del servidor.
+ * **Cargando, error y vacio los pinta `<DataTable>` en lugar de toda la tabla**, y en esos
+ * estados no se pinta el envoltorio de aqui. El vacio sustituye a la tabla tambien con busqueda:
+ * es el propio de la pantalla, con su «Limpiar la búsqueda».
  *
  * **El desbordamiento lo absorbe el primitivo** (R40): `components/ui/table.tsx` ya envuelve la
  * tabla en un contenedor con `overflow-x-auto`, asi que el documento no se desplaza en horizontal y
@@ -54,7 +57,8 @@ import { WorkGroupSheet } from './work-group-sheet';
  * abierto**, asi que cada apertura arranca limpia y un rechazo anterior no reaparece.
  *
  * **El ALTA no esta aqui**: la monta `work-group-create-action.tsx`, hermana de esta tabla, porque
- * esta tabla solo existe cuando hay filas y los grupos **nacen en cero** —no los siembra nadie—.
+ * con cero filas esta tabla solo pinta el vacio y los grupos **nacen en cero**: no los siembra
+ * nadie.
  *
  * **R9, mitad cliente**: sin `usuarios.modificar` no se emite NINGUNA escritura —ni las acciones de
  * fila, ni el panel, ni el dialogo—. Ocultarlas es comodidad de la
@@ -98,13 +102,28 @@ export const WORK_GROUP_TABLE_TEXTS: DataTableTexts = {
   lastYear: 'Último año',
 };
 
+export const WORK_GROUP_LIST_SKELETON_TESTID = 'work-group-list-skeleton';
+export const WORK_GROUP_ROW_SKELETON_TESTID = 'work-group-row-skeleton';
+/** Una celda por columna: un test lo ata al largo de `createWorkGroupColumns(...)`. */
+export const WORK_GROUP_SKELETON_COLUMN_COUNT = WORK_GROUP_COLUMN_COUNT;
+
+export const WORK_GROUP_LIST_EMPTY_TESTID = 'work-group-list-empty';
+export const WORK_GROUP_LIST_EMPTY_MESSAGE_TESTID = 'work-group-list-empty-message';
+export const WORK_GROUP_LIST_CLEAR_SEARCH_TESTID = 'work-group-list-clear-search';
+export const WORK_GROUP_LIST_FIRST_PAGE_TESTID = 'work-group-list-first-page';
+
+export const WORK_GROUP_LIST_ERROR_TESTID = 'work-group-list-error';
+export const WORK_GROUP_LIST_ERROR_MESSAGE_TESTID = 'work-group-list-error-message';
+export const WORK_GROUP_LIST_ERROR_CODE_TESTID = 'work-group-list-error-code';
+export const WORK_GROUP_LIST_RETRY_TESTID = 'work-group-list-retry';
+
 /**
  * Que escritura hay abierta. **Una sola por vez**, que es lo que permite montar una instancia de
  * cada pieza para toda la pagina en vez de una por fila.
  *
  * **Los dos modos actuan SOBRE una fila**, y por eso `group` no es opcional. El alta no esta aqui:
  * vive en `work-group-create-action.tsx`, fuera de la tabla, porque los grupos no los siembra nadie
- * y con cero filas esta tabla no llega a montarse.
+ * y con cero filas esta tabla solo pinta el vacio.
  */
 export type WorkGroupPanelMode = 'edit' | 'delete';
 
@@ -114,7 +133,19 @@ export type WorkGroupPanel = {
   readonly group: WorkGroupRow;
 };
 
-export type WorkGroupTableProps = {
+type WorkGroupTableStatusProps =
+  | { readonly status?: 'idle' | 'loading'; readonly error?: undefined }
+  | { readonly status: 'error'; readonly error: ErrorState };
+
+/** El vacio de grupos no ofrece «crear el primero»: el alta vive arriba, fuera de los estados. */
+export type WorkGroupTableEmpty = {
+  /** Solo si habia termino de busqueda. */
+  readonly clearSearchHref?: string;
+  /** Solo si la pagina pedida era mayor que el total. */
+  readonly firstPageHref?: string;
+};
+
+export type WorkGroupTableProps = WorkGroupTableStatusProps & {
   /** Las filas **ya resueltas** por la consulta, en el orden en que las entrega (R14, R15). */
   readonly groups: readonly WorkGroupRow[];
   /** Los parametros vigentes, los mismos con los que se pidio la lista. */
@@ -125,9 +156,79 @@ export type WorkGroupTableProps = {
    * servidor y bajada por props (R10). No es autorizacion.
    */
   readonly canModify: boolean;
+  /** Presente solo con cero filas: el vacio sustituye a toda la tabla. */
+  readonly empty?: WorkGroupTableEmpty;
 };
 
-export function WorkGroupTable({ groups, params, totalPages, canModify }: WorkGroupTableProps) {
+function buildStates(
+  params: DataTableParams,
+  error: ErrorState | undefined,
+  empty: WorkGroupTableEmpty | undefined,
+): DataTableStates {
+  return {
+    loading: {
+      columns: WORK_GROUP_SKELETON_COLUMN_COUNT,
+      rows: params.pageSize,
+      label: WORK_GROUP_TABLE_TEXTS.loading,
+      testId: WORK_GROUP_LIST_SKELETON_TESTID,
+      rowTestId: WORK_GROUP_ROW_SKELETON_TESTID,
+      headCellClassName: 'h-4 w-full',
+    },
+    ...(error === undefined
+      ? {}
+      : {
+          error: {
+            error,
+            title: WORK_GROUP_TABLE_TEXTS.error,
+            testId: WORK_GROUP_LIST_ERROR_TESTID,
+            messageTestId: WORK_GROUP_LIST_ERROR_MESSAGE_TESTID,
+            codeTestId: WORK_GROUP_LIST_ERROR_CODE_TESTID,
+            retry: { kind: 'refresh' },
+            retryTestId: WORK_GROUP_LIST_RETRY_TESTID,
+          },
+        }),
+    ...(empty === undefined
+      ? {}
+      : {
+          empty: {
+            testId: WORK_GROUP_LIST_EMPTY_TESTID,
+            messageTestId: WORK_GROUP_LIST_EMPTY_MESSAGE_TESTID,
+            message:
+              empty.clearSearchHref === undefined
+                ? 'No hay grupos de trabajo que mostrar.'
+                : 'La búsqueda no encontró ningún grupo de trabajo.',
+            ...(empty.clearSearchHref === undefined
+              ? {}
+              : {
+                  clearSearch: {
+                    href: empty.clearSearchHref,
+                    label: 'Limpiar la búsqueda',
+                    testId: WORK_GROUP_LIST_CLEAR_SEARCH_TESTID,
+                  },
+                }),
+            ...(empty.firstPageHref === undefined
+              ? {}
+              : {
+                  firstPage: {
+                    href: empty.firstPageHref,
+                    label: 'Volver a la primera página',
+                    testId: WORK_GROUP_LIST_FIRST_PAGE_TESTID,
+                  },
+                }),
+          },
+        }),
+  };
+}
+
+export function WorkGroupTable({
+  groups,
+  params,
+  totalPages,
+  canModify,
+  status = 'idle',
+  error,
+  empty,
+}: WorkGroupTableProps) {
   const router = useRouter();
 
   /**
@@ -158,19 +259,26 @@ export function WorkGroupTable({ groups, params, totalPages, canModify }: WorkGr
   const editGroup = panel !== null && panel.mode === 'edit' ? panel.group : null;
   const deleteGroup = panel !== null && panel.mode === 'delete' ? panel.group : null;
 
+  const table = (
+    <DataTable
+      tableId={WORK_GROUP_TABLE_ID}
+      columns={columns}
+      rows={groups}
+      getRowId={(group) => group.id}
+      params={params}
+      totalPages={totalPages}
+      onParamsChange={(next) => router.push(workGroupListHref(next))}
+      status={status}
+      states={buildStates(params, error, empty)}
+      texts={WORK_GROUP_TABLE_TEXTS}
+    />
+  );
+
+  if (status !== 'idle' || (groups.length === 0 && empty !== undefined)) return table;
+
   return (
     <div className="flex flex-col gap-4" data-testid={WORK_GROUP_TABLE_TESTID}>
-      <DataTable
-        tableId={WORK_GROUP_TABLE_ID}
-        columns={columns}
-        rows={groups}
-        getRowId={(group) => group.id}
-        params={params}
-        totalPages={totalPages}
-        onParamsChange={(next) => router.push(workGroupListHref(next))}
-        status="idle"
-        texts={WORK_GROUP_TABLE_TEXTS}
-      />
+      {table}
 
       {/*
         UNA instancia del panel lateral de EDICION para toda la pagina, y solo mientras esta

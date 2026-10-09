@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { PresentationForm, type PresentationSheetTarget } from './presentation-form';
 
@@ -55,8 +56,6 @@ export const PRESENTATION_CREATE_OPEN_TESTID = 'presentation-create-open';
  * consumidores del panel -y sus tests- tienen un solo sitio del que importarlo.
  */
 export { PRESENTATION_SHEET_TESTID, type PresentationSheetTarget } from './presentation-form';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 const CREATE_LABEL = 'Nueva presentación';
 const CREATE_SUCCESS = 'Presentación creada.';
@@ -107,7 +106,7 @@ export function PresentationSheet({
           render={
             <Button
               variant="default"
-              className={TOUCH_TARGET}
+              className={touchTarget}
               data-testid={PRESENTATION_CREATE_OPEN_TESTID}
             />
           }

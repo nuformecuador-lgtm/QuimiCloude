@@ -53,6 +53,7 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
     unitId: null,
     finishedAt: null,
     packedBy: null,
+    conditionedBy: null,
     ...overrides,
   };
 }
@@ -271,6 +272,19 @@ describe('QC-88 — listAssignedOrders: R7 la empresa y la persona salen del ACT
       1,
       undefined,
     );
+  });
+
+  it('R23 - los estados de acondicionamiento (POR_ACONDICIONAR, EN_ACONDICIONAMIENTO, TERMINADO) no entran en el filtro de estados de trabajo', async () => {
+    const { deps, listAliveSummariesByIds } = montar({ ids: [pedidoId(1)] });
+    const listAssignedOrders = createListAssignedOrders(deps);
+
+    await listAssignedOrders(ACTOR, { page: 1 });
+
+    const estados = listAliveSummariesByIds.mock.calls[0]?.[2];
+    expect(estados).toStrictEqual(['PENDIENTE', 'EN_CURSO', 'BLOQUEADO']);
+    for (const estado of ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO']) {
+      expect(estados, estado).not.toContain(estado);
+    }
   });
 });
 

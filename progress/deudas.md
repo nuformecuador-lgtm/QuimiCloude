@@ -128,6 +128,19 @@
 - **Qué falta:** QC-174 dejó abierta QC-180 (tres rojos de `897a4f91` en el baseline), pero la key no aparece en `feature_list.json` el 2026-10-06. Comprobar en el board e importarla.
 - **Dueño:** leader (F0).
 
+### D35 — Tres mapas `OrderStatus → texto` duplicados en rutas distintas (QC-167)
+- **Origen:** QC-167 (2026-10-08), `specs/QC-167-recorrido-de-ejecucion-en-el-dashboard/design.md > 4.3 > Etiquetas de estado`.
+- **Qué falta:** la etiqueta de cada estado de pedido se declara tres veces:
+  - `app/(private)/pedidos/components/order-status-badge.tsx`
+  - `app/(private)/asignacion/components/company-orders-columns.tsx`
+  - `app/(private)/dashboard/components/execution-trace-format.ts` (`TRACE_ORDER_STATUS_LABELS`)
+
+  Los tres son exhaustivos por tipo, así que un estado nuevo no se olvida: el typecheck obliga a
+  añadirlo en los tres, como pasó con los de QC-215. Pero el texto puede divergir entre pantallas.
+  Arreglo: promover un único mapa a `components/shared/` (o a `lib/shared/ui/`) y que las tres rutas
+  lo importen. No se hizo en QC-167 porque tocaba dos rutas de fichas en vuelo.
+- **Dueño:** sin asignar.
+
 ## Pendientes humanos de fichas cerradas
 Rescatados de *Evaluaciones* y *Features en curso* del archivo: no estaban en *Deudas*, pero se habrían perdido al congelarlo.
 
@@ -178,10 +191,11 @@ Rescatados de *Evaluaciones* y *Features en curso* del archivo: no estaban en *D
 - **Qué falta:** `harnessConfig/` (entonces en la raíz) iba por delante: `docs/orquestacion.md`, la regla «si un subagente falla, el leader NO hace su trabajo», soporte de opencode. Solo se portó la sección de comentarios. Nada avisa de la divergencia. `harnessConfig/` ya no está en la raíz el 2026-10-06; el arnés v2 (con `harness_config/` aparte) debería absorberlo.
 - **Dueño:** arnés v2.
 
-### D33 — `catalog-line.int.test.ts` R32 en rojo en `dev`
+### D33 — `catalog-line.int.test.ts` R32 en rojo en `dev` (resuelta)
 - **Origen:** primer `./init.sh --completo` del arnés v2 (2026-10-06), sobre `origin/dev` 1a1db86e.
 - **Qué falta:** el caso R32 espera `PrismaClientKnownRequestError` y recibe `ValidationError`. O el test se adapta a la validación previa, o la validación sobra. Entró al baseline con motivo; al arreglarlo, se borra la entrada.
-- **Dueño:** sin asignar. Llegó con los merges de QC-209/QC-213, sin CI que lo viera.
+- **Estado:** resuelta el 2026-10-07 en `chore/rojos-sueltos-d33-packing`. No había validación previa ni la trajeron QC-209/QC-213: el adaptador no cambió desde QC-158. Causa: con un Postgres en inglés (`lc_messages = en_US.utf8`, el de Docker local y el `postgres:17` de CI) Prisma 6.19.3 sí entrega `meta.constraint` en el `P2003`, y el adaptador traduce como pide `QC-52 design.md > 6.2` (presentación/unidad → `invalid_input`, autor → crudo). El test afirmaba el comportamiento degradado de un Postgres en español. Ahora espía el `create` del delegado: exige el rechazo de la base con la restricción de la columna y la traducción correcta; muerde al quitar las FK y al traducir a ciegas o no traducir. Entrada borrada del baseline. Detalle: `progress/fix-rojos-sueltos.md`.
+- **Dueño:** sin asignar.
 
 ### D34 — `credential-setup.int.test.ts` R11 intermitente en CI (resuelta)
 - **Origen:** primeras corridas de `gate-completo` en GitHub Actions (2026-10-06/07). Falló en 2 de 5.

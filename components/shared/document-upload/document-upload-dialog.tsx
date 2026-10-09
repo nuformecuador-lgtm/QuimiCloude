@@ -12,6 +12,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { MAX_FILES_PER_BATCH, type PdfStrategy } from '@/lib/modules/documentos';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { DocumentUpload } from './document-upload';
 import { CLOSE_LABEL, DIALOG_TITLE, OPEN_LABEL, dialogDescription } from './labels';
@@ -19,9 +20,6 @@ import { CLOSE_LABEL, DIALOG_TITLE, OPEN_LABEL, dialogDescription } from './labe
 export const DOCUMENT_UPLOAD_OPEN_TESTID = 'document-upload-open';
 export const DOCUMENT_UPLOAD_DIALOG_TESTID = 'document-upload-dialog';
 export const DOCUMENT_UPLOAD_CLOSE_TESTID = 'document-upload-close';
-
-/** Objetivo tactil minimo, igual que el resto de la pieza. */
-const TOUCH_TARGET = 'min-h-11 min-w-11 text-base';
 
 export type DocumentUploadDialogProps = {
   /** La estrategia de la tanda que se abrira dentro del dialogo. */
@@ -41,7 +39,7 @@ export function DocumentUploadDialog({ strategy, reviewHrefFor }: DocumentUpload
         render={
           <Button
             variant="outline"
-            className={TOUCH_TARGET}
+            className={`${touchTarget} text-base`}
             data-testid={DOCUMENT_UPLOAD_OPEN_TESTID}
           />
         }
@@ -66,7 +64,7 @@ export function DocumentUploadDialog({ strategy, reviewHrefFor }: DocumentUpload
             render={
               <Button
                 variant="ghost"
-                className={TOUCH_TARGET}
+                className={`${touchTarget} text-base`}
                 data-testid={DOCUMENT_UPLOAD_CLOSE_TESTID}
               />
             }

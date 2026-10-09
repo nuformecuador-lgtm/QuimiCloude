@@ -1,6 +1,7 @@
 // El rol Administrador de acondicionamiento: nace al final de SEED_ROLES sin mover a los otros
 // cuatro, su literal solo se escribe en `roles.ts`, es global, y el codigo de su permiso solo se
-// nombra en el catalogo mientras ningun caso de uso lo exija.
+// nombra en el catalogo, en los casos de uso que lo exigen y en los dos consumidores que no son
+// caso de uso: el predicado de las vistas de `/asignacion` y la pagina del detalle.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, extname, join, sep } from 'node:path';
@@ -43,6 +44,22 @@ const CATALOGO_DE_ROLES = 'lib/modules/identity/domain/roles.ts';
 const CATALOGO_DE_PERMISOS = 'lib/modules/identity/domain/permissions.ts';
 
 const CODIGO_DEL_PERMISO = 'acondicionamiento.modificar';
+
+// Las rutas EXACTAS que nombran el permiso, ademas del catalogo. Una ruta nueva se abre aqui a mano,
+// en la lista que le toca.
+const CASOS_DE_USO_QUE_LO_EXIGEN = [
+  'lib/modules/asignaciones/domain/finish-conditioning.ts',
+  'lib/modules/asignaciones/domain/start-conditioning.ts',
+  'lib/modules/asignaciones/domain/list-conditioning-orders.ts',
+  'lib/modules/asignaciones/domain/list-conditioned-orders.ts',
+  'lib/modules/asignaciones/domain/get-conditioning-order.ts',
+  'lib/modules/asignaciones/domain/list-conditioning-team-candidates.ts',
+] as const;
+
+// Consumidores que no son caso de uso, cada uno con la forma exacta en que debe nombrar el permiso.
+const PREDICADO_DE_VISTAS = 'lib/modules/asignaciones/domain/assignment-views.ts';
+const PAGINA_DEL_DETALLE = 'app/(private)/asignacion/acondicionamiento/[id]/page.tsx';
+const CONSUMIDORES_QUE_NO_SON_CASO_DE_USO = [PREDICADO_DE_VISTAS, PAGINA_DEL_DETALLE] as const;
 
 function toPosix(file: string): string {
   return file.split(sep).join('/');
@@ -205,27 +222,66 @@ describe('R3 — el rol es global: una sola fila y Role sin campo de empresa', (
   });
 });
 
-describe('R17 — ningun archivo de produccion fuera del catalogo nombra acondicionamiento.modificar', () => {
-  it('R17: el codigo solo aparece en el catalogo de permisos', () => {
+describe('R17, R21 — solo el catalogo, los casos de uso del acondicionamiento y sus dos consumidores nombran acondicionamiento.modificar', () => {
+  const permitidos: readonly string[] = [
+    CATALOGO_DE_PERMISOS,
+    ...CASOS_DE_USO_QUE_LO_EXIGEN,
+    ...CONSUMIDORES_QUE_NO_SON_CASO_DE_USO,
+  ];
+
+  it('R21, R31: son nueve rutas exactas: el catalogo, seis casos de uso (con los candidatos del equipo) y dos consumidores', () => {
+    expect(new Set(permitidos).size).toBe(9);
+  });
+
+  it('R17, R21: el codigo solo aparece en el catalogo de permisos y en las rutas exactas abiertas', () => {
     const conElCodigo = findProductionFilesWhere(repoRoot, mentionsAcondicionamientoCode);
-    const inesperados = conElCodigo.filter((ruta) => ruta !== CATALOGO_DE_PERMISOS);
+    const inesperados = conElCodigo.filter((ruta) => !permitidos.includes(ruta));
 
     expect(
       inesperados,
-      `${CODIGO_DEL_PERMISO} solo puede nombrarse en ${CATALOGO_DE_PERMISOS}. ` +
+      `${CODIGO_DEL_PERMISO} solo puede nombrarse en ${permitidos.join(', ')}. ` +
         `Se encontro tambien en: ${inesperados.join(', ')}. ` +
-        'Si eres la ficha que empieza a exigir este permiso (estados, pestaña o detalle del ' +
-        'acondicionamiento), relaja este barrido abriendo aqui las rutas exactas que lo exigen, ' +
-        'como hizo empacador-rol.test.ts con terminados.consultar. No lo conviertas en un toContain.',
+        'Si eres la ficha que empieza a exigir este permiso en otro sitio, abre aqui la ruta exacta ' +
+        'que lo exige. No lo conviertas en un toContain.',
     ).toEqual([]);
-    // Anti-cegado: el barrido si ve el catalogo, que declara el codigo.
-    expect(conElCodigo).toEqual([CATALOGO_DE_PERMISOS]);
+    // Anti-cegado: el barrido ve el catalogo y todas las rutas abiertas, y ninguna sobra.
+    expect([...conElCodigo].sort()).toEqual([...permitidos].sort());
   });
 
-  it('R17: dispara con un fuente sintetico que exige el codigo, con cualquiera de las tres comillas', () => {
+  it('R17, R21: cada caso de uso abierto exige el permiso con requirePermission, no lo nombra de pasada', () => {
+    for (const ruta of CASOS_DE_USO_QUE_LO_EXIGEN) {
+      const fuente = readFileSync(join(repoRoot, ruta), 'utf8');
+      expect(fuente, ruta).toMatch(/requirePermission\(actor, 'acondicionamiento\.modificar'\)/);
+    }
+  });
+
+  it('R21: el predicado de las vistas lo consulta con hasPermission, por permiso y nunca por rol', () => {
+    const fuente = stripComments(readFileSync(join(repoRoot, PREDICADO_DE_VISTAS), 'utf8'));
+
+    expect(fuente).toMatch(/const (\w+): PermissionCode = 'acondicionamiento\.modificar'/);
+    const constante = /const (\w+): PermissionCode = 'acondicionamiento\.modificar'/.exec(fuente)?.[1] ?? '';
+    expect(fuente).toContain(`hasPermission(bearer, ${constante})`);
+    expect(fuente).not.toMatch(/ROLE_[A-Z]+/);
+  });
+
+  it('R21: la pagina del detalle lo exige con requirePagePermission', () => {
+    const fuente = readFileSync(join(repoRoot, PAGINA_DEL_DETALLE), 'utf8');
+
+    expect(fuente).toMatch(/requirePagePermission\(['"]acondicionamiento\.modificar['"]\)/);
+  });
+
+  it('R17, R21: dispara con un fuente sintetico que exige el codigo, con cualquiera de las tres comillas', () => {
     expect(mentionsAcondicionamientoCode(`requirePermission(actor, '${CODIGO_DEL_PERMISO}')`)).toBe(true);
     expect(mentionsAcondicionamientoCode(`requirePermission(actor, "${CODIGO_DEL_PERMISO}")`)).toBe(true);
     expect(mentionsAcondicionamientoCode(`requirePermission(actor, \`${CODIGO_DEL_PERMISO}\`)`)).toBe(true);
+  });
+
+  it('R21: una ruta sintetica que nombra el codigo y no esta abierta sale como inesperada', () => {
+    const sintetico = 'lib/modules/asignaciones/domain/otra-cosa.ts';
+    const encontrados = [...permitidos, sintetico];
+
+    expect(encontrados.filter((ruta) => !permitidos.includes(ruta))).toEqual([sintetico]);
+    expect(mentionsAcondicionamientoCode(`requirePermission(actor, '${CODIGO_DEL_PERMISO}')`)).toBe(true);
   });
 
   it('R17: el caso simetrico: el codigo dentro de un comentario no es una infraccion', () => {

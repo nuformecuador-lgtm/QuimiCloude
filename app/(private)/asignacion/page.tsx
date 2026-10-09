@@ -10,6 +10,8 @@ import {
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { ASSIGNED_ORDERS_LABEL, BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import {
+  CANCELLED_ORDER_PARAM,
+  CONDITIONED_ORDER_PARAM,
   DELIVERED_ORDER_PACKAGES_PARAM,
   DELIVERED_ORDER_PARAM,
   DELIVERED_ORDER_PRODUCT_PARAM,
@@ -17,12 +19,17 @@ import {
 } from '@/lib/shared/routes';
 
 import {
+  AssignedOrderCancelledNotice,
   AssignedOrderDeliveredNotice,
   AssignedOrdersListSection,
   AssignedOrdersSkeleton,
   AssignmentViewTabs,
   CompanyOrdersListSection,
   CompanyOrdersSkeleton,
+  ConditionedOrderNotice,
+  ConditionedOrdersListSection,
+  ConditioningOrdersListSection,
+  ConditioningOrdersSkeleton,
   FinishedOrdersListSection,
   FinishedOrdersSkeleton,
   PackedOrderNotice,
@@ -74,6 +81,8 @@ export default async function AsignacionPage({
     resolvedSearchParams[DELIVERED_ORDER_PRODUCT_PARAM],
   );
   const packedOrderNumber = firstSearchParamValue(resolvedSearchParams[PACKED_ORDER_PARAM]);
+  const conditionedOrderNumber = firstSearchParamValue(resolvedSearchParams[CONDITIONED_ORDER_PARAM]);
+  const cancelledOrderNumber = firstSearchParamValue(resolvedSearchParams[CANCELLED_ORDER_PARAM]);
 
   const assignedOrdersParams = parseAssignedOrdersListParams(resolvedSearchParams);
   const genericListParams = parseAssignmentListParams(resolvedSearchParams);
@@ -93,8 +102,14 @@ export default async function AsignacionPage({
           productName={deliveredOrderProductName}
         />
       ) : null}
+      {cancelledOrderNumber !== undefined ? (
+        <AssignedOrderCancelledNotice orderNumber={cancelledOrderNumber} />
+      ) : null}
       {vista === 'por_empacar' && packedOrderNumber !== undefined ? (
         <PackedOrderNotice orderNumber={packedOrderNumber} />
+      ) : null}
+      {vista === 'por_acondicionar' && conditionedOrderNumber !== undefined ? (
+        <ConditionedOrderNotice orderNumber={conditionedOrderNumber} />
       ) : null}
       {views.length > 1 ? <AssignmentViewTabs current={vista} views={views} /> : null}
       {vista === 'asignados' ? (
@@ -130,6 +145,24 @@ export default async function AsignacionPage({
       {vista === 'por_empacar' ? (
         <Suspense fallback={<PackingOrdersSkeleton rows={genericListParams.pageSize} />}>
           <PackingOrdersListSection params={genericListParams} />
+        </Suspense>
+      ) : null}
+      {vista === 'por_acondicionar' ? (
+        <Suspense
+          fallback={
+            <ConditioningOrdersSkeleton rows={genericListParams.pageSize} list="por_acondicionar" />
+          }
+        >
+          <ConditioningOrdersListSection params={genericListParams} />
+        </Suspense>
+      ) : null}
+      {vista === 'acondicionados' ? (
+        <Suspense
+          fallback={
+            <ConditioningOrdersSkeleton rows={genericListParams.pageSize} list="acondicionados" />
+          }
+        >
+          <ConditionedOrdersListSection params={genericListParams} />
         </Suspense>
       ) : null}
     </div>

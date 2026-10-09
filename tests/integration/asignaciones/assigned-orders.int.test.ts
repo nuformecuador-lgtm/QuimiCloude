@@ -251,6 +251,9 @@ describe('asignaciones · listAssignedOrders con los permisos del Empacador (int
           listAliveSummariesInCompany: async () => {
             throw new Error('QC-144: listAssignedOrders no lista toda la empresa')
           },
+          listSummariesByIdsIncludingDeleted: async () => {
+            throw new Error('listAssignedOrders no lee el historial de pedidos');
+          },
           transitionAliveById: async () => {
             throw new Error('QC-144: listAssignedOrders no escribe el estado del pedido');
           },
@@ -259,6 +262,12 @@ describe('asignaciones · listAssignedOrders con los permisos del Empacador (int
           },
           finishPackingAliveById: async () => {
             throw new Error('QC-144: listAssignedOrders no escribe el estado del pedido');
+          },
+          startConditioningAliveById: async () => {
+            throw new Error('listAssignedOrders no escribe el estado del pedido');
+          },
+          finishConditioningAliveById: async () => {
+            throw new Error('listAssignedOrders no escribe el estado del pedido');
           },
         },
         recipes: {

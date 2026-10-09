@@ -29,6 +29,7 @@ export type {
   DataTableParams,
   DataTableProps,
   DataTableSort,
+  DataTableStates,
   DataTableTexts,
   SortDirection,
 } from './data-table-types';

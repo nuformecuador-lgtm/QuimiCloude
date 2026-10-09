@@ -25,10 +25,10 @@ import {
   type ImportRowIssue,
   type ImportRowType,
 } from '@/lib/modules/inventario';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { cn } from '@/lib/utils';
 
 import {
-  EMPTY_CELL,
   PREVIEW_DETAIL_ADD_EXISTING,
   PREVIEW_DETAIL_CREATE,
   PREVIEW_STATUS_LABELS,
@@ -107,7 +107,7 @@ export function ImportIssueList({ issues }: { readonly issues: readonly ImportRo
 }
 
 function productCell(row: ImportTableRow): ReactNode {
-  const name = row.productName ?? (row.cells.name.trim() === '' ? EMPTY_CELL : row.cells.name);
+  const name = row.productName ?? (row.cells.name.trim() === '' ? EMPTY_MARK : row.cells.name);
   const type = row.type === null ? row.cells.type : IMPORT_TYPE_LABELS[row.type];
   return (
     <span className="flex min-w-32 flex-col">
@@ -193,7 +193,7 @@ export function ImportRowsTable<TRow extends ImportTableRow>({
             key={option.value}
             type="button"
             variant={filter === option.value ? 'default' : 'outline'}
-            className="min-h-11 min-w-11"
+            touch
             aria-pressed={filter === option.value}
             data-testid={statusFilterTestId(option.value)}
             onClick={() => chooseFilter(option.value)}

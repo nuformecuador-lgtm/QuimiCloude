@@ -7,8 +7,6 @@ import {
   hasActiveSearchOrFilter,
   recipeListHref,
 } from './recipe-list-params';
-import { RecipeListEmpty } from './recipe-list-empty';
-import { RecipeListError } from './recipe-list-error';
 import { RecipeTable } from './recipe-table';
 
 type RecipeListSectionProps = {
@@ -19,7 +17,9 @@ export async function RecipeListSection({ params }: RecipeListSectionProps) {
   const result = await listRecipesAction(params);
 
   if (result.status === 'error') {
-    return <RecipeListError error={result} />;
+    return (
+      <RecipeTable status="error" error={result} recipes={[]} params={params} totalPages={0} />
+    );
   }
 
   const { items, page: currentPage, totalPages } = result.data;
@@ -27,7 +27,14 @@ export async function RecipeListSection({ params }: RecipeListSectionProps) {
     currentPage > FIRST_PAGE ? recipeListHref({ ...params, page: FIRST_PAGE }) : undefined;
 
   if (items.length === 0 && !hasActiveSearchOrFilter(params)) {
-    return <RecipeListEmpty firstPageHref={firstPageHref} />;
+    return (
+      <RecipeTable
+        recipes={items}
+        params={{ ...params, page: currentPage }}
+        totalPages={totalPages}
+        empty={{ firstPageHref }}
+      />
+    );
   }
 
   // Mismo árbol con filas o sin resultados: si cambiara, React remontaría la tabla y el campo de

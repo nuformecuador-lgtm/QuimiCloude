@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   MISSING_VALUE_MARK,
   ORDER_BUSINESS_FIELDS,
+  ORDER_CUSTOMER_FIELD,
   ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID,
   ORDER_DISTRIBUTION_PACKAGES_FIELD,
   ORDER_DISTRIBUTION_PACKAGING_FIELD,
@@ -250,6 +251,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     ],
     unitId: UNIDAD.id,
     unitLabel: UNIDAD.symbol,
+    customer: null,
     ...overrides,
   };
 }
@@ -458,7 +460,7 @@ describe('R20 — lo que se guarda no lleva la cotizacion mostrada', () => {
 
     await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
     const enviado = createOrderActionMock.mock.calls[0]?.[1] as FormData;
-    expect([...enviado.keys()].sort()).toEqual([...ORDER_BUSINESS_FIELDS].sort());
+    expect([...enviado.keys()].sort()).toEqual([...ORDER_BUSINESS_FIELDS, ORDER_CUSTOMER_FIELD].sort());
   });
 
   it('el FormData de la edicion lleva los mismos campos mas su reparto, sin estado ni importe', async () => {
@@ -473,6 +475,7 @@ describe('R20 — lo que se guarda no lleva la cotizacion mostrada', () => {
     expect([...enviado.keys()].sort()).toEqual(
       [
         ...ORDER_BUSINESS_FIELDS,
+        ORDER_CUSTOMER_FIELD,
         ORDER_DISTRIBUTION_PACKAGING_FIELD,
         ORDER_DISTRIBUTION_PRESENTATION_FIELD,
         ORDER_DISTRIBUTION_PACKAGES_FIELD,

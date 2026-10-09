@@ -3,13 +3,12 @@
 import { useActionState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 
+import { SubmitButton } from '@/components/shared/submit-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RETURN_PARAM } from '@/lib/modules/identity';
 import { loginAction } from '@/lib/modules/identity/adapters/driving/login-action';
 import { LOGIN_INITIAL_STATE } from '@/lib/modules/identity/adapters/driving/login-form-state';
-
-import { SubmitButton } from './submit-button';
 
 const USERNAME_ERROR_ID = 'username-error';
 const PASSWORD_ERROR_ID = 'password-error';
@@ -140,7 +139,7 @@ export function LoginForm({ next = '' }: LoginFormProps) {
         ) : null}
       </div>
 
-      <SubmitButton />
+      <SubmitButton label="Entrar" pendingLabel="Entrando…" testId="login-submit" className="w-full" />
     </form>
   );
 }

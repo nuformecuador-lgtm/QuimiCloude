@@ -2,7 +2,7 @@ export const PACKED_ORDER_NOTICE_TESTID = 'packed-order-notice';
 
 /** Funcion y no literal, para que un test no pueda comparar contra una copia del texto. */
 export function packedOrderNoticeText(orderNumber: string): string {
-  return `Pedido ${orderNumber} entregado`;
+  return `Pedido ${orderNumber} empacado`;
 }
 
 /**

@@ -22,6 +22,10 @@ const IDENTIDAD = '.arnes.local.json';
 // Cupo por defecto si `arnes.config.json` no declara `cupos_por_persona` (CLAUDE.md regla 1).
 const CUPOS_POR_DEFECTO = { frontend: 2, backend: 3, fullstack: 3 };
 const EN_VUELO = ['spec_ready', 'in_progress'];
+// Los cinco estados del arnes. Son los unicos valores validos de `status` en
+// `feature_list.json` y de `jira.estados` en `arnes.config.json` (`docs/jira.md > Los estados
+// del board`).
+const ESTADOS = ['pending', 'spec_ready', 'in_progress', 'done', 'cancelled'];
 
 const errores = [];
 const notas = [];
@@ -125,6 +129,35 @@ const ref = (f) => f.key ?? String(f.id);
  *  humana 2026-09-01), asi que ambas convenciones conviven y las dos tienen que resolver. */
 const prefijos = (f) => [f.key, f.id].filter((v) => v != null).map(String);
 
+// --- 0a. `jira.estados`: la traduccion nombre-en-Jira -> estado del arnes --------------
+// Los nombres de los estados del board son de cada proyecto, asi que se declaran en el perfil
+// y F0 traduce con esa tabla y nada mas. El 2026-10-08 el doc del arnes suponia cinco
+// columnas con nombre fijo y el board real de QC tenia otros: F0 se encontro tres estados
+// sin traduccion. Se valida aqui, ANTES de mirar `feature_list.json`, porque es perfil
+// versionado y tiene que fallar tambien en CI, donde no hay copia del board.
+// Muchos-a-uno se acepta (un «Bloqueado» que cuente como `in_progress`); un valor fuera de
+// los cinco, no. Que falte alguno de los cinco solo se avisa: un board puede no usar
+// `cancelled` todavia.
+const estadosJira = config?.jira?.estados;
+if (estadosJira !== undefined) {
+  if (estadosJira === null || typeof estadosJira !== 'object' || Array.isArray(estadosJira)) {
+    errores.push(`${CONFIG} > jira.estados no es un objeto { "<nombre en Jira>": "<estado del arnes>" } (docs/jira.md > Los estados del board)`);
+  } else {
+    const malos = Object.entries(estadosJira).filter(([, v]) => !ESTADOS.includes(v));
+    for (const [nombre, valor] of malos) {
+      errores.push(
+        `${CONFIG} > jira.estados traduce "${nombre}" a ${JSON.stringify(valor)}, que no es un estado del arnes ` +
+        `(validos: ${ESTADOS.join(', ')}).`,
+      );
+    }
+    const usados = new Set(Object.values(estadosJira));
+    const sinNombre = ESTADOS.filter((e) => !usados.has(e));
+    if (sinNombre.length > 0) {
+      avisos.push(`${CONFIG} > jira.estados no traduce ningun estado del board a: ${sinNombre.join(', ')}`);
+    }
+  }
+}
+
 if (!existsSync(FEATURE_LIST)) {
   // Caso normal en CI y en un clon recien hecho: la copia del board no se versiona.
   if (errores.length > 0) {
@@ -132,6 +165,7 @@ if (!existsSync(FEATURE_LIST)) {
     process.exit(1);
   }
   console.log('sin copia local del board (feature_list.json): en CI es lo esperado; en local, corre F0');
+  for (const a of avisos) console.log(`AVISO: ${a}`);
   process.exit(0);
 }
 
@@ -206,6 +240,16 @@ for (const f of features) {
   }
 
   for (const r of prefijos(f)) porRef.set(r, f);
+
+  // F0 traduce el estado del issue con `jira.estados`; un `status` fuera de los cinco es una
+  // traduccion inventada o una importacion a medias, y el resto del validador (en vuelo, cupo,
+  // specs) lo ignoraria en silencio.
+  if (!ESTADOS.includes(f.status)) {
+    errores.push(
+      `${ref(f)} tiene status ${JSON.stringify(f.status)}, que no es un estado del arnes ` +
+      `(validos: ${ESTADOS.join(', ')}). F0 traduce con ${CONFIG} > jira.estados (docs/jira.md > Los estados del board).`,
+    );
+  }
 
   if (f.name != null) {
     if (vistosName.has(f.name)) errores.push(`name duplicado: "${f.name}" (ids ${vistosName.get(f.name)} y ${f.id})`);
@@ -300,9 +344,30 @@ notas.push(`cupo por zona respetado (${MI_CUENTA ? 'mis' : 'todas las'} in_progr
 // raiz hasta que su PR mergea en `dev`. Mirar solo la raiz daria rojo por la razon
 // equivocada, que es peor que no mirar; y mirar solo el directorio actual dejaba ciego al
 // gate corrido desde un worktree, que es como se corre siempre (ver `RAIZ` arriba).
+//
+// Y en la rama REMOTA de la feature (`origin/<f.branch>`): la de un companero no esta en tu
+// disco, y sin esto su `spec_ready` ponia en rojo el gate de todo el equipo (QC-167, 2026-10-08).
 function tieneSpec(f) {
   if (f.spec_path && existsSync(path.join(f.spec_path, 'requirements.md'))) return true;
-  return basesDeSpecs().some((base) => globRequirements(base, f));
+  if (basesDeSpecs().some((base) => globRequirements(base, f))) return true;
+  return specEnRamaRemota(f);
+}
+
+/** `origin/<f.branch>:specs/<key>-*\/requirements.md`, sin red: usa lo ultimo que trajo `git fetch`. */
+function specEnRamaRemota(f) {
+  if (!f.branch) return false;
+  let rutas;
+  try {
+    rutas = execFileSync('git', ['ls-tree', '-r', '--name-only', `refs/remotes/origin/${f.branch}`, 'specs/'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch {
+    return false;
+  }
+  return rutas
+    .split('\n')
+    .some((r) => prefijos(f).some((p) => new RegExp(`^specs/${p}-[^/]+/requirements\\.md$`).test(r)));
 }
 
 /** Busca `<base>/<key>-*\/requirements.md` y, como fallback, `<base>/<id>-*\/`.

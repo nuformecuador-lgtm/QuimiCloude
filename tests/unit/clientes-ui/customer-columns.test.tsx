@@ -17,12 +17,12 @@ import {
   EMAIL_COLUMN_ID,
   FIRST_NAMES_COLUMN_ID,
   LAST_NAMES_COLUMN_ID,
-  MISSING_VALUE_MARK,
   PHONE_COLUMN_ID,
   UPDATED_AT_COLUMN_ID,
   buildCustomerColumns,
 } from '@/app/(private)/clientes/components';
 import { CUSTOMER_QUERYABLE, type CustomerView } from '@/lib/modules/clientes';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
 const CUSTOMER_COLUMNS = buildCustomerColumns({ rowActions: () => <span data-testid="fila-accion" /> });
 
@@ -134,7 +134,7 @@ describe('telefono, correo y direccion pintan un marcador identificable cuando f
       const key = columnId as 'phone' | 'email' | 'address';
       const { container } = pintarCelda(columnId, cliente({ [key]: null }));
 
-      expect(screen.getByTestId(`customer-missing-${columnId}`)).toHaveTextContent(MISSING_VALUE_MARK);
+      expect(screen.getByTestId(`customer-missing-${columnId}`)).toHaveTextContent(EMPTY_MARK);
       expect(container.textContent).not.toContain('null');
       expect(container.textContent).not.toContain('undefined');
     },

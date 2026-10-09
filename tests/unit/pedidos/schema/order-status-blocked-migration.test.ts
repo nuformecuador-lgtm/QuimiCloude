@@ -133,12 +133,12 @@ describe('migration.sql del enum — un solo ADD VALUE, y al final', () => {
     expect(enumUp).toEqual([`ALTER TYPE "OrderStatus" ADD VALUE IF NOT EXISTS 'BLOQUEADO'`])
   })
 
-  it('R35: BLOQUEADO es el ULTIMO valor del esquema, y el unico que sigue al de empaque', () => {
+  it('R35: BLOQUEADO va justo detras del de empaque; detras solo los que anadieron migraciones posteriores', () => {
     const valores = valoresDelEsquema()
-    expect(valores.at(-1)).toBe('BLOQUEADO')
-    expect(valores.indexOf('BLOQUEADO')).toBe(valores.length - 1)
+    const posicion = valores.indexOf('BLOQUEADO')
     // El valor anterior no se reordena: `ADD VALUE` solo sabe anadir al final.
-    expect(valores.indexOf('EN_EMPAQUE')).toBe(valores.length - 2)
+    expect(valores.indexOf('EN_EMPAQUE')).toBe(posicion - 1)
+    expect(valores.slice(posicion + 1)).toEqual(['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'])
   })
 
   it('R35: el ADD VALUE no repite valor ni reordena los que ya estaban', () => {
@@ -218,9 +218,10 @@ describe('down.sql del enum — guardia de datos, y reversion exacta', () => {
   })
 
   it('R36: recrea OrderStatus con TODOS los valores de menos el nuevo, sin ningun DROP VALUE', () => {
-    // La lista no se copia a mano: sale del `enum` del esquema sin el valor anadido, que es
+    // La lista no se copia a mano: sale del `enum` del esquema hasta antes del valor anadido, que es
     // exactamente "los valores que habia antes de esta migracion".
-    const esperados = valoresDelEsquema().filter((valor) => valor !== 'BLOQUEADO')
+    const valores = valoresDelEsquema()
+    const esperados = valores.slice(0, valores.indexOf('BLOQUEADO'))
     const esperado = `CREATE TYPE "OrderStatus" AS ENUM (${esperados.map((v) => `'${v}'`).join(', ')})`
     expect(enumDown).toContain(esperado)
     expect(esperados.at(-1)).toBe('EN_EMPAQUE')

@@ -11,7 +11,7 @@ import {
   type DataTableParams,
   type DataTableTexts,
 } from '@/components/shared/data-table';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,7 +23,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
-import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorState } from '@/lib/modules/errores';
 import {
   WORK_GROUP_NAME_MAX_LENGTH,
   createWorkGroupSchema,
@@ -40,6 +40,7 @@ import {
   type CreateWorkGroupFormState,
   type WorkGroupMutationFormState,
 } from '@/lib/modules/identity/adapters/driving/work-group-actions';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * El formulario del alta y del renombrado de un grupo de trabajo (R21, R22, R23, R24;
@@ -146,8 +147,7 @@ export const WORK_GROUP_CANDIDATES_ERROR_TESTID = 'work-group-candidates-error';
 /** Clave de persistencia del fijado de columnas del picker. Distinta de `WORK_GROUP_TABLE_ID`. */
 export const WORK_GROUP_MEMBER_PICKER_TABLE_ID = 'grupo-candidatos';
 
-/** Objetivo tactil minimo (44x44 px) y fuente >= 16 px en TODOS los anchos (R40). */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
+/** Fuente >= 16 px en TODOS los anchos. */
 const FIELD_TEXT = 'text-base md:text-base';
 
 const CREATE_TITLE = 'Nuevo grupo';
@@ -402,25 +402,22 @@ export function WorkGroupForm({ group, onSaved, children }: WorkGroupFormProps) 
         )}
 
         {formError === undefined ? null : (
-          // Region de error del formulario (R24): aqui van los rechazos que no senalan al campo.
-          <div
-            role="alert"
+          // Region de error del formulario: aqui van los rechazos que no senalan al campo.
+          <ErrorAlert
+            error={formError}
             id={formErrorId}
             className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={WORK_GROUP_FORM_ERROR_TESTID}
-            data-code={formError.code}
-          >
-            {formError.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={formError} />
-            ) : (
+            testId={WORK_GROUP_FORM_ERROR_TESTID}
+            withDataCode
+            renderCatalogued={(catalogued) => (
               <>
-                <p>{formError.message}</p>
+                <p>{catalogued.message}</p>
                 <p className="text-xs" data-testid={WORK_GROUP_FORM_ERROR_CODE_TESTID}>
-                  {formError.code}
+                  {catalogued.code}
                 </p>
               </>
             )}
-          </div>
+          />
         )}
 
         <div className="flex flex-col gap-2">
@@ -498,7 +495,7 @@ function FormActions({ disabled }: { readonly disabled: boolean }) {
           <Button
             type="button"
             variant="outline-dashed"
-            className={TOUCH_TARGET}
+            className={touchTarget}
             data-testid={WORK_GROUP_FORM_CANCEL_TESTID}
           />
         }
@@ -507,7 +504,7 @@ function FormActions({ disabled }: { readonly disabled: boolean }) {
       </SheetClose>
       <Button
         type="submit"
-        className={TOUCH_TARGET}
+        touch
         disabled={disabled || pending}
         aria-busy={pending}
         data-testid={WORK_GROUP_FORM_SUBMIT_TESTID}
@@ -545,7 +542,7 @@ function PendingMembersList({
           <Button
             type="button"
             variant="outline"
-            className={TOUCH_TARGET}
+            touch
             aria-label={`${PENDING_MEMBER_REMOVE_LABEL}: ${member.displayName}`}
             data-testid={WORK_GROUP_PENDING_MEMBER_REMOVE_TESTID}
             onClick={() => onRemove(member.id)}
@@ -652,7 +649,7 @@ export function WorkGroupMemberPicker({ busy, selectedIds, onAdd }: WorkGroupMem
             <Button
               type="button"
               variant="outline"
-              className={TOUCH_TARGET}
+              touch
               disabled={busy || added}
               aria-label={`${added ? PICKER_ADDED_LABEL : PICKER_ADD_LABEL}: ${candidate.displayName}`}
               onClick={() => onAdd(candidate)}
@@ -678,18 +675,12 @@ export function WorkGroupMemberPicker({ busy, selectedIds, onAdd }: WorkGroupMem
           <Skeleton className="h-11 w-full" />
         </div>
       ) : shown.status === 'error' ? (
-        <div
-          role="alert"
+        <ErrorAlert
+          error={shown.error}
           className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-          data-testid={WORK_GROUP_CANDIDATES_ERROR_TESTID}
-          data-code={shown.error.code}
-        >
-          {shown.error.code === UNEXPECTED_ERROR_CODE ? (
-            <UnexpectedErrorNotice state={shown.error} />
-          ) : (
-            <p>{shown.error.message}</p>
-          )}
-        </div>
+          testId={WORK_GROUP_CANDIDATES_ERROR_TESTID}
+          withDataCode
+        />
       ) : (
         <DataTable
           tableId={WORK_GROUP_MEMBER_PICKER_TABLE_ID}

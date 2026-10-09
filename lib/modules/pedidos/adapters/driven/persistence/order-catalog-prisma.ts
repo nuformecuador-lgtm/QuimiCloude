@@ -8,8 +8,11 @@ import type { OrderStatus } from '../../../domain/order-classification';
 import type {
   AssignedOrderSummary,
   OrderAssignmentTarget,
+  OrderHistorySummary,
+  OrderSummaryFilter,
   OrderSummaryOrdering,
 } from '../../../domain/order-catalog';
+import type { OrderNumber } from '../../../domain/order-number';
 import type { Page } from '../../../domain/page';
 import type { OrderSummaryLineRecord, OrderSummaryRecord } from '../../../ports/order-summary-reader';
 
@@ -79,6 +82,7 @@ type AssignedOrderSummaryRow = {
   readonly presentationLines: readonly AssignedOrderPresentationLineRow[];
   readonly finishedAt: Date | null;
   readonly packedBy: string | null;
+  readonly conditionedBy: string | null;
 };
 
 /** `select` unico de los dos listados de resumen: si uno gana una columna y el otro no, el
@@ -103,6 +107,7 @@ const SUMMARY_SELECT = {
   },
   finishedAt: true,
   packedBy: true,
+  conditionedBy: true,
 };
 
 /** El «orden de la lista de trabajo»: prioridad, antiguedad y numero, con `id ASC` de
@@ -145,6 +150,7 @@ export function toOrderSummaryRecord(row: AssignedOrderSummaryRow): OrderSummary
     ),
     finishedAt: row.finishedAt,
     packedBy: row.packedBy,
+    conditionedBy: row.conditionedBy,
   };
 }
 
@@ -184,6 +190,70 @@ export async function listAliveOrderSummariesByIds(
   return buildPage(rows.map(toOrderSummaryRecord), total, page, limit);
 }
 
+/** A diferencia de las lecturas de vivos, el `where` NO lleva `deletedAt: null`: el historial
+ *  incluye los dados de baja. El ambito de empresa sigue siendo el primer termino del `AND`. */
+function historyWhere(companyId: string, ids: readonly string[], statuses: readonly OrderStatus[]) {
+  return {
+    AND: [orderCompanyScope({ companyId }), { id: { in: [...ids] }, status: { in: [...statuses] } }],
+  };
+}
+
+const HISTORY_ORDER_BY = [{ orderYear: 'desc' }, { orderSequence: 'desc' }, { id: 'asc' }] as const;
+
+type OrderHistoryRow = {
+  readonly id: string;
+  readonly orderYear: number;
+  readonly orderSequence: number;
+  readonly status: string;
+  readonly deletedAt: Date | null;
+};
+
+/** `deletedAt` se reduce a la marca: la fecha de baja no sale del adaptador. */
+export function toOrderHistorySummary(row: OrderHistoryRow): OrderHistorySummary {
+  return {
+    id: row.id,
+    number: { year: row.orderYear, sequence: row.orderSequence },
+    status: row.status as OrderStatus,
+    deleted: row.deletedAt !== null,
+  };
+}
+
+export async function listOrderNumbersByIdsIncludingDeleted(
+  companyId: string,
+  ids: readonly string[],
+  statuses: readonly OrderStatus[],
+): Promise<readonly { readonly id: string; readonly number: OrderNumber }[]> {
+  const rows = await prisma.order.findMany({
+    where: historyWhere(companyId, ids, statuses),
+    select: { id: true, orderYear: true, orderSequence: true },
+  });
+  return rows.map((row) => ({ id: row.id, number: { year: row.orderYear, sequence: row.orderSequence } }));
+}
+
+export async function listOrderHistoryByIdsIncludingDeleted(
+  companyId: string,
+  ids: readonly string[],
+  statuses: readonly OrderStatus[],
+  page: number,
+  pageSize?: number,
+): Promise<Page<OrderHistorySummary>> {
+  const { offset, limit } = toOffsetLimit(page, pageSize);
+  const where = historyWhere(companyId, ids, statuses);
+
+  const [rows, total] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      select: { id: true, orderYear: true, orderSequence: true, status: true, deletedAt: true },
+      orderBy: [...HISTORY_ORDER_BY],
+      skip: offset,
+      take: limit,
+    }),
+    prisma.order.count({ where }),
+  ]);
+
+  return buildPage(rows.map(toOrderHistorySummary), total, page, limit);
+}
+
 /**
  * Implementa `OrderSummaryReader['listAliveInCompany']`: el mismo
  * resumen que `listAliveOrderSummariesByIds`, pero SIN filtro de ids -toda la empresa-, para
@@ -195,7 +265,7 @@ export async function listAliveOrderSummariesInCompany(
   ordering: OrderSummaryOrdering,
   page: number,
   pageSize?: number,
-  filter?: { readonly packedBy?: string },
+  filter?: OrderSummaryFilter,
 ): Promise<Page<OrderSummaryRecord>> {
   const { offset, limit } = toOffsetLimit(page, pageSize);
   const where = {
@@ -205,6 +275,7 @@ export async function listAliveOrderSummariesInCompany(
         status: { in: [...statuses] },
         deletedAt: null,
         ...(filter?.packedBy === undefined ? {} : { packedBy: filter.packedBy }),
+        ...(filter?.conditionedBy === undefined ? {} : { conditionedBy: filter.conditionedBy }),
       },
     ],
   };

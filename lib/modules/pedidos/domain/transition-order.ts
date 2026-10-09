@@ -2,9 +2,9 @@
 //
 // Implementa `OrderCatalog['transitionAliveById']` (`order-catalog.ts`) sobre la unidad de
 // trabajo compartida con `inventario`: mueve el estado del pedido y, si el destino es
-// `POR_EMPACAR`, consume el material apartado -en la MISMA transaccion-. `EN_EMPAQUE` y
-// `ENTREGADO` no son destino de este metodo: solo los alcanzan los dos metodos de empaque, que
-// conocen a quien empaca. `asignaciones` solo conoce la firma del puerto, nunca este archivo.
+// `POR_EMPACAR`, consume el material apartado -en la MISMA transaccion-. Los destinos de empaque,
+// acondicionamiento y cierre no son de este metodo: solo los alcanzan los metodos que conocen a
+// quien empaca o acondiciona. `asignaciones` solo conoce la firma del puerto, nunca este archivo.
 //
 // Finalizar (`EN_CURSO -> POR_EMPACAR`) YA NO da de alta ningun lote de
 // producto terminado -eso se traslada a Terminar el empaque, una vez por linea del reparto- ni
@@ -20,6 +20,14 @@ import type { OrderStatus } from './order-classification';
 import type { OrderCatalog } from './order-catalog';
 
 import type { OrderUnitOfWork } from '../ports/order-unit-of-work';
+
+const DESTINOS_RESERVADOS: readonly OrderStatus[] = [
+  'EN_EMPAQUE',
+  'POR_ACONDICIONAR',
+  'EN_ACONDICIONAMIENTO',
+  'TERMINADO',
+  'ENTREGADO',
+];
 
 export type TransitionOrderDeps = {
   readonly unitOfWork: OrderUnitOfWork;
@@ -46,10 +54,9 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
   ) {
     // Falla rapido, sin abrir transaccion, si el destino no es alcanzable desde el estado actual.
     assertTransition(from, to);
-    // `EN_EMPAQUE` y `ENTREGADO` SI son destinos legales de la matriz (los usan Comenzar y
-    // Terminar), pero este metodo no conoce a quien empaca: los rechaza igual que un destino
-    // fuera de la matriz.
-    if (to === 'EN_EMPAQUE' || to === 'ENTREGADO') {
+    // Son destinos legales de la matriz, pero este metodo no conoce a quien empaca ni a quien
+    // acondiciona: los rechaza igual que un destino fuera de la matriz.
+    if (DESTINOS_RESERVADOS.includes(to)) {
       throw new InvalidTransitionError(`de ${from} a ${to}`);
     }
 

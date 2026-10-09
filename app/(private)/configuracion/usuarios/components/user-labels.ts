@@ -1,4 +1,5 @@
 import { USER_ACCOUNT_STATUSES, type UserAccountStatus } from '@/lib/modules/identity';
+import { formatCivilDate } from '@/lib/shared/ui/date-civil';
 
 /**
  * Textos y conversiones de la pantalla de usuarios que **no necesitan JSX** (R20, R26;
@@ -97,16 +98,12 @@ export function endUserSessionsSuccess(displayName: string): string {
 
 /**
  * Un `Date` a `YYYY-MM-DD`, que es lo que `<input type="date">` emite y lo que `z.iso.date()`
- * espera (R26).
+ * espera.
  *
  * **En UTC, y eso es el requisito.** `UserDetail.birthDate` viene de una columna `@db.Date`, o
  * sea medianoche UTC; formatearla con el huso local restaria un dia entero en cualquier huso
- * negativo —America entera— y el formulario de edicion precargaria una fecha de nacimiento
- * equivocada. `toISOString()` es siempre UTC, asi que el recorte de los diez primeros caracteres
- * no depende del entorno: mismo patron que `order-columns.tsx`, `recipe-columns.ts` y
- * `supplier-columns.ts`, y misma razon por la que no se usa `toLocaleDateString` (que ademas
- * produciria discrepancias de hidratacion entre servidor y navegador).
+ * negativo y el formulario de edicion precargaria una fecha de nacimiento equivocada.
  */
 export function toDateInputValue(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  return formatCivilDate(date);
 }

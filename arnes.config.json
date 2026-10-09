@@ -1,17 +1,24 @@
 {
   "$comment": "Perfil del proyecto para el arnes v2. Versionado. Lo genera /arnes-init y lo lee el gate (scripts/validate-features.mjs, scripts/check-perfil.mjs). docs/equipo.md explica cada campo.",
-  "arnes_version": "2.3.0",
+  "arnes_version": "2.5.0",
   "plantilla": {
     "url": "https://github.com/singularis-co/harness_config.git",
     "ref": "main"
   },
   "jira": {
     "site": "singularboard.atlassian.net",
-    "project": "QC"
+    "project": "QC",
+    "estados": {
+      "Por hacer": "pending",
+      "En revisión": "spec_ready",
+      "En curso": "in_progress",
+      "Finalizado": "done",
+      "Cancelado": "cancelled"
+    }
   },
   "ramas": {
     "integracion": "dev",
-    "produccion": "main"
+    "produccion": "prod"
   },
   "cupos_por_persona": {
     "frontend": 2,
@@ -35,6 +42,12 @@
       "ui",
       "node",
       "integration"
+    ],
+    "siempre": [
+      "guard",
+      "module-contract",
+      "route-contract",
+      "scope.test"
     ]
   }
 }

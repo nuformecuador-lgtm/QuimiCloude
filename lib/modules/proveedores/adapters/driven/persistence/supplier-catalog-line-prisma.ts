@@ -170,17 +170,17 @@ export function isDuplicateLineViolation(error: unknown): boolean {
  * Se leen las DOS claves porque el conector ha usado las dos: `field_name` en las versiones
  * en las que se escribio el precedente de `inventario`, y `constraint` en Prisma 6.
  *
- * HALLAZGO EMPIRICO (2026-09-04, Prisma 6.19.3, Postgres local) — hoy NINGUNA de las dos
- * viene: todo `P2003` sobre `supplier_catalog_lines` y sobre `products` llega con
- * `meta = { modelName, constraint: null }` y el mensaje termina en «violated on the (not
- * available)». Da igual que la FK este declarada con `@relation` (`products.presentation_id`,
- * `supplier_catalog_lines.supplier_id`) o sea un escalar (`unit_id`, `created_by`): el
- * conector no dice CUAL. Consecuencia, escrita para que no se lea como un descuido:
- * `classifyForeignKeyViolation` devuelve `'unknown'` en todos los casos reales de hoy y el
- * error se RELANZA CRUDO. La clasificacion de abajo es correcta y esta probada en unitario;
- * empezara a traducir sola en cuanto el conector diga el nombre. Traducir «a ciegas»
- * -asumir que todo `P2003` de esta tabla es la presentacion- seria inventarse un dato que
- * nadie tiene, y le diria `invalid_input` al usuario cuando el fallo fuera del autor.
+ * HALLAZGO EMPIRICO (2026-10-08, Prisma 6.19.3) — que el `P2003` traiga el nombre de la
+ * restriccion depende del idioma del servidor Postgres. Con el servidor en ingles
+ * (`lc_messages = en_US.utf8`: el Docker local y el `postgres:17` de CI) llega
+ * `meta.constraint` (sondeado: `supplier_catalog_lines_presentation_id_fkey`), y el
+ * adaptador traduce como pide `QC-52 design.md > 6.2`: presentacion/unidad ->
+ * `ValidationError` (`invalid_input`), autor -> crudo. Con un servidor en espanol llegaba
+ * `meta = { modelName, constraint: null }`, `classifyForeignKeyViolation` devolvia
+ * `'unknown'` y el error se relanzaba crudo; eso es lo que fijaba el antiguo test R32.
+ * Traducir «a ciegas» -asumir que todo `P2003` de esta tabla es la presentacion- seria
+ * inventarse un dato que nadie tiene, y le diria `invalid_input` al usuario cuando el fallo
+ * fuera del autor: sin nombre, se relanza crudo.
  */
 function fieldNameOf(error: Prisma.PrismaClientKnownRequestError): string {
   const meta: unknown = error.meta;

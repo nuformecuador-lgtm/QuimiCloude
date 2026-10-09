@@ -63,6 +63,7 @@ import {
   type Fixture,
 } from './use-case-fixture';
 import { realOrderSummaries } from '../../helpers/order-summaries';
+import { executionOnClient } from '../../helpers/execution-transaction-on-client';
 
 const summaryReaders = realOrderSummaries();
 
@@ -121,9 +122,12 @@ function ordersReales(): OrderCatalog {
     findAliveById: findAliveOrderTargetById,
     listAliveSummariesByIds: summaryReaders.listAliveSummariesByIds,
     listAliveSummariesInCompany: async () => noLlamar('orders.listAliveSummariesInCompany'),
+    listSummariesByIdsIncludingDeleted: async () => noLlamar('orders.listSummariesByIdsIncludingDeleted'),
     transitionAliveById: transitionAliveByIdReal,
     startPackingAliveById: async () => noLlamar('orders.startPackingAliveById'),
     finishPackingAliveById: async () => noLlamar('orders.finishPackingAliveById'),
+    startConditioningAliveById: async () => noLlamar('orders.startConditioningAliveById'),
+    finishConditioningAliveById: async () => noLlamar('orders.finishConditioningAliveById'),
   };
 }
 
@@ -132,6 +136,7 @@ function ordersReales(): OrderCatalog {
 function wireExecutionUseCases(fixture: Fixture) {
   const assignments = createOrderAssignmentRepository(fixture.tx);
   const orders = ordersReales();
+  const execution = executionOnClient(fixture.tx, orders);
   const deps = {
     assignments,
     orders,
@@ -143,12 +148,13 @@ function wireExecutionUseCases(fixture: Fixture) {
 
   return {
     get: createGetAssignedOrderExecution(deps),
-    start: createStartAssignedOrder({ ...deps, now: () => NOW }),
+    start: createStartAssignedOrder({ ...deps, ...execution, now: () => NOW }),
     finish: createFinishAssignedOrder({
       assignments,
       orders,
       people: assignmentDirectoryPrisma,
       groups: assignmentDirectoryPrisma,
+      ...execution,
       now: () => NOW,
     }),
   };
@@ -249,7 +255,7 @@ describe('asignaciones · quien puede ser responsable, contra la base (integraci
       const errorStart = await withSavepoint(fixture.tx, () => ejecucion.start(actor, { orderId: pedido }));
       expect(codeOf(errorStart)).toBe('order_not_found');
 
-      const errorFinish = await withSavepoint(fixture.tx, () => ejecucion.finish(actor, { orderId: pedido }));
+      const errorFinish = await withSavepoint(fixture.tx, () => ejecucion.finish(actor, { orderId: pedido, stepPosition: null }));
       expect(codeOf(errorFinish)).toBe('order_not_found');
 
       const fila = await fixture.tx.order.findUniqueOrThrow({
@@ -298,7 +304,7 @@ describe('asignaciones · quien puede ser responsable, contra la base (integraci
       const trasArrancar = await ejecucion.start(actor, { orderId: pedido });
       expect(trasArrancar.status).toBe('EN_CURSO');
 
-      const resultado = await ejecucion.finish(actor, { orderId: pedido });
+      const resultado = await ejecucion.finish(actor, { orderId: pedido, stepPosition: null });
       expect(resultado.numberText).toEqual(expect.any(String));
 
       const filaFinal = await fixture.tx.order.findUniqueOrThrow({

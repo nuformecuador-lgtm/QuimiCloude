@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
 import { FORMULAS_ROUTE } from '@/lib/shared/routes';
@@ -225,12 +225,17 @@ describe('alcance de la migracion de las listas a la tabla compartida', () => {
     expect(hallazgos('muestra', MUESTRA_E2E, PATRONES_E2E)).toHaveLength(4);
   });
 
-  it('R30: la lista no conserva tabla ni barra propias y si su vacio, su error y su esqueleto', () => {
+  it('R30 (enmendado el 2026-10-08): la lista no conserva tabla, barra, vacio, error ni esqueleto propios; los pinta la tabla compartida', () => {
     const nombres = readdirSync(join(RAIZ, COMPONENTES_PATH));
-    const esqueleto = enRutaDePosix(join(COMPONENTES_PATH, 'recipe-table-skeleton.tsx'));
     const tabla = enRutaDePosix(join(COMPONENTES_PATH, 'recipe-table.tsx'));
 
-    for (const borrado of ['recipe-list-toolbar.tsx', 'recipe-columns.ts']) {
+    for (const borrado of [
+      'recipe-list-toolbar.tsx',
+      'recipe-columns.ts',
+      'recipe-list-empty.tsx',
+      'recipe-list-error.tsx',
+      'recipe-table-skeleton.tsx',
+    ]) {
       expect(nombres, `${COMPONENTES_PATH} no deberia tener ${borrado}`).not.toContain(borrado);
     }
     expect(
@@ -240,22 +245,15 @@ describe('alcance de la migracion de las listas a la tabla compartida', () => {
 
     const importaTablaPrimitiva = /from\s*['"]@\/components\/ui\/table['"]/;
     expect(
-      FUENTES_DE_LA_RUTA.filter(
-        (ruta) => ruta !== esqueleto && importaTablaPrimitiva.test(fuenteSinComentarios(ruta)),
-      ),
-      'solo el esqueleto puede seguir montando la tabla primitiva',
+      FUENTES_DE_LA_RUTA.filter((ruta) => importaTablaPrimitiva.test(fuenteSinComentarios(ruta))),
+      'ningun archivo de la ruta monta la tabla primitiva',
     ).toEqual([]);
-
-    for (const conservado of [
-      enRutaDePosix(join(COMPONENTES_PATH, 'recipe-list-empty.tsx')),
-      enRutaDePosix(join(COMPONENTES_PATH, 'recipe-list-error.tsx')),
-      esqueleto,
-    ]) {
-      expect(existsSync(join(RAIZ, conservado)), `deberia existir ${conservado}`).toBe(true);
-    }
 
     expect(fuenteSinComentarios(tabla)).toMatch(
       /from\s*['"]@\/components\/shared\/data-table['"]/,
+    );
+    expect(fuenteSinComentarios(tabla), 'la tabla le pasa sus estados a la compartida').toMatch(
+      /\bstates=\{/,
     );
   });
 });

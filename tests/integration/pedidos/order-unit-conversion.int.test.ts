@@ -54,6 +54,13 @@ import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
+import { findAliveCustomerRefById, findCustomerRefsIncludingDeleted } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+
+const customerCatalog = {
+  findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
+  findRefsIncludingDeleted: (ids: readonly string[], companyId: string) =>
+    findCustomerRefsIncludingDeleted(ids, { companyId }),
+};
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -103,8 +110,8 @@ const units: UnitCatalog = {
   findRefsSharingBaseInCompany: findUnitRefsSharingBaseInCompany,
 };
 
-const createOrder = createCreateOrder({ recipes, products, units, presentations, packaging, unitOfWork, now: () => new Date() });
-const getOrder = createGetOrder({ orders, recipes, presentations, packaging, units });
+const createOrder = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging, unitOfWork, now: () => new Date() });
+const getOrder = createGetOrder({ customerCatalog, orders, recipes, presentations, packaging, units });
 
 type Fixture = {
   readonly companyId: string;
@@ -255,7 +262,7 @@ describe('QC-204 — la necesidad se convierte a la unidad del insumo', () => {
       // Lo que la formula anterior guardaba: 1000 g al 10 % leidos como 100 kg, a 3.0000.
       const orderId = await withOrderTransaction(async (tx) => {
         const order = await createOrderWriteRepository(tx).create(
-          { recipeId, quantity: '1000', priority: 'BAJA', unitId: fixture.gramoId, status: 'PENDIENTE', presentationLines: [] },
+          { recipeId, quantity: '1000', priority: 'BAJA', unitId: fixture.gramoId, status: 'PENDIENTE', presentationLines: [], customerId: null },
           instante.getUTCFullYear(),
           fixture.actorId,
           instante,

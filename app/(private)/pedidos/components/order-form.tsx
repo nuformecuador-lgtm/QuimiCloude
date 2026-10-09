@@ -16,7 +16,7 @@ import {
   PRESENTATION_UNIT_FIELD,
   PresentationUnitSelect,
 } from '@/components/shared/presentation-unit-select';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -43,7 +43,7 @@ import {
   createOrderAction,
   updateOrderAction,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import { getRecipeAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeQueryResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeLineView } from '@/lib/modules/recetas';
@@ -52,9 +52,12 @@ import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 // Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
 import type { OrderCoverage } from '@/lib/modules/inventario';
 import { trimDecimal } from '@/lib/shared/ui/decimal-display';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { BlockedOrderDialog } from './blocked-order-dialog';
 import { compatibleUnitIds } from './compatible-unit-ids';
 import { OrderCostQuote } from './order-cost-quote';
+import type { OrderCustomerChoice } from './order-customer-label';
+import { OrderCustomerPicker } from './order-customer-picker';
 import {
   ORDER_DISTRIBUTION_PACKAGES_FIELD,
   ORDER_DISTRIBUTION_PACKAGING_FIELD,
@@ -193,7 +196,6 @@ export const ORDER_FORM_CANCEL_TESTID = 'order-form-cancel';
 
 type OrderFieldName = (typeof ORDER_BUSINESS_FIELDS)[number] | typeof PRESENTATION_LINES_FIELD;
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base md:text-base';
 
 const CREATE_TITLE = 'Nuevo pedido';
@@ -235,7 +237,14 @@ const FIELD_MESSAGES: Readonly<Record<OrderFieldName, string>> = {
 const FIELD_LABELS = {
   quantity: 'Cantidad',
   priority: 'Prioridad',
+  customer: 'Cliente',
 } as const;
+
+/** Nombre del campo del `FormData` con el id del cliente; vacio = sin cliente. */
+export const ORDER_CUSTOMER_FIELD = 'customerId';
+
+const CUSTOMER_PLACEHOLDER = 'Busca un cliente por su nombre';
+const CUSTOMER_EMPTY_LABEL = 'Ningún cliente coincide con la búsqueda.';
 
 /**
  * Donde se pinta cada `code` estable de `pedidos/domain/errors.ts` (`design.md > 8`). Los codigos
@@ -406,7 +415,11 @@ export function OrderForm({
 }: OrderFormProps) {
   const fieldId = useId();
   const formErrorId = `${fieldId}-form-error`;
+  const customerFieldId = `${fieldId}-customer`;
   const isEdit = order !== undefined;
+  const [customer, setCustomer] = useState<OrderCustomerChoice | null>(
+    order?.customer ? { kind: 'customer', customer: order.customer } : null,
+  );
 
   /**
    * QC-102 T14 — La seccion de responsables, DENTRO de este mismo panel (R23). Cuando el panel se
@@ -707,27 +720,21 @@ export function OrderForm({
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
         {formError === undefined ? null : (
-          // Region de error del formulario (R34): aqui van los rechazos que no senalan campo.
-          //
-          // QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
-          // identificador de la peticion. El CATALOGADO se pinta como siempre y sin identificador.
-          <div
-            role="alert"
+          // Aqui van los rechazos que no senalan campo.
+          <ErrorAlert
+            error={formError}
             id={formErrorId}
             className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={ORDER_FORM_ERROR_TESTID}
-          >
-            {formError.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={formError} />
-            ) : (
+            testId={ORDER_FORM_ERROR_TESTID}
+            renderCatalogued={(catalogued) => (
               <>
-                <p data-testid="order-form-error-message">{formError.message}</p>
+                <p data-testid="order-form-error-message">{catalogued.message}</p>
                 <p className="text-xs" data-testid="order-form-error-code">
-                  {formError.code}
+                  {catalogued.code}
                 </p>
               </>
             )}
-          </div>
+          />
         )}
 
         {/*
@@ -766,6 +773,21 @@ export function OrderForm({
               onChange={chooseVersion}
               error={fieldErrors.recipeVersionId}
             />
+
+            <div className="flex flex-col gap-2">
+              <label htmlFor={customerFieldId} className="text-sm font-medium">
+                {FIELD_LABELS.customer}
+              </label>
+              <OrderCustomerPicker
+                purpose="assign"
+                name={ORDER_CUSTOMER_FIELD}
+                id={customerFieldId}
+                value={customer}
+                onChange={setCustomer}
+                placeholder={CUSTOMER_PLACEHOLDER}
+                emptyMessage={CUSTOMER_EMPTY_LABEL}
+              />
+            </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
 
@@ -948,7 +970,7 @@ function SelectField({
           aria-labelledby={labelId}
           aria-invalid={error === undefined ? undefined : true}
           aria-describedby={error === undefined ? undefined : errorId}
-          className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT}`}
+          className={`w-full ${touchTarget} ${FIELD_TEXT}`}
           data-testid={triggerTestId}
         >
           <SelectValue />
@@ -990,7 +1012,7 @@ function FormActions({ canSave, busy }: { canSave: boolean; busy: boolean }) {
           <Button
             type="button"
             variant="outline-dashed"
-            className={TOUCH_TARGET}
+            className={touchTarget}
             data-testid={ORDER_FORM_CANCEL_TESTID}
           />
         }
@@ -1018,7 +1040,7 @@ function SaveButton({ canSave, busy }: { canSave: boolean; busy: boolean }) {
   return (
     <Button
       type="submit"
-      className={TOUCH_TARGET}
+      className={touchTarget}
       disabled={pending || !canSave}
       aria-busy={pending}
       data-testid={ORDER_FORM_SUBMIT_TESTID}

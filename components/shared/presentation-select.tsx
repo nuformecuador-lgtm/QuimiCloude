@@ -1,29 +1,18 @@
 'use client';
 
-import { CircleAlertIcon, Loader2Icon } from 'lucide-react';
+import { CircleAlertIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
+import { AsyncAutocomplete } from '@/components/shared/async-autocomplete';
 import {
   PRESENTATION_UNIT_FIELD,
   PresentationUnitSelect,
 } from '@/components/shared/presentation-unit-select';
-import {
-  Autocomplete,
-  AutocompleteClear,
-  AutocompleteContent,
-  AutocompleteInput,
-  AutocompleteInputGroup,
-  AutocompleteItem,
-  AutocompleteList,
-} from '@/components/ui/autocomplete';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import {
-  useAsyncPaginatedOptions,
-  type AsyncPageRequest,
-} from '@/hooks/use-async-paginated-options';
+import type { AsyncPageRequest } from '@/hooks/use-async-paginated-options';
 import { createPresentationSchema } from '@/lib/modules/inventario';
 import {
   createPresentationAction,
@@ -31,11 +20,10 @@ import {
 } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /** Campo del formulario de producto que alimenta este selector, via su `input` espejo. */
 export const PRESENTATION_FIELD = 'presentationId';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /** La lista de presentaciones siempre empieza por su primera pagina. */
 const FIRST_PAGE = 1;
@@ -118,75 +106,30 @@ type PresentationSelectProps = {
 };
 
 /**
- * Selector de presentacion con busqueda al servidor y alta en linea (QC-22 R24 y R25; QC-44 R37,
- * R38 y R39).
- *
- * **ENMIENDA DEL 2026-09-07 (decision humana): es un AUTOCOMPLETE, no un desplegable con «Cargar
- * más».** El control pasa a `components/ui/autocomplete.tsx` (primitivos de `@base-ui/react`, la
- * misma libreria de la que salian `Select` e `Input`) mas el hook generico
- * `useAsyncPaginatedOptions`, el mismo motor que ya mueve el selector de ingrediente de recetas y
- * el de receta de pedidos. Lo que cambia para quien lo usa:
- *
- *   - se escribe para BUSCAR, y la busqueda la resuelve el SERVIDOR (`PRESENTATION_QUERYABLE`
- *     declara `searchable: true`, asi que aqui no se recorta nada en memoria);
- *   - las paginas siguientes se anexan al llegar al final del scroll, no con un boton
- *     «Cargar más» -que desaparece, junto a su `data-testid`-;
- *   - el desplegable no consulta nada mientras esta cerrado.
- *
- * Lo que NO cambia: el campo del formulario (`presentationId`), el alta en linea con todo su
- * bloque y sus `data-testid`, el mensaje de error de campo y la API del componente, que solo
- * GANA una prop opcional (`defaultLabel`).
- *
- * **La ayuda de la etiqueta es opcional** (`helper`, QC-90): quien use el selector puede explicar
- * que es una presentacion sin que el componente decida el copy. Sin `helper` no se pinta nada
- * nuevo, asi que la prop no obliga a mover ninguno de los dos consumidores.
- *
- * **Vive en `components/shared/` desde QC-44**: dos pantallas -inventario y proveedores- lo
- * necesitan igual, que es la condicion que `docs/architecture.md > Regla: sin sobre-ingenieria`
- * pone para promover. El barrel de `app/(private)/inventario/components` lo reexporta, asi que la
- * ruta lo sigue consumiendo por su barrel. **Las dos pantallas cambian a la vez**: es el precio de
- * que sea un componente compartido, y es deliberado.
+ * Selector de presentacion con busqueda al servidor y alta en linea.
  *
  * **Por que carga por su cuenta y no por props**: el conjunto de presentaciones no depende de la
  * pagina de productos que se este viendo y cambia cuando el propio usuario crea una sin salir del
- * panel. Se pide con `listPresentationsAction`, que es una Server Action del modulo -no un
- * `fetch` a una ruta de API propia (R28)-, y el componente no importa ni la composicion ni
- * Prisma (R30).
+ * panel.
  *
- * **Como se alcanza cualquier presentacion (R24)**: escribiendo -la busqueda va al servidor- o
- * bajando en el desplegable, que anexa la pagina siguiente. El tamano de pagina sigue siendo
- * `MAX_PAGE_SIZE` **importado**, nunca el 25 escrito a mano.
- *
- * **Como se muestra la presentacion ya elegida al editar**: si el llamante pasa `defaultLabel`
- * -el formulario de producto lo tiene en `product.presentationName`-, se pinta y no se consulta
- * nada. Si no lo pasa -la linea de catalogo de proveedores entrega el id EN CRUDO, por decision de
- * QC-52-, el selector pide UNA vez la primera pagina y busca ahi el nombre. Es exactamente lo que
- * hacia el desplegable anterior, que tambien cargaba la primera pagina al montar y dejaba el campo
- * en blanco si la elegida no estaba en ella; la diferencia es que ahora esa consulta solo ocurre
- * cuando hace falta.
+ * **Como se muestra la presentacion ya elegida al editar**: si el llamante pasa `defaultLabel`,
+ * se pinta y no se consulta nada. Si no lo pasa -la linea de catalogo de proveedores entrega el id
+ * en crudo-, el selector pide UNA vez la primera pagina y busca ahi el nombre.
  *
  * **El texto que se busca NO es el que se muestra**: mientras el usuario no escribe, el campo
  * ensena la presentacion elegida pero el termino de busqueda es la cadena vacia, asi que abrir un
- * selector ya relleno ofrece el catalogo entero y no solo lo que ya tiene.
+ * selector ya relleno ofrece el catalogo entero.
  *
- * **El alta en linea PIDE LA UNIDAD** (QC-80 R10, R11): `presentations.unit_id` es `NOT NULL` y
- * el esquema del contrato publico la exige, asi que este camino -que crea presentaciones- tampoco
- * puede saltarsela. Las unidades **llegan por props** (`units`), pedidas una sola vez por la
- * pantalla que monta el selector (QC-44 R46); el componente no consulta el catalogo de unidades.
- * Sin ese catalogo el alta rapida **no se ofrece**, igual que R19 resolvio en la pantalla de
- * presentaciones; elegir una presentacion ya existente no se ve afectado.
+ * **El alta en linea PIDE LA UNIDAD**: `presentations.unit_id` es `NOT NULL`. Las unidades llegan
+ * por props, pedidas una sola vez por la pantalla; sin ellas el alta rapida no se ofrece.
  *
  * **El alta en linea NO es un `form`**: este componente vive DENTRO del formulario de producto y
- * anidar formularios es HTML invalido. La Server Action se invoca directamente desde el
- * manejador, que es lo mismo que hace el `action` de un formulario pero sin el elemento. Tampoco
- * es un segundo `sheet` anidado: apilar capas modales es justo lo que se rompe en iOS.
+ * anidar formularios es HTML invalido. Tampoco es un segundo `sheet` anidado: apilar capas modales
+ * es justo lo que se rompe en iOS.
  *
- * **R25**: de las cuatro operaciones de presentacion que el modulo expone, este archivo importa
- * SOLO las dos que R24 necesita -listar para poblar el selector y crear-. Ni la de renombrar ni
- * la de borrar aparecen aqui ni en ningun otro archivo de la ruta: la unica operacion de
- * presentacion disponible en toda la pantalla es su alta, y listar y editar presentaciones sale
- * a QC-45. Los nombres de las dos prohibidas no se escriben ni en este comentario, para que una
- * guardia de fuente que las busque no encuentre un falso positivo.
+ * De las operaciones de presentacion del modulo, aqui solo se importan listar y crear. Los nombres
+ * de las prohibidas no se escriben ni en este comentario, para que una guardia de fuente que las
+ * busque no encuentre un falso positivo.
  */
 export function PresentationSelect({
   defaultValue,
@@ -205,7 +148,6 @@ export function PresentationSelect({
   const createErrorId = useId();
   const errorId = useId();
 
-  const [open, setOpen] = useState(false);
   /** Lo que el usuario esta escribiendo. `null` = no esta escribiendo: se muestra lo elegido. */
   const [draft, setDraft] = useState<string | null>(null);
   /** Lo elegido: el id viaja en el formulario y el nombre es lo que se ve. */
@@ -262,8 +204,6 @@ export function PresentationSelect({
   /** Pide una pagina del catalogo, con el termino vigente si lo hay. */
   const pedirPagina = useCallback(async ({ query, page }: AsyncPageRequest) => {
     const search = query.trim();
-    // Sin termino la clave se omite por claridad del sitio de llamada, no porque el esquema fuera
-    // a rechazarla: con el contrato de QC-57 una busqueda vacia es AUSENCIA de busqueda.
     const filtro = search === '' ? {} : { search };
     const porUnidad =
       unitIds === undefined ? {} : { filters: { unitId: { kind: 'select', values: unitIds } } };
@@ -292,38 +232,18 @@ export function PresentationSelect({
     };
   }, [unitIds]);
 
-  const {
-    items,
-    isLoading,
-    isLoadingMore,
-    error: loadError,
-    loadMore,
-  } = useAsyncPaginatedOptions<PresentationOption>({
-    fetchPage: pedirPagina,
-    query: draft ?? '',
-    pageSize: MAX_PAGE_SIZE,
-    debounceMs: SEARCH_DEBOUNCE_MS,
-    enabled: open,
-  });
+  function isWithoutContent(option: PresentationOption): boolean {
+    return requireContent && option.content === null;
+  }
 
-  /** Llegar al final de la lista pide la pagina siguiente; el hook ignora lo que sobra. */
-  const handleScroll = useCallback(
-    (event: React.UIEvent<HTMLDivElement>) => {
-      const lista = event.currentTarget;
-      if (lista.scrollHeight - lista.scrollTop - lista.clientHeight <= SCROLL_THRESHOLD) {
-        loadMore();
-      }
-    },
-    [loadMore],
-  );
-
-  function choose(option: PresentationOption) {
-    if (requireContent && option.content === null) return;
+  function choose(option: PresentationOption | null) {
+    if (option === null) {
+      return;
+    }
     onSelect?.(option);
     setSelectedId(option.id);
     setSelectedName(option.name);
     setDraft(null);
-    setOpen(false);
   }
 
   /**
@@ -400,28 +320,12 @@ export function PresentationSelect({
     setCreating(false);
   }
 
-  // Las creadas en linea van DELANTE y sin repetir lo que ya trae la consulta. Se escribe con
-  // `flatMap` y no con el metodo de recorte por texto: aqui no se filtra por lo escrito, que es
-  // trabajo del servidor.
-  const seleccionables = [
-    ...created.flatMap((nueva) =>
-      items.some((item) => item.id === nueva.id) ||
-      (unitIds !== undefined && !unitIds.includes(nueva.unitId))
-        ? []
-        : [nueva],
-    ),
-    ...items,
-  ];
-
-  // Con el desplegable cerrado o sin escribir, el campo muestra lo YA elegido.
-  const displayValue = draft ?? selectedName;
-  const cargando = isLoading || isLoadingMore;
-  const mensajeDeFallo =
-    loadError === undefined
-      ? null
-      : loadError.cause instanceof Error
-        ? loadError.cause.message
-        : loadError.message;
+  // Las creadas en linea se siguen ofreciendo aunque la consulta vigente no las traiga, salvo las
+  // de una unidad que el llamante no admite. `flatMap` y no el metodo de recorte por texto: aqui
+  // no se filtra por lo escrito, que es trabajo del servidor.
+  const creadasAdmitidas = created.flatMap((nueva) =>
+    unitIds !== undefined && !unitIds.includes(nueva.unitId) ? [] : [nueva],
+  );
 
   return (
     <div className="flex flex-col gap-2">
@@ -439,15 +343,9 @@ export function PresentationSelect({
                 <button
                   type="button"
                   aria-label="Qué es Presentación"
-                  // 44x44 DE VERDAD, no `size-6`: `docs/architecture.md > Componentes > Regla:
-                  // multiplataforma` exige ese objetivo tactil minimo y el `design.md` de QC-90
-                  // no declara excepcion. Se usa la constante que este mismo archivo ya define
-                  // arriba, en vez de reescribir las clases. Crece el BLANCO DE TOQUE del boton
-                  // -que es lo que busca el dedo-; el icono dibujado sigue en `size-4`, y
-                  // `items-center justify-center` lo mantiene pegado a la etiqueta dentro del
-                  // `flex items-center gap-1.5` del padre. `shrink-0` impide que el flex le
-                  // recorte los 44 px de ancho en pantallas estrechas.
-                  className={`flex ${TOUCH_TARGET} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
+                  // Crece el blanco de toque, no el icono, que sigue en `size-4`. `shrink-0` impide
+                  // que el flex del padre le recorte los 44 px en pantallas estrechas.
+                  className={`flex ${touchTarget} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
                   data-testid="presentation-helper"
                 />
               }
@@ -482,106 +380,58 @@ export function PresentationSelect({
         />
       )}
 
-      <Autocomplete
-        items={seleccionables}
-        mode="none"
-        itemToStringValue={(option: PresentationOption) => option.name}
-        value={displayValue}
-        onValueChange={handleValueChange}
-        open={open}
-        onOpenChange={setOpen}
-        openOnInputClick
-      >
-        <AutocompleteInputGroup>
-          <AutocompleteInput
-            id={inputId}
-            aria-labelledby={labelId}
-            aria-invalid={error === undefined ? undefined : true}
-            aria-describedby={error === undefined ? undefined : errorId}
-            className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT} pr-8`}
-            placeholder={PLACEHOLDER}
-            data-testid="presentation-select"
-          />
-          <AutocompleteClear
-            aria-label="Borrar presentación"
-            data-testid="presentation-select-clear"
-          />
-        </AutocompleteInputGroup>
-
-        <AutocompleteContent className="min-w-56">
-          <div
-            data-testid="presentation-popup"
-            className="overflow-y-auto overscroll-contain"
-            style={{ maxHeight: MAX_LIST_HEIGHT }}
-            onScroll={handleScroll}
-          >
-            {mensajeDeFallo === null ? (
-              <>
-                <AutocompleteList>
-                  {(option: PresentationOption, index: number) => {
-                    const withoutContent = requireContent && option.content === null;
-                    return (
-                      <AutocompleteItem
-                        key={option.id}
-                        index={index}
-                        value={option}
-                        disabled={withoutContent}
-                        className={`${TOUCH_TARGET} ${FIELD_TEXT} items-center`}
-                        data-testid="presentation-option"
-                        data-presentation-id={option.id}
-                        data-without-content={withoutContent ? 'true' : undefined}
-                        onClick={() => choose(option)}
-                      >
-                        <span className="truncate">{option.name}</span>
-                        {withoutContent ? (
-                          <span
-                            className="ml-auto flex items-center gap-1 text-sm text-destructive"
-                            data-testid={PRESENTATION_OPTION_WITHOUT_CONTENT_TESTID}
-                          >
-                            <CircleAlertIcon className="size-4" aria-hidden />
-                            {WITHOUT_CONTENT_LABEL}
-                          </span>
-                        ) : null}
-                      </AutocompleteItem>
-                    );
-                  }}
-                </AutocompleteList>
-
-                {seleccionables.length === 0 && !cargando ? (
-                  <p
-                    className="px-2 py-3 text-sm text-muted-foreground"
-                    data-testid="presentation-empty"
-                  >
-                    {EMPTY_LABEL}
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              <p
-                role="alert"
-                className="p-2 text-sm text-destructive"
-                data-testid="presentation-load-error"
+      <AsyncAutocomplete<PresentationOption>
+        layout="split"
+        id={inputId}
+        fetchPage={pedirPagina}
+        leadingOptions={creadasAdmitidas}
+        getOptionLabel={(option) => option.name}
+        getOptionKey={(option) => option.id}
+        onSelect={choose}
+        inputValue={draft ?? selectedName}
+        searchQuery={draft ?? ''}
+        onInputValueChange={handleValueChange}
+        isOptionDisabled={isWithoutContent}
+        pageSize={MAX_PAGE_SIZE}
+        debounceMs={SEARCH_DEBOUNCE_MS}
+        maxHeight={MAX_LIST_HEIGHT}
+        scrollThreshold={SCROLL_THRESHOLD}
+        placeholder={PLACEHOLDER}
+        emptyMessage={EMPTY_LABEL}
+        aria-labelledby={labelId}
+        aria-invalid={error === undefined ? undefined : true}
+        aria-describedby={error === undefined ? undefined : errorId}
+        renderOption={(option) => (
+          <>
+            <span className="truncate">{option.name}</span>
+            {isWithoutContent(option) ? (
+              <span
+                className="ml-auto flex items-center gap-1 text-sm text-destructive"
+                data-testid={PRESENTATION_OPTION_WITHOUT_CONTENT_TESTID}
               >
-                {mensajeDeFallo}
-              </p>
-            )}
-
-            <p
-              role="status"
-              aria-live="polite"
-              className="flex items-center justify-center gap-1.5 px-2 text-sm text-muted-foreground empty:hidden"
-              data-testid="presentation-loading"
-            >
-              {cargando ? (
-                <>
-                  <Loader2Icon className="size-4 animate-spin" aria-hidden />
-                  <span className="py-2">{LOADING_LABEL}</span>
-                </>
-              ) : null}
-            </p>
-          </div>
-        </AutocompleteContent>
-      </Autocomplete>
+                <CircleAlertIcon className="size-4" aria-hidden />
+                {WITHOUT_CONTENT_LABEL}
+              </span>
+            ) : null}
+          </>
+        )}
+        slots={{
+          inputTestId: 'presentation-select',
+          inputClassName: `w-full ${touchTarget} ${FIELD_TEXT} pr-8`,
+          clear: { label: 'Borrar presentación', testId: 'presentation-select-clear' },
+          popupTestId: 'presentation-popup',
+          optionTestId: 'presentation-option',
+          optionClassName: `${touchTarget} ${FIELD_TEXT} items-center`,
+          optionDataAttributes: (option) =>
+            isWithoutContent(option)
+              ? { 'data-presentation-id': option.id, 'data-without-content': 'true' }
+              : { 'data-presentation-id': option.id },
+          emptyTestId: 'presentation-empty',
+          loadErrorTestId: 'presentation-load-error',
+          loadingTestId: 'presentation-loading',
+          loadingLabel: LOADING_LABEL,
+        }}
+      />
 
       {error === undefined ? null : (
         <p id={errorId} className="text-sm text-destructive" data-testid="presentation-select-error">
@@ -598,7 +448,7 @@ export function PresentationSelect({
             id={createFieldId}
             ref={createFieldRef}
             type="text"
-            className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+            className={`${touchTarget} ${FIELD_TEXT}`}
             aria-invalid={createError === null ? undefined : true}
             aria-describedby={createError === null ? undefined : createErrorId}
             data-testid="presentation-create-name"
@@ -637,7 +487,7 @@ export function PresentationSelect({
           <div className="flex gap-2">
             <Button
               type="button"
-              className={TOUCH_TARGET}
+              touch
               disabled={createPending}
               aria-busy={createPending}
               data-testid="presentation-create-submit"
@@ -648,7 +498,7 @@ export function PresentationSelect({
             <Button
               type="button"
               variant="outline"
-              className={TOUCH_TARGET}
+              touch
               data-testid="presentation-create-cancel"
               onClick={() => {
                 setCreating(false);
@@ -664,7 +514,7 @@ export function PresentationSelect({
         <Button
           type="button"
           variant="outline"
-          className={TOUCH_TARGET}
+          touch
           data-testid="presentation-create-open"
           onClick={() => setCreating(true)}
         >

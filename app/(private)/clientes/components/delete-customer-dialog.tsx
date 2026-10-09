@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,12 +15,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import type { CustomerView } from '@/lib/modules/clientes';
 import {
   deleteCustomerAction,
   type CustomerMutationFormState,
 } from '@/lib/modules/clientes/adapters/driving/customer-actions';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Confirmacion de la baja de un cliente, calcada de `delete-unit-dialog.tsx`.
@@ -52,8 +52,6 @@ export const DELETE_CUSTOMER_ID_TESTID = 'delete-customer-id';
 
 /** Nombre del campo del `FormData` que lee el adaptador driving (`customer-actions.ts`). */
 export const DELETE_CUSTOMER_ID_FIELD = 'id';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 const TITLE = 'Eliminar el cliente';
 const CONFIRM_LABEL = 'Eliminar';
@@ -101,19 +99,16 @@ export function DeleteCustomerDialog({ customer, open, onOpenChange }: DeleteCus
         </AlertDialogHeader>
 
         {error === undefined ? null : (
-          <div
-            role="alert"
+          <ErrorAlert
+            error={error}
             id={errorId}
             className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={DELETE_CUSTOMER_ERROR_TESTID}
-            data-code={error.code}
-          >
-            {error.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={error} />
-            ) : (
-              <p data-testid={DELETE_CUSTOMER_ERROR_MESSAGE_TESTID}>{error.message}</p>
+            testId={DELETE_CUSTOMER_ERROR_TESTID}
+            withDataCode
+            renderCatalogued={(catalogued) => (
+              <p data-testid={DELETE_CUSTOMER_ERROR_MESSAGE_TESTID}>{catalogued.message}</p>
             )}
-          </div>
+          />
         )}
 
         <form action={formAction} data-testid={DELETE_CUSTOMER_FORM_TESTID}>
@@ -124,13 +119,13 @@ export function DeleteCustomerDialog({ customer, open, onOpenChange }: DeleteCus
             data-testid={DELETE_CUSTOMER_ID_TESTID}
           />
           <AlertDialogFooter>
-            <AlertDialogCancel className={TOUCH_TARGET} data-testid={DELETE_CUSTOMER_DISMISS_TESTID}>
+            <AlertDialogCancel className={touchTarget} data-testid={DELETE_CUSTOMER_DISMISS_TESTID}>
               {DISMISS_LABEL}
             </AlertDialogCancel>
             <AlertDialogAction
               type="submit"
               variant="destructive"
-              className={TOUCH_TARGET}
+              touch
               disabled={isPending}
               aria-busy={isPending}
               data-testid={DELETE_CUSTOMER_CONFIRM_TESTID}

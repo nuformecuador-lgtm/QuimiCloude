@@ -7,6 +7,7 @@
 // Los adaptadores driving de QC-34 NO pasan por aqui: QC-35 importara `order-actions.ts` por su
 // ruta exacta (`docs/architecture.md`, excepcion de los driving; `design.md > 9`).
 export { formatOrderNumber } from './domain/order-number';
+export { orderNumberContains } from './domain/order-number';
 export type { OrderId, OrderNumber } from './domain/order-number';
 export {
   ORDER_PRIORITY_VALUES,
@@ -82,6 +83,7 @@ export {
   OrderDistributionExceedsQuantityError,
   OrderWithoutDistributionError,
   OrderPresentationLineNotEditableError,
+  CustomerNotFoundError,
 } from './domain/errors';
 
 /** La pagina y su esquema (R34, R36). El defecto de 10 y el tope de 25 NO viven aqui: los
@@ -160,6 +162,10 @@ export { createUpdateOrder } from './domain/update-order';
 export type { UpdateOrderDeps } from './domain/update-order';
 export { createCancelOrder } from './domain/cancel-order';
 export type { CancelOrderDeps } from './domain/cancel-order';
+/** Cancelar por encargo de otro modulo, con la unidad de trabajo que le cablee la composicion:
+ *  mismas comprobaciones y la misma liberacion que `createCancelOrder`, sin permiso ni motivo. */
+export { createCancelAliveOrder } from './domain/order-cancellation';
+export type { CancelAliveOrderDeps, OrderCancellation } from './domain/order-cancellation';
 export { createDeleteOrder } from './domain/delete-order';
 export type { DeleteOrderDeps } from './domain/delete-order';
 
@@ -175,10 +181,22 @@ export type { TransitionOrderDeps } from './domain/transition-order';
 export { createStartPacking, createFinishPacking } from './domain/order-packing';
 export type { StartPackingDeps, FinishPackingDeps } from './domain/order-packing';
 
+/** Implementan `OrderCatalog['startConditioningAliveById']` y `['finishConditioningAliveById']`:
+ *  cada uno un `UPDATE` condicional, fuera de la unidad de trabajo de `inventario`. */
+export { createStartConditioning, createFinishConditioning } from './domain/order-conditioning';
+export type {
+  ConditioningDeps,
+  FinishConditioningAliveById,
+  StartConditioningAliveById,
+} from './domain/order-conditioning';
+
 /** Implementan los dos listados de resumen de `OrderCatalog`, con el nombre del envase de cada
  *  linea ya resuelto. */
 export { createListAliveSummariesByIds, createListAliveSummariesInCompany } from './domain/list-order-summaries';
 export type { ListOrderSummariesDeps } from './domain/list-order-summaries';
+export { createListSummariesByIdsIncludingDeleted } from './domain/list-order-summaries';
+export type { ListHistorySummariesDeps } from './domain/list-order-summaries';
+export type { OrderHistorySummary } from './domain/order-catalog';
 
 /** La cobertura de varios pedidos a la vez, una consulta por pagina, para pintar «sin
  *  cobertura completa» sin N+1. */
@@ -231,3 +249,23 @@ export type { DistributionLineInput, PresentationLineInput } from './domain/reso
  *  la reserva, la ejecucion y la tabla de ingredientes del formulario. */
 export { resolveLineNeed } from './domain/order-line-need';
 export type { LineNeedUnits, OrderLineNeed } from './domain/order-line-need';
+
+/** El cliente del pedido: su forma, el filtro del listado y la comprobacion de que existe y
+ *  sigue vivo. Los tipos del catalogo de clientes no se reexportan: son de `clientes`. */
+export {
+  ORDER_CUSTOMER_FILTER_FIELD,
+  ORDER_CUSTOMER_PRESENCE_FILTER_FIELD,
+  ORDER_CUSTOMER_PRESENCE_NONE,
+  ORDER_CUSTOMER_PRESENCE_VALUES,
+  formatOrderCustomerName,
+  isCustomerIdShape,
+  requireAliveCustomer,
+  toOrderCustomer,
+} from './domain/order-customer';
+export type { OrderCustomer, OrderCustomerSearchPurpose } from './domain/order-customer';
+export { createSetOrderCustomer } from './domain/set-order-customer';
+export type { SetOrderCustomerDeps } from './domain/set-order-customer';
+export { createSearchOrderCustomers } from './domain/search-order-customer-options';
+export type { SearchOrderCustomersDeps } from './domain/search-order-customer-options';
+export { createGetOrderCustomerFilterOption } from './domain/get-order-customer-filter-option';
+export type { GetOrderCustomerFilterOptionDeps } from './domain/get-order-customer-filter-option';

@@ -33,7 +33,7 @@ Además, `/arnes-init` monta el arnés en un proyecto nuevo o revisa el perfil d
 <produccion> <- PR (solo humano mergea) -- <integracion> <- PR <- feature/<key>-<slug>
 ```
 
-Los nombres reales están en `arnes.config.json > ramas`; en este repo son `main` y `dev`.
+Los nombres reales están en `arnes.config.json > ramas`, y solo ahí.
 
 - Las ramas de feature nacen de la rama de integración y se **publican al nacer** (es el candado
   de equipo, `docs/equipo.md`).
@@ -111,7 +111,9 @@ Al arrancar sesión, con el MCP de `atlassian`:
 - Regenera la lista `features` de `feature_list.json` (en la raíz del worktree principal; no se
   versiona). La consulta es `project = <arnes.config.json > jira.project> AND issuetype != Epic`.
 - Por cada ficha importa:
-  - `description` y `status` (por la columna);
+  - `description` y `status`: este último, por el **nombre del estado** del issue, traducido con
+    `arnes.config.json > jira.estados`. Un estado que no esté en esa tabla **detiene F0** con un
+    mensaje que lo nombre: nunca se adivina (`docs/jira.md > Los estados del board`);
   - `depends_on` (links "is blocked by");
   - `epic` + `epic_name`;
   - **`assignee: {accountId, displayName}`** (o `null`).
@@ -149,18 +151,18 @@ Contrato completo: `docs/jira.md`.
    - Si `spec_author` devuelve `BLOQUEADO: ya existe <ref>`, **PARA y pregunta** al humano
      (`docs/specs.md > Antes de especificar: lo que ya existe`). Relanza `spec_author` con su
      decisión: él la escribe como fila en `Decisiones cerradas`.
-3. **(F1.3)** Cambia a `spec_ready`, mueve la tarjeta a *Spec en revisión*, comenta en el issue la
-   ruta del spec y haz `git push`.
+3. **(F1.3)** Cambia a `spec_ready`, mueve la tarjeta al estado de `spec_ready` (según
+   `jira.estados`), comenta en el issue la ruta del spec y haz `git push`.
 4. **(F1.4) PARA. Pide aprobación humana.**
-   - La forma canónica de aprobar es mover la tarjeta de *Spec en revisión* a *En curso*. Un
-     "aprobado" escrito también vale.
+   - La forma canónica de aprobar es mover la tarjeta del estado de `spec_ready` al de
+     `in_progress` (según `jira.estados`). Un "aprobado" escrito también vale.
    - Si el humano pide cambios, vuelve a F1.2.
    - Si el `design.md` propone una librería nueva, la aprobación del spec la incluye: el leader
      añade su fila a `docs/dependencias.md`.
 
 ### F2 — Implementación
 
-5. **(F2.0)** Cambia a `in_progress` y asegura la tarjeta en *En curso*. Repite
+5. **(F2.0)** Cambia a `in_progress` y asegura la tarjeta en el estado de `in_progress`. Repite
    `archivos-en-vuelo.mjs --candidata <key>`: si ahora choca, espera.
 6. **(F2.1)** Lanza `implementer` en el worktree.
    - Sigue `tasks.md` una por una, marcando `[x]`, y escribe `progress/impl_<key>.md` (archivos
@@ -195,7 +197,7 @@ Contrato completo: `docs/jira.md`.
        reproduce en local.
      - Solo con verde reporta la URL del PR al humano para el merge.
 10. **(F2.5) Cerrar.** Cuando el humano mergea:
-    - cambia a `done`, mueve la tarjeta a *Hecho* y comenta la URL del PR en el issue;
+    - cambia a `done`, mueve la tarjeta al estado de `done` y comenta la URL del PR en el issue;
     - `./scripts/wt.sh done <key>-<slug>` (con `--assume-merged` si el merge fue squash);
     - borra el proyecto del grafo (`delete_project`).
 

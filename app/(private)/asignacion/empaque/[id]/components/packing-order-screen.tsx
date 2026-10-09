@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { useActionState, useRef, useState } from 'react';
 
 import { ConfirmActionDialog } from '@/components/shared/confirm-action-dialog';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { StepReader } from '@/components/shared/step-reader';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
 import type {
   OrderDistributionLineView,
@@ -18,10 +18,11 @@ import {
   type FinishPackingResult,
   type StartPackingResult,
 } from '@/lib/modules/asignaciones/adapters/driving/order-packing-actions';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import type { OrderStatus } from '@/lib/modules/pedidos';
 import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * La pantalla de un pedido de empaque. Sin control de edicion: los datos del pedido se leen tal
@@ -76,9 +77,7 @@ export const PACKING_ORDER_FINISH_CONFIRM_TEXTS = {
   confirm: 'Terminar',
 } as const;
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 const RECIPE_MISSING_TEXT = 'Esta receta esta dada de baja.';
-const MISSING_VALUE_MARK = '—';
 const QUANTITY_LABEL = 'Cantidad:';
 const DISTRIBUTION_LABEL = 'Reparto';
 const EMPTY_DISTRIBUTION_TEXT = 'Sin presentación';
@@ -95,7 +94,7 @@ const BACK_HREF = `${ASSIGNED_ORDERS_ROUTE}?vista=por_empacar`;
 const PACKER_UNKNOWN_TEXT = 'Lo esta empacando otra persona.';
 
 function distributionLineText(line: OrderDistributionLineView): string {
-  return `${line.packages} × ${line.packagingName ?? line.presentationName ?? MISSING_VALUE_MARK}`;
+  return `${line.packages} × ${line.packagingName ?? line.presentationName ?? EMPTY_MARK}`;
 }
 
 function packerLabel(order: PackingOrderRow): string {
@@ -198,7 +197,7 @@ export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) 
       </section>
 
       <p className="text-base" data-testid={PACKING_ORDER_PACKAGES_TESTID}>
-        Envases: {order.packages ?? MISSING_VALUE_MARK}
+        Envases: {order.packages ?? EMPTY_MARK}
       </p>
 
       <p
@@ -219,7 +218,7 @@ export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) 
           <input type="hidden" name={PACKING_ORDER_ID_FIELD} defaultValue={order.id} />
           <Button
             type="button"
-            className={TOUCH_TARGET}
+            touch
             onClick={() => setStartConfirmOpen(true)}
             disabled={startPending}
             aria-busy={startPending}
@@ -263,7 +262,7 @@ export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) 
           {showsPackingSteps ? null : (
             <Button
               type="button"
-              className={TOUCH_TARGET}
+              touch
               onClick={() => setFinishConfirmOpen(true)}
               disabled={finishPending}
               aria-busy={finishPending}
@@ -290,36 +289,24 @@ export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) 
       ) : null}
 
       {startError !== undefined ? (
-        <div
-          role="alert"
-          data-testid={PACKING_ORDER_START_ERROR_TESTID}
+        <ErrorAlert
+          error={startError}
+          testId={PACKING_ORDER_START_ERROR_TESTID}
           className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-        >
-          {startError.code === UNEXPECTED_ERROR_CODE ? (
-            <UnexpectedErrorNotice state={startError} />
-          ) : (
-            <p>{startError.message}</p>
-          )}
-        </div>
+        />
       ) : null}
 
       {finishError !== undefined ? (
-        <div
-          role="alert"
-          data-testid={PACKING_ORDER_FINISH_ERROR_TESTID}
+        <ErrorAlert
+          error={finishError}
+          testId={PACKING_ORDER_FINISH_ERROR_TESTID}
           className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-        >
-          {finishError.code === UNEXPECTED_ERROR_CODE ? (
-            <UnexpectedErrorNotice state={finishError} />
-          ) : (
-            <p>{finishError.message}</p>
-          )}
-        </div>
+        />
       ) : null}
 
       <Link
         href={BACK_HREF}
-        className={`inline-flex w-fit items-center ${TOUCH_TARGET} text-sm font-medium underline`}
+        className={`inline-flex w-fit items-center ${touchTarget} text-sm font-medium underline`}
         data-testid={PACKING_ORDER_BACK_LINK_TESTID}
       >
         {BACK_LABEL}

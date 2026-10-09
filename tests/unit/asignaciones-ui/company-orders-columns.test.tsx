@@ -111,8 +111,44 @@ describe('R41 - las etiquetas de estado cubren los seis valores del contrato', (
   });
 });
 
-describe('R24, R41 - la columna Estado declara el filtro select de los siete estados, en orden de flujo', () => {
-  it('la columna Estado trae `filter: select` con las siete opciones', () => {
+describe('R28, R32 - «Todos» pinta y filtra los estados de acondicionamiento y TERMINADO', () => {
+  it('las etiquetas son literales legibles, no el nombre del enum', () => {
+    expect(COMPANY_ORDER_STATUS_LABELS.POR_ACONDICIONAR).toBe('Por acondicionar');
+    expect(COMPANY_ORDER_STATUS_LABELS.EN_ACONDICIONAMIENTO).toBe('En acondicionamiento');
+    expect(COMPANY_ORDER_STATUS_LABELS.TERMINADO).toBe('Terminado');
+  });
+
+  it.each([
+    ['POR_ACONDICIONAR', 'Por acondicionar'],
+    ['EN_ACONDICIONAMIENTO', 'En acondicionamiento'],
+    ['TERMINADO', 'Terminado'],
+  ] as const)('la celda Estado pinta %s como «%s» con `data-status`', (status, label) => {
+    renderCell(COMPANY_ORDER_STATUS_COLUMN_ID, { ...BASE_ORDER, status });
+
+    const cell = screen.getByTestId('company-order-status');
+    expect(cell).toHaveAttribute('data-status', status);
+    expect(cell).toHaveTextContent(label);
+    expect(cell).not.toHaveTextContent(status);
+  });
+
+  it('el filtro ofrece las dos opciones de acondicionamiento entre «En empaque» y «Terminado»', () => {
+    const values = COMPANY_ORDER_STATUS_FILTER_OPTIONS.map((option) => option.value);
+    const enEmpaque = values.indexOf('EN_EMPAQUE');
+    expect(values.slice(enEmpaque, enEmpaque + 4)).toEqual([
+      'EN_EMPAQUE',
+      'POR_ACONDICIONAR',
+      'EN_ACONDICIONAMIENTO',
+      'TERMINADO',
+    ]);
+    expect(COMPANY_ORDER_STATUS_FILTER_OPTIONS).toContainEqual({
+      value: 'TERMINADO',
+      label: 'Terminado',
+    });
+  });
+});
+
+describe('R24, R41, R2, R28 - la columna Estado declara el filtro select de todos los estados, en orden de flujo', () => {
+  it('la columna Estado trae `filter: select` con las opciones en el orden del flujo', () => {
     const columns = buildCompanyOrdersColumns({ showFinishedAt: false });
     const status = columns.find((column) => column.id === COMPANY_ORDER_STATUS_COLUMN_ID);
 
@@ -122,6 +158,9 @@ describe('R24, R41 - la columna Estado declara el filtro select de los siete est
       'EN_CURSO',
       'POR_EMPACAR',
       'EN_EMPAQUE',
+      'POR_ACONDICIONAR',
+      'EN_ACONDICIONAMIENTO',
+      'TERMINADO',
       'ENTREGADO',
       'CANCELADO',
       'BLOQUEADO',

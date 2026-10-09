@@ -521,6 +521,25 @@ const METODOS_DELEGADOS_EN_DOMINIO: ReadonlyMap<string, RegExp> = new Map([
     'listAliveSummariesInCompany',
     /^createListAliveSummariesInCompany\s*\(\s*\{\s*summaries\s*:\s*orderSummaryReader\s*,\s*packaging\s*:\s*packagingCatalog\s*,?\s*\}\s*\)$/,
   ],
+  // QC-167: el filtro por numero se decide en `pedidos/domain`, sobre `OrderSummaryReader`. Quien
+  // toca la base son `listOrderNumbersByIdsIncludingDeleted` y `listOrderHistoryByIdsIncludingDeleted`
+  // (`order-catalog-prisma.ts`), que el barrido de mas abajo sigue exigiendo con `companyId`.
+  [
+    'listSummariesByIdsIncludingDeleted',
+    /^createListSummariesByIdsIncludingDeleted\s*\(\s*\{\s*summaries\s*:\s*orderSummaryReader\s*,?\s*\}\s*\)$/,
+  ],
+  // QC-215 (R8, R12): Comenzar y Terminar el acondicionamiento cablean un caso de uso de
+  // `pedidos/domain` sobre `OrderConditioningRepository`. Quien toca la base son
+  // `startConditioningAliveOrder` y `finishConditioningAliveOrder` (`order-prisma.ts`), con
+  // `scope: OrderScope`, y el barrido sin lista de excepciones de mas abajo las sigue exigiendo.
+  [
+    'startConditioningAliveById',
+    /^createStartConditioning\s*\(\s*\{\s*conditioning\s*:\s*orderConditioningRepository\s*,?\s*\}\s*\)$/,
+  ],
+  [
+    'finishConditioningAliveById',
+    /^createFinishConditioning\s*\(\s*\{\s*conditioning\s*:\s*orderConditioningRepository\s*,?\s*\}\s*\)$/,
+  ],
 ])
 
 describe('QC-60 R18 — el punto unico es de verdad UNA definicion', () => {
@@ -913,4 +932,232 @@ describe('QC-60 R18, R22, R24 — el SQL crudo escribe y numera con la empresa d
       }
     })
   }
+})
+
+// --- La unidad de trabajo propia y la unida a una transaccion ajena (QC-82) ----------------------
+
+const COMPOSITION_ROOT = join(repoRoot, 'lib', 'composition')
+const COMPOSICION = join(COMPOSITION_ROOT, 'index.ts')
+
+/** Lo que se lee para estas reglas: sin comentarios y sin contenido de cadenas. */
+const legible = (source: string): string => vaciarCadenas(sinComentarios(source))
+
+const sinEspacios = (texto: string): string => texto.replace(/\s+/g, '')
+
+/** Los miembros del ambito que construye `orderTransactionScopeOn`, ordenados. */
+function miembrosDelAmbito(source: string): readonly string[] {
+  const codigo = legible(source)
+  const funcion = funcionesDe(codigo, sinComentarios(source)).find((f) => f.nombre === 'orderTransactionScopeOn')
+  if (funcion === undefined) return []
+  const retorno = funcion.cuerpo.search(/\breturn\s*\{/)
+  if (retorno < 0) return []
+  const abre = funcion.cuerpo.indexOf('{', retorno)
+  return porComasDeNivelCero(funcion.cuerpo.slice(abre + 1, cierreEquilibrado(funcion.cuerpo, abre, '{', '}')))
+    .map((entrada) => /^(\w+)/.exec(entrada)?.[1] ?? entrada)
+    .sort()
+}
+
+/** Reemplaza la primera aparicion de `buscado` a partir de `desde`, y falla si no esta. */
+function mutar(real: string, buscado: string, nuevo: string, desde = 0): string {
+  const indice = real.indexOf(buscado, desde)
+  expect(indice, `la mutacion no encontro ${buscado}`).toBeGreaterThan(-1)
+  return `${real.slice(0, indice)}${nuevo}${real.slice(indice + buscado.length)}`
+}
+
+describe('QC-82 — el ambito de la unidad de trabajo se construye en un solo sitio', () => {
+  it('R24: el ambito de la unidad de trabajo tiene exactamente seis miembros y las dos unidades lo construyen igual', () => {
+    const real = readFileSync(COMPOSICION, 'utf8')
+    expect(miembrosDelAmbito(real)).toEqual(['finishedGoods', 'orders', 'products', 'recipes', 'reservations', 'units'])
+    const codigo = sinEspacios(legible(real))
+    expect(codigo).toContain('withOrderTransaction((tx)=>work(orderTransactionScopeOn(tx)))')
+    expect(codigo).toContain('{run:(work)=>work(orderTransactionScopeOn(tx))}')
+  })
+
+  it('R24 ANTI-PLACEBO: quitar `units` del ambito sale en rojo', () => {
+    const mutado = mutar(readFileSync(COMPOSICION, 'utf8'), '    units: createUnitCatalogReader(tx),\n', '')
+    expect(miembrosDelAmbito(mutado)).toEqual(['finishedGoods', 'orders', 'products', 'recipes', 'reservations'])
+  })
+})
+
+// --- La cancelacion por encargo y la transaccion de ejecucion (QC-82) ----------------------------
+
+const ORDER_CANCELLATION = join(MODULE_ROOT, 'domain', 'order-cancellation.ts')
+
+/** Los argumentos de cada llamada a `fabrica(` del texto, sin espacios. `\b` deja fuera
+ *  `createStartPackingOrder(` cuando se busca `createStartPacking(`. */
+function argumentosDeCadaLlamada(codigo: string, fabrica: string): readonly string[] {
+  const argumentos: string[] = []
+  for (const match of codigo.matchAll(new RegExp(`${fabrica}\\s*\\(`, 'g'))) {
+    const abre = match.index + match[0].length - 1
+    argumentos.push(sinEspacios(codigo.slice(abre + 1, cierreEquilibrado(codigo, abre, '(', ')'))))
+  }
+  return argumentos
+}
+
+/** El cuerpo del objeto que se asigna a `const <constante>: <Tipo> = { … }`, o '' si no esta. */
+function cuerpoDeLaConstante(codigo: string, constante: string): string {
+  const inicio = codigo.search(new RegExp(`\\bconst\\s+${constante}\\s*:\\s*\\w+\\s*=\\s*\\{`))
+  if (inicio < 0) return ''
+  const abre = codigo.indexOf('{', inicio)
+  return codigo.slice(abre + 1, cierreEquilibrado(codigo, abre, '{', '}'))
+}
+
+type FuenteDeComposicion = { readonly relPath: string; readonly content: string }
+
+function fuentesDeComposicion(): readonly FuenteDeComposicion[] {
+  return readdirSync(COMPOSITION_ROOT)
+    .filter((archivo) => archivo.endsWith('.ts'))
+    .map((archivo) => ({
+      relPath: `lib/composition/${archivo}`,
+      content: readFileSync(join(COMPOSITION_ROOT, archivo), 'utf8'),
+    }))
+}
+
+const UNIDAD_PROPIA = '{unitOfWork:orderUnitOfWork}'
+const UNIDAD_UNIDA = '{unitOfWork:joinOrderUnitOfWork(tx)}'
+const FABRICAS_CON_UNIDAD = ['createTransitionOrder', 'createCancelAliveOrder'] as const
+
+/** La firma por encargo declara la empresa y el cuerpo unico la lleva a las dos escrituras. */
+function hallazgosDeLaCancelacion(source: string): readonly string[] {
+  const hallazgos: string[] = []
+  const codigo = legible(source)
+
+  const tipo = codigo.search(/\bexport\s+type\s+OrderCancellation\s*=\s*\{/)
+  const abreTipo = codigo.indexOf('{', tipo)
+  const cuerpoTipo = tipo < 0 ? '' : codigo.slice(abreTipo + 1, cierreEquilibrado(codigo, abreTipo, '{', '}'))
+  const firma = /\bcancelAliveById\s*\(([^)]*)\)/.exec(cuerpoTipo)
+  if (firma === null || !/\bcompanyId\s*:\s*string\b/.test(firma[1] ?? '')) {
+    hallazgos.push('OrderCancellation.cancelAliveById no declara `companyId: string`')
+  }
+
+  const funcion = funcionesDe(codigo, sinComentarios(source)).find((f) => f.nombre === 'cancelInsideTransaction')
+  if (funcion === undefined) return [...hallazgos, 'no se encontro cancelInsideTransaction']
+  for (const metodo of ['lockAliveById', 'cancelAlive']) {
+    const llamadas = argumentosDeCadaLlamada(funcion.cuerpo, `\\.${metodo}\\b`)
+    if (llamadas.length === 0 || !llamadas.every((args) => args.endsWith(',{companyId}'))) {
+      hallazgos.push(`cancelInsideTransaction no lleva \`{ companyId }\` a ${metodo}`)
+    }
+  }
+  return hallazgos
+}
+
+/** Transicionar y cancelar solo se cablean con una de las dos unidades de trabajo, y dentro de la
+ *  transaccion de ejecucion, con la unida a `tx`. */
+function hallazgosDeLasUnidades(fuentes: readonly FuenteDeComposicion[]): readonly string[] {
+  const hallazgos: string[] = []
+  for (const fuente of fuentes) {
+    const codigo = legible(fuente.content)
+    for (const fabrica of FABRICAS_CON_UNIDAD) {
+      for (const args of argumentosDeCadaLlamada(codigo, `\\b${fabrica}`)) {
+        if (args !== UNIDAD_PROPIA && args !== UNIDAD_UNIDA) {
+          hallazgos.push(`${fuente.relPath}: ${fabrica}(${args}) no recibe exactamente una de las dos unidades de trabajo`)
+        }
+      }
+    }
+    const ejecucion = cuerpoDeLaConstante(codigo, 'executionTransaction')
+    if (ejecucion === '') continue
+    for (const fabrica of FABRICAS_CON_UNIDAD) {
+      const llamadas = argumentosDeCadaLlamada(ejecucion, `\\b${fabrica}`)
+      if (llamadas.length !== 1 || llamadas[0] !== UNIDAD_UNIDA) {
+        hallazgos.push(`${fuente.relPath}: dentro de executionTransaction, ${fabrica} no se une a \`tx\``)
+      }
+    }
+  }
+  return hallazgos
+}
+
+/** El repositorio de empaque de la composicion se construye SOLO sobre `tx`, y Comenzar y Terminar,
+ *  dentro de la transaccion de ejecucion, escriben por ella. */
+function hallazgosDelEmpaque(fuentes: readonly FuenteDeComposicion[]): readonly string[] {
+  const hallazgos: string[] = []
+  for (const fuente of fuentes) {
+    const codigo = legible(fuente.content)
+    for (const args of argumentosDeCadaLlamada(codigo, '\\bcreateOrderPackingRepository')) {
+      if (args !== 'tx') hallazgos.push(`${fuente.relPath}: createOrderPackingRepository(${args}) no recibe \`tx\``)
+    }
+    const ejecucion = cuerpoDeLaConstante(codigo, 'executionTransaction')
+    if (ejecucion === '') continue
+    const comenzar = argumentosDeCadaLlamada(ejecucion, '\\bcreateStartPacking')
+    if (comenzar.length !== 1 || comenzar[0] !== '{packing:createOrderPackingRepository(tx)}') {
+      hallazgos.push(`${fuente.relPath}: dentro de executionTransaction, createStartPacking no escribe por \`tx\``)
+    }
+    const terminar = argumentosDeCadaLlamada(ejecucion, '\\bcreateFinishPacking')
+    const entradas = terminar.length === 1 ? porComasDeNivelCero((terminar[0] ?? '').slice(1, -1)) : []
+    if (
+      !entradas.includes('packing:createOrderPackingRepository(tx)') ||
+      !entradas.includes('unitOfWork:joinOrderUnitOfWork(tx)')
+    ) {
+      hallazgos.push(`${fuente.relPath}: dentro de executionTransaction, createFinishPacking no escribe por \`tx\``)
+    }
+  }
+  return hallazgos
+}
+
+describe('QC-82 — cancelar por encargo y la transaccion de ejecucion no pierden la empresa', () => {
+  // 2026-09-24: cancelar desde la ejecucion pasa por el mismo cuerpo que la pantalla de pedidos, y
+  // la composicion solo puede darle una de las dos unidades de trabajo.
+  it('R29: OrderCancellation declara la empresa, cancelInsideTransaction la lleva, y la composicion solo usa las dos unidades', () => {
+    expect(hallazgosDeLaCancelacion(readFileSync(ORDER_CANCELLATION, 'utf8'))).toEqual([])
+    const fuentes = fuentesDeComposicion()
+    expect(hallazgosDeLasUnidades(fuentes)).toEqual([])
+    const cancelaciones = fuentes.flatMap((f) => argumentosDeCadaLlamada(legible(f.content), '\\bcreateCancelAliveOrder'))
+    expect(cancelaciones, 'la composicion no cablea createCancelAliveOrder sobre `tx`').toContain(UNIDAD_UNIDA)
+  })
+
+  it('R29 ANTI-PLACEBO (a): quitar `companyId` del ambito en cancelInsideTransaction sale en rojo', () => {
+    const mutado = mutar(
+      readFileSync(ORDER_CANCELLATION, 'utf8'),
+      'lockAliveById(id, { companyId })',
+      'lockAliveById(id, {} as never)',
+    )
+    expect(hallazgosDeLaCancelacion(mutado)).toEqual(['cancelInsideTransaction no lleva `{ companyId }` a lockAliveById'])
+  })
+
+  it('R29 ANTI-PLACEBO (b): cablear la cancelacion de la ejecucion con otra unidad de trabajo sale en rojo', () => {
+    const mutado = mutar(
+      readFileSync(COMPOSICION, 'utf8'),
+      'createCancelAliveOrder({ unitOfWork: joinOrderUnitOfWork(tx) })',
+      'createCancelAliveOrder({ unitOfWork: orderUnitOfWork })',
+    )
+    expect(hallazgosDeLasUnidades([{ relPath: 'lib/composition/index.ts', content: mutado }])).toEqual([
+      'lib/composition/index.ts: dentro de executionTransaction, createCancelAliveOrder no se une a `tx`',
+    ])
+  })
+
+  // 2026-09-26, ampliado 2026-10-06: el empaque escribe dentro de la transaccion de ejecucion.
+  // Comenzar por su repositorio construido sobre `tx`; Terminar ademas por la unidad unida. El
+  // cableado del `orderCatalog` global sigue en METODOS_DELEGADOS_EN_DOMINIO, sin cambios.
+  it('R24, R41: createOrderPackingRepository recibe `tx` y Comenzar y Terminar escriben por ella', () => {
+    const fuentes = fuentesDeComposicion()
+    expect(hallazgosDelEmpaque(fuentes)).toEqual([])
+    const llamadas = fuentes.flatMap((f) =>
+      argumentosDeCadaLlamada(legible(f.content), '\\bcreateOrderPackingRepository'),
+    )
+    expect(llamadas).toEqual(['tx', 'tx'])
+  })
+
+  it('R24 ANTI-PLACEBO (c): atar createOrderPackingRepository al cliente global sale en rojo', () => {
+    const mutado = mutar(
+      readFileSync(COMPOSICION, 'utf8'),
+      'createStartPacking({ packing: createOrderPackingRepository(tx) })',
+      'createStartPacking({ packing: createOrderPackingRepository(prisma) })',
+    )
+    expect(hallazgosDelEmpaque([{ relPath: 'lib/composition/index.ts', content: mutado }])).toEqual([
+      'lib/composition/index.ts: createOrderPackingRepository(prisma) no recibe `tx`',
+      'lib/composition/index.ts: dentro de executionTransaction, createStartPacking no escribe por `tx`',
+    ])
+  })
+
+  it('R24 ANTI-PLACEBO (d): Terminar dentro de executionTransaction con orderUnitOfWork sale en rojo', () => {
+    const real = readFileSync(COMPOSICION, 'utf8')
+    const mutado = mutar(
+      real,
+      'unitOfWork: joinOrderUnitOfWork(tx),',
+      'unitOfWork: orderUnitOfWork,',
+      real.indexOf('finishPackingAliveById: createFinishPacking', real.indexOf('const executionTransaction')),
+    )
+    expect(hallazgosDelEmpaque([{ relPath: 'lib/composition/index.ts', content: mutado }])).toEqual([
+      'lib/composition/index.ts: dentro de executionTransaction, createFinishPacking no escribe por `tx`',
+    ])
+  })
 })

@@ -4,6 +4,8 @@ import type { DataTableColumn } from '@/components/shared/data-table';
 import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import type { PackingOrderRow } from '@/lib/modules/asignaciones';
 import { packingOrderRoute } from '@/lib/shared/routes';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { COMPANY_ORDER_STATUS_LABELS } from './company-orders-columns';
 
@@ -14,12 +16,10 @@ import { COMPANY_ORDER_STATUS_LABELS } from './company-orders-columns';
  * desde un componente de servidor.
  */
 
-export const MISSING_VALUE_MARK = '—';
-
 function MissingValue({ field }: { readonly field: string }) {
   return (
     <span aria-label="Sin dato" data-testid={`packing-order-missing-${field}`}>
-      {MISSING_VALUE_MARK}
+      {EMPTY_MARK}
     </span>
   );
 }
@@ -44,7 +44,7 @@ export function buildPackingOrdersColumns(): readonly DataTableColumn<PackingOrd
         <Link
           href={packingOrderRoute(order.id)}
           data-testid="packing-order-link"
-          className="flex min-h-11 min-w-11 items-center underline-offset-4 hover:underline focus-visible:underline"
+          className={`flex ${touchTarget} items-center underline-offset-4 hover:underline focus-visible:underline`}
         >
           {order.numberText}
         </Link>

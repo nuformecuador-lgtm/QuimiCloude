@@ -10,10 +10,17 @@
  * las features de los companeros viven en SUS ramas, no en tu disco. Aqui la fuente es el
  * remoto: por cada feature `in_progress`/`spec_ready` (de cualquiera) con rama publicada,
  *   - archivos TOCADOS: `git diff --name-only origin/<integracion>...origin/<rama>`
- *   - archivos ESPERADOS: rutas entre backticks de su `tasks.md`, leido de su rama
+ *   - archivos ESPERADOS: rutas entre backticks de la seccion `## Archivos esperados` de su
+ *     `tasks.md` (`docs/specs.md > tasks.md`), leido de su rama. Si el tasks.md no tiene esa
+ *     seccion, todas las rutas entre backticks del archivo MENOS las que empiezan por `./`
+ *     (son comandos: `./init.sh`, `./scripts/x.sh`), y avisa.
  * Requisito para que sirva: cada tanda termina con `git push` (AGENTS.md > F2.1).
  *
  * `specs/` y `progress/` no cuentan como conflicto: cada feature escribe en su carpeta.
+ * Los archivos COMPARTIDOS de apendice (`tests/baseline-rojos.json`, `progress/deudas.md`;
+ * ampliable en `arnes.config.json > equipo.archivos_compartidos`) dan AVISO, no CHOCA.
+ * Por que (2026-10-08): `./init.sh` citado como comando y el baseline compartido hacian que
+ * toda candidata chocara con todo lo que estaba en vuelo (`docs/equipo.md`).
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -41,16 +48,34 @@ const candidata = iCand >= 0 ? args[iCand + 1] : null;
 gitOpcional('fetch', '--quiet', '--prune', 'origin');
 
 const RUTA = /`([\w.@()[\]\-]+(?:\/[\w.@()[\]\-]+)+\.[a-z0-9]+)`/gi;
+// Dentro de `## Archivos esperados` tambien cuentan los archivos de la raiz (`init.sh`, `package.json`).
+const RUTA_EN_SECCION = /`([\w.@()[\]\-]+(?:\/[\w.@()[\]\-]+)*\.[a-z0-9]+)`/gi;
 const ignorable = (f) => f.startsWith('specs/') || f.startsWith('progress/');
+const COMPARTIDOS = new Set(config.equipo?.archivos_compartidos ?? ['tests/baseline-rojos.json', 'progress/deudas.md']);
 
-/** Rutas de archivo citadas entre backticks en un tasks.md. */
+/** Cuerpo de la seccion `## Archivos ...` (canon: `## Archivos esperados`), o null si no hay. */
+function seccionArchivos(texto) {
+  const lineas = texto.split(/\r?\n/);
+  const i = lineas.findIndex((l) => /^##\s+Archivos\b/i.test(l));
+  if (i < 0) return null;
+  const fin = lineas.findIndex((l, j) => j > i && /^#{1,2}\s/.test(l));
+  return lineas.slice(i + 1, fin < 0 ? undefined : fin).join('\n');
+}
+
+/**
+ * Rutas de archivo esperadas de un tasks.md. Con seccion `## Archivos esperados`, solo las de
+ * la seccion (alli `./x` es un archivo). Sin ella, las de todo el archivo salvo las que empiezan
+ * por `./`, que en el cuerpo del tasks.md son comandos (`./init.sh`). `sinSeccion` lo marca.
+ */
 function esperados(texto) {
+  const seccion = seccionArchivos(texto);
   const out = new Set();
-  for (const m of texto.matchAll(RUTA)) {
+  for (const m of seccion == null ? texto.matchAll(RUTA) : seccion.matchAll(RUTA_EN_SECCION)) {
+    if (seccion == null && m[1].startsWith('./')) continue;
     const ruta = m[1].replace(/^\.\//, '');
     if (!ignorable(ruta)) out.add(ruta);
   }
-  return out;
+  return { rutas: out, sinSeccion: seccion == null };
 }
 
 const ramaDe = (f) => f.branch ?? `feature/${f.key ?? f.id}-${f.name}`;
@@ -67,15 +92,17 @@ for (const f of enVuelo) {
   }
   const tocados = (gitOpcional('diff', '--name-only', `origin/${INTEGRACION}...${remoto}`) ?? '')
     .split('\n').filter((l) => l && !ignorable(l));
-  const tasks = gitOpcional('show', `${remoto}:${specDe(f)}/tasks.md`) ?? '';
-  inventario.push({ f, rama, publicada: true, archivos: new Set([...tocados, ...esperados(tasks)]) });
+  const tasks = gitOpcional('show', `${remoto}:${specDe(f)}/tasks.md`);
+  const esp = tasks == null ? { rutas: new Set(), sinSeccion: false } : esperados(tasks);
+  inventario.push({ f, rama, publicada: true, sinSeccion: esp.sinSeccion, archivos: new Set([...tocados, ...esp.rutas]) });
 }
 
 const quien = (f) => f.assignee?.displayName ?? 'sin assignee';
 
 if (!candidata) {
-  for (const { f, rama, publicada, archivos } of inventario) {
-    console.log(`${f.key ?? f.id} (${quien(f)}) ${rama}${publicada ? '' : '  [rama NO publicada: no se puede saber que toca]'}`);
+  for (const { f, rama, publicada, sinSeccion, archivos } of inventario) {
+    const nota = !publicada ? '  [rama NO publicada: no se puede saber que toca]' : sinSeccion ? '  [tasks.md sin `## Archivos esperados`]' : '';
+    console.log(`${f.key ?? f.id} (${quien(f)}) ${rama}${nota}`);
     for (const a of [...archivos].sort()) console.log(`  ${a}`);
   }
   process.exit(0);
@@ -98,18 +125,26 @@ if (tasksCand == null) {
   console.error(`no encuentro ${specDe(fichaCand)}/tasks.md: la validacion de conflicto necesita el tasks.md de la candidata`);
   process.exit(2);
 }
-const mios = esperados(tasksCand);
+const { rutas: mios, sinSeccion: candSinSeccion } = esperados(tasksCand);
+const SIN_SECCION = 'su tasks.md no tiene `## Archivos esperados`: se leen las rutas de todo el archivo (docs/specs.md > tasks.md)';
+if (candSinSeccion) console.log(`AVISO: ${candidata}: ${SIN_SECCION}`);
 
 let choques = 0;
-for (const { f, publicada, archivos } of inventario) {
+for (const { f, publicada, sinSeccion, archivos } of inventario) {
   if (!publicada) {
     console.log(`AVISO: ${f.key ?? f.id} (${quien(f)}) esta en vuelo y su rama no esta publicada: no se puede comprobar el conflicto`);
     continue;
   }
+  if (sinSeccion) console.log(`AVISO: ${f.key ?? f.id} (${quien(f)}): ${SIN_SECCION}`);
   const comunes = [...mios].filter((a) => archivos.has(a));
-  if (comunes.length > 0) {
+  const compartidos = comunes.filter((a) => COMPARTIDOS.has(a));
+  const reales = comunes.filter((a) => !COMPARTIDOS.has(a));
+  if (compartidos.length > 0) {
+    console.log(`AVISO: comparte con ${f.key ?? f.id} (${quien(f)}) archivos de apendice, no choca: ${compartidos.join(', ')}`);
+  }
+  if (reales.length > 0) {
     choques++;
-    console.log(`CHOCA con ${f.key ?? f.id} (${quien(f)}): ${comunes.join(', ')}`);
+    console.log(`CHOCA con ${f.key ?? f.id} (${quien(f)}): ${reales.join(', ')}`);
   }
 }
 if (choques === 0) console.log(`${candidata}: sin conflicto de archivos con ${inventario.length} feature(s) en vuelo`);

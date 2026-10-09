@@ -6,7 +6,7 @@ import { useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
 import { StepReader } from '@/components/shared/step-reader';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Dialog,
@@ -19,7 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import {
   createRecipeSchema,
   sumPercentages,
@@ -35,6 +35,7 @@ import {
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { FORMULAS_ROUTE, recipeVersionRoute } from '@/lib/shared/routes';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
 import type { ProductPickerOption } from './product-picker';
@@ -96,7 +97,6 @@ import {
  * Si al propagar alguna versión queda por revisar, NO navega: se queda en la ficha y las nombra.
  */
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base';
 
 const PACKING_STEPS_TITLE = 'Pasos de envasado';
@@ -331,24 +331,19 @@ export function RecipeForm(props: RecipeFormProps) {
           </Link>
         </div>
       ) : (
-        // QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
-        // identificador de la peticion. El CATALOGADO se pinta como siempre y sin identificador.
-        <div
-          role="alert"
+        <ErrorAlert
+          error={saveError}
           className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-          data-testid="recipe-form-error"
-        >
-          {saveError.code === UNEXPECTED_ERROR_CODE ? (
-            <UnexpectedErrorNotice state={saveError} />
-          ) : (
+          testId="recipe-form-error"
+          renderCatalogued={(catalogued) => (
             <>
-              <p data-testid="recipe-form-error-message">{saveError.message}</p>
+              <p data-testid="recipe-form-error-message">{catalogued.message}</p>
               <p className="text-xs" data-testid="recipe-form-error-code">
-                {saveError.code}
+                {catalogued.code}
               </p>
             </>
           )}
-        </div>
+        />
       )}
 
       {props.mode === 'edit' && underReview.length > 0 ? (
@@ -363,7 +358,7 @@ export function RecipeForm(props: RecipeFormProps) {
               <li key={version.id}>
                 <Link
                   href={recipeVersionRoute(props.recipe.id, version.id)}
-                  className={cn('inline-flex items-center underline', TOUCH_TARGET)}
+                  className={cn('inline-flex items-center underline', touchTarget)}
                   data-testid="recipe-form-under-review-link"
                 >
                   {version.name}
@@ -393,7 +388,7 @@ export function RecipeForm(props: RecipeFormProps) {
               type="text"
               value={state.name}
               onChange={(event) => setState((previous) => ({ ...previous, name: event.target.value }))}
-              className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+              className={`${touchTarget} ${FIELD_TEXT}`}
               aria-invalid={fieldErrors.name === undefined ? undefined : true}
               aria-describedby={fieldErrors.name === undefined ? undefined : 'recipe-error-name'}
               data-testid="recipe-field-name"
@@ -414,7 +409,7 @@ export function RecipeForm(props: RecipeFormProps) {
               onChange={(event) =>
                 setState((previous) => ({ ...previous, description: event.target.value }))
               }
-              className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+              className={`${touchTarget} ${FIELD_TEXT}`}
               aria-invalid={fieldErrors.description === undefined ? undefined : true}
               aria-describedby={fieldErrors.description === undefined ? undefined : 'recipe-error-description'}
               data-testid="recipe-field-description"
@@ -473,7 +468,7 @@ export function RecipeForm(props: RecipeFormProps) {
                 type="button"
                 variant="outline"
                 ref={previewTriggerRef}
-                className={TOUCH_TARGET}
+                touch
               />
             }
           >
@@ -505,13 +500,13 @@ export function RecipeForm(props: RecipeFormProps) {
           href={FORMULAS_ROUTE}
           data-slot="button"
           data-testid="recipe-form-cancel"
-          className={cn(buttonVariants({ variant: 'outline' }), TOUCH_TARGET)}
+          className={cn(buttonVariants({ variant: 'outline', touch: true }))}
         >
           Cancelar
         </Link>
         <Button
           type="submit"
-          className={TOUCH_TARGET}
+          touch
           disabled={isPending || !canSubmit}
           aria-busy={isPending}
           data-testid="recipe-form-submit"

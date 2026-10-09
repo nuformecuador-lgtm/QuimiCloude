@@ -1,6 +1,6 @@
 // tests/unit/asignaciones/list-finished-orders.test.ts
 //
-// «Terminados»: los `ENTREGADO` de toda la empresa, sin filtro por usuario asignado, ordenados por
+// «Terminados»: los `TERMINADO` de toda la empresa, sin filtro por usuario asignado, ordenados por
 // fecha de terminado. A diferencia de «Mis asignados», los responsables incluyen al propio actor.
 
 import { describe, expect, it, vi } from 'vitest';
@@ -46,11 +46,12 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
     recipeId: RECETA,
     quantity: '10.0000',
     priority: 'MEDIA',
-    status: 'ENTREGADO',
+    status: 'TERMINADO',
     presentationLines: [],
     unitId: null,
     finishedAt: new Date('2026-09-20T10:00:00.000Z'),
     packedBy: null,
+    conditionedBy: null,
     ...overrides,
   };
 }
@@ -184,8 +185,8 @@ describe('QC-145 — listFinishedOrders: la entrada', () => {
   });
 });
 
-describe('QC-145 — listFinishedOrders: R17 pedidos ENTREGADO de toda la empresa', () => {
-  it('consulta el catalogo con la empresa del actor, solo ENTREGADO y el orden de terminados', async () => {
+describe('QC-145 — listFinishedOrders: R17 pedidos TERMINADO de toda la empresa (QC-215 R31)', () => {
+  it('R31: consulta el catalogo con la empresa del actor, solo TERMINADO -nunca ENTREGADO- y el orden de terminados', async () => {
     const { deps, listAliveSummariesInCompany } = montar();
     const listFinishedOrders = createListFinishedOrders(deps);
 
@@ -193,12 +194,24 @@ describe('QC-145 — listFinishedOrders: R17 pedidos ENTREGADO de toda la empres
 
     expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
       EMPRESA,
-      ['ENTREGADO'],
+      ['TERMINADO'],
       'finished_recent_first',
       1,
       undefined,
       undefined,
     );
+  });
+
+  it('R31: la lista de estados que pide es exactamente TERMINADO, sin ENTREGADO ni estados de acondicionamiento', async () => {
+    const { deps, listAliveSummariesInCompany } = montar();
+
+    await createListFinishedOrders(deps)(ACTOR, { page: 1 });
+
+    const estados = listAliveSummariesInCompany.mock.calls[0]?.[1] as readonly string[];
+    expect(estados).toEqual(['TERMINADO']);
+    expect(estados).not.toContain('ENTREGADO');
+    expect(estados).not.toContain('POR_ACONDICIONAR');
+    expect(estados).not.toContain('EN_ACONDICIONAMIENTO');
   });
 });
 
@@ -285,7 +298,7 @@ describe('QC-145 — listFinishedOrders: R27 paginacion delegada al catalogo', (
 
     expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
       EMPRESA,
-      ['ENTREGADO'],
+      ['TERMINADO'],
       'finished_recent_first',
       2,
       25,
@@ -311,7 +324,7 @@ describe('listFinishedOrders — quien no ejecuta solo ve lo que empaco', () => 
     expect(listAliveSummariesInCompany).toHaveBeenCalledTimes(1);
     expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
       EMPRESA,
-      ['ENTREGADO'],
+      ['TERMINADO'],
       'finished_recent_first',
       3,
       5,
@@ -347,7 +360,7 @@ describe('listFinishedOrders — quien no ejecuta solo ve lo que empaco', () => 
 
     expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
       EMPRESA,
-      ['ENTREGADO'],
+      ['TERMINADO'],
       'finished_recent_first',
       1,
       undefined,

@@ -4,7 +4,15 @@ import {
   type DataTableParams,
   type DataTableSort,
 } from '@/components/shared/data-table';
-import { ORDER_PRIORITY_VALUES, ORDER_QUERYABLE, ORDER_STATUS_VALUES } from '@/lib/modules/pedidos';
+import {
+  ORDER_CUSTOMER_FILTER_FIELD,
+  ORDER_CUSTOMER_PRESENCE_FILTER_FIELD,
+  ORDER_CUSTOMER_PRESENCE_NONE,
+  ORDER_PRIORITY_VALUES,
+  ORDER_QUERYABLE,
+  ORDER_STATUS_VALUES,
+  isCustomerIdShape,
+} from '@/lib/modules/pedidos';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
@@ -44,6 +52,9 @@ export const PRIORITY_PARAM = 'priority';
 export const CREATED_FROM_PARAM = 'createdFrom';
 export const CREATED_TO_PARAM = 'createdTo';
 export const SEARCH_PARAM = 'q';
+/** Un solo parametro para los dos filtros de cliente: asi la direccion nunca lleva los dos. */
+export const CUSTOMER_PARAM = 'customer';
+export const CUSTOMER_NONE_PARAM_VALUE = 'none';
 
 /**
  * Tope del termino de busqueda. Copia el `SEARCH_MAX_LENGTH` privado de
@@ -60,6 +71,8 @@ export const ORDER_SEARCH_MAX_LENGTH = 120;
 export const STATUS_COLUMN_ID = 'status';
 export const PRIORITY_COLUMN_ID = 'priority';
 export const CREATED_AT_COLUMN_ID = 'createdAt';
+export const CUSTOMER_COLUMN_ID = ORDER_CUSTOMER_FILTER_FIELD;
+export const CUSTOMER_PRESENCE_COLUMN_ID = ORDER_CUSTOMER_PRESENCE_FILTER_FIELD;
 
 /** Separador de `campo:direccion` en el parametro de orden. */
 export const SORT_SEPARATOR = ':';
@@ -185,6 +198,13 @@ export function parseOrderListParams(
     filters[CREATED_AT_COLUMN_ID] = { kind: 'dateRange', from, to };
   }
 
+  const customer = firstValue(searchParams?.[CUSTOMER_PARAM]);
+  if (customer === CUSTOMER_NONE_PARAM_VALUE) {
+    filters[CUSTOMER_PRESENCE_COLUMN_ID] = { kind: 'select', values: [ORDER_CUSTOMER_PRESENCE_NONE] };
+  } else if (customer !== undefined && isCustomerIdShape(customer)) {
+    filters[CUSTOMER_COLUMN_ID] = { kind: 'select', values: [customer] };
+  }
+
   // Recortar tras el `trim` puede dejar un espacio final: se vuelve a hacer `trim`.
   const search = firstValue(searchParams?.[SEARCH_PARAM])
     ?.trim()
@@ -234,6 +254,14 @@ export function buildOrderListQuery(params: DataTableParams): string {
   if (createdAt?.kind === 'dateRange') {
     if (createdAt.from !== null) query.set(CREATED_FROM_PARAM, createdAt.from);
     if (createdAt.to !== null) query.set(CREATED_TO_PARAM, createdAt.to);
+  }
+
+  const customerId = params.filters[CUSTOMER_COLUMN_ID];
+  const presence = params.filters[CUSTOMER_PRESENCE_COLUMN_ID];
+  if (customerId?.kind === 'select' && customerId.values.length > 0) {
+    query.set(CUSTOMER_PARAM, customerId.values[0]);
+  } else if (presence?.kind === 'select' && presence.values.includes(ORDER_CUSTOMER_PRESENCE_NONE)) {
+    query.set(CUSTOMER_PARAM, CUSTOMER_NONE_PARAM_VALUE);
   }
 
   return query.toString();

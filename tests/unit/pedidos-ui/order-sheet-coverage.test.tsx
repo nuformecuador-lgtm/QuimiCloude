@@ -133,6 +133,7 @@ function pedido(): OrderSummary {
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    customer: null,
   };
 }
 

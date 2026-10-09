@@ -1,11 +1,11 @@
 'use client';
 
-import { LoaderCircleIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
+import { Spinner } from '@/components/shared/spinner';
 import { Button } from '@/components/ui/button';
-import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorState } from '@/lib/modules/errores';
 import {
   buildInventoryImportErrorFile,
   type ImportAlreadyDone,
@@ -81,14 +81,12 @@ type Busy = 'preview' | 'confirm' | null;
 
 function ScreenError({ error }: { readonly error: ErrorState }) {
   return (
-    <div
-      role="alert"
+    <ErrorAlert
+      error={error}
       className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-      data-testid={SCREEN_ERROR_TESTID}
-      data-code={error.code}
-    >
-      {error.code === UNEXPECTED_ERROR_CODE ? <UnexpectedErrorNotice state={error} /> : <p>{error.message}</p>}
-    </div>
+      testId={SCREEN_ERROR_TESTID}
+      withDataCode
+    />
   );
 }
 
@@ -181,7 +179,7 @@ export function InventoryImportScreen({ units }: InventoryImportScreenProps) {
             {outcome?.kind === 'preview' ? null : (
               <Button
                 type="button"
-                className="min-h-11 min-w-11"
+                touch
                 disabled={!canReview}
                 aria-busy={busy === 'preview'}
                 data-testid={REVIEW_BUTTON_TESTID}
@@ -197,7 +195,7 @@ export function InventoryImportScreen({ units }: InventoryImportScreenProps) {
 
       {busy === 'preview' ? (
         <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground" data-testid={REVIEWING_TESTID}>
-          <LoaderCircleIcon className="size-4 animate-spin" aria-hidden />
+          <Spinner />
           {REVIEWING_NOTICE}
         </p>
       ) : null}

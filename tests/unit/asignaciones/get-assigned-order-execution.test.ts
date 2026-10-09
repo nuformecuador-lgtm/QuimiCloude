@@ -15,7 +15,7 @@ import {
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { AssignedOrderExecutionView } from '@/lib/modules/asignaciones/domain/assigned-order-execution-view';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
-import type { AssignedOrderSummary, OrderCatalog } from '@/lib/modules/pedidos';
+import type { AssignedOrderSummary, OrderCatalog, OrderStatus } from '@/lib/modules/pedidos';
 import type { RecipeCatalog, RecipeExecutionContent } from '@/lib/modules/recetas';
 import type { PresentationCatalog, PresentationRef, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { MassVolumeBridge, UnitCatalog, UnitRef } from '@/lib/modules/unidades';
@@ -51,6 +51,7 @@ function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummar
     unitId: null,
     finishedAt: null,
     packedBy: null,
+    conditionedBy: null,
     ...overrides,
   };
 }
@@ -97,7 +98,7 @@ type Dobles = {
 
 function montar(options?: {
   readonly ids?: readonly string[];
-  readonly order?: { id: string; status: 'PENDIENTE' | 'EN_CURSO' | 'BLOQUEADO' } | null;
+  readonly order?: { id: string; status: OrderStatus } | null;
   readonly summary?: AssignedOrderSummary;
   readonly content?: RecipeExecutionContent | null;
   readonly products?: readonly ProductRef[];
@@ -269,6 +270,27 @@ describe('QC-138 — getAssignedOrderExecution: un BLOQUEADO no se abre', () => 
     expect(listAliveSummariesByIds).not.toHaveBeenCalled();
     expect(findExecutionContentById).not.toHaveBeenCalled();
   });
+});
+
+describe('QC-215 — getAssignedOrderExecution: acondicionamiento y TERMINADO no se abren', () => {
+  for (const estado of ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const) {
+    it(`R21, R30: leer la ejecucion de un ${estado} rechaza con el mismo error que EN_EMPAQUE`, async () => {
+      const empaque = montar({ order: { id: PEDIDO, status: 'EN_EMPAQUE' } });
+      const errorEmpaque = await createGetAssignedOrderExecution(empaque.deps)(ACTOR, { orderId: PEDIDO }).catch(
+        (e: unknown) => e,
+      );
+      const { deps, listAliveSummariesByIds, findExecutionContentById } = montar({
+        order: { id: PEDIDO, status: estado },
+      });
+
+      const error = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(OrderNotFoundError);
+      expect((error as OrderNotFoundError).code).toBe((errorEmpaque as OrderNotFoundError).code);
+      expect(listAliveSummariesByIds).not.toHaveBeenCalled();
+      expect(findExecutionContentById).not.toHaveBeenCalled();
+    });
+  }
 });
 
 describe('getAssignedOrderExecution — la vista', () => {

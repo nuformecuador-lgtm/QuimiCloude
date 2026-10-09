@@ -1,8 +1,6 @@
 // Sin 'use client': la frontera la declara cada componente, y así page.tsx sigue siendo de servidor.
 export { ShowcaseLineCard } from './showcase-line-card';
 export { ShowcaseLoadTrigger } from './showcase-load-trigger';
-export { SupplierListEmpty } from './supplier-list-empty';
-export { SupplierListError } from './supplier-list-error';
 export {
   EMPTY_SHOWCASE_FILTERS,
   PRODUCT_SEARCH_PARAM,

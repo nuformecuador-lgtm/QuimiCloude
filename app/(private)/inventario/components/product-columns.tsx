@@ -7,6 +7,7 @@ import { EntityImage } from '@/components/shared/entity-image';
 import { compareQuantities, productDisplayName, type ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
 /**
  * Declaracion de las columnas de la tabla de productos (R6, R7, R8, `design.md > 7`).
@@ -33,8 +34,8 @@ import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shar
  * columna de imagen no ordena ni filtra: no se ordena por una ruta de archivo.
  */
 
-/** Marca de "sin dato" para las columnas opcionales. Constante para que ningun test dependa del glifo. */
-export const EMPTY_CELL = '—';
+/** Lo sigue importando `product-batches-panel.tsx`; el resto usa `EMPTY_MARK`. */
+export const EMPTY_CELL = EMPTY_MARK;
 
 /**
  * Campos de `ProductView` que quedan FUERA de la tabla como columna propia: el identificador
@@ -83,7 +84,7 @@ export const ACTIONS_COLUMN_LABEL = 'Acciones';
 export function unitLabel(unitId: UnitRef['id'], units: readonly UnitRef[] | undefined): string | null {
   if (units === undefined) return null;
   const unit = units.find((candidate) => candidate.id === unitId);
-  return unit?.symbol ?? unit?.name ?? EMPTY_CELL;
+  return unit?.symbol ?? unit?.name ?? EMPTY_MARK;
 }
 
 /**
@@ -163,7 +164,7 @@ function productQuantityCell(
 
 /** La alerta de cantidad, opcional: sin valor pinta el marcador de vacio, sin `title` ni `aria-label`. */
 export function qtyAlertCell(product: ProductView, units: readonly UnitRef[] | undefined): ReactNode {
-  if (product.qtyAlert === null) return EMPTY_CELL;
+  if (product.qtyAlert === null) return EMPTY_MARK;
   return productQuantityCell(product.qtyAlert, 'product-qty-alert', product, units);
 }
 
@@ -179,7 +180,7 @@ function aggregateQuantityCell(
   product: ProductView,
   units: readonly UnitRef[] | undefined,
 ): ReactNode {
-  if (value === undefined) return EMPTY_CELL;
+  if (value === undefined) return EMPTY_MARK;
   return productQuantityCell(value, testId, product, units);
 }
 
@@ -219,7 +220,7 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       sortable: true,
       width: 500,
       hideText: false,
-      cell: (product) => product.name
+      cell: (product) => productDisplayName(product.name, productUnitLabel(product, units)),
     },
     {
       id: 'stock',

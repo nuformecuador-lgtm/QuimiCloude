@@ -67,6 +67,8 @@ export const ERROR_MESSAGE_KEY = {
   order_packing_taken: 'errors.order_packing_taken',
   order_not_packable: 'errors.order_not_packable',
   order_produced_frozen: 'errors.order_produced_frozen',
+  order_conditioning_taken: 'errors.order_conditioning_taken',
+  order_not_conditionable: 'errors.order_not_conditionable',
   order_would_block: 'errors.order_would_block',
   order_blocked: 'errors.order_blocked',
   order_without_distribution: 'errors.order_without_distribution',
@@ -77,6 +79,8 @@ export const ERROR_MESSAGE_KEY = {
   order_unit_not_convertible: 'errors.order_unit_not_convertible',
   batch_stock_changed: 'errors.batch_stock_changed',
   adjustment_reason_not_allowed: 'errors.adjustment_reason_not_allowed',
+  conditioning_team_member_not_allowed: 'errors.conditioning_team_member_not_allowed',
+  conditioning_team_empty: 'errors.conditioning_team_empty',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -177,6 +181,9 @@ export const ERROR_MESSAGES_ES = {
   'errors.order_not_packable': 'El pedido no esta en un estado que admita esa accion de empaque.',
   'errors.order_produced_frozen':
     'Un pedido ya producido conserva sus responsables tal como estaban.',
+  'errors.order_conditioning_taken': 'Otra persona esta acondicionando este pedido.',
+  'errors.order_not_conditionable':
+    'El pedido no esta en un estado que admita esa accion de acondicionamiento.',
   'errors.order_would_block':
     'No hay material suficiente para este pedido: si lo guardas, quedara bloqueado hasta que entre inventario.',
   'errors.order_blocked': 'Falta material: el pedido esta bloqueado y no se puede iniciar.',
@@ -196,4 +203,7 @@ export const ERROR_MESSAGES_ES = {
     'La existencia del lote cambio mientras ajustabas: revisa la diferencia y confirma de nuevo.',
   'errors.adjustment_reason_not_allowed':
     'Un aumento de existencia solo admite los motivos conteo fisico o error de carga.',
+  'errors.conditioning_team_member_not_allowed':
+    'Esta persona no puede formar parte del equipo de acondicionamiento.',
+  'errors.conditioning_team_empty': 'El equipo de acondicionamiento necesita al menos una persona.',
 } as const satisfies Record<ErrorMessageKey, string>;

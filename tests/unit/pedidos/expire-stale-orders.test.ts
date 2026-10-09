@@ -426,3 +426,26 @@ describe('createExpireStaleOrders — recorre lotes hasta vaciarlos, POR EMPRESA
     expect(resultado.expired).toBe(100)
   })
 })
+
+describe('createExpireStaleOrders — los estados de acondicionamiento no caducan', () => {
+  it.each(['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const)(
+    'R23: un candidato %s bajo el candado no se cancela ni se libera',
+    async (status) => {
+      const d = fakeUnitOfWork({
+        orders: { lockAliveById: vi.fn(async () => fakeOrderRow({ status })) },
+      })
+
+      const resultado = await createExpireStaleOrders({
+        listCompanyIds: vi.fn(async () => [EMPRESA_A]),
+        findExpirable: vi.fn(async () => [candidato(PEDIDO_A_ID)]),
+        unitOfWork: d.unitOfWork,
+        now: () => AHORA,
+      })()
+
+      expect(d.orders.cancelAlive).not.toHaveBeenCalled()
+      expect(d.reservations.releaseForOrder).not.toHaveBeenCalled()
+      expect(d.orders.setReservedAt).not.toHaveBeenCalled()
+      expect(resultado).toEqual({ expired: 0, failed: [] })
+    },
+  )
+})

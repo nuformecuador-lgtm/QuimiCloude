@@ -16,28 +16,44 @@ vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }));
 
 import { asignaciones } from '@/lib/composition';
 
-describe('QC-88 T8 (censo crecido por QC-63, QC-145 y QC-168) — la fachada de `asignaciones` lista sus DIECISEIS operaciones', () => {
+describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167 y QC-215) — la fachada de `asignaciones` lista sus VEINTIDOS operaciones', () => {
   // El censo CRECE, no se afloja: primero llegaron las tres de la pantalla de ejecucion, luego
   // las tres de las vistas nuevas -`listFinishedOrders`, `listCompanyOrders`,
   // `listResponsibleCandidates`- y ahora las CUATRO del empaque de QC-168. Siguen nombradas UNA A
   // UNA y comparadas por igualdad exacta: una operacion futura que nadie declare aqui pone el caso
   // en rojo, que es justo lo que este censo promete.
-  it('expone las doce anteriores mas las CUATRO de QC-168, y ninguna mas', () => {
+  // 2026-10-06 (QC-82): crece con `cancelAssignedOrder` y `recordStepMove`.
+  // 2026-10-08 (QC-167): crece con DOS operaciones de solo lectura del recorrido de ejecucion,
+  // `listExecutionTraces` y `getExecutionTrace` (`design.md` de QC-167). Ninguna previa se quita.
+  // 2026-10-08 (QC-215): crece con `startConditioning` y `finishConditioning`.
+  // 2026-10-08: crece con `listConditioningOrders`, `listConditionedOrders` y `getConditioningOrder`.
+  // 2026-10-08 (QC-218): crece con `listConditioningTeamCandidates`.
+  it('R31: expone las doce anteriores, las CUATRO de QC-168, las DOS de QC-82, las DOS de QC-167, las DOS de QC-215, las TRES del acondicionamiento y los candidatos del equipo, y ninguna mas', () => {
     expect(Object.keys(asignaciones).sort()).toEqual([
       'assignResponsibles',
+      'cancelAssignedOrder',
       'finishAssignedOrder',
+      'finishConditioning',
       'finishPacking',
       'getAssignedOrderExecution',
+      'getConditioningOrder',
+      'getExecutionTrace',
       'getPackingOrder',
       'listAssignedOrders',
       'listCompanyOrders',
+      'listConditionedOrders',
+      'listConditioningOrders',
+      'listConditioningTeamCandidates',
+      'listExecutionTraces',
       'listFinishedOrders',
       'listOrderResponsibles',
       'listPackingOrders',
       'listResponsibleCandidates',
       'listResponsiblesForOrders',
+      'recordStepMove',
       'removeWorkGroupFromOrder',
       'startAssignedOrder',
+      'startConditioning',
       'startPacking',
       'unassignResponsible',
     ]);
@@ -157,6 +173,85 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145 y QC-168) — la fachada de 
   it('`finishPacking` rechaza sin `empaque.modificar` sin llegar a la base', async () => {
     const error = await asignaciones
       .finishPacking({ id: 'u', companyId: 'c', permissions: [] }, { orderId: 'o' })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('R26: `cancelAssignedOrder` rechaza sin `asignaciones.ejecutar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .cancelAssignedOrder({ id: 'u', companyId: 'c', permissions: ['asignaciones.consultar'] }, { orderId: 'o' })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('R26: `recordStepMove` rechaza sin `asignaciones.ejecutar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .recordStepMove({ id: 'u', companyId: 'c', permissions: ['asignaciones.consultar'] }, { orderId: 'o' })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  // QC-215: mismo criterio, con un actor que tiene los permisos del empaque pero no el suyo.
+  it('R15: `startConditioning` rechaza sin `acondicionamiento.modificar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .startConditioning({ id: 'u', companyId: 'c', permissions: ['empaque.modificar'] }, { orderId: 'o' })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('R15: `finishConditioning` rechaza sin `acondicionamiento.modificar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .finishConditioning({ id: 'u', companyId: 'c', permissions: ['empaque.modificar'] }, { orderId: 'o' })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('R19: `listConditioningOrders` rechaza sin `acondicionamiento.modificar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .listConditioningOrders({ id: 'u', companyId: 'c', permissions: ['empaque.modificar'] }, { page: 1 })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('R19: `listConditionedOrders` rechaza sin `acondicionamiento.modificar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .listConditionedOrders({ id: 'u', companyId: 'c', permissions: ['terminados.consultar'] }, { page: 1 })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('R19: `getConditioningOrder` rechaza sin `acondicionamiento.modificar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .getConditioningOrder({ id: 'u', companyId: 'c', permissions: ['pedidos.consultar'] }, { orderId: 'o' })
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('R30: `listConditioningTeamCandidates` rechaza sin `acondicionamiento.modificar` sin llegar a la base', async () => {
+    const error = await asignaciones
+      .listConditioningTeamCandidates(
+        { id: 'u', companyId: 'c', permissions: ['asignaciones.modificar', 'usuarios.consultar'] },
+        {},
+      )
+      .catch((caught: unknown) => caught);
+
+    expect((error as { code?: string }).code).toBe('unauthorized');
+  });
+
+  it('R19: `startConditioning` con la entrada nueva sigue rechazando sin el permiso sin llegar a la base', async () => {
+    const error = await asignaciones
+      .startConditioning(
+        { id: 'u', companyId: 'c', permissions: ['empaque.modificar'] },
+        { orderId: 'o', userIds: [], workGroupIds: [] },
+      )
       .catch((caught: unknown) => caught);
 
     expect((error as { code?: string }).code).toBe('unauthorized');

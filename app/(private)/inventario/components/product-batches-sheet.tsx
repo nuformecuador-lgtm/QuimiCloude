@@ -28,8 +28,6 @@ import { BatchHistory } from './batch-history';
 import { productUnitLabel } from './product-columns';
 import { ProductBatchesPanel } from './product-batches-panel';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 type BatchesLoadState =
   | { readonly status: 'idle' }
   | { readonly status: 'loading' }
@@ -76,7 +74,7 @@ export function ProductBatchesSheet({
         render={
           <Button
             variant="ghost"
-            className={TOUCH_TARGET}
+            touch
             aria-label={`Lotes de ${displayName}`}
             data-testid="product-batches-open"
           />

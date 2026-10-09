@@ -101,6 +101,11 @@ QC-150 R10/R13/R24/R26/R27/R37; QC-145 R3/R30; QC-74 R3/R8; QC-144 R9; `docs/arc
 | R42 | `unit/pedidos-ui/order-row-actions.test.tsx` |
 | R43 | `unit/asignaciones-ui/packing-order-page.test.tsx` › R43; `packing-orders-{columns,list-section}.test.tsx` |
 | R44, R45 | `unit/asignaciones/packing-limits.test.ts` |
+
+> _Nota fechada, 2026-10-06 (QC-82, por decisión humana): **R45 ya no tiene test.** El bloque R45 de
+> `packing-limits.test.ts` solo barría `specs/QC-82-*`, y QC-82 lo retiró entero al enmendar ese spec
+> con el empaque (`38539229`). R44 sigue en ese archivo, enmendado para admitir el registro de
+> ejecución en `start-packing.ts` y `finish-packing.ts`._
 | R46, R47 | `unit/pedidos/schema/order-packing-states-migration.test.ts` (sin tabla nueva; guardia `RAISE` y recreación literal en `down.sql`); `integration/pedidos/order-packing-states-rollback.int.test.ts` › R47 (el `down.sql` real aborta contra Postgres con pedidos en `POR_EMPACAR` y en `EN_EMPAQUE`, y el esquema queda intacto); ciclo real anotado en «Base de datos» |
 | R48 | `e2e/empaque.spec.ts` (verde, lo corrió el leader) |
 

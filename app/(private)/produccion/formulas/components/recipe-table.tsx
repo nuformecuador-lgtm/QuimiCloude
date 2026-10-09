@@ -7,18 +7,20 @@ import { useMemo, useTransition, type MouseEvent } from 'react';
 import {
   DataTable,
   type DataTableParams,
+  type DataTableStates,
   type DataTableTexts,
 } from '@/components/shared/data-table';
 import { buttonVariants } from '@/components/ui/button';
+import type { ErrorState as OperationError } from '@/lib/modules/errores';
 import type { RecipeSummary } from '@/lib/modules/recetas';
-import { recipeEditRoute } from '@/lib/shared/routes';
+import { NEW_RECIPE_ROUTE, recipeEditRoute } from '@/lib/shared/routes';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
 import { DeleteRecipeDialog } from './delete-recipe-dialog';
 import { buildRecipeColumns } from './recipe-columns';
+import { RECIPE_SKELETON_COLUMN_COUNT } from './recipe-columns-skeleton';
 import { recipeListHref } from './recipe-list-params';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 export const RECIPE_TABLE_ID = 'recetas';
 
@@ -54,13 +56,81 @@ type NoResultsSlot = {
   readonly firstPageHref?: string;
 };
 
+type EmptySlot = {
+  readonly firstPageHref?: string;
+};
+
+type RecipeTableStatusProps =
+  | { readonly status?: 'idle'; readonly error?: undefined }
+  | { readonly status: 'loading'; readonly error?: undefined }
+  | { readonly status: 'error'; readonly error: OperationError };
+
 export type RecipeTableProps = {
   readonly recipes: readonly RecipeSummary[];
   readonly params: DataTableParams;
   readonly totalPages: number;
   /** Solo con cero filas y búsqueda o filtro activos. */
   readonly noResults?: NoResultsSlot;
-};
+  /** Solo con cero filas y sin búsqueda ni filtro activos. */
+  readonly empty?: EmptySlot;
+} & RecipeTableStatusProps;
+
+function buildRecipeTableStates(
+  params: DataTableParams,
+  error: OperationError | undefined,
+  empty: EmptySlot | undefined,
+): DataTableStates {
+  return {
+    loading: {
+      columns: RECIPE_SKELETON_COLUMN_COUNT,
+      rows: params.pageSize,
+      label: RECIPE_TABLE_TEXTS.loading,
+      testId: 'recipe-table-skeleton',
+      rowTestId: 'recipe-row-skeleton',
+    },
+    error:
+      error === undefined
+        ? undefined
+        : {
+            error,
+            title: 'No se pudo cargar el catálogo.',
+            testId: 'recipe-list-error',
+            messageTestId: 'recipe-list-error-message',
+            codeTestId: 'recipe-list-error-code',
+            retry: { kind: 'refresh' },
+            retryTestId: 'recipe-list-retry',
+          },
+    empty:
+      empty === undefined
+        ? undefined
+        : {
+            testId: 'recipe-list-empty',
+            message:
+              empty.firstPageHref === undefined
+                ? 'Todavía no hay recetas en el catálogo.'
+                : 'Esta página ya no tiene recetas.',
+            firstPage:
+              empty.firstPageHref === undefined
+                ? undefined
+                : {
+                    href: empty.firstPageHref,
+                    label: FIRST_PAGE_LABEL,
+                    testId: 'recipe-list-first-page',
+                  },
+            // Un enlace y no `Button` con `render`: Base UI le pondría `role="button"` al `<a>`.
+            children: (
+              <Link
+                href={NEW_RECIPE_ROUTE}
+                data-slot="button"
+                data-testid="recipe-create-open"
+                className={cn(buttonVariants({ variant: 'default', touch: true }))}
+              >
+                Nueva fórmula
+              </Link>
+            ),
+          },
+  };
+}
 
 // Con modificadores se deja al navegador abrir otra pestaña; si no, la navegación va por la
 // transición para que la tabla siga montada.
@@ -70,7 +140,15 @@ function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
   );
 }
 
-export function RecipeTable({ recipes, params, totalPages, noResults }: RecipeTableProps) {
+export function RecipeTable({
+  recipes,
+  params,
+  totalPages,
+  noResults,
+  empty,
+  status = 'idle',
+  error,
+}: RecipeTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -83,7 +161,7 @@ export function RecipeTable({ recipes, params, totalPages, noResults }: RecipeTa
             <Link
               href={recipeEditRoute(recipe.id)}
               className={cn(
-                TOUCH_TARGET,
+                touchTarget,
                 'inline-flex items-center justify-center rounded-lg px-2 text-sm hover:bg-muted',
               )}
               aria-label={`Editar ${recipe.name}`}
@@ -122,7 +200,7 @@ export function RecipeTable({ recipes, params, totalPages, noResults }: RecipeTa
           href={noResults.clearHref}
           data-slot="button"
           data-testid="recipe-list-clear-search"
-          className={cn(buttonVariants({ variant: 'default' }), TOUCH_TARGET)}
+          className={cn(buttonVariants({ variant: 'default', touch: true }))}
           onClick={navigateOnPlainClick(noResults.clearHref)}
         >
           {CLEAR_SEARCH_LABEL}
@@ -132,7 +210,7 @@ export function RecipeTable({ recipes, params, totalPages, noResults }: RecipeTa
             href={noResults.firstPageHref}
             data-slot="button"
             data-testid="recipe-list-no-results-first-page"
-            className={cn(buttonVariants({ variant: 'outline' }), TOUCH_TARGET)}
+            className={cn(buttonVariants({ variant: 'outline', touch: true }))}
             onClick={navigateOnPlainClick(noResults.firstPageHref)}
           >
             {FIRST_PAGE_LABEL}
@@ -140,6 +218,31 @@ export function RecipeTable({ recipes, params, totalPages, noResults }: RecipeTa
         )}
       </div>
     );
+
+  const table = (
+    <DataTable
+      tableId={RECIPE_TABLE_ID}
+      columns={columns}
+      rows={recipes}
+      getRowId={(recipe) => recipe.id}
+      params={params}
+      totalPages={totalPages}
+      onParamsChange={(next) => navigate(recipeListHref(next))}
+      status={status}
+      texts={
+        noResults === undefined
+          ? RECIPE_TABLE_TEXTS
+          : { ...RECIPE_TABLE_TEXTS, empty: RECIPE_NO_RESULTS_TEXT }
+      }
+      emptyAction={emptyAction}
+      states={buildRecipeTableStates(params, error, empty)}
+    />
+  );
+
+  // Fuera de las filas la tabla pinta el estado sola: el envoltorio no existía en esos estados.
+  if (status !== 'idle' || (recipes.length === 0 && empty !== undefined)) {
+    return table;
+  }
 
   return (
     <div
@@ -151,22 +254,7 @@ export function RecipeTable({ recipes, params, totalPages, noResults }: RecipeTa
       {isPending ? (
         <p className="text-xs text-muted-foreground">{RECIPE_TABLE_TEXTS.loading}</p>
       ) : null}
-      <DataTable
-        tableId={RECIPE_TABLE_ID}
-        columns={columns}
-        rows={recipes}
-        getRowId={(recipe) => recipe.id}
-        params={params}
-        totalPages={totalPages}
-        onParamsChange={(next) => navigate(recipeListHref(next))}
-        status="idle"
-        texts={
-          noResults === undefined
-            ? RECIPE_TABLE_TEXTS
-            : { ...RECIPE_TABLE_TEXTS, empty: RECIPE_NO_RESULTS_TEXT }
-        }
-        emptyAction={emptyAction}
-      />
+      {table}
     </div>
   );
 }

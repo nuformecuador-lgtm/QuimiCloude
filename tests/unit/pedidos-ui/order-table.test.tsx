@@ -12,6 +12,7 @@ import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  ORDER_CUSTOMER_FILTER_TESTID,
   ORDER_LIST_CLEAR_SEARCH_TESTID,
   ORDER_LIST_NO_MATCHES_TESTID,
   ORDER_NUMBER_COLUMN_ID,
@@ -113,6 +114,7 @@ function pedido(id: string, sequence: number, overrides: Partial<OrderSummary> =
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    customer: null,
     ...overrides,
   };
 }
@@ -615,5 +617,35 @@ describe('la caja sigue a la URL cuando el termino cambia por fuera (R27)', () =
     expect(screen.getByTestId('data-table-search')).toBe(caja);
     expect(caja).toHaveFocus();
     expect(caja).toHaveValue('ab');
+  });
+});
+
+describe('el filtro «Cliente» vive en la barra de la tabla', () => {
+  it('R34: se pinta dentro de toolbarActions, aparte de la caja de busqueda', () => {
+    montar();
+
+    const barra = screen.getByTestId('data-table-toolbar-actions');
+    expect(within(barra).getByTestId(ORDER_CUSTOMER_FILTER_TESTID)).toBeInTheDocument();
+  });
+
+  it('R29: arranca con el valor que resolvio el servidor', () => {
+    render(
+      <OrderTable
+        orders={PEDIDOS}
+        params={parametros()}
+        totalPages={1}
+        recipes={RECETAS}
+        units={UNIDADES}
+        bridge={null}
+        customerFilter={{
+          kind: 'customer',
+          customer: { id: '6f1c2a3b-4d5e-4f60-8a71-b2c3d4e5f601', name: 'Ana Garcia', isDeleted: true },
+        }}
+      />,
+    );
+
+    expect(within(screen.getByTestId(ORDER_CUSTOMER_FILTER_TESTID)).getByRole('combobox')).toHaveValue(
+      'Ana Garcia (eliminado)',
+    );
   });
 });

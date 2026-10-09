@@ -270,6 +270,7 @@ describe('R21 — no hay accion manual de desbloqueo', () => {
   it('R21: el esquema del formulario de pedido no declara estado y descarta uno que llegue', () => {
     expect(Object.keys(createOrderSchema.shape).sort()).toEqual([
       'confirmBlocked',
+      'customerId',
       'presentationLines',
       'priority',
       'quantity',

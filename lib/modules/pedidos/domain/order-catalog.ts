@@ -15,6 +15,7 @@
  * intactos.
  */
 import type { OrderPriority, OrderStatus } from './order-classification';
+import type { FinishConditioningAliveById, StartConditioningAliveById } from './order-conditioning';
 import type { OrderNumber } from './order-number';
 import type { Page } from './page';
 
@@ -32,6 +33,22 @@ export type OrderAssignmentTarget = {
 /** El orden de un resumen paginado. `work_queue` es el de la lista de trabajo (prioridad,
  *  antiguedad, numero); `finished_recent_first` es el de «Terminados». */
 export type OrderSummaryOrdering = 'work_queue' | 'finished_recent_first';
+
+/** Filtro opcional por persona de un resumen paginado. Va en la consulta, no despues, para que
+ *  `total` y la paginacion describan solo lo filtrado. */
+export type OrderSummaryFilter = {
+  readonly packedBy?: string;
+  readonly conditionedBy?: string;
+};
+
+/** Lo que el historial de un pedido necesita de el, vivo o dado de baja; nada de receta,
+ *  cantidades ni reparto. */
+export type OrderHistorySummary = {
+  readonly id: string;
+  readonly number: OrderNumber;
+  readonly status: OrderStatus;
+  readonly deleted: boolean;
+};
 
 /** Lo que entro al inventario por UNA linea del reparto cuando Terminar el empaque dio de alta
  *  su lote: el nombre del producto terminado que lo recibio y cuantos envases enteros. */
@@ -74,6 +91,7 @@ export interface OrderCatalog {
    * terminado, con los nulos al final y, entre ellos, por numero de pedido descendente.
    *
    * `filter.packedBy` deja solo los pedidos de ese empacador; un `packedBy` nulo no entra.
+   * `filter.conditionedBy` hace lo mismo con quien acondiciona.
    */
   listAliveSummariesInCompany(
     companyId: string,
@@ -81,8 +99,22 @@ export interface OrderCatalog {
     ordering: OrderSummaryOrdering,
     page: number,
     pageSize?: number,
-    filter?: { readonly packedBy?: string },
+    filter?: OrderSummaryFilter,
   ): Promise<Page<AssignedOrderSummary>>;
+
+  /**
+   * Unico listado del catalogo que DEVUELVE los dados de baja, marcados con `deleted`. Orden fijo:
+   * numero de pedido descendente con `id` de desempate. `filter.numberContains` deja solo los
+   * pedidos cuyo numero visible lo contiene (`orderNumberContains`); el `total` cuenta lo filtrado.
+   */
+  listSummariesByIdsIncludingDeleted(
+    companyId: string,
+    ids: readonly string[],
+    statuses: readonly OrderStatus[],
+    page: number,
+    pageSize?: number,
+    filter?: { readonly numberContains?: string },
+  ): Promise<Page<OrderHistorySummary>>;
 
   /**
    * Mueve el estado de un pedido vivo de esa empresa, SOLO si `assertTransition(from, to)` lo
@@ -105,9 +137,10 @@ export interface OrderCatalog {
    * existian para esa alta (`'presentation_without_content'`, `'no_whole_package'`,
    * `'recipe_not_found'`).
    *
-   * `'EN_EMPAQUE'` y `'ENTREGADO'` no son destino valido de este metodo: se rechazan con
-   * `InvalidTransitionError`, aunque la matriz de transiciones los admita, porque solo los
-   * alcanzan las dos acciones de empaque, que si conocen a quien empaca.
+   * `'EN_EMPAQUE'`, `'POR_ACONDICIONAR'`, `'EN_ACONDICIONAMIENTO'`, `'TERMINADO'` y `'ENTREGADO'`
+   * no son destino valido de este metodo: se rechazan con `InvalidTransitionError`, aunque la
+   * matriz de transiciones los admita, porque solo los alcanzan acciones propias que conocen a
+   * quien empaca o acondiciona.
    */
   transitionAliveById(
     id: string,
@@ -134,8 +167,8 @@ export interface OrderCatalog {
   ): Promise<'ok' | 'already_mine' | 'taken' | 'not_packable' | 'not_found' | 'without_distribution'>;
 
   /**
-   * Terminar el empaque: `EN_EMPAQUE -> ENTREGADO`, con `finishedAt` en la MISMA escritura que
-   * el cambio de estado, solo si `packerId` es quien tiene el pedido en empaque. `'not_packer'`
+   * Terminar el empaque: `EN_EMPAQUE -> POR_ACONDICIONAR`, sin `finishedAt` -el pedido aun no esta
+   * terminado-, solo si `packerId` es quien tiene el pedido en empaque. `'not_packer'`
    * es un pedido `EN_EMPAQUE` de otro empacador; `'not_packable'` es cualquier otro estado;
    * `'not_found'` es el mismo caso que en `findAliveById`.
    *
@@ -169,6 +202,33 @@ export interface OrderCatalog {
     | 'order_without_unit'
     | 'insufficient_material'
   >;
+
+  /**
+   * Comenzar el acondicionamiento: `POR_ACONDICIONAR -> EN_ACONDICIONAMIENTO` con `conditionerId`
+   * como quien acondiciona, en un solo `UPDATE` condicional. `'already_mine'` es el mismo
+   * acondicionador sobre su propio `EN_ACONDICIONAMIENTO`, sin escribir; `'taken'`, ese estado a
+   * nombre de otro; `'not_conditionable'`, cualquier otro estado; `'not_found'`, el mismo caso que
+   * en `findAliveById`.
+   */
+  startConditioningAliveById(
+    id: string,
+    companyId: string,
+    conditionerId: string,
+    now: Date,
+  ): ReturnType<StartConditioningAliveById>;
+
+  /**
+   * Terminar el acondicionamiento: `EN_ACONDICIONAMIENTO -> TERMINADO` con `finishedAt = now` en la
+   * misma escritura, solo si `conditionerId` es quien lo acondiciona. `'not_conditioner'` es ese
+   * estado a nombre de otro; `'not_conditionable'`, cualquier otro estado; `'not_found'`, igual que
+   * arriba.
+   */
+  finishConditioningAliveById(
+    id: string,
+    companyId: string,
+    conditionerId: string,
+    now: Date,
+  ): ReturnType<FinishConditioningAliveById>;
 }
 
 /**
@@ -210,4 +270,7 @@ export type AssignedOrderSummary = {
    *  no lo tienen, los nuevos lo conservan). El identificador viaja en crudo, igual que
    *  `recipeId`; el nombre lo resuelve quien consulta con el directorio de personas. */
   readonly packedBy: string | null;
+  /** Quien acondiciona: obligatorio en `EN_ACONDICIONAMIENTO` y `TERMINADO`, opcional en
+   *  `ENTREGADO` y `null` en el resto. Viaja en crudo, como `packedBy`. */
+  readonly conditionedBy: string | null;
 };

@@ -3,8 +3,6 @@ import type { UnitRef, UnitView } from '@/lib/modules/unidades';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 
 import type { UnitBaseIndex } from './unit-columns';
-import { UnitListEmpty } from './unit-list-empty';
-import { UnitListError } from './unit-list-error';
 import { FIRST_PAGE, unitListHref } from './unit-list-params';
 import { UnitTable } from './unit-table';
 
@@ -62,7 +60,17 @@ export async function UnitListSection({ params, catalog }: UnitListSectionProps)
   const pageResult = await listUnitsAction(params);
 
   if (pageResult.status === 'error') {
-    return <UnitListError error={pageResult} />;
+    return (
+      <UnitTable
+        status="error"
+        error={pageResult}
+        units={[]}
+        baseIndex={{}}
+        baseUnits={[]}
+        params={params}
+        totalPages={0}
+      />
+    );
   }
 
   const baseIndex = buildBaseIndex(catalog);
@@ -71,29 +79,28 @@ export async function UnitListSection({ params, catalog }: UnitListSectionProps)
   const { items, page: currentPage, totalPages } = pageResult.data;
 
   if (items.length === 0) {
-    // R24: el vacio es el de «la busqueda no encontro nada» y **no** ofrece «crear la primera».
+    // Con termino de busqueda tambien es el vacio propio, no el «sin resultados» de la tabla.
     return (
-      <UnitListEmpty
-        clearSearchHref={
-          params.search.trim() === ''
-            ? undefined
-            : unitListHref({ ...params, search: '', page: FIRST_PAGE })
-        }
-        firstPageHref={
-          currentPage > FIRST_PAGE ? unitListHref({ ...params, page: FIRST_PAGE }) : undefined
-        }
+      <UnitTable
+        units={items}
+        baseIndex={baseIndex}
+        baseUnits={baseUnits}
+        params={params}
+        totalPages={totalPages}
+        empty={{
+          clearSearchHref:
+            params.search.trim() === ''
+              ? undefined
+              : unitListHref({ ...params, search: '', page: FIRST_PAGE }),
+          firstPageHref:
+            currentPage > FIRST_PAGE ? unitListHref({ ...params, page: FIRST_PAGE }) : undefined,
+        }}
       />
     );
   }
 
   return (
     <div className="flex flex-col gap-4" data-testid={UNIT_LIST_TESTID}>
-      {/*
-        `unit-table.tsx` es un modulo de CLIENTE —la columna de acciones declara una celda que
-        devuelve elementos—, asi que desde aqui solo bajan datos serializables: las filas, el
-        indice, las unidades base, los parametros vigentes y el total de paginas. La tabla recibe
-        `status: 'idle'` siempre: los tres estados se pintan FUERA de `<DataTable>`.
-      */}
       <UnitTable
         units={items}
         baseIndex={baseIndex}

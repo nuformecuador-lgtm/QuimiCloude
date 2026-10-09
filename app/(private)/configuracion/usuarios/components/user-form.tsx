@@ -4,7 +4,7 @@ import { LogOutIcon } from 'lucide-react';
 import { useActionState, useEffect, useId, useState, type ReactNode } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,17 +22,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import {
-  errorMessage,
-  UNEXPECTED_ERROR_CODE,
-  type ErrorCode,
-  type ErrorState,
-} from '@/lib/modules/errores';
+import { errorMessage, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import { DOCUMENT_TYPE_CODES, type RoleOption, type UserDetail } from '@/lib/modules/identity';
 import {
   createUserAction,
   updateUserAction,
 } from '@/lib/modules/identity/adapters/driving/user-actions';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { endUserSessionsLabel, toDateInputValue } from './user-labels';
 import { nextUsernameCandidate, usernameFromNames } from './username-from-names';
@@ -157,8 +153,6 @@ const CODE_TO_FIELD: Readonly<Partial<Record<ErrorCode, UserFieldName>>> = {
   duplicate_document: USER_DOCUMENT_NUMBER_FIELD,
   role_not_found: USER_ROLE_FIELD,
 };
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /** >= 16 px en TODOS los anchos: por debajo, iOS hace zoom al enfocar el campo (R40). */
 const FIELD_TEXT = 'text-base md:text-base';
@@ -431,25 +425,22 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
         {formError === undefined ? null : (
-          // Region de error del formulario (R27): aqui van los rechazos que no senalan campo.
-          <div
-            role="alert"
+          // Region de error del formulario: aqui van los rechazos que no senalan campo.
+          <ErrorAlert
+            error={formError}
             id={formErrorId}
             className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={USER_FORM_ERROR_TESTID}
-            data-code={formError.code}
-          >
-            {formError.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={formError} />
-            ) : (
+            testId={USER_FORM_ERROR_TESTID}
+            withDataCode
+            renderCatalogued={(catalogued) => (
               <>
-                <p>{formError.message}</p>
+                <p>{catalogued.message}</p>
                 <p className="text-xs" data-testid={USER_FORM_ERROR_CODE_TESTID}>
-                  {formError.code}
+                  {catalogued.code}
                 </p>
               </>
             )}
-          </div>
+          />
         )}
 
         {/*
@@ -557,7 +548,7 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
                   <Button
                     type="button"
                     variant="outline"
-                    className={`w-full ${TOUCH_TARGET}`}
+                    className={`w-full ${touchTarget}`}
                     data-testid={USER_USERNAME_SUGGESTION_APPLY_TESTID}
                     onClick={() => changeUsername(suggestedUsername)}
                   >
@@ -575,18 +566,13 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
           se aparenta tenerlas.
         */}
         {rolesError === null ? null : (
-          <div
-            role="alert"
+          <ErrorAlert
+            error={rolesError}
             className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={USER_ROLES_ERROR_TESTID}
-            data-code={rolesError.code}
-          >
-            {rolesError.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={rolesError} />
-            ) : (
-              <p>{ROLES_UNAVAILABLE}</p>
-            )}
-          </div>
+            testId={USER_ROLES_ERROR_TESTID}
+            withDataCode
+            renderCatalogued={() => <p>{ROLES_UNAVAILABLE}</p>}
+          />
         )}
         <UserSelectField
           idPrefix={`${fieldId}-${USER_ROLE_FIELD}`}
@@ -608,7 +594,7 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
             <Button
               type="button"
               variant="outline"
-              className={`w-full ${TOUCH_TARGET}`}
+              className={`w-full ${touchTarget}`}
               aria-label={endUserSessionsLabel(endSessions.displayName)}
               data-testid={USER_FORM_END_SESSIONS_TESTID}
               onClick={endSessions.onEndSessions}
@@ -728,7 +714,7 @@ function UserSelectField({
           aria-labelledby={labelId}
           aria-invalid={error === undefined ? undefined : true}
           aria-describedby={error === undefined ? undefined : errorId}
-          className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT}`}
+          className={`w-full ${touchTarget} ${FIELD_TEXT}`}
           data-testid={USER_FIELD_TESTIDS[name]}
         >
           <SelectValue />
@@ -763,7 +749,7 @@ function FormActions() {
           <Button
             type="button"
             variant="outline-dashed"
-            className={TOUCH_TARGET}
+            className={touchTarget}
             data-testid={USER_FORM_CANCEL_TESTID}
           />
         }
@@ -782,7 +768,7 @@ function SaveButton() {
   return (
     <Button
       type="submit"
-      className={TOUCH_TARGET}
+      touch
       disabled={pending}
       aria-busy={pending}
       data-testid={USER_FORM_SUBMIT_TESTID}
