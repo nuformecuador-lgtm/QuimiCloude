@@ -1,13 +1,13 @@
-// Guardia: los dobles del modulo `documentos` no se encienden solos y no se eligen a ciegas
-// (QC-107 R20, `specs/QC-107-componente-de-carga-de-archivos/design.md > 8`).
+// Guardia: los dobles de E2E de cada modulo no se encienden solos y no se eligen a ciegas.
+// Vigila una VARIABLE por fila de `VIGILADAS`: hoy la de `documentos` y la de `integraciones`. Cada
+// fila dice donde esta escrita su decision.
 //
-// Dos motivos de rojo, y uno por cada mitad de la decision:
+// Dos motivos de rojo por fila, y uno por cada mitad de la decision:
 //
-//   1. ACTIVACION — ningun archivo versionado que no sea `playwright.config.ts` pone
-//      `DOCUMENTS_E2E_DOUBLES` con algo dentro. Si alguien la activara en un `.env.example`, en un
-//      script o en un flujo de CI, la aplicacion guardaria los PDF en un mapa en memoria y leeria
-//      con una IA de guion sin que nada avisara.
-//   2. ELECCION — `lib/composition` no cablea ninguno de los tres dobles sin CONSULTAR esa
+//   1. ACTIVACION — ningun archivo versionado que no sea `playwright.config.ts` pone la variable
+//      con algo dentro. Si alguien la activara en un `.env.example`, en un script o en un flujo de
+//      CI, la aplicacion usaria los dobles sin que nada avisara.
+//   2. ELECCION — `lib/composition` no cablea ninguno de los dobles de la fila sin CONSULTAR su
 //      variable. Un doble cableado a pelo es el mismo agujero por la otra puerta.
 //
 // Recorre ARCHIVOS, no el grafo de imports —por eso vive en `tests/guards/`—: ningun grafo
@@ -24,28 +24,50 @@ import { describe, expect, it } from 'vitest';
 /** Raiz del repo: dos niveles por encima de `tests/guards/`. */
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-const DESIGN = 'specs/QC-107-componente-de-carga-de-archivos/design.md';
-
-/** La variable vigilada. Se escribe una sola vez y de aqui salen los dos patrones. */
-const VARIABLE = 'DOCUMENTS_E2E_DOUBLES';
-
-/** El UNICO archivo versionado autorizado a ACTIVARLA (`design.md > 8`). */
+/** El UNICO archivo versionado autorizado a ACTIVAR cualquiera de las variables. */
 const ACTIVADOR_AUTORIZADO = 'playwright.config.ts';
 
 /** El UNICO archivo que ata puerto -> adaptador, y por tanto el unico que puede elegir un doble. */
 const COMPOSICION = 'lib/composition/index.ts';
 
-/** Los dobles del modulo `documentos` para el E2E, sin extension: asi valen para el import con alias `@/`. */
-const DOBLES = [
-  'lib/modules/documentos/adapters/driven/storage/document-storage-memory',
-  'lib/modules/documentos/adapters/driven/queue/processing-queue-inline',
-  'lib/modules/documentos/adapters/driven/ai/ai-reader-canned',
-  'lib/modules/documentos/adapters/driven/storage/crop-storage-memory',
-  'lib/modules/documentos/adapters/driven/storage/crop-catalog-memory',
-] as const;
+type Vigilada = {
+  /** La variable. Se escribe una sola vez y de aqui salen los patrones. */
+  readonly variable: string;
+  /** La consulta que tiene que acompanar a toda eleccion de uno de sus dobles. */
+  readonly consulta: string;
+  /** Sus dobles, sin extension: asi valen para el import con alias `@/`. */
+  readonly dobles: readonly string[];
+  /** Donde esta escrita la decision, y el requisito que la exige. */
+  readonly design: string;
+  readonly requisito: string;
+  /** Un nombre importable de su primer doble, para el caso de sensibilidad de la eleccion. */
+  readonly ejemplo: string;
+};
 
-/** La consulta que tiene que acompanar a toda eleccion de un doble. */
-const CONSULTA = 'documentsE2EDoublesEnabled(';
+const VIGILADAS: readonly Vigilada[] = [
+  {
+    variable: 'DOCUMENTS_E2E_DOUBLES',
+    consulta: 'documentsE2EDoublesEnabled(',
+    dobles: [
+      'lib/modules/documentos/adapters/driven/storage/document-storage-memory',
+      'lib/modules/documentos/adapters/driven/queue/processing-queue-inline',
+      'lib/modules/documentos/adapters/driven/ai/ai-reader-canned',
+      'lib/modules/documentos/adapters/driven/storage/crop-storage-memory',
+      'lib/modules/documentos/adapters/driven/storage/crop-catalog-memory',
+    ],
+    design: 'specs/QC-107-componente-de-carga-de-archivos/design.md > 8',
+    requisito: 'R20',
+    ejemplo: 'documentStorageMemory',
+  },
+  {
+    variable: 'INTEGRATIONS_E2E_DOUBLES',
+    consulta: 'integrationsE2EDoublesEnabled(',
+    dobles: ['lib/modules/integraciones/adapters/driven/graph/whatsapp-graph-client-canned'],
+    design: 'specs/QC-237-conexion-whatsapp-por-empresa/design.md > 9',
+    requisito: 'R41',
+    ejemplo: 'whatsappGraphClientCanned',
+  },
+];
 
 /** Carpetas que nunca se recorren: no son fuente versionada del repo. */
 const CARPETAS_IGNORADAS = new Set([
@@ -137,12 +159,15 @@ const CENSO = new Map<string, string>(
  * vacia y documentada de `.env.example` —el nombre, el signo y fin de linea— tampoco: detras del
  * signo no queda nada.
  */
-const PATRON_DE_ACTIVACION = new RegExp(`${VARIABLE}\\s*[:=]\\s*['"\`]?[^\\s'"\`,;)}]`);
+function patronDeActivacion(variable: string): RegExp {
+  return new RegExp(`${variable}\\s*[:=]\\s*['"\`]?[^\\s'"\`,;)}]`);
+}
 
 /** Los archivos de un censo cualquiera que ACTIVAN la variable. Puro, para poder alimentarlo a mano. */
-function activadoresDe(censo: ReadonlyMap<string, string>): string[] {
+function activadoresDe(censo: ReadonlyMap<string, string>, variable: string): string[] {
+  const patron = patronDeActivacion(variable);
   return [...censo.entries()]
-    .filter(([, fuente]) => PATRON_DE_ACTIVACION.test(fuente))
+    .filter(([, fuente]) => patron.test(fuente))
     .map(([ruta]) => ruta)
     .sort();
 }
@@ -167,82 +192,82 @@ function declaracionesDe(fuente: string): string[] {
 }
 
 /**
- * Las declaraciones que NOMBRAN un doble sin consultar la variable. La propia linea de `import` no
- * cuenta: importar no es elegir.
+ * Las declaraciones que NOMBRAN un doble de la fila sin consultar su variable. La propia linea de
+ * `import` no cuenta: importar no es elegir.
  */
-function eleccionesSinConsulta(fuente: string): string[] {
-  const nombres = DOBLES.flatMap((doble) => bindingsDelDoble(fuente, doble));
+function eleccionesSinConsulta(fuente: string, vigilada: Vigilada): string[] {
+  const nombres = vigilada.dobles.flatMap((doble) => bindingsDelDoble(fuente, doble));
 
   return declaracionesDe(fuente)
     .filter((declaracion) => !declaracion.trimStart().startsWith('import '))
     .filter((declaracion) =>
       nombres.some((nombre) => new RegExp(`\\b${nombre}\\b`).test(declaracion)),
     )
-    .filter((declaracion) => !declaracion.includes(CONSULTA))
+    .filter((declaracion) => !declaracion.includes(vigilada.consulta))
     .map((declaracion) => declaracion.trim().split('\n')[0]);
 }
 
-describe(`guardia: los dobles de extremo a extremo de \`documentos\` (${DESIGN} > 8, R20)`, () => {
-  it('el recorrido cubre el fuente del repo y no se ha quedado vacio (R20)', () => {
-    // Sin esto, un fallo del recorrido dejaria los casos de abajo en verde por vacuidad: la
-    // guardia mas peligrosa es la que pasa porque no mira nada.
-    expect(
-      CENSO.size,
-      'el recorrido deberia encontrar cientos de archivos; si encuentra pocos, ya no esta ' +
-        'mirando el arbol y la guardia esta pasando en vacio',
-    ).toBeGreaterThan(100);
+it('el recorrido cubre el fuente del repo y no se ha quedado vacio (R20, R41)', () => {
+  // Sin esto, un fallo del recorrido dejaria los casos de abajo en verde por vacuidad: la
+  // guardia mas peligrosa es la que pasa porque no mira nada.
+  expect(
+    CENSO.size,
+    'el recorrido deberia encontrar cientos de archivos; si encuentra pocos, ya no esta ' +
+      'mirando el arbol y la guardia esta pasando en vacio',
+  ).toBeGreaterThan(100);
 
-    for (const ruta of [ACTIVADOR_AUTORIZADO, COMPOSICION, '.env.example']) {
-      expect(
-        CENSO.has(ruta),
-        `${ruta} no aparece en el recorrido: o se renombro o se borro`,
-      ).toBe(true);
-    }
+  for (const ruta of [ACTIVADOR_AUTORIZADO, COMPOSICION, '.env.example']) {
+    expect(CENSO.has(ruta), `${ruta} no aparece en el recorrido: o se renombro o se borro`).toBe(true);
+  }
+});
 
-    for (const doble of DOBLES) {
+describe.each(VIGILADAS)('guardia: los dobles de E2E de $variable ($design, $requisito)', (vigilada) => {
+  const { variable, consulta, dobles, design, requisito, ejemplo } = vigilada;
+
+  it(`cada doble que enumera la fila existe (${requisito})`, () => {
+    for (const doble of dobles) {
       expect(
         existsSync(join(RAIZ, `${doble}.ts`)),
-        `${doble}.ts lo enumera ${DESIGN} > 8 y no existe: si el inventario de dobles cambia de ` +
+        `${doble}.ts lo enumera ${design} y no existe: si el inventario de dobles cambia de ` +
           'verdad, cambia primero el design.md',
       ).toBe(true);
     }
   });
 
-  it(`solo ${ACTIVADOR_AUTORIZADO} activa ${VARIABLE} (R20)`, () => {
+  it(`solo ${ACTIVADOR_AUTORIZADO} activa ${variable} (${requisito})`, () => {
     expect(
-      activadoresDe(CENSO),
-      `${VARIABLE} solo puede encenderse desde ${ACTIVADOR_AUTORIZADO} (${DESIGN} > 8). ` +
+      activadoresDe(CENSO, variable),
+      `${variable} solo puede encenderse desde ${ACTIVADOR_AUTORIZADO} (${design}). ` +
         'Si SOBRA uno: su ausencia significa los adaptadores REALES, asi que encenderla en un ' +
-        'archivo versionado deja la aplicacion guardando los PDF en un mapa en memoria y leyendo ' +
-        'con una IA de guion sin que nada avise. Si FALTA: el recorrido de extremo a extremo ' +
-        'necesita esa linea en `webServer.env` para correr sin red.',
+        'archivo versionado deja la aplicacion con los dobles sin que nada avise. Si FALTA: el ' +
+        'recorrido de extremo a extremo necesita esa linea en `webServer.env` para correr sin red.',
     ).toEqual([ACTIVADOR_AUTORIZADO]);
   });
 
-  it(`${COMPOSICION} no elige ningun doble sin consultar ${VARIABLE} (R20)`, () => {
+  it(`${COMPOSICION} no elige ningun doble sin consultar ${variable} (${requisito})`, () => {
     const fuente = CENSO.get(COMPOSICION) ?? '';
 
     expect(
-      DOBLES.flatMap((doble) => bindingsDelDoble(fuente, doble)).length,
-      `${COMPOSICION} deberia importar los tres dobles de ${DESIGN} > 8; si no importa ninguno, ` +
-        'este caso estaria pasando en vacio',
-    ).toBeGreaterThanOrEqual(DOBLES.length);
+      dobles.flatMap((doble) => bindingsDelDoble(fuente, doble)).length,
+      `${COMPOSICION} deberia importar los dobles de ${design}; si no importa ninguno, este caso ` +
+        'estaria pasando en vacio',
+    ).toBeGreaterThanOrEqual(dobles.length);
 
     expect(
-      eleccionesSinConsulta(fuente),
-      `Toda eleccion de un doble en ${COMPOSICION} tiene que pasar por \`${CONSULTA})\`: un doble ` +
+      eleccionesSinConsulta(fuente, vigilada),
+      `Toda eleccion de un doble en ${COMPOSICION} tiene que pasar por \`${consulta})\`: un doble ` +
         'cableado a pelo se lleva la aplicacion entera a los dobles sin que ninguna variable lo ' +
-        `pida. La bifurcacion es UNA y esta escrita en ${DESIGN} > 8.`,
+        `pida. La bifurcacion es UNA y esta escrita en ${design}.`,
     ).toEqual([]);
   });
 
-  it(`SENSIBILIDAD: activar ${VARIABLE} en otro archivo pondria esta guardia en rojo (R20)`, () => {
+  it(`SENSIBILIDAD: activar ${variable} en otro archivo pondria esta guardia en rojo (${requisito})`, () => {
     // Se simula sobre el censo EN MEMORIA: no se escribe ningun archivo en el arbol.
-    for (const forma of [`${VARIABLE}=1`, `${VARIABLE}: '1'`, `process.env.${VARIABLE} = 'si'`]) {
+    for (const forma of [`${variable}=1`, `${variable}: '1'`, `process.env.${variable} = 'si'`]) {
       const censoContaminado = new Map(CENSO);
       censoContaminado.set('scripts/arranque-inventado.mjs', forma);
 
-      expect(activadoresDe(censoContaminado), `la forma \`${forma}\` deberia detectarse`).toEqual([
+      expect(activadoresDe(censoContaminado, variable), `la forma \`${forma}\` deberia detectarse`).toEqual([
         ACTIVADOR_AUTORIZADO,
         'scripts/arranque-inventado.mjs',
       ]);
@@ -250,27 +275,38 @@ describe(`guardia: los dobles de extremo a extremo de \`documentos\` (${DESIGN} 
 
     // Y la linea VACIA de `.env.example` no cuenta: declararla no es activarla.
     const censoConLineaVacia = new Map(CENSO);
-    censoConLineaVacia.set('otro/.env.example', `${VARIABLE}=\n`);
-    expect(activadoresDe(censoConLineaVacia)).toEqual([ACTIVADOR_AUTORIZADO]);
+    censoConLineaVacia.set('otro/.env.example', `${variable}=\n`);
+    expect(activadoresDe(censoConLineaVacia, variable)).toEqual([ACTIVADOR_AUTORIZADO]);
   });
 
-  it('SENSIBILIDAD: elegir un doble sin consultar la variable pondria esta guardia en rojo (R20)', () => {
+  it(`SENSIBILIDAD: elegir un doble sin consultar ${variable} pondria esta guardia en rojo (${requisito})`, () => {
     const aCiegas = [
-      `import { documentStorageMemory } from '@/${DOBLES[0]}';`,
-      'const documentStorage: DocumentStorage = documentStorageMemory;',
+      `import { ${ejemplo} } from '@/${dobles[0]}';`,
+      `const elegido: Puerto = ${ejemplo};`,
     ].join('\n');
 
-    expect(eleccionesSinConsulta(aCiegas)).toEqual([
-      'const documentStorage: DocumentStorage = documentStorageMemory;',
-    ]);
+    expect(eleccionesSinConsulta(aCiegas, vigilada)).toEqual([`const elegido: Puerto = ${ejemplo};`]);
 
     const consultando = [
-      `import { documentStorageMemory } from '@/${DOBLES[0]}';`,
-      'const documentStorage: DocumentStorage = documentsE2EDoublesEnabled()',
-      '  ? documentStorageMemory',
-      '  : documentStorageSupabase;',
+      `import { ${ejemplo} } from '@/${dobles[0]}';`,
+      `const elegido: Puerto = ${consulta})`,
+      `  ? ${ejemplo}`,
+      '  : real;',
     ].join('\n');
 
-    expect(eleccionesSinConsulta(consultando)).toEqual([]);
+    expect(eleccionesSinConsulta(consultando, vigilada)).toEqual([]);
+  });
+
+  it(`SENSIBILIDAD: la consulta de OTRA variable no vale como consulta de ${variable} (${requisito})`, () => {
+    const otra = VIGILADAS.find((fila) => fila.variable !== variable);
+    expect(otra, 'la tabla deberia tener al menos dos filas').toBeTruthy();
+    const conLaOtra = [
+      `import { ${ejemplo} } from '@/${dobles[0]}';`,
+      `const elegido: Puerto = ${otra?.consulta ?? ''})`,
+      `  ? ${ejemplo}`,
+      '  : real;',
+    ].join('\n');
+
+    expect(eleccionesSinConsulta(conLaOtra, vigilada)).toEqual([`const elegido: Puerto = ${otra?.consulta ?? ''})`]);
   });
 });

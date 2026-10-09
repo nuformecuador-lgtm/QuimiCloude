@@ -499,6 +499,14 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       ).confirmInventoryImportAction(formData);
     },
   },
+  {
+    archivo: 'lib/modules/integraciones/adapters/driving/whatsapp-connection-actions.ts',
+    nombre: 'getWhatsappConnectionAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/integraciones/adapters/driving/whatsapp-connection-actions')
+      ).getWhatsappConnectionAction(),
+  },
 ];
 
 /**

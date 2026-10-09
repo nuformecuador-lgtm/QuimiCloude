@@ -350,3 +350,10 @@ export const PRIVATE_ROUTE_PREFIXES = [
   INVENTORY_INTEGRATION_ROUTE,
   WHATSAPP_INTEGRATION_ROUTE,
 ] as const;
+
+/** Ruta publica del webhook de WhatsApp: Meta la llama sin sesion, con el id de la conexion al final. */
+export const WHATSAPP_WEBHOOK_ROUTE_BASE = '/api/integraciones/whatsapp/webhook';
+
+export function whatsappWebhookPath(connectionId: string): string {
+  return `${WHATSAPP_WEBHOOK_ROUTE_BASE}/${connectionId}`;
+}

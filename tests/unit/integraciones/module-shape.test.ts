@@ -1,7 +1,7 @@
-// El modulo `integraciones` guarda el cifrado de los secretos de las integraciones: un contrato con
-// sus errores y el contexto de un secreto, dos puertos y sus adaptadores driven, y un unico
-// importador de fuera, `lib/composition`. Su permiso solo lo exigen las tres paginas de
-// integraciones y lo declara el menu.
+// El modulo `integraciones` guarda el cifrado de los secretos de las integraciones y la conexion de
+// WhatsApp: un contrato con sus errores, tipos y fabricas, sus puertos y adaptadores, y un unico
+// importador de produccion de fuera, `lib/composition`. Su permiso lo exigen las tres paginas de
+// integraciones y el actor del modulo, y lo declara el menu.
 
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
@@ -139,6 +139,7 @@ const MODULE_CODE_FILES = [
   'adapters/driven/security/random-source-node.ts',
   'adapters/driven/security/secret-cipher-aes-gcm.ts',
   'adapters/driven/security/secret-digest-sha256.ts',
+  'adapters/driving/whatsapp-connection-actions.ts',
   'domain/actor.ts',
   'domain/connection-secrets.ts',
   'domain/connection-status.ts',
@@ -311,17 +312,36 @@ describe('la forma del modulo integraciones', () => {
     expect(adaptadores).toEqual(['driven/', 'driving/'])
   })
 
-  it('R20: el contrato reexporta exactamente los tres errores y el tipo SecretContext, y solo desde ./domain', () => {
+  it('R20: el contrato reexporta exactamente los errores, los tipos y las fabricas de casos de uso, y solo desde ./domain', () => {
     const { otherStatements, reexports } = contractReexports(readFileSync(join(moduleDir, 'index.ts'), 'utf8'))
 
     expect(otherStatements, 'el contrato solo reexporta: ni declaraciones ni export *').toBe(0)
     expect(reexports.map((r) => r.name).sort()).toEqual([
+      'ActionNotAllowedError',
+      'Actor',
       'IntegracionesError',
       'SecretContext',
       'SecretUnreadableError',
+      'UnauthorizedError',
       'ValidationError',
+      'WhatsappConnectionExistsError',
+      'WhatsappConnectionNotFoundError',
+      'WhatsappConnectionStatus',
+      'WhatsappConnectionView',
+      'WhatsappPhoneNumberTakenError',
+      'createCreateWhatsappConnection',
+      'createGetWhatsappConnection',
+      'createRegenerateWhatsappVerifyToken',
+      'createSetWhatsappConnectionEnabled',
+      'createTestWhatsappConnection',
+      'createUpdateWhatsappConnection',
     ])
-    expect(reexports.filter((r) => r.typeOnly).map((r) => r.name)).toEqual(['SecretContext'])
+    expect(reexports.filter((r) => r.typeOnly).map((r) => r.name).sort()).toEqual([
+      'Actor',
+      'SecretContext',
+      'WhatsappConnectionStatus',
+      'WhatsappConnectionView',
+    ])
     for (const reexport of reexports) {
       expect(reexport.from, reexport.name).toMatch(/^\.\/domain(\/|$)/)
     }
@@ -400,13 +420,26 @@ describe('la forma del modulo integraciones', () => {
     ])
   })
 
-  it('R19: lib/composition exporta integraciones con exactamente secretCipher y secretDigest, tipados con sus puertos', () => {
+  it('R19: lib/composition exporta integraciones con exactamente el cifrado, los casos de uso de la conexion y la URL del webhook, con sus puertos tipados', () => {
     const cableado = integracionesWiring(readFileSync(join(repoRoot, 'lib', 'composition', 'index.ts'), 'utf8'))
 
     expect(cableado, 'lib/composition/index.ts deberia exportar const integraciones = { ... }').not.toBeNull()
-    expect([...(cableado?.members ?? [])].sort()).toEqual(['secretCipher', 'secretDigest'])
+    expect([...(cableado?.members ?? [])].sort()).toEqual([
+      'createWhatsappConnection',
+      'getWhatsappConnection',
+      'regenerateWhatsappVerifyToken',
+      'secretCipher',
+      'secretDigest',
+      'setWhatsappConnectionEnabled',
+      'testWhatsappConnection',
+      'updateWhatsappConnection',
+      'whatsappWebhookUrl',
+    ])
     expect(cableado?.typeOf.secretCipher).toBe('SecretCipher')
     expect(cableado?.typeOf.secretDigest).toBe('SecretDigest')
+    expect(cableado?.typeOf.whatsappGraphClient).toBe('WhatsappGraphClient')
+    expect(cableado?.typeOf.whatsappConnectionRepository).toBe('WhatsappConnectionRepository')
+    expect(cableado?.typeOf.randomSource).toBe('RandomSource')
   })
 
   it('R19: el lector del cableado ve un miembro de mas y un tipo que no es el puerto', () => {

@@ -63,6 +63,8 @@ export default defineConfig({
       DOCUMENTS_E2E_DOUBLES: '1',
       CATALOG_PROMPT: 'prompt ficticio de catalogo para el recorrido de extremo a extremo',
       FORMULA_PROMPT: 'prompt ficticio de formula para el recorrido de extremo a extremo',
+      // El doble de Graph: la prueba de la conexion de WhatsApp responde sin red.
+      INTEGRATIONS_E2E_DOUBLES: '1',
     },
   },
 })

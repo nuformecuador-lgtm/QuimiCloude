@@ -9,9 +9,8 @@
 // De cada funcion de persistencia del modulo comprueba las dos mitades: que DECLARA el ambito y que
 // ese valor LLEGA hasta una envoltura de `./company-scope`. Sin lista de excepciones.
 //
-// Diferencia con la de `clientes`: el puerto se ata a su adaptador con la tabla `ADAPTADOR_DE` de
-// abajo, no leyendo `lib/composition`. Cuando la composicion lo cablee, el cableado tiene que usar
-// exactamente esas funciones; eso lo fija quien lo cablee.
+// Como en la de `clientes`, el puerto se ata a su adaptador LEYENDO `lib/composition`: lo que se
+// comprueba es la funcion que de verdad se cablea, no una tabla escrita aqui.
 //
 // TECNICA: barrido de TEXTO sobre el disco, como el resto de `tests/guards/`.
 
@@ -50,16 +49,9 @@ const LITERAL = 'scope: IntegracionesScope'
 const PUERTO = {
   nombre: 'WhatsappConnectionRepository',
   ruta: join(MODULE_ROOT, 'ports', 'whatsapp-connection-repository.ts'),
+  constante: 'whatsappConnectionRepository',
   metodosEsperados: 4,
 } as const
-
-/** Metodo del puerto -> funcion del adaptador que lo implementa. */
-const ADAPTADOR_DE: Readonly<Record<string, string>> = {
-  findLive: 'findLiveWhatsappConnection',
-  findLiveById: 'findLiveWhatsappConnectionById',
-  create: 'insertWhatsappConnection',
-  update: 'updateLiveWhatsappConnection',
-}
 
 // --- Lectura y troceado del texto -------------------------------------------------------------
 
@@ -262,6 +254,61 @@ function metodosDeLaInterfaz(ruta: string, interfaz: string): ReadonlyMap<string
   return metodos
 }
 
+/** Trocea un texto por sus comas de NIVEL CERO (fuera de parentesis, llaves y corchetes). */
+function porComasDeNivelCero(texto: string): readonly string[] {
+  const trozos: string[] = []
+  let nivel = 0
+  let actual = ''
+  for (const caracter of texto) {
+    if ('({['.includes(caracter)) nivel += 1
+    if (')}]'.includes(caracter)) nivel -= 1
+    if (caracter === ',' && nivel === 0) {
+      trozos.push(actual)
+      actual = ''
+      continue
+    }
+    actual += caracter
+  }
+  trozos.push(actual)
+  return trozos.map((trozo) => trozo.trim()).filter((trozo) => trozo.length > 0)
+}
+
+/** El objeto que un fuente ata al puerto: `{ metodoDelPuerto -> funcionDelAdaptador }`, o `null`. */
+function cableadoEnFuente(
+  fuente: string,
+  constante: string,
+  interfaz: string,
+): ReadonlyMap<string, string> | null {
+  const source = vaciarCadenas(sinComentarios(fuente))
+  const inicio = source.indexOf(`const ${constante}: ${interfaz} = {`)
+  if (inicio === -1) return null
+  const abre = source.indexOf('{', inicio)
+  const cuerpo = source.slice(abre + 1, cierreEquilibrado(source, abre, '{', '}'))
+
+  const cableado = new Map<string, string>()
+  for (const entrada of porComasDeNivelCero(cuerpo)) {
+    const conNombre = /^(\w+)\s*:\s*(\w+)$/.exec(entrada)
+    if (conNombre !== null) {
+      cableado.set(conNombre[1] ?? '', conNombre[2] ?? '')
+      continue
+    }
+    const abreviado = /^(\w+)$/.exec(entrada)
+    if (abreviado !== null) {
+      cableado.set(abreviado[1] ?? '', abreviado[1] ?? '')
+      continue
+    }
+    cableado.set(entrada, '')
+  }
+  return cableado
+}
+
+function cableadoDe(constante: string, interfaz: string): ReadonlyMap<string, string> {
+  const fuente = readFileSync(join(repoRoot, 'lib', 'composition', 'index.ts'), 'utf8')
+  const cableado = cableadoEnFuente(fuente, constante, interfaz)
+  expect(cableado, `lib/composition no ata ${constante}: ${interfaz}`).not.toBeNull()
+  return cableado ?? new Map<string, string>()
+}
+
 // --- Casos -------------------------------------------------------------------------------------
 
 describe('R2 — el punto unico de integraciones es de verdad UNA definicion', () => {
@@ -295,11 +342,18 @@ describe('R2 — el punto unico de integraciones es de verdad UNA definicion', (
 
 describe('R2 — cada metodo del puerto declara Y consume el ambito de empresa', () => {
   const metodos = metodosDeLaInterfaz(PUERTO.ruta, PUERTO.nombre)
+  const cableado = cableadoDe(PUERTO.constante, PUERTO.nombre)
   const adaptador = analizar(ADAPTADOR)
 
-  it(`${PUERTO.nombre}: los ${String(PUERTO.metodosEsperados)} metodos tienen su funcion en el adaptador, y ninguno se queda fuera`, () => {
+  it(`${PUERTO.nombre}: los ${String(PUERTO.metodosEsperados)} metodos estan cableados en lib/composition, con nombre, y ninguno se queda fuera`, () => {
     expect(metodos.size).toBe(PUERTO.metodosEsperados)
-    expect(Object.keys(ADAPTADOR_DE).sort()).toEqual([...metodos.keys()].sort())
+    expect([...cableado.keys()].sort()).toEqual([...metodos.keys()].sort())
+    for (const [metodo, implementacion] of cableado) {
+      expect(
+        implementacion,
+        `${PUERTO.constante}.${metodo} no esta cableado a una funcion con nombre del adaptador: la guardia no puede seguir una lambda, un bind ni un spread`,
+      ).toMatch(/^\w+$/)
+    }
   })
 
   it(`${PUERTO.nombre}: el propio puerto EXIGE \`${LITERAL}\` en cada firma, y no opcional`, () => {
@@ -312,19 +366,21 @@ describe('R2 — cada metodo del puerto declara Y consume el ambito de empresa',
     }
   })
 
-  for (const [metodo, implementacion] of Object.entries(ADAPTADOR_DE)) {
-    it(`${PUERTO.nombre}.${metodo} -> ${implementacion} declara \`${LITERAL}\` y lo lleva hasta el punto unico`, () => {
+  for (const metodo of metodos.keys()) {
+    it(`${PUERTO.nombre}.${metodo} declara \`${LITERAL}\` y lo lleva hasta el punto unico`, () => {
+      const implementacion = cableado.get(metodo)
+      expect(implementacion, `${metodo} no esta cableado en lib/composition`).toBeTruthy()
       const funcion = adaptador.funciones.find((f) => f.nombre === implementacion)
-      expect(funcion, `${ADAPTADOR} no declara ${implementacion}`).toBeTruthy()
+      expect(funcion, `${ADAPTADOR} no declara ${implementacion ?? '?'} que cablea ${metodo}`).toBeTruthy()
       if (funcion === undefined) return
-      expect(new RegExp(`^export\\s+async\\s+function\\s+${implementacion}\\b`, 'm').test(adaptador.codigo)).toBe(true)
-      expect(declaraElAmbito(funcion), `${implementacion} no declara \`${LITERAL}\``).toBe(true)
-      expect(adaptador.consumidoras.has(funcion.nombre), `${implementacion} no lleva el ambito a ./company-scope`).toBe(true)
+      expect(new RegExp(`^export\\s+async\\s+function\\s+${funcion.nombre}\\b`, 'm').test(adaptador.codigo)).toBe(true)
+      expect(declaraElAmbito(funcion), `${funcion.nombre} no declara \`${LITERAL}\``).toBe(true)
+      expect(adaptador.consumidoras.has(funcion.nombre), `${funcion.nombre} no lleva el ambito a ./company-scope`).toBe(true)
     })
   }
 
   it('R2 — la escritura sobre una fila existente lleva el ambito en el `where` de su `updateMany`', () => {
-    const funcion = adaptador.funciones.find((f) => f.nombre === ADAPTADOR_DE.update)
+    const funcion = adaptador.funciones.find((f) => f.nombre === cableado.get('update'))
     expect(funcion).toBeTruthy()
     const cuerpo = funcion?.cuerpo ?? ''
     const match = /\bprisma\s*\.\s*whatsappConnection\s*\.\s*updateMany\s*\(/.exec(cuerpo)
@@ -337,6 +393,7 @@ describe('R2 — cada metodo del puerto declara Y consume el ambito de empresa',
 
 describe('R2 — ninguna consulta del modulo se queda sin ambito, y NO hay lista de excepciones', () => {
   const archivos = readdirSync(PERSISTENCE_ROOT).filter((archivo) => archivo.endsWith('.ts'))
+  const cableado = cableadoDe(PUERTO.constante, PUERTO.nombre)
 
   it('los archivos de persistencia se barren todos, y el troceo VE las consultas', () => {
     expect(archivos).toContain(ADAPTADOR)
@@ -344,7 +401,7 @@ describe('R2 — ninguna consulta del modulo se queda sin ambito, y NO hay lista
     const conConsulta = analizar(ADAPTADOR)
       .funciones.filter((f) => tocaLaBase(f.cuerpo))
       .map((f) => f.nombre)
-    expect(conConsulta.sort()).toEqual(Object.values(ADAPTADOR_DE).sort())
+    expect(conConsulta.sort()).toEqual([...cableado.values()].sort())
   })
 
   for (const archivo of archivos) {
@@ -409,6 +466,20 @@ describe('R2 — sensibilidad: la guardia muerde con fuentes sinteticos', () => 
   it('una consulta fuera de una `function` declarada da hallazgo', () => {
     const fuente = CABECERA + 'export const leak = () => prisma.whatsappConnection.findMany({})\n'
     expect(hallazgosDe('x.ts', analizarFuente(fuente), false).join('\n')).toMatch(/fuera de una/)
+  })
+
+  it('el lector del cableado ve una lambda, un spread y un metodo que falta', () => {
+    const fuente =
+      'const whatsappConnectionRepository: WhatsappConnectionRepository = {\n' +
+      '  findLive: (scope) => leak(scope),\n' +
+      '  ...otro,\n' +
+      '  create: insertWhatsappConnection,\n' +
+      '}\n'
+    const cableado = cableadoEnFuente(fuente, PUERTO.constante, PUERTO.nombre)
+    expect(cableado?.get('create')).toBe('insertWhatsappConnection')
+    expect([...(cableado?.values() ?? [])].filter((nombre) => !/^\w+$/.test(nombre))).toHaveLength(2)
+    expect(cableado?.has('update')).toBe(false)
+    expect(cableadoEnFuente('const x = {}\n', PUERTO.constante, PUERTO.nombre)).toBeNull()
   })
 
   it('el ambito llevado por un ayudante del mismo archivo cuenta como consumido', () => {

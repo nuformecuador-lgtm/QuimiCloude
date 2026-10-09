@@ -257,7 +257,17 @@ describe('la composición se importa sin las variables del cifrado', () => {
         '@/lib/modules/integraciones/adapters/driven/security/secret-digest-sha256'
       )
 
-      expect(Object.keys(composition.integraciones).sort()).toEqual(['secretCipher', 'secretDigest'])
+      expect(Object.keys(composition.integraciones).sort()).toEqual([
+        'createWhatsappConnection',
+        'getWhatsappConnection',
+        'regenerateWhatsappVerifyToken',
+        'secretCipher',
+        'secretDigest',
+        'setWhatsappConnectionEnabled',
+        'testWhatsappConnection',
+        'updateWhatsappConnection',
+        'whatsappWebhookUrl',
+      ])
       expect(composition.integraciones.secretCipher).toBe(secretCipherAesGcm)
       expect(composition.integraciones.secretDigest).toBe(secretDigestSha256)
     },

@@ -74,7 +74,7 @@
 
 ## T8–T9 — Composición, rutas y acciones
 
-- [ ] **T8.** `lib/shared/routes.ts` (`design.md > 4.6`), bloque de composición (`> 5`), contrato
+- [x] **T8.** `lib/shared/routes.ts` (`design.md > 4.6`), bloque de composición (`> 5`), contrato
       `index.ts`. Tests `whatsapp-webhook-url.test.ts`,
       `tests/unit/composition/integraciones-graph-doubles.test.ts`. Se tensan en
       `module-shape.test.ts` R17, R18, R19 y R20 (`design.md > 11.3`). Se parametriza
@@ -82,7 +82,7 @@
       **Hecho cuando:** los tests nombrados, `module-shape.test.ts` y todas las guardias en verde.
       Cubre R33, R34 (URL), R41 (elección), R42. Depende de: T4, T5, T6, T7.
 
-- [ ] **T9.** Server Actions (`design.md > 6`). Test `whatsapp-connection-actions.test.ts`;
+- [x] **T9.** Server Actions (`design.md > 6`). Test `whatsapp-connection-actions.test.ts`;
       `session-once-per-request-actions.test.ts` sigue verde sin tocarlo.
       **Hecho cuando:** los dos en verde. Cubre R10 (acciones), R14, R15. Depende de: T8.
 
