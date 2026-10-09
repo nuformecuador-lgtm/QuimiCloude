@@ -519,6 +519,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261008120843_integrations_permission',
   // El equipo de acondicionamiento; no toca el identificador.
   '20261008150000_order_conditioning_team',
+  // El dia de produccion del lote; no toca el identificador.
+  '20261009120000_product_batches_production_date',
 ] as const
 
 export function hallazgosDeMigraciones(
