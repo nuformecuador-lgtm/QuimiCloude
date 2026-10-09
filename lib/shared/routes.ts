@@ -275,6 +275,10 @@ export function executionTraceRoute(orderId: string): string {
  */
 export const PACKED_ORDER_PARAM = 'empacado';
 
+/** Con `?vista=por_acondicionar&acondicionado=<numero>`, «Por acondicionar» anuncia el pedido
+ *  que se acaba de terminar de acondicionar. */
+export const CONDITIONED_ORDER_PARAM = 'acondicionado';
+
 /**
  * Nombre del parametro de consulta con el que la lista de pedidos asignados anuncia que uno
  * acaba de cancelarse: `?cancelado=<numero>`. El aviso se pinta en cualquier vista.
