@@ -149,8 +149,12 @@ export async function crearPedido(
     },
     select: { id: true },
   });
+  // 2026-10-09: cada linea lleva su `createdAt` explicito y creciente. Las lineas se leen por
+  // `created_at, id`, y dos `create` seguidos pueden caer en el mismo milisegundo: entonces el
+  // desempate es el `id` aleatorio y el orden de las lineas del escenario dejaba de ser el pedido.
+  const base = Date.now();
   const lineIds: string[] = [];
-  for (const linea of lineas) {
+  for (const [indice, linea] of lineas.entries()) {
     const { id } = await prisma.orderPresentationLine.create({
       data: {
         orderId,
@@ -158,6 +162,7 @@ export async function crearPedido(
         presentationId: linea.presentationId,
         packages: linea.packages,
         presentationContent: null,
+        createdAt: new Date(base + indice * 1000),
       },
       select: { id: true },
     });
