@@ -56,7 +56,7 @@
   - Al final de `specs/QC-25-crud-de-recetas/requirements.md`, `specs/QC-24-modelo-recetas/requirements.md`
     y `specs/QC-35-pantalla-de-pedidos/requirements.md`, sin reescribir nada de lo que ya está.
   - **Hecho:** tres notas fechadas el 2026-10-08 con referencia a QC-180.
-- [ ] **T7** Cierre. Depende de T1 a T6.
+- [x] **T7** Cierre. Depende de T1 a T6.
   - Comprobar con `git diff --name-only origin/dev...HEAD` que no hay nada bajo `app/` ni `lib/` (R11).
   - Correr `./init.sh` y dejarlo en verde.
   - Escribir en `progress/impl_QC-180-rojos-heredados-de-alta-de-grupos.md` el mapa `R<n> -> test`:
