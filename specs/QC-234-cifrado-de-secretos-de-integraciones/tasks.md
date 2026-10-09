@@ -19,13 +19,13 @@
 
 ## T1–T2 — Catálogo, dominio y puertos
 
-- [ ] **T1.** Catálogo de errores (`design.md > 4`): `integration_secret_unreadable` al final de
+- [x] **T1.** Catálogo de errores (`design.md > 4`): `integration_secret_unreadable` al final de
       `ERROR_CODES` con su línea de enmienda, su clave y su texto en `error-catalog.ts`; conteo de
       `tests/unit/errores/catalogo.test.ts` a 75 con su línea de comentario.
       **Hecho cuando:** `catalogo.test.ts` y `guard-catalogo-de-errores` en verde. Cubre R21.
       Depende de: —.
 
-- [ ] **T2.** `domain/errors.ts` (`IntegracionesError`, `SecretUnreadableError`,
+- [x] **T2.** `domain/errors.ts` (`IntegracionesError`, `SecretUnreadableError`,
       `ValidationError`), `domain/secret-context.ts` y `domain/stored-secret.ts` (`design.md > 3.1`
       a `> 3.3`), y los puertos `ports/secret-cipher.ts` y `ports/secret-digest.ts`
       (`design.md > 3.4`). Contrato `index.ts` con los cuatro símbolos de `design.md > 7`. Se
@@ -82,7 +82,7 @@
 
 ## T8–T9 — Entorno, deuda y cierre
 
-- [ ] **T8. [P]** `.env.example`: las dos variables vacías, con el comentario de
+- [x] **T8. [P]** `.env.example`: las dos variables vacías, con el comentario de
       `design.md > 5` (formato, cómo generar una clave, los tres pasos de rotación, y que preview
       y producción comparten base y por tanto valor). Caso en
       `tests/unit/integraciones/encryption-keys-env.test.ts` que comprueba que las dos están

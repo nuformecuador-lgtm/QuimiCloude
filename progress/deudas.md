@@ -141,6 +141,14 @@
   lo importen. No se hizo en QC-167 porque tocaba dos rutas de fichas en vuelo.
 - **Dueño:** sin asignar.
 
+### D36 — Re-cifrar las credenciales de integraciones a la versión activa (QC-234)
+- **Origen:** QC-234 (2026-10-09), `specs/QC-234-cifrado-de-secretos-de-integraciones/design.md > 10`.
+- **Qué falta:** un comando que re-cifre a la versión activa toda credencial de integraciones
+  guardada con una versión vieja. Sin él, retirar una versión vieja de
+  `INTEGRATIONS_ENCRYPTION_KEYS` obliga a re-guardar a mano cada credencial cifrada con ella.
+  Hoy no hay ninguna fila cifrada (las tablas llegan con QC-237), así que no bloquea.
+- **Dueño:** sin asignar.
+
 ## Pendientes humanos de fichas cerradas
 Rescatados de *Evaluaciones* y *Features en curso* del archivo: no estaban en *Deudas*, pero se habrían perdido al congelarlo.
 
