@@ -28,8 +28,8 @@ function variableDeDobles(): string {
 
 const DOBLES = variableDeDobles()
 
-const REF = 'refinventadopreview'
-const OTRO_REF = 'refinventadoproduccion'
+const REF = 'refinventadopreviewx'
+const OTRO_REF = 'refinventadoprodxxxx'
 const URLS = ['DATABASE_URL', 'DIRECT_URL', 'SUPABASE_STORAGE_URL'] as const
 const CREDENCIALES = ['RESEND_API_KEY', 'SMTP_PASS', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'QSTASH_TOKEN'] as const
 
@@ -38,9 +38,9 @@ const SECRETO = 'secreto-inventado-no-debe-salir'
 
 function urlsDe(ref: string): Record<(typeof URLS)[number], string> {
   return {
-    DATABASE_URL: `postgresql://postgres.${ref}:clave-inventada@pooler.invalid:6543/postgres`,
-    DIRECT_URL: `postgresql://postgres:clave-inventada@db.${ref}.supabase.invalid:5432/postgres`,
-    SUPABASE_STORAGE_URL: `https://${ref}.supabase.invalid`,
+    DATABASE_URL: `postgresql://postgres.${ref}:clave-inventada@aws-0-xx.pooler.supabase.com:6543/postgres`,
+    DIRECT_URL: `postgresql://postgres:clave-inventada@db.${ref}.supabase.co:5432/postgres`,
+    SUPABASE_STORAGE_URL: `https://${ref}.supabase.co`,
   }
 }
 
@@ -94,6 +94,129 @@ describe('apuntanAPreview', () => {
   it('solo mira las variables que se le piden', () => {
     const env = { ...urlsDe(REF), SUPABASE_STORAGE_URL: urlsDe(OTRO_REF).SUPABASE_STORAGE_URL, [VARIABLE_REF_DE_PREVIEW]: REF }
     expect(apuntanAPreview(env, ['DATABASE_URL', 'DIRECT_URL'])).toEqual({ ok: true })
+  })
+})
+
+// Enmienda de R9 (2026-10-09, m1 del review, aprobada por el humano): el ref tiene la forma de un
+// Reference ID y va en una posicion reconocida de cada URL, no como subcadena suelta.
+describe('apuntanAPreview: forma del ref y posicion en cada URL (enmienda R9, m1)', () => {
+  const POOLER_TRANSACCION = (ref: string) => `postgresql://postgres.${ref}:clave-inventada@aws-0-xx.pooler.supabase.com:6543/postgres`
+  const POOLER_SESION = (ref: string) => `postgresql://postgres.${ref}:clave-inventada@aws-0-xx.pooler.supabase.com:5432/postgres`
+  const DIRECTA = (ref: string) => `postgresql://postgres:clave-inventada@db.${ref}.supabase.co:5432/postgres`
+  const STORAGE = (ref: string) => `https://${ref}.supabase.co`
+
+  /** Las tres URL de produccion (otro ref de 20 letras). */
+  const DE_PRODUCCION = urlsDe(OTRO_REF)
+
+  it('los refs inventados de estos tests tienen la forma de un Reference ID', () => {
+    for (const ref of [REF, OTRO_REF]) expect(ref).toMatch(/^[a-z]{20}$/)
+  })
+
+  it('un ref sin la forma de Reference ID no cumple y nombra solo PREVIEW_SUPABASE_REF (R9)', () => {
+    const malos = ['supabase', 'postgres', 'pooler', REF.slice(0, 19), `${REF}a`, REF.toUpperCase(), `${REF.slice(0, 19)}1`, `${REF.slice(0, 10)}-${REF.slice(10, 19)}`]
+    for (const ref of malos) {
+      const env = { ...urlsDe(ref), [VARIABLE_REF_DE_PREVIEW]: ref }
+      expect(apuntanAPreview(env, [...URLS]), `ref=${ref}`).toEqual({ ok: false, variables: [VARIABLE_REF_DE_PREVIEW] })
+    }
+  })
+
+  it('ref "supabase" o "postgres" con las URL de produccion: no pasa y el mensaje no lleva el valor (R9, m1)', () => {
+    for (const ref of ['supabase', 'postgres']) {
+      const problemas = problemasDe({ ...previewCorrecta(), ...DE_PRODUCCION, [VARIABLE_REF_DE_PREVIEW]: ref })
+      expect(problemas, `ref=${ref}`).toEqual([
+        `${VARIABLE_REF_DE_PREVIEW} debe tener el Reference ID del proyecto de Supabase de preview (20 letras minusculas)`,
+      ])
+    }
+  })
+
+  it('ref truncado (19 letras) del de produccion con las URL de produccion: no pasa (R9, m1)', () => {
+    const truncado = OTRO_REF.slice(0, 19)
+    expect(truncado).toHaveLength(19)
+    expect(apuntanAPreview({ ...DE_PRODUCCION, [VARIABLE_REF_DE_PREVIEW]: truncado }, [...URLS])).toEqual({
+      ok: false,
+      variables: [VARIABLE_REF_DE_PREVIEW],
+    })
+  })
+
+  it('URL de produccion (otro ref de 20 letras) con el ref de preview: nombra cada una, sin valores (R9, m1)', () => {
+    const formatos = [POOLER_TRANSACCION, POOLER_SESION, DIRECTA]
+    for (const formato of formatos) {
+      const env = { ...previewCorrecta(), DATABASE_URL: formato(OTRO_REF), DIRECT_URL: formato(OTRO_REF), SUPABASE_STORAGE_URL: STORAGE(OTRO_REF) }
+      const problemas = problemasDe(env)
+      expect(problemas.map((p) => p.split(' ')[0])).toEqual([...URLS])
+      for (const problema of problemas) {
+        for (const valor of [REF, OTRO_REF, 'clave-inventada', 'supabase.co', 'supabase.com']) expect(problema).not.toContain(valor)
+      }
+    }
+  })
+
+  it('el ref valido solo como subcadena fuera de su posicion no cuenta (R9, m1)', () => {
+    const base = DIRECTA(OTRO_REF)
+    const fueraDePosicionEnBase = [
+      `postgresql://postgres.${OTRO_REF}:clave-inventada@aws-0-xx.pooler.supabase.com:6543/${REF}`,
+      `postgresql://postgres.${OTRO_REF}:clave-inventada@aws-0-xx.pooler.supabase.com:6543/postgres?application_name=postgres.${REF}:`,
+      `${base}?options=db.${REF}.supabase.co`,
+      `postgresql://postgres:postgres.${REF}@db.${OTRO_REF}.supabase.co:5432/postgres`,
+      `postgresql://postgres:clave-inventada@db.${REF}.supabase.co.otro.invalid:5432/postgres`,
+      `postgresql://postgres.${REF}x:clave-inventada@aws-0-xx.pooler.supabase.com:6543/postgres`,
+      `postgres.${REF}:@db.${REF}.supabase.co`,
+    ]
+    for (const nombre of ['DATABASE_URL', 'DIRECT_URL'] as const) {
+      for (const url of fueraDePosicionEnBase) {
+        const env = { ...urlsDe(REF), [nombre]: url, [VARIABLE_REF_DE_PREVIEW]: REF }
+        expect(apuntanAPreview(env, [...URLS]), `${nombre}=${url}`).toEqual({ ok: false, variables: [nombre] })
+      }
+    }
+    const fueraDePosicionEnStorage = [
+      `https://${OTRO_REF}.supabase.co/${REF}`,
+      `https://${OTRO_REF}.supabase.co/storage/v1/s3?x=//${REF}.supabase.co`,
+      `https://${REF}.supabase.co.otro.invalid`,
+      `https://otro${REF}.supabase.co`,
+      `https://${REF}:clave-inventada@${OTRO_REF}.supabase.co`,
+    ]
+    for (const url of fueraDePosicionEnStorage) {
+      const env = { ...urlsDe(REF), SUPABASE_STORAGE_URL: url, [VARIABLE_REF_DE_PREVIEW]: REF }
+      expect(apuntanAPreview(env, [...URLS]), url).toEqual({ ok: false, variables: ['SUPABASE_STORAGE_URL'] })
+    }
+  })
+
+  it('validas: pooler transaction 6543, pooler session 5432 y conexion directa, en DATABASE_URL y DIRECT_URL (R9)', () => {
+    for (const formato of [POOLER_TRANSACCION, POOLER_SESION, DIRECTA]) {
+      for (const otroFormato of [POOLER_TRANSACCION, POOLER_SESION, DIRECTA]) {
+        const env = { DATABASE_URL: formato(REF), DIRECT_URL: otroFormato(REF), SUPABASE_STORAGE_URL: STORAGE(REF), [VARIABLE_REF_DE_PREVIEW]: REF }
+        expect(apuntanAPreview(env, [...URLS])).toEqual({ ok: true })
+      }
+    }
+  })
+
+  it('valida: storage con ruta y el host en mayusculas; el ref del entorno con espacios a los lados (R9)', () => {
+    const env = {
+      ...urlsDe(REF),
+      SUPABASE_STORAGE_URL: `https://${REF.toUpperCase()}.SUPABASE.CO/storage/v1/s3`,
+      [VARIABLE_REF_DE_PREVIEW]: `  ${REF} `,
+    }
+    expect(apuntanAPreview(env, [...URLS])).toEqual({ ok: true })
+  })
+
+  it('la posicion depende de la variable: la URL de storage no vale como base ni la de base como storage (R9)', () => {
+    expect(apuntanAPreview({ ...urlsDe(REF), DATABASE_URL: STORAGE(REF), [VARIABLE_REF_DE_PREVIEW]: REF }, [...URLS])).toEqual({
+      ok: false,
+      variables: ['DATABASE_URL'],
+    })
+    expect(apuntanAPreview({ ...urlsDe(REF), SUPABASE_STORAGE_URL: DIRECTA(REF), [VARIABLE_REF_DE_PREVIEW]: REF }, [...URLS])).toEqual({
+      ok: false,
+      variables: ['SUPABASE_STORAGE_URL'],
+    })
+  })
+
+  it('una variable sin regla de posicion no cumple nunca: lado seguro (R9)', () => {
+    const env = { ...urlsDe(REF), OTRA_URL: DIRECTA(REF), toString: DIRECTA(REF), [VARIABLE_REF_DE_PREVIEW]: REF }
+    expect(apuntanAPreview(env, ['OTRA_URL', 'toString'])).toEqual({ ok: false, variables: ['OTRA_URL', 'toString'] })
+  })
+
+  it('una URL ilegible no cumple (R9)', () => {
+    const env = { ...urlsDe(REF), DIRECT_URL: `no es una url ${REF}`, [VARIABLE_REF_DE_PREVIEW]: REF }
+    expect(apuntanAPreview(env, [...URLS])).toEqual({ ok: false, variables: ['DIRECT_URL'] })
   })
 })
 
@@ -172,7 +295,7 @@ describe('comprobarEntornoDePreview', () => {
     const problemas = problemasDe(env)
     expect(problemas.length).toBeGreaterThan(0)
     for (const problema of problemas) {
-      for (const valor of [REF, OTRO_REF, SECRETO, 'transporte-inventado', 'clave-inventada', 'supabase.invalid']) {
+      for (const valor of [REF, OTRO_REF, SECRETO, 'transporte-inventado', 'clave-inventada', 'supabase.co']) {
         expect(problema).not.toContain(valor)
       }
     }

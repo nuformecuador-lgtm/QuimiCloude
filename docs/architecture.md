@@ -713,6 +713,11 @@ Con `VERCEL` definida y `VERCEL_ENV=preview`, `scripts/build.mjs` primero llama 
   `SUPABASE_STORAGE_URL` lo contienen. El host no basta: el pooler de Supabase comparte host entre
   proyectos, el Reference ID no. El identificador vive solo en el scope Preview de Vercel, nunca en
   el repo (es publico).
+  *Nota 2026-10-09 (QC-249, enmienda de R9, m1 del review):* «lo contienen» es ahora mas
+  estricto. `PREVIEW_SUPABASE_REF` tiene que ser exactamente 20 letras minusculas, y el
+  identificador tiene que estar en su posicion: usuario del pooler (`postgres.<ref>`) o host directo
+  (`db.<ref>.supabase.co`) en `DATABASE_URL` y `DIRECT_URL`, y host (`<ref>.supabase.co`) en
+  `SUPABASE_STORAGE_URL`. Como subcadena en otro sitio (nombre de la base, parametros) no cuenta.
 - **Ningun efecto fuera de la app.** `MAIL_TRANSPORT` es exactamente `desactivado`;
   `DOCUMENTS_E2E_DOUBLES` tiene valor; `RESEND_API_KEY`, `SMTP_PASS`, `ANTHROPIC_API_KEY`,
   `GEMINI_API_KEY` y `QSTASH_TOKEN` estan vacias o ausentes. Elegir los dobles y quitar las

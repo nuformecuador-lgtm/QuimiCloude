@@ -11,17 +11,17 @@ import {
 const LOCAL_URL = 'postgresql://postgres:x@localhost:5433/QuimiCloude?schema=public'
 const REMOTE_URL = 'postgresql://postgres:x@db.abcdefgh.supabase.co:6543/postgres'
 
-const PREVIEW_REF = 'refinventadopreview'
-const OTHER_REF = 'refinventadoproduccion'
-const OTHER_PROJECT_URL = `postgresql://postgres.${OTHER_REF}:x@pooler.invalid:6543/postgres`
+const PREVIEW_REF = 'refinventadopreviewx'
+const OTHER_REF = 'refinventadoprodxxxx'
+const OTHER_PROJECT_URL = `postgresql://postgres.${OTHER_REF}:x@aws-0-xx.pooler.supabase.com:6543/postgres`
 
 /** Un build de preview de Vercel contra la base de preview (identificador inventado). */
 const PREVIEW_ENV: Record<string, string | undefined> = {
   VERCEL: '1',
   VERCEL_ENV: 'preview',
   PREVIEW_SUPABASE_REF: PREVIEW_REF,
-  DATABASE_URL: `postgresql://postgres.${PREVIEW_REF}:x@pooler.invalid:6543/postgres`,
-  DIRECT_URL: `postgresql://postgres:x@db.${PREVIEW_REF}.supabase.invalid:5432/postgres`,
+  DATABASE_URL: `postgresql://postgres.${PREVIEW_REF}:x@aws-0-xx.pooler.supabase.com:6543/postgres`,
+  DIRECT_URL: `postgresql://postgres:x@db.${PREVIEW_REF}.supabase.co:5432/postgres`,
 }
 
 describe('seed de demo — guardas de entorno', () => {
@@ -118,6 +118,37 @@ describe('seed de demo — guardas de entorno', () => {
             expect(verdict.reason).not.toContain(PREVIEW_REF)
           }
         }
+      }
+    }
+  })
+
+  it('VERCEL_ENV=preview hereda el candado estricto de R9: ref sin forma de Reference ID con URL de produccion, negado (R14, m1)', () => {
+    const deProduccion = {
+      DATABASE_URL: OTHER_PROJECT_URL,
+      DIRECT_URL: `postgresql://postgres:x@db.${OTHER_REF}.supabase.co:5432/postgres`,
+    }
+    for (const PREVIEW_SUPABASE_REF of ['supabase', 'postgres', OTHER_REF.slice(0, 19)]) {
+      for (const argv of [[], [DEMO_SEED_FORCE_FLAG]]) {
+        const verdict = evaluateDemoSeedGuard({ argv, env: { ...PREVIEW_ENV, ...deProduccion, PREVIEW_SUPABASE_REF } })
+        expect(verdict.allowed, `ref=${PREVIEW_SUPABASE_REF}`).toBe(false)
+        if (!verdict.allowed) {
+          expect(verdict.reason).toContain('PREVIEW_SUPABASE_REF')
+          expect(verdict.reason).not.toContain(OTHER_REF)
+        }
+      }
+    }
+  })
+
+  it('VERCEL_ENV=preview con el ref de preview solo fuera de su posicion (nombre de la base, parametro): negado (R14, m1)', () => {
+    const fueraDePosicion = [
+      `postgresql://postgres.${OTHER_REF}:x@aws-0-xx.pooler.supabase.com:6543/${PREVIEW_REF}`,
+      `postgresql://postgres:x@db.${OTHER_REF}.supabase.co:5432/postgres?options=db.${PREVIEW_REF}.supabase.co`,
+    ]
+    for (const nombre of ['DATABASE_URL', 'DIRECT_URL'] as const) {
+      for (const url of fueraDePosicion) {
+        const verdict = evaluateDemoSeedGuard({ argv: [], env: { ...PREVIEW_ENV, [nombre]: url } })
+        expect(verdict.allowed, `${nombre}=${url}`).toBe(false)
+        if (!verdict.allowed) expect(verdict.reason).toContain(nombre)
       }
     }
   })

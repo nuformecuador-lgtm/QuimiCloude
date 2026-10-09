@@ -202,3 +202,45 @@ Veredicto: T6 y T7 hechas y en verde; falta T8 (gate local) y T9 (humano).
 cargado en el entorno (apunta a localhost; no se copió ningún archivo): `== init OK ==`.
 Unit/ui/node: 309 archivos, 4755 tests en verde (2 skipped). Guardias: 102 archivos, 1413 tests en
 verde (32 skipped). Integración relacionada (incluida `identity-seed.int.test.ts`) en verde.
+
+## Enmienda R9 (m1) y m5 del review (backend_dev, 2026-10-09)
+Aprobada por el humano el 2026-10-09.
+
+### Archivos
+- `scripts/entorno-de-preview.mjs`: `apuntanAPreview` exige ref `/^[a-z]{20}$/` y posicion por
+  variable (`POSICION_DEL_REF`): usuario `postgres.<ref>` o host `db.<ref>.supabase.co` en
+  `DATABASE_URL`/`DIRECT_URL`; host `<ref>.supabase.co` en `SUPABASE_STORAGE_URL`. Variable sin
+  regla o URL ilegible: no cumple. Mensajes sin valores.
+- `scripts/build.mjs`: `VERCEL_ENV` recortado (m5).
+- Tests: `entorno-de-preview.test.ts`, `build.test.ts`, `seed-demo-guard.test.ts` (fixtures a refs
+  inventados de 20 letras y hosts `supabase.co`/`pooler.supabase.com`; tests nuevos).
+- Notas fechadas (solo adicion): `requirements.md` (R9), `design.md > 4`, `docs/architecture.md >
+  Previews`.
+- Sin tocar: `lib/composition/index.ts`, `.env.example` (su comentario aun dice «no lo contienen»).
+
+### R → test
+- R9 (forma): `apuntanAPreview: forma del ref ...` > «un ref sin la forma de Reference ID...»,
+  «ref "supabase" o "postgres"...», «ref truncado (19 letras)...»; `build.test` > «m1: ...».
+- R9 (posicion): «el ref valido solo como subcadena fuera de su posicion no cuenta», «URL de
+  produccion (otro ref de 20 letras)...», «validas: pooler transaction 6543, pooler session 5432 y
+  conexion directa...», «la posicion depende de la variable...», «una variable sin regla...».
+- R14 (herencia): `seed-demo-guard.test` > «...hereda el candado estricto de R9...», «...solo fuera
+  de su posicion...».
+- R7/R8 (m5): `build.test` > «m5: VERCEL_ENV se compara recortado...».
+
+### Salida
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: 0 errors, 7 warnings (preexistentes).
+- `vitest related --project node --project ui` (6 archivos): 4 files, 94 passed.
+- `pnpm exec vitest run guard`: 64 files, 861 passed, 15 skipped.
+
+Veredicto: m1 y m5 cerrados, en verde; sin commit.
+
+## implementer — cierre de m1 y m5 (2026-10-09)
+- Enmienda de R9 aprobada por el humano: ref = `/^[a-z]{20}$/` y en posicion reconocida por variable;
+  m5: `VERCEL_ENV` recortado en `scripts/build.mjs`. Detalle y nombres de test en la seccion anterior.
+- `.env.example`: 3 lineas de comentario anadidas (enmienda m1); 0 lineas borradas.
+- Salida: typecheck exit 0; lint 0 errores (7 avisos previos ajenos); related node+ui 4 archivos /
+  94 tests verdes; `vitest run guard` + `deploy-hook.test.ts`: 65 archivos, 874 pasan, 15 saltados.
+- Abierto para el humano (no implementado): una `DIRECT_URL` con host de preview y `?host=<otro>`
+  pasaria la comprobacion (Prisma prioriza ese parametro). Ampliacion barata si se aprueba.

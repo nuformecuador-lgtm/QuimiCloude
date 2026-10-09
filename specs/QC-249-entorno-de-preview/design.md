@@ -173,6 +173,22 @@ que:
   mergear. Con la comprobación, ese build falla antes del primer paso.
 - No se versiona ningún identificador de proyecto (el repo es público).
 
+**Enmienda 2026-10-09 (m1 del review, aprobada por el humano; R9).** «Contenga» se sustituye por
+forma y posición, en `scripts/entorno-de-preview.mjs`:
+
+- `PREVIEW_SUPABASE_REF` (recortado) tiene que cumplir `/^[a-z]{20}$/`; si no, `apuntanAPreview`
+  devuelve solo `PREVIEW_SUPABASE_REF` y el mensaje lo nombra sin valor.
+- Cada URL se lee con `new URL` y la posición depende del nombre de la variable
+  (`POSICION_DEL_REF`): `DATABASE_URL` y `DIRECT_URL` cumplen si el usuario es exactamente
+  `postgres.<ref>` (pooler, transaction 6543 o session 5432) o si el host es exactamente
+  `db.<ref>.supabase.co` (directa); `SUPABASE_STORAGE_URL` cumple si el host es exactamente
+  `<ref>.supabase.co`. El ref en el nombre de la base, en la contraseña o en un parámetro no cuenta;
+  una URL ilegible o una variable sin regla no cumple (lado seguro).
+- La guarda del seed de demostración llama a `apuntanAPreview` con `['DATABASE_URL', 'DIRECT_URL']`
+  y hereda el candado sin cambios propios.
+- De paso (m5 del review), `scripts/build.mjs` compara `VERCEL_ENV` recortado, igual que la guarda
+  del seed.
+
 **Los efectos fuera de la app (R10).** `comprobarEntornoDePreview` añade un problema por cada una
 de estas condiciones:
 

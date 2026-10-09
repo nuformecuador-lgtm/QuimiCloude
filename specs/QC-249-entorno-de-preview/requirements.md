@@ -61,6 +61,15 @@ Escritos por `spec_author` (F1.2) el 2026-10-09. «El build» es `pnpm run build
   `PREVIEW_SUPABASE_REF`, o alguna de `DATABASE_URL`, `DIRECT_URL` o `SUPABASE_STORAGE_URL` no
   contiene ese identificador, ENTONCES el build DEBE fallar antes de ejecutar ningún paso, con un
   mensaje que nombre las variables que no cumplen y que no incluya ningún valor.
+  - *Enmienda 2026-10-09 (m1 del review, aprobada por el humano):* «contiene» se endurece. (a)
+    `PREVIEW_SUPABASE_REF` DEBE tener la forma de un Reference ID de Supabase, exactamente 20
+    letras minúsculas `[a-z]`; si no, el build falla con un mensaje que nombra la variable, sin
+    valor. (b) El identificador DEBE aparecer en una posición reconocida, no como subcadena suelta:
+    en `DATABASE_URL` y `DIRECT_URL`, como usuario del pooler (`postgres.<ref>:`) o como host directo
+    (`@db.<ref>.supabase.co`); en `SUPABASE_STORAGE_URL`, como host (`//<ref>.supabase.co`). Las que
+    no cumplen se nombran sin valores. La guarda del seed de demostración (R13, R14) hereda el mismo
+    candado para `DATABASE_URL` y `DIRECT_URL`. Motivo: con un ref como `supabase`, `postgres` o uno
+    truncado, las URL de producción pasaban la comprobación.
 
 ### Sin efectos fuera de la app
 

@@ -43,7 +43,8 @@ export function pasosDelBuild(env) {
   if (!env.VERCEL) {
     return { pasos: [...CON_TODO], saltados: [], motivo: '[build] fuera de Vercel -> con migrate y seed' };
   }
-  const vercelEnv = env.VERCEL_ENV;
+  // Recortado, como la guarda del seed de demostracion (m5 del review de QC-249).
+  const vercelEnv = (env.VERCEL_ENV ?? '').trim();
   if (vercelEnv === 'production') {
     return { pasos: [...CON_TODO], saltados: [], motivo: '[build] Vercel production -> con migrate y seed' };
   }

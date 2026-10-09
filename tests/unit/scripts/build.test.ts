@@ -22,8 +22,8 @@ const SIN_BASE = [GENERAR, CONSTRUIR]
 const MOTIVO_PREVIEW = '[build] Vercel preview -> con migrate, seed y seed de demostracion (base de preview)'
 const MOTIVO_PREVIEW_INCOMPLETA = '[build] Vercel preview -> configuracion de preview incompleta'
 
-const REF = 'refinventadopreview'
-const OTRO_REF = 'refinventadoproduccion'
+const REF = 'refinventadopreviewx'
+const OTRO_REF = 'refinventadoprodxxxx'
 const SECRETO = 'secreto-inventado'
 
 /** Un scope Preview de Vercel que pasa la comprobacion previa. */
@@ -32,9 +32,9 @@ function previewCorrecta(): Record<string, string | undefined> {
     VERCEL: '1',
     VERCEL_ENV: 'preview',
     PREVIEW_SUPABASE_REF: REF,
-    DATABASE_URL: `postgresql://postgres.${REF}:clave-inventada@pooler.invalid:6543/postgres`,
-    DIRECT_URL: `postgresql://postgres:clave-inventada@db.${REF}.supabase.invalid:5432/postgres`,
-    SUPABASE_STORAGE_URL: `https://${REF}.supabase.invalid`,
+    DATABASE_URL: `postgresql://postgres.${REF}:clave-inventada@aws-0-xx.pooler.supabase.com:6543/postgres`,
+    DIRECT_URL: `postgresql://postgres:clave-inventada@db.${REF}.supabase.co:5432/postgres`,
+    SUPABASE_STORAGE_URL: `https://${REF}.supabase.co`,
     MAIL_TRANSPORT: 'desactivado',
   }
   env['DOCUMENTS_E2E_DOUBLES'] = 'si'
@@ -107,6 +107,33 @@ describe('pasosDelBuild', () => {
     expect(r.pasos).toEqual(TODO)
     expect(r.pasos).not.toContain(SEMBRAR_DEMO)
     expect(r.motivo).toBe('[build] fuera de Vercel -> con migrate y seed')
+  })
+
+  it('m1: PREVIEW_SUPABASE_REF "supabase", "postgres" o truncado con las URL de produccion no programa ningun paso (R9)', () => {
+    const deProduccion = {
+      DATABASE_URL: `postgresql://postgres.${OTRO_REF}:clave-inventada@aws-0-xx.pooler.supabase.com:6543/postgres`,
+      DIRECT_URL: `postgresql://postgres:clave-inventada@db.${OTRO_REF}.supabase.co:5432/postgres`,
+      SUPABASE_STORAGE_URL: `https://${OTRO_REF}.supabase.co`,
+    }
+    for (const ref of ['supabase', 'postgres', OTRO_REF.slice(0, 19)]) {
+      const r = pasosDelBuild({ ...previewCorrecta(), ...deProduccion, PREVIEW_SUPABASE_REF: ref })
+      expect(r.pasos, `ref=${ref}`).toEqual([])
+      expect(r.motivo).toBe(MOTIVO_PREVIEW_INCOMPLETA)
+      expect(r.problemas).toHaveLength(1)
+      expect(r.problemas?.[0]).toContain('PREVIEW_SUPABASE_REF')
+    }
+  })
+
+  it('m5: VERCEL_ENV se compara recortado, como en la guarda del seed de demostracion (R7, R8)', () => {
+    expect(pasosDelBuild({ ...previewCorrecta(), VERCEL_ENV: ' preview ' }).pasos).toEqual(TODO_Y_DEMO)
+    expect(pasosDelBuild({ ...previewCorrecta(), VERCEL_ENV: '\tpreview', PREVIEW_SUPABASE_REF: undefined }).pasos).toEqual([])
+    expect(pasosDelBuild({ VERCEL: '1', VERCEL_ENV: ' production ' }).pasos).toEqual(TODO)
+    const blanco = pasosDelBuild({ VERCEL: '1', VERCEL_ENV: '   ' })
+    expect(blanco.pasos).toEqual(SIN_BASE)
+    expect(blanco.motivo).toBe('[build] Vercel sin VERCEL_ENV -> sin migrate ni seed (lado seguro)')
+    expect(pasosDelBuild({ VERCEL: '1', VERCEL_ENV: ' development ' }).motivo).toBe(
+      '[build] Vercel development -> sin migrate ni seed (solo production y preview tocan la base)',
+    )
   })
 
   it('migrate va antes que generate, el seed despues de generate, la demo despues del seed y next build al final (R7)', () => {
@@ -219,7 +246,7 @@ describe('ejecutarBuild en una preview de Vercel', () => {
 
   it('una URL de otro proyecto: devuelve 1, no ejecuta ningun paso y nombra la variable (R9)', () => {
     for (const nombre of ['DATABASE_URL', 'DIRECT_URL', 'SUPABASE_STORAGE_URL']) {
-      const env = { ...previewCorrecta(), [nombre]: `https://${OTRO_REF}.supabase.invalid` }
+      const env = { ...previewCorrecta(), [nombre]: `https://${OTRO_REF}.supabase.co` }
       const { ejecutar, llamados } = ejecutorFalso()
       const { salida, log, error } = salidaFalsa()
       expect(ejecutarBuild(env, ejecutar, salida)).toBe(1)
