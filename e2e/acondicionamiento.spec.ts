@@ -2,8 +2,8 @@
  * E2E de las pestañas del acondicionador en `/asignacion` (R22) y de quién NO las ve (R23).
  *
  * R22 recorre con el Administrador de acondicionamiento «Por acondicionar» -un pedido con dos
- * líneas de reparto y otro que acondiciona otra persona-, el detalle de solo lectura, y
- * «Terminados», que lista solo el TERMINADO que acondicionó él: ni el de otro ni un ENTREGADO suyo.
+ * líneas de reparto y otro que acondiciona otra persona-, el detalle con un único botón,
+ * «Acondicionar», y «Terminados», que lista solo el TERMINADO que acondicionó él: ni el de otro ni un ENTREGADO suyo.
  * R23 comprueba, con un `test` por rol, que Administrador, Operador y Empacador no ven la pestaña,
  * tampoco pidiéndola por la dirección, y que el detalle les responde 404.
  *
@@ -122,7 +122,7 @@ const CONDITIONING_ORDER_LINK_TESTID = 'conditioning-order-link';
 const ORDER_DISTRIBUTION_FULL_TESTID = 'order-distribution-full';
 const ROW_STATUS_TESTID = 'conditioning-order-status';
 
-/** El detalle de solo lectura, `conditioning-order-screen.tsx`. */
+/** El detalle del pedido, `conditioning-order-screen.tsx`; su único botón es «Acondicionar». */
 const SCREEN_TESTID = 'conditioning-order-screen';
 const SCREEN_NUMBER_TESTID = 'conditioning-order-number';
 const SCREEN_STATUS_TESTID = 'conditioning-order-status';
@@ -372,7 +372,7 @@ test.afterAll(async () => {
 test.setTimeout(180_000);
 
 test.describe('las pestañas del acondicionador (R22)', () => {
-  test('R22 - el acondicionador aterriza en Por acondicionar con el reparto completo y quién acondiciona, abre el detalle sin botones, y en Terminados ve solo el TERMINADO suyo', async ({
+  test('R22 - el acondicionador aterriza en Por acondicionar con el reparto completo y quién acondiciona, abre el detalle con solo el botón Acondicionar, y en Terminados ve solo el TERMINADO suyo', async ({
     page,
   }) => {
     const { A, B, C, D, E } = seeded();
@@ -417,7 +417,7 @@ test.describe('las pestañas del acondicionador (R22)', () => {
       ),
     );
 
-    // --- 3. El número de A abre el detalle: número, estado y ningún botón.
+    // --- 3. El número de A abre el detalle: número, estado y un único botón, «Acondicionar».
     await rowA.getByTestId(CONDITIONING_ORDER_LINK_TESTID).click();
     await page.waitForURL((url) => url.pathname === conditioningOrderRoute(A.id), {
       timeout: 60_000,
