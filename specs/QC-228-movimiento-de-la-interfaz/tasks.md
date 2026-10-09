@@ -20,7 +20,7 @@ la fase 3 entra. Las demás preguntas tienen propuesta por defecto y no bloquean
     y avisar antes de T2.
   - **Hecho cuando:** los tests de tokens están verdes y `e2e/login-skin.spec.ts` sigue verde.
 
-- [ ] **T2 [P] (tras T1). Primitivos de `components/ui/` y chevron** (R4–R9, R11, R12)
+- [x] **T2 [P] (tras T1). Primitivos de `components/ui/` y chevron** (R4–R9, R11, R12)
   - Clases de `design.md > 4` en `dialog.tsx`, `alert-dialog.tsx`, `sheet.tsx`,
     `dropdown-menu.tsx`, `select.tsx`, `popover.tsx`, `autocomplete.tsx`, `tooltip.tsx`,
     `tabs.tsx` y `sidebar.tsx`; chevron de `components/private/app-sidebar.tsx`.
@@ -29,7 +29,7 @@ la fase 3 entra. Las demás preguntas tienen propuesta por defecto y no bloquean
   - **Hecho cuando:** ninguna de esas clases contiene `duration-100/150/200`, `ease-linear` ni
     `ease-in-out`, y los tests de esos componentes siguen verdes (salvo paridad, T6).
 
-- [ ] **T3 [P] (tras T1). Botones** (R16, R17, R18, R21)
+- [x] **T3 [P] (tras T1). Botones** (R16, R17, R18, R21)
   - `@utility btn-shine` y `btn-veil` y los tokens `--button-primary-gradient` /
     `--button-veil-color` en `:root` y `.dark` (este último según P1).
   - Variantes `default` y `outline` de `components/ui/button.tsx` (`design.md > 4.1`).
@@ -60,7 +60,7 @@ la fase 3 entra. Las demás preguntas tienen propuesta por defecto y no bloquean
 
 ## Fase 2 — Entrada de pantalla
 
-- [ ] **T7. Clave de módulo y `ScreenEnter`** (R19, R20)
+- [x] **T7. Clave de módulo y `ScreenEnter`** (R19, R20)
   - `lib/shared/navigation/nav-module.ts` con `navModuleKey` y su test
     `tests/unit/navegacion/nav-module.test.ts` (prefijo por segmentos, detalle del mismo módulo,
     ruta sin ítem).
