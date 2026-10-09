@@ -5,25 +5,13 @@ import { useRouter } from 'next/navigation';
 import { useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { ErrorAlert } from '@/components/shared/error-alert';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { Button } from '@/components/ui/button';
 import type { ErrorState } from '@/lib/modules/errores';
 import {
   deleteRecipeAction,
   listRecipeVersionsAction,
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 const DELETE_SUCCESS = 'Receta borrada.';
 const DELETE_VERSION_SUCCESS = 'Versión borrada.';
@@ -49,11 +37,8 @@ export function DeleteRecipeDialog({
   readonly kind?: DeleteKind;
 }) {
   const [open, setOpen] = useState(false);
-  /*
-    El error, ENTERO. QC-71 (R17): era `{ code, message }` copiado a mano, y esa copia perdia el
-    `reference` del error inesperado. Un `reference?: string` local reabriria el agujero por el
-    otro lado, asi que se guarda la union cerrada y el render estrecha por `code`.
-  */
+  // El error entero y no una copia de `{ code, message }`: la copia perdería el `reference` del
+  // error inesperado. El render estrecha por `code`.
   const [error, setError] = useState<ErrorState | null>(null);
   const [versionCount, setVersionCount] = useState<VersionCount>({ status: 'idle' });
   const [isPending, startTransition] = useTransition();
@@ -97,7 +82,7 @@ export function DeleteRecipeDialog({
     !isVersion && versionCount.status === 'ready' ? versionsNotice(versionCount.count) : null;
 
   return (
-    <AlertDialog
+    <DeleteConfirmDialog
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
@@ -109,23 +94,21 @@ export function DeleteRecipeDialog({
           setVersionCount({ status: 'idle' });
         }
       }}
-    >
-      <AlertDialogTrigger
-        render={
+      trigger={{
+        render: (
           <Button
             variant="ghost"
             touch
             aria-label={`Borrar ${recipe.name}`}
             data-testid="recipe-delete-open"
           />
-        }
-      >
-        <Trash2Icon />
-      </AlertDialogTrigger>
-      <AlertDialogContent data-testid="delete-recipe-dialog">
-        <AlertDialogHeader>
-          <AlertDialogTitle>{isVersion ? 'Borrar versión' : 'Borrar receta'}</AlertDialogTitle>
-          <AlertDialogDescription data-testid="delete-recipe-message">
+        ),
+        children: <Trash2Icon />,
+      }}
+      texts={{
+        title: isVersion ? 'Borrar versión' : 'Borrar receta',
+        description: (
+          <>
             {isVersion
               ? `Se va a borrar la versión «${recipe.name}». Esta acción no se puede deshacer.`
               : `Se va a borrar «${recipe.name}». Esta acción no se puede deshacer.`}
@@ -135,33 +118,24 @@ export function DeleteRecipeDialog({
                 <span data-testid="delete-recipe-versions-notice">{notice}</span>
               </>
             )}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        {error === null ? null : (
-          <ErrorAlert
-            error={error}
-            cataloguedAs="p"
-            className="text-sm text-destructive"
-            testId="delete-recipe-error"
-          />
-        )}
-
-        <AlertDialogFooter>
-          <AlertDialogCancel className={touchTarget} data-testid="delete-recipe-cancel">
-            Cancelar
-          </AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            className={touchTarget}
-            disabled={isPending || countBlocksConfirm}
-            data-testid="delete-recipe-confirm"
-            onClick={handleConfirm}
-          >
-            Borrar
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </>
+        ),
+        dismiss: 'Cancelar',
+        confirm: 'Borrar',
+      }}
+      testIds={{
+        dialog: 'delete-recipe-dialog',
+        message: 'delete-recipe-message',
+        dismiss: 'delete-recipe-cancel',
+        confirm: 'delete-recipe-confirm',
+        error: 'delete-recipe-error',
+      }}
+      submit={{ kind: 'transition', onConfirm: handleConfirm }}
+      isPending={isPending}
+      announceBusy={false}
+      confirmDisabled={countBlocksConfirm}
+      error={error ?? undefined}
+      errorStyle="inline"
+    />
   );
 }
