@@ -339,6 +339,7 @@ lista aquí, para que `archivos-en-vuelo` no lo lea como ruta de esta feature. L
 
 ### Tests y guardias que se editan (R4, R25, R28)
 - `tests/guards/guard-piezas-base.test.ts`
+- `tests/unit/shared/data-table.test.tsx` (lista cerrada de exports del barrel: gana `actionsColumn`)
 - `tests/unit/paridad/__snapshots__/clientes-paridad.test.tsx.snap`
 - `tests/unit/paridad/__snapshots__/presentaciones-paridad.test.tsx.snap`
 - `tests/unit/paridad/__snapshots__/unidades-paridad.test.tsx.snap`

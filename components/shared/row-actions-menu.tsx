@@ -3,6 +3,7 @@
 import type { ComponentType } from 'react';
 
 import { MoreVerticalIcon } from 'lucide-react';
+import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -41,12 +42,15 @@ export type RowActionMenuItem = {
   readonly label: string;
   /** Componente de icono de lucide-react, p. ej. `PencilIcon`. */
   readonly icon: ComponentType<{ 'aria-hidden'?: boolean | 'true' | 'false' }>;
-  readonly onSelect: () => void;
   readonly disabled?: boolean;
   readonly destructive?: boolean;
   /** `data-testid` de ESTE item del menu. Sin valor, no lleva ninguno. */
   readonly testId?: string;
-};
+} & (
+  | { readonly onSelect: () => void; readonly href?: undefined }
+  /** Item enlace: se pinta como `<a href>` y navega a esa ruta. */
+  | { readonly href: string; readonly onSelect?: () => void }
+);
 
 export type RowActionsMenuProps = {
   readonly items: readonly RowActionMenuItem[];
@@ -98,6 +102,7 @@ export function RowActionsMenu({
               disabled={item.disabled}
               data-testid={item.testId}
               className={ITEM_TOUCH_TARGET}
+              render={item.href === undefined ? undefined : <Link href={item.href} />}
               // El primitivo de Base UI (`components/ui/dropdown-menu.tsx`) expone `onClick`, no
               // `onSelect`: aqui se traduce el callback semantico del item a ese evento.
               onClick={item.onSelect}
