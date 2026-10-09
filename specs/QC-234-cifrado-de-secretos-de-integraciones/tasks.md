@@ -39,20 +39,20 @@
 
 ## T3–T5 — Adaptadores
 
-- [ ] **T3. [P]** `adapters/driven/config/encryption-keys-env.ts` (`design.md > 5`), con
+- [x] **T3. [P]** `adapters/driven/config/encryption-keys-env.ts` (`design.md > 5`), con
       `tests/unit/integraciones/encryption-keys-env.test.ts`: un caso por fila de la tabla de
       `design.md > 5`, la versión activa ausente, mal formada y ausente de la lista, la lectura en
       cada llamada y el barrido de no-fuga de `design.md > 8`.
       **Hecho cuando:** el test en verde. Cubre R10 (lectura al llamar), R11, R12 (lectura), R14
       (errores de config). Depende de: T2.
 
-- [ ] **T4. [P]** `adapters/driven/security/secret-digest-sha256.ts` (`design.md > 6.2`), con
+- [x] **T4. [P]** `adapters/driven/security/secret-digest-sha256.ts` (`design.md > 6.2`), con
       `tests/unit/integraciones/secret-digest-sha256.test.ts`: vector `abc`, determinismo,
       verdadero y falso, resumen mal formado (largo, mayúsculas fuera de rango, no hex) da `false`
       sin lanzar, y el espía de `timingSafeEqual` de `design.md > 8`.
       **Hecho cuando:** el test en verde. Cubre R14 (resumidor), R15, R16, R17. Depende de: T2.
 
-- [ ] **T5.** `adapters/driven/security/secret-cipher-aes-gcm.ts` (`design.md > 6.1`), con
+- [x] **T5.** `adapters/driven/security/secret-cipher-aes-gcm.ts` (`design.md > 6.1`), con
       `tests/unit/integraciones/secret-cipher-aes-gcm.test.ts`: ida y vuelta (ASCII, no ASCII, 1 y
       4096 caracteres), dos cifrados distintos, forma del valor guardado, alteración de IV, tag y
       ciphertext, cada componente del contexto cambiado, los dos contextos de R6, versión ausente,
