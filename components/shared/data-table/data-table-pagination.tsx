@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { PAGE_SIZE_OPTIONS, withPage, withPageSize } from './data-table-params';
 import type { DataTableParams, DataTableTexts } from './data-table-types';
@@ -34,8 +35,6 @@ import type { DataTableParams, DataTableTexts } from './data-table-types';
  * `sticky` depende ademas de que ningun ancestro recorte con `overflow`: por eso la barra vive
  * FUERA del `div[data-slot=table-container]`, que es el que si desplaza en horizontal.
  */
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 const FIRST_PAGE = 1;
 
@@ -65,7 +64,7 @@ export function DataTablePagination({
           type="button"
           variant="outline"
           size="icon"
-          className={TOUCH_TARGET}
+          touch
           aria-label={texts.previousPage}
           disabled={isFirstPage}
           data-testid="data-table-previous"
@@ -82,7 +81,7 @@ export function DataTablePagination({
           type="button"
           variant="outline"
           size="icon"
-          className={TOUCH_TARGET}
+          touch
           aria-label={texts.nextPage}
           disabled={isLastPage}
           data-testid="data-table-next"
@@ -102,7 +101,7 @@ export function DataTablePagination({
       >
         <SelectTrigger
           aria-label={texts.pageSize}
-          className={TOUCH_TARGET}
+          className={touchTarget}
           data-testid="data-table-page-size"
         >
           <SelectValue />

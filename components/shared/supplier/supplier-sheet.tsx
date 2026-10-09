@@ -8,10 +8,9 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
 import type { SupplierView } from '@/lib/modules/proveedores';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { SupplierForm } from './supplier-form';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 const CREATE_LABEL = 'Nuevo proveedor';
 const CREATE_SUCCESS = 'Proveedor creado.';
@@ -60,7 +59,7 @@ export function SupplierSheet({ supplier }: { readonly supplier?: SupplierView }
         render={
           <Button
             variant={isEdit ? 'ghost' : 'default'}
-            className={TOUCH_TARGET}
+            className={touchTarget}
             aria-label={isEdit ? `Editar ${supplier.name}` : undefined}
             data-testid={isEdit ? 'supplier-edit-open' : 'supplier-create-open'}
           />

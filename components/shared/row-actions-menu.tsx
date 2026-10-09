@@ -11,6 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Menu "de los 3 puntos" para las acciones de una fila: UN disparador siempre presente en el DOM
@@ -28,9 +29,6 @@ import {
  * clic; el disparador en si sigue siempre visible, siempre en el DOM y con su propio objetivo
  * tactil, igual que cualquier otro boton de accion del repo.
  */
-
-/** Objetivo tactil minimo (44x44 px). Los primitivos miden 32 px de alto por defecto. */
-const TRIGGER_TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /** El primitivo trae `px-1.5 py-1 gap-1.5` (~28 px): demasiado justo para tocar con el dedo. */
 const ITEM_TOUCH_TARGET = 'min-h-11 gap-2.5 px-3 py-2.5';
@@ -80,7 +78,7 @@ export function RowActionsMenu({
             type="button"
             variant="ghost"
             size="icon"
-            className={TRIGGER_TOUCH_TARGET}
+            className={touchTarget}
             aria-label={triggerLabel}
             data-testid={triggerTestId}
             {...triggerDataAttributes}

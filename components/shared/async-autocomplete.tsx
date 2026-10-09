@@ -1,8 +1,8 @@
 'use client';
 
-import { Loader2Icon } from 'lucide-react';
 import { useCallback, useId, useRef, useState, type CSSProperties } from 'react';
 
+import { Spinner } from '@/components/shared/spinner';
 import {
   Autocomplete,
   AutocompleteClear,
@@ -203,7 +203,7 @@ export function AsyncAutocomplete<T>({
           >
             {isLoading || isLoadingMore ? (
               <span className="flex items-center justify-center gap-1.5 py-2">
-                <Loader2Icon className="size-4 animate-spin" aria-hidden />
+                <Spinner />
                 Cargando...
               </span>
             ) : null}
