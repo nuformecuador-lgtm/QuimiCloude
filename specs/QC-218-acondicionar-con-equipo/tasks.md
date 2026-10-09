@@ -180,7 +180,7 @@
   **Hecho:** `pnpm exec playwright test e2e/acondicionamiento.spec.ts` en verde, sin otra línea
   cambiada.
 
-- [ ] **T18. Cierre** (R36) [todas].
+- [x] **T18. Cierre** (R36) [todas].
   `./init.sh` en verde. `package.json` sin dependencias nuevas. `progress/impl_QC-218.md` con el mapa
   `R<n> -> test` de R1–R36.
 
