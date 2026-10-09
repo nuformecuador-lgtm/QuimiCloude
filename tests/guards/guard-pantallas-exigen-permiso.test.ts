@@ -254,6 +254,10 @@ function describir(infracciones: readonly Infraccion[]): string {
 //
 // TENSADA el 2026-10-08: de veintiuna a VEINTIDOS, con `/asignacion/acondicionamiento/[id]`,
 // que llama a `requirePagePermission` UNA sola vez, con `acondicionamiento.modificar`.
+//
+// TENSADA el 2026-10-08 (QC-222): de veintidos a VEINTICINCO, con `/integraciones/proveedor-ia`,
+// `/integraciones/inventarios` y `/integraciones/whatsapp`, las tres pantallas del menu de
+// integraciones. Se dan de alta en la lista como cualquier otra: el barrido las valida igual.
 const RUTAS_ESPERADAS_HOY = [
   '/asignacion',
   '/asignacion/[id]',
@@ -265,6 +269,9 @@ const RUTAS_ESPERADAS_HOY = [
   '/configuracion/usuarios',
   '/dashboard',
   '/dashboard/recorrido/[id]',
+  '/integraciones/inventarios',
+  '/integraciones/proveedor-ia',
+  '/integraciones/whatsapp',
   '/inventario',
   '/inventario/importar',
   '/pedidos',
@@ -280,7 +287,7 @@ const RUTAS_ESPERADAS_HOY = [
 ].sort();
 
 describe('guardia — toda pantalla bajo app/(private)/ exige un permiso del catalogo (R6, R20)', () => {
-  it('el barrido encuentra exactamente las veintidos pantallas privadas de hoy', () => {
+  it('el barrido encuentra exactamente las veinticinco pantallas privadas de hoy', () => {
     const rutas = [...listPrivatePages(repoRoot).map((pantalla) => pantalla.route)].sort();
 
     expect(rutas).toEqual(RUTAS_ESPERADAS_HOY);

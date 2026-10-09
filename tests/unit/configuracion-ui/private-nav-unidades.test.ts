@@ -75,8 +75,8 @@ function paginaDe(href: string): string {
   return join(RAIZ, 'app', '(private)', ...href.split('/').filter(Boolean), 'page.tsx');
 }
 
-describe('la seccion Configuración sigue siendo una y ahora tiene dos items (R9)', () => {
-  it('hay exactamente UNA seccion Configuración y lleva exactamente DOS items', () => {
+describe('la seccion Configuración sigue siendo una y ahora tiene tres items (R9)', () => {
+  it('hay exactamente UNA seccion Configuración y lleva exactamente TRES items', () => {
     // Ni se crea una segunda seccion ni se renombra la que existe: se anade un item a la de
     // QC-45, que nacio con uno.
     const secciones = groupNavItemsBySection(PRIVATE_NAV_ITEMS).filter(
@@ -89,7 +89,9 @@ describe('la seccion Configuración sigue siendo una y ahora tiene dos items (R9
     // decision humana (es operacion, no configuracion). Lo que R9 promete sigue intacto y lo
     // comprueba el caso de abajo: el item de presentaciones no se toca y sigue siendo el primero;
     // el de unidades tampoco se mueve.
-    expect(secciones[0]?.items).toHaveLength(2);
+    // TENSADA el 2026-10-08 a TRES con el grupo «Integraciones», que entra al FINAL: Unidades
+    // sigue en la segunda posicion.
+    expect(secciones[0]?.items).toHaveLength(3);
     expect((secciones[0]?.items[1] as NavLink | undefined)?.href).toBe(UNITS_ROUTE);
   });
 

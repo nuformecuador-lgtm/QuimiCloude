@@ -1,5 +1,5 @@
 // El modulo `integraciones` es un armazon: contrato vacio, carpetas hexagonales sin codigo y nadie
-// que lo importe. Su permiso existe en el catalogo, pero ningun archivo de produccion lo exige aun.
+// que lo importe. Su permiso solo lo exigen las tres paginas de integraciones y lo declara el menu.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, extname, join, relative, resolve, sep } from 'node:path'
@@ -101,11 +101,23 @@ function productionFilesContaining(literal: string): string[] {
     .map((file) => toPosix(relative(repoRoot, file)))
 }
 
-/** Lo que el permiso tiene permitido: el catalogo y las migraciones. */
+/**
+ * Archivos que exigen o declaran el permiso por su ruta exacta. Una pantalla, un enlace o un caso
+ * de uso nuevo entra con su ruta EXACTA, nunca abriendo una carpeta.
+ */
+const EXACT_HOLDERS_OUTSIDE_THE_CATALOG = [
+  'app/(private)/integraciones/proveedor-ia/page.tsx',
+  'app/(private)/integraciones/inventarios/page.tsx',
+  'app/(private)/integraciones/whatsapp/page.tsx',
+  'lib/shared/navigation/private-nav.ts',
+] as const
+
+/** Lo que el permiso tiene permitido: el catalogo, las migraciones y las rutas exactas de arriba. */
 export function isAllowedHolderOfTheCode(relativePath: string): boolean {
   return (
     relativePath === 'lib/modules/identity/domain/permissions.ts' ||
-    relativePath.startsWith('db/migrations/')
+    relativePath.startsWith('db/migrations/') ||
+    (EXACT_HOLDERS_OUTSIDE_THE_CATALOG as readonly string[]).includes(relativePath)
   )
 }
 
@@ -193,7 +205,7 @@ describe('la autorizacion del modulo es por permiso', () => {
     expect(findForbiddenPatternsInSource(sintetico).length).toBeGreaterThan(0)
   })
 
-  it('R9: el codigo del permiso solo aparece en el catalogo y en db/migrations/', () => {
+  it('R17: el codigo del permiso solo aparece en el catalogo, en db/migrations/, en las tres paginas de integraciones y en el menu privado', () => {
     const conElCodigo = productionFilesContaining(CODIGO)
 
     expect(conElCodigo, 'el barrido deberia ver el catalogo de permisos').toContain(
@@ -201,16 +213,29 @@ describe('la autorizacion del modulo es por permiso', () => {
     )
     expect(
       conElCodigo.filter((file) => !isAllowedHolderOfTheCode(file)),
-      `${CODIGO} aparece fuera del catalogo y de las migraciones. Si lo exige una pagina, un ` +
-        'enlace del menu o un caso de uso nuevo (QC-222 o una ficha posterior), anade su ruta ' +
-        'EXACTA a isAllowedHolderOfTheCode en vez de abrir una carpeta entera.',
+      `${CODIGO} aparece fuera de los archivos permitidos. Si lo exige una pagina, un enlace del ` +
+        'menu o un caso de uso nuevo, anade su ruta EXACTA a isAllowedHolderOfTheCode en vez de ' +
+        'abrir una carpeta entera.',
     ).toEqual([])
   })
 
-  it('R9: la regla rechaza un archivo de produccion ajeno y admite el catalogo y las migraciones', () => {
+  it('R17: el barrido ve el codigo del permiso en cada una de las cuatro rutas exactas admitidas', () => {
+    const conElCodigo = productionFilesContaining(CODIGO)
+    for (const ruta of EXACT_HOLDERS_OUTSIDE_THE_CATALOG) {
+      expect(conElCodigo, ruta).toContain(ruta)
+    }
+  })
+
+  it('R17: la regla admite el catalogo, las migraciones y las cuatro rutas exactas, y rechaza un archivo vecino', () => {
     expect(isAllowedHolderOfTheCode('lib/modules/identity/domain/permissions.ts')).toBe(true)
     expect(isAllowedHolderOfTheCode('db/migrations/x_integrations_permission/migration.sql')).toBe(true)
-    expect(isAllowedHolderOfTheCode('app/(private)/integraciones/whatsapp/page.tsx')).toBe(false)
-    expect(isAllowedHolderOfTheCode('lib/shared/navigation/private-nav.ts')).toBe(false)
+    expect(isAllowedHolderOfTheCode('app/(private)/integraciones/proveedor-ia/page.tsx')).toBe(true)
+    expect(isAllowedHolderOfTheCode('app/(private)/integraciones/inventarios/page.tsx')).toBe(true)
+    expect(isAllowedHolderOfTheCode('app/(private)/integraciones/whatsapp/page.tsx')).toBe(true)
+    expect(isAllowedHolderOfTheCode('lib/shared/navigation/private-nav.ts')).toBe(true)
+    expect(
+      isAllowedHolderOfTheCode('app/(private)/integraciones/components/integration-placeholder.tsx'),
+    ).toBe(false)
+    expect(isAllowedHolderOfTheCode('lib/shared/routes.ts')).toBe(false)
   })
 })

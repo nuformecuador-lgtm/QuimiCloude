@@ -7,6 +7,7 @@ import {
   FlaskConical,
   LayoutDashboard,
   Package,
+  Puzzle,
   ShoppingCart,
   Truck,
   Users,
@@ -47,4 +48,5 @@ export const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   // obliga a que este aqui: olvidarla no compila.
   users: Users,
   contact: Contact,
+  puzzle: Puzzle,
 };

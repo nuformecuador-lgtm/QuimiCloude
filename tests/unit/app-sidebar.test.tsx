@@ -273,6 +273,8 @@ describe('barra lateral privada', () => {
       'nav-clientes',
       'nav-presentaciones',
       'nav-unidades',
+      // «Integraciones» es el ultimo item de «Configuración»: se dibuja detras de Unidades.
+      'nav-integraciones',
     ];
 
     expect(enDom).toEqual(esperado);
@@ -593,7 +595,7 @@ describe('el borrado de items de relleno (QC-13)', () => {
     // El dashboard esta fuera temporalmente: vive en `HIDDEN_DASHBOARD_NAV_ITEM`.
     // 2026-10-08 (QC-167): el humano pide volver a mostrar el item Dashboard. Vuelve a DIEZ, con
     // el dashboard SEGUNDO, detras de «Asignación», para no cambiar el aterrizaje de nadie.
-    expect(PRIVATE_NAV_ITEMS).toHaveLength(10);
+    expect(PRIVATE_NAV_ITEMS).toHaveLength(11);
     expect(PRIVATE_NAV_ITEMS.map((item) => item.testId)).toEqual([
       'nav-asignacion',
       'nav-dashboard',
@@ -605,6 +607,7 @@ describe('el borrado de items de relleno (QC-13)', () => {
       'nav-unidades',
       'nav-usuarios',
       'nav-clientes',
+      'nav-integraciones',
     ]);
   });
 
