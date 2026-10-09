@@ -163,7 +163,7 @@
 
 ## Tanda 4 — E2E y cierre
 
-- [ ] **T16. E2E nuevo** (R33, R34) [T15].
+- [x] **T16. E2E nuevo** (R33, R34) [T15].
   `e2e/acondicionar-con-equipo.spec.ts`, con el patrón de `e2e/acondicionamiento.spec.ts`:
   - roles reales del seed;
   - empresa nueva con dos acondicionadores, un Administrador, un Operador y un grupo con el Operador
@@ -174,7 +174,7 @@
   - el recorrido completo de R33, con la espera real de 5 s en los dos modales;
   - el caso de R34 con el acondicionador 2.
 
-- [ ] **T17. Ajuste del E2E de QC-217** (R35) [T15].
+- [x] **T17. Ajuste del E2E de QC-217** (R35) [T15].
   En `e2e/acondicionamiento.spec.ts`, la aserción «cero botones» del detalle del pedido A pasa a
   «el único botón es Acondicionar».
   **Hecho:** `pnpm exec playwright test e2e/acondicionamiento.spec.ts` en verde, sin otra línea

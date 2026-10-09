@@ -429,8 +429,8 @@ test.describe('las pestañas del acondicionador (R22)', () => {
       'data-status',
       'POR_ACONDICIONAR',
     );
-    await expect(screenA.locator('button')).toHaveCount(0);
-    await expect(screenA.getByRole('button')).toHaveCount(0);
+    await expect(screenA.locator('button')).toHaveCount(1);
+    await expect(screenA.getByRole('button')).toHaveText([exactText('Acondicionar')]);
 
     // --- 4. «Terminados»: C sí; D (de otro) y E (ENTREGADO suyo) no.
     await page.goto(ASSIGNED_ORDERS_ROUTE);
