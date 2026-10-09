@@ -718,6 +718,8 @@ Con `VERCEL` definida y `VERCEL_ENV=preview`, `scripts/build.mjs` primero llama 
   identificador tiene que estar en su posicion: usuario del pooler (`postgres.<ref>`) o host directo
   (`db.<ref>.supabase.co`) en `DATABASE_URL` y `DIRECT_URL`, y host (`<ref>.supabase.co`) en
   `SUPABASE_STORAGE_URL`. Como subcadena en otro sitio (nombre de la base, parametros) no cuenta.
+  Y ninguna de las tres puede traer el parametro `host` en la query (sin mirar mayusculas, tambien
+  vacio o repetido), que Prisma prioriza sobre el host de la URL: mismo criterio que H1 de QC-230.
 - **Ningun efecto fuera de la app.** `MAIL_TRANSPORT` es exactamente `desactivado`;
   `DOCUMENTS_E2E_DOUBLES` tiene valor; `RESEND_API_KEY`, `SMTP_PASS`, `ANTHROPIC_API_KEY`,
   `GEMINI_API_KEY` y `QSTASH_TOKEN` estan vacias o ausentes. Elegir los dobles y quitar las

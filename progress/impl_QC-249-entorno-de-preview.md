@@ -244,3 +244,16 @@ Veredicto: m1 y m5 cerrados, en verde; sin commit.
   94 tests verdes; `vitest run guard` + `deploy-hook.test.ts`: 65 archivos, 874 pasan, 15 saltados.
 - Abierto para el humano (no implementado): una `DIRECT_URL` con host de preview y `?host=<otro>`
   pasaria la comprobacion (Prisma prioriza ese parametro). Ampliacion barata si se aprueba.
+
+## implementer — rechazo de `?host=` (2026-10-09)
+- Aprobado por el humano: `apuntanAPreview` rechaza `DATABASE_URL`, `DIRECT_URL` o
+  `SUPABASE_STORAGE_URL` con parametro `host` en la query (nombre exacto, sin distinguir mayusculas;
+  vacio o repetido tambien), criterio H1 de QC-230. La guarda del seed lo hereda.
+- Tests nuevos: bloque «apuntanAPreview: parametro host en la query (enmienda R9, criterio H1 de
+  QC-230)» en `tests/unit/scripts/entorno-de-preview.test.ts` (pooler, directa, storage, mensaje sin
+  valor, validos `?pgbouncer=true&connection_limit=1`, `?hostaddr_x=1`, `?ghost=1`, `&hosts=1`) y un
+  caso R14 en `tests/unit/scripts/seed-demo-guard.test.ts`.
+- Salida: typecheck exit 0; lint 0 errores (7 avisos previos ajenos); related node+ui 4 archivos /
+  100 tests verdes; `vitest run guard` 64 archivos, 862 pasan, 15 saltados.
+- Abierto para el humano: `hostaddr` (nombre exacto) tambien desvia la conexion en libpq y pasa,
+  igual que en la guarda de QC-230; bloquearlo exigiria tocar las dos guardas.

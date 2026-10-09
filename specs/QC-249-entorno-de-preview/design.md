@@ -183,7 +183,9 @@ forma y posición, en `scripts/entorno-de-preview.mjs`:
   `postgres.<ref>` (pooler, transaction 6543 o session 5432) o si el host es exactamente
   `db.<ref>.supabase.co` (directa); `SUPABASE_STORAGE_URL` cumple si el host es exactamente
   `<ref>.supabase.co`. El ref en el nombre de la base, en la contraseña o en un parámetro no cuenta;
-  una URL ilegible o una variable sin regla no cumple (lado seguro).
+  una URL ilegible o una variable sin regla no cumple (lado seguro). Además (2026-10-09, aprobado
+  por el humano), una URL que traiga el parámetro `host` en la query (nombre exacto sin mirar
+  mayúsculas, con cualquier valor, vacío o repetido) no cumple, como H1 de QC-230.
 - La guarda del seed de demostración llama a `apuntanAPreview` con `['DATABASE_URL', 'DIRECT_URL']`
   y hereda el candado sin cambios propios.
 - De paso (m5 del review), `scripts/build.mjs` compara `VERCEL_ENV` recortado, igual que la guarda

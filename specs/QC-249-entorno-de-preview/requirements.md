@@ -69,7 +69,10 @@ Escritos por `spec_author` (F1.2) el 2026-10-09. «El build» es `pnpm run build
     (`@db.<ref>.supabase.co`); en `SUPABASE_STORAGE_URL`, como host (`//<ref>.supabase.co`). Las que
     no cumplen se nombran sin valores. La guarda del seed de demostración (R13, R14) hereda el mismo
     candado para `DATABASE_URL` y `DIRECT_URL`. Motivo: con un ref como `supabase`, `postgres` o uno
-    truncado, las URL de producción pasaban la comprobación.
+    truncado, las URL de producción pasaban la comprobación. Además (2026-10-09, aprobado por el
+    humano), cualquiera de las tres URL que traiga el parámetro `host` en la query (sin mirar
+    mayúsculas del nombre, también vacío o repetido) no cumple y se nombra sin valor, con el mismo
+    criterio que H1 de QC-230.
 
 ### Sin efectos fuera de la app
 

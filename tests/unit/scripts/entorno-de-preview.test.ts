@@ -220,6 +220,80 @@ describe('apuntanAPreview: forma del ref y posicion en cada URL (enmienda R9, m1
   })
 })
 
+// Enmienda de R9 (2026-10-09, aprobada por el humano): Prisma prioriza el parametro `host` de la
+// query sobre el de la autoridad. Cualquier `host` en la query se rechaza, como H1 de QC-230.
+describe('apuntanAPreview: parametro host en la query (enmienda R9, criterio H1 de QC-230)', () => {
+  const POOLER = `postgresql://postgres.${REF}:clave-inventada@aws-0-xx.pooler.supabase.com:6543/postgres`
+  const DIRECTA = `postgresql://postgres:clave-inventada@db.${REF}.supabase.co:5432/postgres`
+  const STORAGE = `https://${REF}.supabase.co/storage/v1/s3`
+  const HOST_DE_PRODUCCION = `db.${OTRO_REF}.supabase.co`
+
+  /** Queries con `host`: suelto, tras otro parametro, en mayusculas, vacio, repetido. */
+  const CON_HOST = [
+    `?host=${HOST_DE_PRODUCCION}`,
+    `?pgbouncer=true&host=${HOST_DE_PRODUCCION}`,
+    `?HOST=${HOST_DE_PRODUCCION}`,
+    `?Host=${HOST_DE_PRODUCCION}`,
+    '?host=',
+    `?host=${HOST_DE_PRODUCCION}&host=${HOST_DE_PRODUCCION}`,
+  ]
+
+  it('base con el ref en el usuario del pooler y host en la query: no cumple y la nombra (R9)', () => {
+    for (const nombre of ['DATABASE_URL', 'DIRECT_URL'] as const) {
+      for (const query of CON_HOST) {
+        const env = { ...urlsDe(REF), [nombre]: `${POOLER}${query}`, [VARIABLE_REF_DE_PREVIEW]: REF }
+        expect(apuntanAPreview(env, [...URLS]), `${nombre} ${query}`).toEqual({ ok: false, variables: [nombre] })
+      }
+    }
+  })
+
+  it('base con el host directo db.<ref>.supabase.co y host en la query: no cumple y la nombra (R9)', () => {
+    for (const nombre of ['DATABASE_URL', 'DIRECT_URL'] as const) {
+      for (const query of CON_HOST) {
+        const env = { ...urlsDe(REF), [nombre]: `${DIRECTA}${query}`, [VARIABLE_REF_DE_PREVIEW]: REF }
+        expect(apuntanAPreview(env, [...URLS]), `${nombre} ${query}`).toEqual({ ok: false, variables: [nombre] })
+      }
+    }
+  })
+
+  it('storage con host en la query: no cumple y la nombra (R9)', () => {
+    for (const query of CON_HOST) {
+      const env = { ...urlsDe(REF), SUPABASE_STORAGE_URL: `${STORAGE}${query}`, [VARIABLE_REF_DE_PREVIEW]: REF }
+      expect(apuntanAPreview(env, [...URLS]), query).toEqual({ ok: false, variables: ['SUPABASE_STORAGE_URL'] })
+    }
+  })
+
+  it('el mensaje nombra la variable y no lleva el valor del host ni de la URL (R9)', () => {
+    for (const query of CON_HOST) {
+      const env = {
+        ...previewCorrecta(),
+        DATABASE_URL: `${POOLER}${query}`,
+        DIRECT_URL: `${DIRECTA}${query}`,
+        SUPABASE_STORAGE_URL: `${STORAGE}${query}`,
+      }
+      const problemas = problemasDe(env)
+      expect(problemas.map((p) => p.split(' ')[0]), query).toEqual([...URLS])
+      for (const problema of problemas) {
+        for (const valor of [REF, OTRO_REF, HOST_DE_PRODUCCION, 'clave-inventada', 'supabase.co', 'pgbouncer']) {
+          expect(problema).not.toContain(valor)
+        }
+      }
+    }
+  })
+
+  it('validas: otros parametros, y nombres que solo contienen "host" sin ser `host` (R9)', () => {
+    for (const query of ['?pgbouncer=true&connection_limit=1', '?hostaddr_x=1', '?ghost=1', '?sslmode=require&hosts=1']) {
+      const env = {
+        DATABASE_URL: `${POOLER}${query}`,
+        DIRECT_URL: `${DIRECTA}${query}`,
+        SUPABASE_STORAGE_URL: `${STORAGE}${query}`,
+        [VARIABLE_REF_DE_PREVIEW]: REF,
+      }
+      expect(apuntanAPreview(env, [...URLS]), query).toEqual({ ok: true })
+    }
+  })
+})
+
 describe('comprobarEntornoDePreview', () => {
   it('un scope Preview que cumple todo pasa (R9, R10)', () => {
     expect(comprobarEntornoDePreview(previewCorrecta())).toEqual({ ok: true })

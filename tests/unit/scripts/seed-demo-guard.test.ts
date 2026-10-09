@@ -153,6 +153,23 @@ describe('seed de demo — guardas de entorno', () => {
     }
   })
 
+  it('VERCEL_ENV=preview con el ref en su posicion y `host` en la query: negado sin el valor, tambien con --forzar (R14, enmienda R9)', () => {
+    const hostDeProduccion = `db.${OTHER_REF}.supabase.co`
+    for (const nombre of ['DATABASE_URL', 'DIRECT_URL'] as const) {
+      for (const query of [`?host=${hostDeProduccion}`, `?pgbouncer=true&HOST=${hostDeProduccion}`, '?host=']) {
+        for (const argv of [[], [DEMO_SEED_FORCE_FLAG]]) {
+          const verdict = evaluateDemoSeedGuard({ argv, env: { ...PREVIEW_ENV, [nombre]: `${PREVIEW_ENV[nombre]}${query}` } })
+          expect(verdict.allowed, `${nombre} ${query}`).toBe(false)
+          if (!verdict.allowed) {
+            expect(verdict.reason).toContain(nombre)
+            expect(verdict.reason).not.toContain(OTHER_REF)
+            expect(verdict.reason).not.toContain(PREVIEW_REF)
+          }
+        }
+      }
+    }
+  })
+
   it('--forzar no anula un VERCEL_ENV arbitrario distinto de development (R15)', () => {
     const verdict = evaluateDemoSeedGuard({ argv: [DEMO_SEED_FORCE_FLAG], env: { DATABASE_URL: LOCAL_URL, VERCEL_ENV: 'staging' } })
     expect(verdict.allowed).toBe(false)

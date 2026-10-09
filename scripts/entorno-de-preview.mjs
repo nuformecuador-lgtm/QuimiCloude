@@ -48,15 +48,29 @@ function leer(env, nombre) {
 const FORMA_DEL_REF = /^[a-z]{20}$/;
 
 /**
+ * ¿Trae la query un parametro `host`? Prisma (como libpq) lo prioriza sobre el host de la autoridad,
+ * asi que con el ref en su posicion la conexion iria a otro sitio. Se rechaza con cualquier valor,
+ * vacio o repetido, sin mirar mayusculas del nombre; un nombre que solo contiene "host" (`ghost`,
+ * `hostaddr_x`) no es ese parametro. Mismo criterio que H1 de QC-230 (enmienda de R9, 2026-10-09).
+ * @param {URL} url
+ * @returns {boolean}
+ */
+function traeParametroHost(url) {
+  return [...url.searchParams.keys()].some((clave) => clave.toLowerCase() === 'host');
+}
+
+/**
  * @param {string} valor
- * @returns {URL | null} la URL, o null si no se puede leer
+ * @returns {URL | null} la URL, o null si no se puede leer o trae el parametro `host`
  */
 function comoUrl(valor) {
+  let url;
   try {
-    return new URL(valor);
+    url = new URL(valor);
   } catch {
     return null;
   }
+  return traeParametroHost(url) ? null : url;
 }
 
 /**
@@ -128,7 +142,7 @@ export function comprobarEntornoDePreview(env) {
       problemas.push(
         nombre === VARIABLE_REF_DE_PREVIEW
           ? `${nombre} debe tener el Reference ID del proyecto de Supabase de preview (20 letras minusculas)`
-          : `${nombre} debe apuntar al proyecto de preview (${VARIABLE_REF_DE_PREVIEW} no esta en su posicion: usuario del pooler, host directo o host de storage)`,
+          : `${nombre} debe apuntar al proyecto de preview (${VARIABLE_REF_DE_PREVIEW} no esta en su posicion: usuario del pooler, host directo o host de storage, y sin parametro \`host\` en la query)`,
       );
     }
   }
