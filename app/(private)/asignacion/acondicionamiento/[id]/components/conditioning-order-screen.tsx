@@ -1,15 +1,20 @@
 import Link from 'next/link';
 
-import type { ConditioningOrderRow } from '@/lib/modules/asignaciones';
+import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import type { ConditioningOrderDetail, ConditioningTeamCandidates } from '@/lib/modules/asignaciones';
+import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
 import type { OrderStatus } from '@/lib/modules/pedidos';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 import { OrderDistributionFull, assignmentViewHref } from '../../../components';
 
+import { ConditioningActions } from './conditioning-actions';
+import { ConditioningTeamList } from './conditioning-team-list';
+
 /**
- * El detalle de un pedido para quien acondiciona, en solo lectura: sin formulario, sin botón y sin
- * ninguna Server Action. Los valores son los de su fila en «Por acondicionar», que comparte la
- * misma composición.
+ * El detalle de un pedido para quien acondiciona. Los valores son los de su fila en «Por
+ * acondicionar», que comparte la misma composición. Qué acción se ofrece lo decide la página; la
+ * autorización real la hacen los casos de uso.
  */
 
 export const CONDITIONING_ORDER_SCREEN_TESTID = 'conditioning-order-screen';
@@ -20,6 +25,7 @@ export const CONDITIONING_ORDER_DISTRIBUTION_TESTID = 'conditioning-order-distri
 export const CONDITIONING_ORDER_STATUS_TESTID = 'conditioning-order-status';
 export const CONDITIONING_ORDER_CONDITIONER_TESTID = 'conditioning-order-conditioner';
 export const CONDITIONING_ORDER_BACK_LINK_TESTID = 'conditioning-order-back-link';
+export const CONDITIONING_ORDER_CANDIDATES_ERROR_TESTID = 'conditioning-order-candidates-error';
 
 export const CONDITIONING_ORDER_SCREEN_TEXTS = {
   recipeMissing: 'Esta receta está dada de baja.',
@@ -51,10 +57,21 @@ function backLink(status: OrderStatus): { readonly href: string; readonly label:
 }
 
 export type ConditioningOrderScreenProps = {
-  readonly order: ConditioningOrderRow;
+  readonly order: ConditioningOrderDetail;
+  readonly canStart?: boolean;
+  readonly canFinish?: boolean;
+  /** Sin candidatos no se ofrece «Acondicionar». */
+  readonly candidates?: ConditioningTeamCandidates | null;
+  readonly candidatesError?: ErrorState | null;
 };
 
-export function ConditioningOrderScreen({ order }: ConditioningOrderScreenProps) {
+export function ConditioningOrderScreen({
+  order,
+  canStart = false,
+  canFinish = false,
+  candidates = null,
+  candidatesError = null,
+}: ConditioningOrderScreenProps) {
   const back = backLink(order.status);
 
   return (
@@ -104,6 +121,37 @@ export function ConditioningOrderScreen({ order }: ConditioningOrderScreenProps)
         <p className="text-base text-muted-foreground" data-testid={CONDITIONING_ORDER_CONDITIONER_TESTID}>
           {CONDITIONING_ORDER_SCREEN_TEXTS.conditionedBy(order.conditionedByName)}
         </p>
+      )}
+
+      {order.team.length > 0 ? <ConditioningTeamList team={order.team} /> : null}
+
+      {canStart && candidates !== null ? (
+        <ConditioningActions
+          key="start"
+          kind="start"
+          orderId={order.id}
+          orderNumber={order.numberText}
+          candidates={candidates}
+        />
+      ) : null}
+
+      {canFinish ? (
+        <ConditioningActions key="finish" kind="finish" orderId={order.id} orderNumber={order.numberText} />
+      ) : null}
+
+      {candidatesError === null ? null : (
+        <div
+          role="alert"
+          className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
+          data-testid={CONDITIONING_ORDER_CANDIDATES_ERROR_TESTID}
+          data-code={candidatesError.code}
+        >
+          {candidatesError.code === UNEXPECTED_ERROR_CODE ? (
+            <UnexpectedErrorNotice state={candidatesError} />
+          ) : (
+            <p>{candidatesError.message}</p>
+          )}
+        </div>
       )}
 
       <Link

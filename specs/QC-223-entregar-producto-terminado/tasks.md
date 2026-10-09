@@ -80,7 +80,7 @@ Cubre: R16 (función), base de R1, R10, R18, R20 y R38.
 Depende de: T0.
 
 Archivos:
-- `db/migrations/20261008150000_inventory_movement_kind_delivery/migration.sql` y `down.sql`.
+- `db/migrations/20261008150050_inventory_movement_kind_delivery/migration.sql` y `down.sql`.
 - `db/migrations/20261008150100_order_deliveries/migration.sql` y `down.sql`.
 - `db/migrations/20261008150200_delivery_permission/migration.sql` y `down.sql`.
 - Las tres van según `design.md > 3`. Antes de escribirlas hay que comprobar dos cosas:
@@ -420,8 +420,8 @@ Producción:
 - `lib/modules/errores/domain/error-catalog.ts`
 - `lib/composition/index.ts`
 - `db/schema.prisma`
-- `db/migrations/20261008150000_inventory_movement_kind_delivery/migration.sql`
-- `db/migrations/20261008150000_inventory_movement_kind_delivery/down.sql`
+- `db/migrations/20261008150050_inventory_movement_kind_delivery/migration.sql`
+- `db/migrations/20261008150050_inventory_movement_kind_delivery/down.sql`
 - `db/migrations/20261008150100_order_deliveries/migration.sql`
 - `db/migrations/20261008150100_order_deliveries/down.sql`
 - `db/migrations/20261008150200_delivery_permission/migration.sql`

@@ -203,6 +203,11 @@ export {
   packedOrderNoticeText,
 } from './packed-order-notice';
 export {
+  CONDITIONED_ORDER_NOTICE_TESTID,
+  ConditionedOrderNotice,
+  conditionedOrderNoticeText,
+} from './conditioned-order-notice';
+export {
   ORDER_DISTRIBUTION_FULL_SEPARATOR,
   ORDER_DISTRIBUTION_FULL_TESTID,
   OrderDistributionFull,

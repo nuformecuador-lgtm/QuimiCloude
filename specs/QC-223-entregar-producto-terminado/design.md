@@ -389,7 +389,7 @@ misma transacción (55P04). Precedentes: `20260924190000_finished_product_enum_v
 comprobar que van detrás de la última migración de `origin/dev` y que no chocan con QC-217, QC-218
 ni QC-219, que corren en paralelo.
 
-### 3.1 `20261008150000_inventory_movement_kind_delivery`
+### 3.1 `20261008150050_inventory_movement_kind_delivery`
 
 ```sql
 ALTER TYPE "InventoryMovementKind" ADD VALUE 'delivery';

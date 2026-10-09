@@ -53,6 +53,7 @@ const CASOS_DE_USO_QUE_LO_EXIGEN = [
   'lib/modules/asignaciones/domain/list-conditioning-orders.ts',
   'lib/modules/asignaciones/domain/list-conditioned-orders.ts',
   'lib/modules/asignaciones/domain/get-conditioning-order.ts',
+  'lib/modules/asignaciones/domain/list-conditioning-team-candidates.ts',
 ] as const;
 
 // Consumidores que no son caso de uso, cada uno con la forma exacta en que debe nombrar el permiso.
@@ -228,8 +229,8 @@ describe('R17, R21 — solo el catalogo, los casos de uso del acondicionamiento 
     ...CONSUMIDORES_QUE_NO_SON_CASO_DE_USO,
   ];
 
-  it('R21: son ocho rutas exactas: el catalogo, cinco casos de uso y dos consumidores', () => {
-    expect(new Set(permitidos).size).toBe(8);
+  it('R21, R31: son nueve rutas exactas: el catalogo, seis casos de uso (con los candidatos del equipo) y dos consumidores', () => {
+    expect(new Set(permitidos).size).toBe(9);
   });
 
   it('R17, R21: el codigo solo aparece en el catalogo de permisos y en las rutas exactas abiertas', () => {

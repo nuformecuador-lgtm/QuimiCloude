@@ -47,4 +47,14 @@ export interface WorkGroupDirectory {
     workGroupId: string,
     now: Date,
   ): Promise<WorkGroupSnapshot | null>;
+
+  /**
+   * Las fotos de los grupos vivos de la empresa, por nombre normalizado y despues por id, como
+   * mucho `limit`. Cada `activeMemberIds` sigue el mismo filtro que `findSnapshotAliveInCompany`.
+   */
+  listSnapshotsAliveInCompany(
+    companyId: string,
+    now: Date,
+    limit: number,
+  ): Promise<readonly WorkGroupSnapshot[]>;
 }

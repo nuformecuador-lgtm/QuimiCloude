@@ -526,7 +526,10 @@ async function vaciarPedidos(tx: Prisma.TransactionClient) {
  * `order_execution_entries_order_id_company_id_fkey`, con la misma forma; se retira y restaura
  * igual que las otras dos.
  *
- * QC-223 2026-10-08: `20261008150100_order_deliveries` anadio una cuarta,
+ * 2026-10-08 (QC-218): `20261008150000_order_conditioning_team` anadio una cuarta,
+ * `order_conditioning_team_members_order_id_company_id_fkey`, con la misma forma.
+ *
+ * QC-223 2026-10-08: `20261008150100_order_deliveries` anadio una quinta,
  * `order_deliveries_order_id_fkey`, con la misma forma; se retira y restaura igual.
  */
 const RESERVATION_ORDER_FK =
@@ -539,6 +542,10 @@ const INVENTORY_ORDER_FK =
   'ON DELETE RESTRICT ON UPDATE CASCADE'
 const EXECUTION_ENTRY_ORDER_FK =
   'ALTER TABLE "order_execution_entries" ADD CONSTRAINT "order_execution_entries_order_id_company_id_fkey" ' +
+  'FOREIGN KEY ("order_id", "company_id") REFERENCES "orders"("id", "company_id") ' +
+  'ON DELETE RESTRICT ON UPDATE CASCADE'
+const CONDITIONING_TEAM_ORDER_FK =
+  'ALTER TABLE "order_conditioning_team_members" ADD CONSTRAINT "order_conditioning_team_members_order_id_company_id_fkey" ' +
   'FOREIGN KEY ("order_id", "company_id") REFERENCES "orders"("id", "company_id") ' +
   'ON DELETE RESTRICT ON UPDATE CASCADE'
 const DELIVERY_ORDER_FK =
@@ -556,6 +563,9 @@ async function dropForeignKeysDependingOnOrdersCompanyKey(tx: Prisma.Transaction
   await tx.$executeRawUnsafe(
     'ALTER TABLE "order_execution_entries" DROP CONSTRAINT "order_execution_entries_order_id_company_id_fkey"',
   )
+  await tx.$executeRawUnsafe(
+    'ALTER TABLE "order_conditioning_team_members" DROP CONSTRAINT "order_conditioning_team_members_order_id_company_id_fkey"',
+  )
   await tx.$executeRawUnsafe('ALTER TABLE "order_deliveries" DROP CONSTRAINT "order_deliveries_order_id_fkey"')
 }
 
@@ -563,6 +573,7 @@ async function restoreForeignKeysDependingOnOrdersCompanyKey(tx: Prisma.Transact
   await tx.$executeRawUnsafe(RESERVATION_ORDER_FK)
   await tx.$executeRawUnsafe(INVENTORY_ORDER_FK)
   await tx.$executeRawUnsafe(EXECUTION_ENTRY_ORDER_FK)
+  await tx.$executeRawUnsafe(CONDITIONING_TEAM_ORDER_FK)
   await tx.$executeRawUnsafe(DELIVERY_ORDER_FK)
 }
 

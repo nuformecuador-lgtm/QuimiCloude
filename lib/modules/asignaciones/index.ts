@@ -63,6 +63,8 @@ export {
   OrderNotConditionableError,
   OrderBlockedError,
   OrderWithoutDistributionError,
+  ConditioningTeamMemberNotAllowedError,
+  ConditioningTeamEmptyError,
 } from './domain/errors';
 
 // Los TRES esquemas del borde (R14, R29, R31, R32, R42) y sus tipos inferidos. Se publican para
@@ -261,6 +263,8 @@ export {
 export {
   composeConditioningOrderRows,
   type ConditioningOrderRow,
+  type ConditioningOrderDetail,
+  type ConditioningTeamMemberView,
 } from './domain/conditioning-order-view';
 export {
   createListConditioningOrders,
@@ -274,3 +278,15 @@ export {
   createGetConditioningOrder,
   type GetConditioningOrderDeps,
 } from './domain/get-conditioning-order';
+
+// ---------------------------------------------------------------------------------------
+// El equipo de acondicionamiento: la entrada de Comenzar y los candidatos del modal.
+// ---------------------------------------------------------------------------------------
+export { startConditioningSchema, type StartConditioningInput } from './domain/conditioning-team';
+export {
+  createListConditioningTeamCandidates,
+  type ConditioningTeamCandidateGroup,
+  type ConditioningTeamCandidatePerson,
+  type ConditioningTeamCandidates,
+  type ListConditioningTeamCandidatesDeps,
+} from './domain/list-conditioning-team-candidates';
