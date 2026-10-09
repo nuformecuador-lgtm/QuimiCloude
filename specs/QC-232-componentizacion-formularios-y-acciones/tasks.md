@@ -62,7 +62,7 @@ hace push y el leader vuelve a correr `archivos-en-vuelo`.
 
 ## Tanda 1 — Piezas compartidas (depende de T0; cada task [P] respecto de las demás)
 
-- [ ] **T1a [P]. `FormSheet`, `SaveButton` y `useEntitySheet`** (R6–R11; `design.md > 3.1`).
+- [x] **T1a [P]. `FormSheet`, `SaveButton` y `useEntitySheet`** (R6–R11; `design.md > 3.1`).
   - **Test:** `tests/unit/shared-ui/form-sheet.test.tsx` y `tests/unit/shared-ui/use-entity-sheet.test.tsx`,
     con un caso por R.
   - **Hecho cuando:** los dos están en verde y cubren:
@@ -70,7 +70,7 @@ hace push y el leader vuelve a correr `archivos-en-vuelo`.
     - el envío en curso;
     - `busy`, `canSave = false` y `disabled`;
     - el orden cerrar, toast y refresh.
-- [ ] **T1b [P]. `ConfirmDialog` y `DeleteConfirmDialog`** (R12–R15; `design.md > 3.2`).
+- [x] **T1b [P]. `ConfirmDialog` y `DeleteConfirmDialog`** (R12–R15; `design.md > 3.2`).
   - **Test:** `tests/unit/shared-ui/confirm-dialog.test.tsx`.
   - **Hecho cuando:** está en verde y cubre:
     - con form y con transición;
@@ -78,13 +78,13 @@ hace push y el leader vuelve a correr `archivos-en-vuelo`.
     - el error que deja el diálogo abierto;
     - el pendiente;
     - el disparador propio frente al controlado.
-- [ ] **T1c [P]. `FieldError`, `TextField`, `SelectField` (y la ampliación aditiva de `SharedSelect`) y
+- [x] **T1c [P]. `FieldError`, `TextField`, `SelectField` (y la ampliación aditiva de `SharedSelect`) y
   `DatePicker`** (R16, R18, R19; `design.md > 3.3`).
   - **Test:** `tests/unit/shared-ui/campos.test.tsx`.
   - **Hecho cuando:**
     - está en verde;
     - los tests de `product-form`, el único consumidor de `SharedSelect`, pasan sin editar.
-- [ ] **T1d [P]. `RowActionsMenu` con items enlace y `actionsColumn()`** (R21, R24; `design.md > 3.4`).
+- [x] **T1d [P]. `RowActionsMenu` con items enlace y `actionsColumn()`** (R21, R24; `design.md > 3.4`).
   - **Test:** `tests/unit/shared-ui/row-actions-menu-href.test.tsx` y
     `tests/unit/shared-ui/actions-column.test.tsx`.
   - **Hecho cuando:**
