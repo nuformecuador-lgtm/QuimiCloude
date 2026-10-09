@@ -170,3 +170,32 @@ Todo con el árbol completo (HEAD `11dde9a7`), salvo lo que se indica.
 - **Listas cerradas:** `acondicionar-con-equipo.spec.ts` se dio de alta en `E2E_ESPERADOS`, en
   `tests/guards/guard-identificador-de-request.test.ts` (commit `a20b35d8`). El spec no menciona
   `data-table`, así que no entra en `data-table-alcance`.
+
+## Integración con `dev` (F2.3, 2026-10-09)
+
+- **Merge** `origin/dev` (trae QC-222 y QC-233; sin migraciones nuevas, `package.json` solo suma
+  el script `db:seed:demo`): commit `0d31b71b`.
+  - Conflicto único, `tests/integration/aislamiento.json`: se conservan las dos entradas
+    (`asignaciones/start-conditioning-team.int.test.ts` y `scripts/seed-demo.int.test.ts`).
+  - Uniones automáticas revisadas: `lib/shared/routes.ts` (QC-218 suma `CONDITIONED_ORDER_PARAM`;
+    QC-222 mete las tres rutas de integraciones en `PRIVATE_ROUTE_PREFIXES`), la lista cerrada de
+    `recipe-route-contract` (`CONDITIONED_ORDER_PARAM`, dev no suma exports), `E2E_ESPERADOS`
+    (`acondicionar-con-equipo.spec.ts` + `brand-assets.spec.ts` + `integraciones.spec.ts`) y
+    `MIGRACIONES_ESPERADAS`: llevan los dos lados. `guard-pantallas-exigen-permiso` y
+    `data-table-alcance` no los toca QC-218.
+- **Rojo semántico de la integración:** `tests/guards/guard-piezas-base.test.ts` (QC-231, llega con
+  dev) marcó R7 (constante local `TOUCH_TARGET` en 5 componentes del acondicionamiento) y R12
+  (comparación con `UNEXPECTED_ERROR_CODE` en los diálogos de comenzar y terminar). Arreglo
+  mecánico con el mismo DOM: `touchTarget` compartido y `ErrorAlert ... withDataCode`. Commit
+  `3caf9a9e`.
+- **m1 del review:** título y comentarios de `e2e/acondicionamiento.spec.ts` describen el botón
+  «Acondicionar» del detalle; las aserciones no cambian. Commit `e3c24ffc`.
+- **Verificación tras el merge, con todo el árbol:**
+  - `pnpm typecheck`: exit 0.
+  - `pnpm lint`: exit 0 (0 errores, 7 avisos previos ajenos).
+  - `vitest run tests/guards tests/unit/shared tests/unit/recetas-ui tests/unit/asignaciones
+    tests/unit/asignaciones-ui tests/unit/identity tests/unit/composition tests/unit/errores
+    tests/integration/pedidos/company-scope.int.test.ts`: `Test Files 310 passed (310)`,
+    `Tests 5396 passed | 42 skipped (5438)`. Antes del arreglo: 1 archivo rojo (guard-piezas-base,
+    2 tests).
+  - `prisma migrate status`: «Database schema is up to date!».
