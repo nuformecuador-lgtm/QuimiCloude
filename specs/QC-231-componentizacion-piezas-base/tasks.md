@@ -148,7 +148,7 @@ y se anota en el impl.
 
 ## Tanda 4 — `components/shared` (depende de T1, T2, T4 y T5; [P] con la tanda 3)
 
-- [ ] **T10.** La talla táctil, `Spinner` y `EMPTY_MARK` en los consumidores compartidos de
+- [x] **T10.** La talla táctil, `Spinner` y `EMPTY_MARK` en los consumidores compartidos de
   `Archivos esperados` (`data-table/*`, `document-upload/*`, `supplier/*`, `step-reader/*`,
   pickers y selects). Entra también `ErrorAlert` en `supplier/supplier-form.tsx`.
   - **Hecho cuando:** los tests de esos componentes y la paridad están en verde.
@@ -230,7 +230,9 @@ y se anota en el impl.
 - `components/shared/supplier/supplier-form.tsx`
 - `components/shared/supplier/supplier-field.tsx`
 - `components/shared/step-reader/step-reader.tsx`
-- `components/shared/step-reader/step-document-view.tsx`
+- ~~`components/shared/step-reader/step-document-view.tsx`~~: **fuera de alcance, va en QC-232**
+  (decisión del humano del 2026-10-08). Lo protege la lista cerrada R18 de
+  `order-execution-screen.test.tsx`. T14 lo excluye de forma explícita.
 - `components/shared/data-table/data-table-scroll-nav.tsx`
 - `components/shared/data-table/data-table-pagination.tsx`
 - `components/shared/data-table/data-table-header-menu.tsx`
