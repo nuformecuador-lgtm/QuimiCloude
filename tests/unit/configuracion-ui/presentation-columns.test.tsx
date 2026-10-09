@@ -33,6 +33,9 @@ import {
 import { PRESENTATION_QUERYABLE, type PresentationView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 
+import { openRowActionsMenu } from '../../helpers/row-actions-menu';
+import { setupUser } from '../../helpers/user-event';
+
 // El panel de edicion y el dialogo de borrado que la celda de acciones monta usan `useRouter`
 // para refrescar la lista tras una escritura (R25). En jsdom no hay App Router montado, asi que
 // se sustituye por un doble; ningun caso de este archivo escribe nada.
@@ -223,13 +226,15 @@ describe('la columna de acciones es una columna NORMAL que devuelve elementos (R
 });
 
 describe('cada fila ofrece editar y borrar, alcanzables por rol ARIA (R19)', () => {
-  it('los dos botones estan en el DOM desde el primer render y son botones de verdad', () => {
+  it('los dos botones estan en el DOM desde el primer render y son botones de verdad', async () => {
+    const user = setupUser();
     const view = presentacion();
 
     pintarCelda(ACTIONS_COLUMN_ID, view);
+    await openRowActionsMenu(user, screen.getByTestId(PRESENTATION_ROW_ACTIONS_TESTID));
 
-    const editar = screen.getByRole('button', { name: editPresentationLabel(view.name) });
-    const borrar = screen.getByRole('button', { name: deletePresentationLabel(view.name) });
+    const editar = screen.getByRole('menuitem', { name: editPresentationLabel() });
+    const borrar = screen.getByRole('menuitem', { name: deletePresentationLabel() });
 
     expect(editar).toBeInTheDocument();
     expect(borrar).toBeInTheDocument();
@@ -254,7 +259,7 @@ describe('cada fila ofrece editar y borrar, alcanzables por rol ARIA (R19)', () 
   it('los dos objetivos tactiles miden al menos 44x44 px (R34)', () => {
     pintarCelda(ACTIONS_COLUMN_ID, presentacion());
 
-    for (const testId of [PRESENTATION_ACTION_EDIT_TESTID, PRESENTATION_ACTION_DELETE_TESTID]) {
+    for (const testId of [PRESENTATION_ROW_ACTIONS_TESTID]) {
       const boton = screen.getByTestId(testId);
       expect(boton).toHaveClass('min-h-11');
       expect(boton).toHaveClass('min-w-11');
