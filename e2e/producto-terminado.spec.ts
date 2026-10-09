@@ -78,6 +78,7 @@ import {
 import { addPackagingLine } from './helpers/order-distribution';
 import { batchStock, seedPackaging } from './helpers/packaging';
 import { exactProductNameCellText } from './helpers/product-name-cell';
+import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 const FIXTURE_PREFIX = 'qc150_e2e_';
 
@@ -324,7 +325,9 @@ async function openFinishedGoodsBatchesPanel(page: Page, productName: string): P
   const row = page
     .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
     .filter({ has: nameCell });
-  await row.getByTestId('product-batches-open').click();
+  await (
+    await openRowActionsMenuItem(page, row.getByTestId('product-row-actions'), 'product-batches-open')
+  ).click();
   await expect(page.getByTestId('product-batches-sheet')).toBeVisible({ timeout: 60_000 });
 
   return page.getByTestId('product-batches-sheet');
