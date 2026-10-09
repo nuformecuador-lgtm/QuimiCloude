@@ -206,7 +206,7 @@ export const EXCLUSIONES: readonly Exclusion[] = [
     simbolo: 'EMPTY_CELL',
     motivo:
       'alias `EMPTY_CELL = EMPTY_MARK`: lo importa product-batches-panel.tsx, fuera de la lista ' +
-      '(pregunta abierta para el leader)',
+      'de Archivos esperados; decision del humano (2026-10-08): el alias pasa a QC-232',
   },
   {
     archivo: 'app/(private)/proveedores/[id]/components/catalog-columns.tsx',
@@ -214,7 +214,7 @@ export const EXCLUSIONES: readonly Exclusion[] = [
     simbolo: 'EMPTY_CELL',
     motivo:
       'alias `EMPTY_CELL = EMPTY_MARK`: lo importa supplier-detail-header.tsx, fuera de la lista ' +
-      '(pregunta abierta para el leader)',
+      'de Archivos esperados; decision del humano (2026-10-08): el alias pasa a QC-232',
   },
   {
     archivo: 'app/(private)/asignacion/components/assigned-orders-columns.tsx',
