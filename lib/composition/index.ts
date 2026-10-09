@@ -352,6 +352,7 @@ import { readMailTransportFromEnv } from '@/lib/modules/identity/adapters/driven
 import { sendCredentialSetupLink as sendCredentialSetupLinkToOutbox } from '@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-outbox';
 import { sendCredentialSetupLink as sendCredentialSetupLinkWithResend } from '@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-resend';
 import { sendCredentialSetupLink as sendCredentialSetupLinkWithSmtp } from '@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-smtp';
+import { sendCredentialSetupLink as sendCredentialSetupLinkDisabled } from '@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-desactivado';
 import {
   applyCredentialAndActivate,
   issueForPendingUser,
@@ -698,6 +699,8 @@ const credentialSetupMailer: CredentialSetupMailer = {
         return sendCredentialSetupLinkWithSmtp(input);
       case 'resend':
         return sendCredentialSetupLinkWithResend(input);
+      case 'desactivado':
+        return sendCredentialSetupLinkDisabled(input);
     }
   },
 };
