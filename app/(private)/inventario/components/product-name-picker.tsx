@@ -2,37 +2,17 @@
 
 import { useCallback, useId, useState } from 'react';
 
-import { Spinner } from '@/components/shared/spinner';
-import {
-  Autocomplete,
-  AutocompleteContent,
-  AutocompleteInput,
-  AutocompleteInputGroup,
-  AutocompleteItem,
-  AutocompleteList,
-} from '@/components/ui/autocomplete';
-import {
-  useAsyncPaginatedOptions,
-  type AsyncPageRequest,
-} from '@/hooks/use-async-paginated-options';
+import { AsyncAutocomplete } from '@/components/shared/async-autocomplete';
+import type { AsyncPageRequest } from '@/hooks/use-async-paginated-options';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import type { ProductType } from '@/lib/modules/inventario';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
- * Autocomplete del NOMBRE de producto en el alta (`design.md` heredado de QC-22, R18).
- *
- * **Decision humana del 2026-09-09**: el nombre deja de ser un `<input>` de texto plano y pasa a
- * ser un autocomplete que busca productos EXISTENTES en el servidor (`listProductsAction` con
- * `search`). Sigue siendo TEXTO LIBRE: si lo escrito no coincide con ningun producto, ese nombre
- * se guarda tal cual. Si se elige un producto existente, el componente avisa por `onSelect` y el
- * formulario autocompleta la alerta de cantidad.
- *
- * **Mismo motor que los otros dos selectores del ERP** (`components/ui/autocomplete.tsx` +
- * `useAsyncPaginatedOptions`): la busqueda la resuelve el SERVIDOR -nunca se recorta en memoria-,
- * el rebote es de 400 ms y las paginas siguientes se anexan al llegar al final del scroll. Ninguna
- * dependencia nueva entro en el repo.
+ * Autocomplete del NOMBRE de producto en el alta. Busca productos existentes en el servidor, pero
+ * sigue siendo TEXTO LIBRE: si lo escrito no coincide con ninguno, ese nombre se guarda tal cual.
+ * Si se elige uno existente, avisa por `onSelect` y el formulario autocompleta la alerta.
  *
  * **El nombre viaja en un `input` espejo** (`name`), no en el combobox: el formulario usa
  * `<form action>` y el valor tiene que estar en el `FormData`. El espejo es `sr-only` -y no
@@ -93,17 +73,11 @@ export function ProductNamePicker({
   const inputId = useId();
   const errorId = useId();
 
-  const [open, setOpen] = useState(false);
   /** Lo que viaja en el `FormData`: es el nombre, tanto si se escribio como si se eligio. */
   const [name, setName] = useState(defaultValue);
   /** Lo que el usuario esta escribiendo. `null` = no esta escribiendo: se muestra lo elegido. */
   const [draft, setDraft] = useState<string | null>(null);
 
-  /**
-   * Pide una pagina del catalogo, con el termino vigente si lo hay. La busqueda la resuelve el
-   * servidor: con termino viaja `search`; sin el, es la pagina completa del catalogo. El tipo
-   * tambien se filtra en el servidor, no recortando en memoria.
-   */
   const pedirPagina = useCallback(async ({ query, page }: AsyncPageRequest) => {
     const search = query.trim();
     const filtro = {
@@ -129,55 +103,19 @@ export function ProductNamePicker({
     };
   }, [productType]);
 
-  const { items, isLoading, isLoadingMore, error: loadError, loadMore, reset } =
-    useAsyncPaginatedOptions<ProductNameOption>({
-      fetchPage: pedirPagina,
-      query: draft ?? '',
-      pageSize: MAX_PAGE_SIZE,
-      debounceMs: SEARCH_DEBOUNCE_MS,
-      enabled: open,
-    });
-
-  // El hook solo reconsulta al cambiar el texto o al abrir: sin este reinicio, al reabrir tras
-  // cambiar de tipo se veria un instante la lista del tipo anterior.
-  const [tipoConsultado, setTipoConsultado] = useState(productType);
-  if (tipoConsultado !== productType) {
-    setTipoConsultado(productType);
-    reset();
-  }
-
-  /** Llegar al final de la lista pide la pagina siguiente; el hook ignora lo que sobra. */
-  const handleScroll = useCallback(
-    (event: React.UIEvent<HTMLDivElement>) => {
-      const lista = event.currentTarget;
-      if (lista.scrollHeight - lista.scrollTop - lista.clientHeight <= SCROLL_THRESHOLD) {
-        loadMore();
-      }
-    },
-    [loadMore],
-  );
-
   function handleValueChange(next: string) {
     setDraft(next);
     setName(next);
   }
 
-  function choose(option: ProductNameOption) {
+  function choose(option: ProductNameOption | null) {
+    if (option === null) {
+      return;
+    }
     setName(option.name);
     setDraft(null);
-    setOpen(false);
     onSelect?.(option);
   }
-
-  // Con el desplegable cerrado o sin escribir, el campo muestra lo YA elegido.
-  const displayValue = draft ?? name;
-  const cargando = isLoading || isLoadingMore;
-  const mensajeDeFallo =
-    loadError === undefined
-      ? null
-      : loadError.cause instanceof Error
-        ? loadError.cause.message
-        : loadError.message;
 
   return (
     <div className="flex flex-col gap-2">
@@ -204,88 +142,40 @@ export function ProductNamePicker({
         data-testid="product-name-value"
       />
 
-      <Autocomplete
-        items={items}
-        mode="none"
-        itemToStringValue={(option: ProductNameOption) => option.name}
-        value={displayValue}
-        onValueChange={handleValueChange}
-        open={open}
-        onOpenChange={setOpen}
-        openOnInputClick
-      >
-        <AutocompleteInputGroup>
-          <AutocompleteInput
-            id={inputId}
-            aria-labelledby={labelId}
-            aria-invalid={error === undefined ? undefined : true}
-            aria-describedby={error === undefined ? undefined : errorId}
-            className={`w-full ${touchTarget} ${FIELD_TEXT}`}
-            placeholder={PLACEHOLDER}
-            data-testid="product-field-name"
-          />
-        </AutocompleteInputGroup>
-
-        <AutocompleteContent className="min-w-56">
-          <div
-            data-testid="product-name-popup"
-            className="overflow-y-auto overscroll-contain"
-            style={{ maxHeight: MAX_LIST_HEIGHT }}
-            onScroll={handleScroll}
-          >
-            {mensajeDeFallo === null ? (
-              <>
-                <AutocompleteList>
-                  {(option: ProductNameOption, index: number) => (
-                    <AutocompleteItem
-                      key={option.id}
-                      index={index}
-                      value={option}
-                      className={`${touchTarget} ${FIELD_TEXT} items-center`}
-                      data-testid="product-name-option"
-                      data-product-id={option.id}
-                      onClick={() => choose(option)}
-                    >
-                      <span className="truncate">{option.name}</span>
-                    </AutocompleteItem>
-                  )}
-                </AutocompleteList>
-
-                {items.length === 0 && !cargando ? (
-                  <p
-                    className="px-2 py-3 text-sm text-muted-foreground"
-                    data-testid="product-name-empty"
-                  >
-                    {EMPTY_LABEL}
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              <p
-                role="alert"
-                className="p-2 text-sm text-destructive"
-                data-testid="product-name-load-error"
-              >
-                {mensajeDeFallo}
-              </p>
-            )}
-
-            <p
-              role="status"
-              aria-live="polite"
-              className="flex items-center justify-center gap-1.5 px-2 text-sm text-muted-foreground empty:hidden"
-              data-testid="product-name-loading"
-            >
-              {cargando ? (
-                <>
-                  <Spinner />
-                  <span className="py-2">{LOADING_LABEL}</span>
-                </>
-              ) : null}
-            </p>
-          </div>
-        </AutocompleteContent>
-      </Autocomplete>
+      {/* Sin el reinicio por tipo, al reabrir tras cambiarlo se veria un instante la lista del anterior. */}
+      <AsyncAutocomplete<ProductNameOption>
+        layout="split"
+        id={inputId}
+        fetchPage={pedirPagina}
+        resetKey={productType}
+        getOptionLabel={(option) => option.name}
+        getOptionKey={(option) => option.id}
+        onSelect={choose}
+        inputValue={draft ?? name}
+        searchQuery={draft ?? ''}
+        onInputValueChange={handleValueChange}
+        pageSize={MAX_PAGE_SIZE}
+        debounceMs={SEARCH_DEBOUNCE_MS}
+        maxHeight={MAX_LIST_HEIGHT}
+        scrollThreshold={SCROLL_THRESHOLD}
+        placeholder={PLACEHOLDER}
+        emptyMessage={EMPTY_LABEL}
+        aria-labelledby={labelId}
+        aria-invalid={error === undefined ? undefined : true}
+        aria-describedby={error === undefined ? undefined : errorId}
+        slots={{
+          inputTestId: 'product-field-name',
+          inputClassName: `w-full ${touchTarget} ${FIELD_TEXT}`,
+          popupTestId: 'product-name-popup',
+          optionTestId: 'product-name-option',
+          optionClassName: `${touchTarget} ${FIELD_TEXT} items-center`,
+          optionDataAttributes: (option) => ({ 'data-product-id': option.id }),
+          emptyTestId: 'product-name-empty',
+          loadErrorTestId: 'product-name-load-error',
+          loadingTestId: 'product-name-loading',
+          loadingLabel: LOADING_LABEL,
+        }}
+      />
 
       {error === undefined ? null : (
         <p id={errorId} className="text-sm text-destructive" data-testid="product-error-name">
