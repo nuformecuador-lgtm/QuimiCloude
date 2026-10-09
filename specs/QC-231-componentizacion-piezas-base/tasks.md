@@ -188,11 +188,12 @@ y se anota en el impl.
   - el inventario de T3;
   - las excepciones de D4;
   - los sitios de R12 que conservan la comparación sin pintar.
-- [ ] **T16. Capturas «después»** (R3) en `_trabajo/marca/capturas-despues/`, con el seed demo de
+- [x] **T16. Capturas «después»** (R3) en `_trabajo/marca/capturas-despues/`, con el seed demo de
   QC-230. Son las mismas pantallas y estados que en `capturas-antes/`. QC-230 es `depends_on` (D14):
   esta task **espera a que QC-230 esté mergeada en `dev`** y a sincronizar con `dev`.
   - **Hecho cuando:** cada captura «antes» tiene su pareja, y la tabla de parejas queda lista para
     el reviewer.
+  - **Hecha por el leader:** ver `progress/features/QC-231.md > Tandas`, nota «T16 (leader, 2026-10-08)».
 
 ## Archivos esperados
 

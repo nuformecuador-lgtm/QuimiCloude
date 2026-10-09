@@ -379,7 +379,7 @@ Notas consolidadas de cada subagente (frontend_dev).
 - Dashboard: solo `states.error`, como dice design 5.4.
 - Producto terminado: no pasa `states.empty`, porque nunca tuvo un vacío propio.
 - Presentaciones: el error previo de página se pinta con `<PresentationTable status="error">` y no con `ErrorState` directo, porque el módulo de constantes es `'use client'`.
-- D5: en catálogo, unidades, presentaciones, usuarios y grupos, la sección pasa `states.empty` también con búsqueda activa, porque hoy se ve el vacío de la sección. El snapshot no cambia, pero choca con el comentario de `DataTableStates.empty`. Tiene que mirarlo el reviewer.
+- D5: en catálogo, unidades, presentaciones, usuarios y grupos, la sección pasa `states.empty` también con búsqueda activa, porque hoy se ve el vacío de la sección. El snapshot no cambia, pero choca con el comentario de `DataTableStates.empty`. Tiene que mirarlo el reviewer. **Resuelto el 2026-10-08:** el humano enmienda R18 y D5 (H3), y el comentario de `DataTableStates.empty` describe ya este uso.
 
 ### Sitios de R12 que conservan la comparación
 - Pintan, y la etiqueta cambia según la rama (`div`/`p`): `delete-recipe-dialog`, `delete-product-dialog`, `delete-catalog-line-dialog` y `delete-supplier-dialog`. Están excluidos y nombrados en la guardia.

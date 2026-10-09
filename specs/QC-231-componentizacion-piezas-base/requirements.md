@@ -84,7 +84,7 @@ Toda adopción de piezas que los exija queda para QC-232.
 | D2 | 2026-10-08 | Sin cambios visuales ni de comportamiento: el rediseño es QC-227 | R1, R2, R3, R4 |
 | D3 | 2026-10-08 | **La credencial sale de QC-231** y va con QC-36. No se tocan `establecer-contrasena`, `credential-field` ni `credential-requirements`, salvo lo de D12 | R33 |
 | D4 | 2026-10-08 | **La `DataTable` pinta ella misma cargando, error y vacío sin búsqueda**, y el estado sustituye a toda la tabla, barras incluidas. Si una lista no puede pasar su estado por la tabla sin cambiar el DOM, la sección pinta la pieza compartida directamente y la excepción se apunta por lista. **Deja sin efecto QC-56 D12 y R30** (enmienda) | R15, R16, R17, R18, R19, R20, R21, R32 |
-| D5 | 2026-10-08 | El «sin resultados» de QC-56 D15 no cambia: sigue dentro de la tabla, con sus barras | R18 |
+| D5 | 2026-10-08 | El «sin resultados» de QC-56 D15 no cambia: sigue dentro de la tabla, con sus barras. **Enmendada el 2026-10-08:** en catálogo, unidades, presentaciones, usuarios y grupos, cuyo «sin resultados» ya era el vacío propio de la sección, se conserva lo de hoy mediante `states.empty`. La unificación es QC-227 | R18 |
 | D6 | 2026-10-08 | Las diferencias de marcado de `ErrorAlert` se conservan como props. La unificación visual va en QC-227 | R9, R10, R11, R12 |
 | D7 | 2026-10-08 | Los vacíos y esqueletos de las 5 listas de asignación van en QC-232 | R7, R21, R33 |
 | D8 | 2026-10-08 | Talla táctil en `Button` y **una** constante compartida en `lib/shared/ui` para lo demás. Se borran las constantes locales. Los 3 tests de contrato táctil se **enmiendan, no se borran** | R5, R6, R7, R8 |
@@ -207,6 +207,13 @@ identificador del error inesperado. NO DEBE mostrar ningún dato de la lista.
   tabla;
 - si hay búsqueda o filtro activos, DEBE seguir pintando el «sin resultados» de QC-56 D15 dentro de
   la tabla y con sus barras.
+
+> **Enmienda del 2026-10-08 (decisión del humano, `progress/features/QC-231.md > Decisiones`).** Hay
+> cinco listas cuyo «sin resultados» con búsqueda ya era hoy el vacío propio de la sección: catálogo,
+> unidades, presentaciones, usuarios y grupos. En ellas se conserva lo de hoy: la pantalla pasa
+> `states.empty` también con búsqueda o filtro activos, y la `DataTable` pinta `EmptyState`. El «sin
+> resultados» de QC-56 D15 sigue solo donde ya existía. Unificarlo queda para QC-227. El
+> comportamiento no cambia.
 
 **R19.** DONDE una pantalla no le pase configuración de estado, la `DataTable` DEBE comportarse
 como hoy. QC-55 R19-R22 siguen vigentes sin cambios.

@@ -249,6 +249,10 @@ en otro caso → lo de hoy (barras + DataTableLoading/DataTableError/DataTableEm
   (`data-table.test.tsx`, `data-table-states.test.tsx`) no se tocan (R19).
 - «Sin resultados» (D5): la pantalla **no** pasa `states.empty` cuando hay búsqueda o filtro. La
   tabla cae entonces en `DataTableEmpty`, con sus barras, como hoy.
+  **Enmienda del 2026-10-08 (decisión del humano):** en catálogo, unidades, presentaciones,
+  usuarios y grupos, el «sin resultados» con búsqueda ya era el vacío propio de la sección. Ahí la
+  pantalla pasa `states.empty` también con búsqueda, y se conserva lo de hoy. `DataTableEmpty` sigue
+  solo donde ya existía, y la unificación queda para QC-227.
 
 ### 5.3 Cómo lo usa cada lista
 
