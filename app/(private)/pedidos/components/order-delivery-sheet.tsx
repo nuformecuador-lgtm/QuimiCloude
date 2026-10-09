@@ -4,13 +4,14 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState, useTransition, type FormEvent } from 'react';
 import { toast } from 'sonner';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { errorMessage, UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
 import { newRequestId } from '@/lib/modules/observabilidad';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 import {
   checkDelivery,
   type DeliveryAllocation,
@@ -50,8 +51,6 @@ export const ORDER_DELIVERY_CUSTOMER_ERROR_TESTID = 'order-delivery-customer-err
 export const ORDER_DELIVERY_EMPTY_ERROR_TESTID = 'order-delivery-empty-error';
 export const ORDER_DELIVERY_SUBMIT_TESTID = 'order-delivery-submit';
 export const ORDER_DELIVERY_CANCEL_TESTID = 'order-delivery-cancel';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 const LABELS = {
   title: (numberText: string) => `Entregar pedido ${numberText}`,
@@ -145,14 +144,12 @@ function evaluate(view: OrderDeliveryView, draft: OrderDeliveryDraft): Evaluatio
 
 function ErrorNotice({ error, testId }: { readonly error: ErrorState; readonly testId: string }) {
   return (
-    <div
-      role="alert"
+    <ErrorAlert
+      error={error}
       className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-      data-testid={testId}
-      data-code={error.code}
-    >
-      {error.code === UNEXPECTED_ERROR_CODE ? <UnexpectedErrorNotice state={error} /> : <p>{error.message}</p>}
-    </div>
+      testId={testId}
+      withDataCode
+    />
   );
 }
 
@@ -303,7 +300,7 @@ export function OrderDeliverySheet({ order, open, onOpenChange }: OrderDeliveryS
               <Button
                 type="button"
                 variant="outline"
-                className={TOUCH_TARGET}
+                className={touchTarget}
                 onClick={cancel}
                 data-testid={ORDER_DELIVERY_CANCEL_TESTID}
               >
@@ -311,7 +308,7 @@ export function OrderDeliverySheet({ order, open, onOpenChange }: OrderDeliveryS
               </Button>
               <Button
                 type="submit"
-                className={TOUCH_TARGET}
+                className={touchTarget}
                 disabled={isPending}
                 data-testid={ORDER_DELIVERY_SUBMIT_TESTID}
               >
