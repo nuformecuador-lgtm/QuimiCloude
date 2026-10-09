@@ -13,9 +13,6 @@ import { cn } from '@/lib/utils';
 
 import type { DataTableFilterValue, DataTableTexts } from './data-table-types';
 
-/** Reexportada para los consumidores que ya importan por esta ruta (tests, viewport helpers). */
-export { formatDateLocalISO };
-
 /**
  * Filtro de rango de fechas con atajos (`design.md > 6.1`, T9, R18).
  *
