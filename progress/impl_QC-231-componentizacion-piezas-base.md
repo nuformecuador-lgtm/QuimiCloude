@@ -415,3 +415,20 @@ No se ha escrito ni tocado ningún spec de `e2e/`, así que no se corre ninguno 
   - `grupos/alcance.test.ts` (QC-85) se activa solo si la rama es exactamente `feature/QC-85-pantalla-de-grupos-de-trabajo`: se lee con `git rev-parse` y, si sale `HEAD`, con `GITHUB_HEAD_REF`. El diff usa `--diff-filter=d`. La señal antigua de las dos piezas solo la usa ya el ancla. Hay muestras nuevas (igualdad exacta, `null`/`HEAD`, QC-67 y QC-231 no cuentan). Los casos de «filtro de columna» y «fetch» ganan la misma comprobación de rama.
   - `shared/data-table-alcance.test.ts` (QC-56) usa el mismo ancla por nombre de rama, con muestras. **No se le pone `--diff-filter=d`:** ese test no lee archivos, solo lista nombres, y con el filtro un borrado en la tabla compartida dejaría de contar para R20 y R28, lo que los debilitaría.
 - `guard-piezas-base`: los alias `EMPTY_CELL` citan ya QC-232.
+
+### Salida final (2026-10-08, tras el merge de dev, HEAD `92b2692c` + bitácora)
+`./init.sh` (rápido): `== init OK ==`
+```
+related:        Test Files 1 failed | 269 passed (270)   Tests 1 failed | 3927 passed | 30 skipped
+  FAIL pantallas-exigen-permiso > '/pedidos'                    (baseline)
+tests de árbol: Test Files 2 failed | 97 passed (99)     Tests 2 failed | 1366 passed | 28 skipped
+  FAIL recetas/module-contract.test.ts, recetas/scope.test.ts    (baseline)
+```
+Los tres rojos están en `tests/baseline-rojos.json` y son deuda heredada de `dev`.
+
+A mano, `pnpm exec vitest run tests/unit/configuracion-ui/grupos/alcance.test.ts tests/unit/shared`:
+```
+ Test Files  36 passed (36)
+      Tests  402 passed | 20 skipped (422)
+```
+Los 20 saltados son los 18 casos de QC-85 y los 2 de QC-56 (R20 y R28). Saltan con su motivo escrito porque esta no es la rama de su feature.
