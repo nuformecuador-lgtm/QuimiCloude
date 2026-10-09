@@ -19,6 +19,7 @@ import {
 import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import type { UnitView } from '@/lib/modules/unidades';
 import { createUnitAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import {
   DIALOG_CONTENT_CLASS,
@@ -151,7 +152,7 @@ export function ImportCreateUnitDialog({ initialName, units, onClose, onCreated 
                 aria-labelledby={baseLabelId}
                 aria-invalid={fieldError('baseUnitId') === undefined ? undefined : true}
                 aria-describedby={fieldError('baseUnitId') === undefined ? undefined : baseErrorId}
-                className={`w-full min-h-11 min-w-11 ${FIELD_TEXT}`}
+                className={`w-full ${touchTarget} ${FIELD_TEXT}`}
                 data-testid={dialogFieldTestId('baseUnitId')}
               >
                 <SelectValue />

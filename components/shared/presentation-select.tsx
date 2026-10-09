@@ -1,12 +1,13 @@
 'use client';
 
-import { CircleAlertIcon, Loader2Icon } from 'lucide-react';
+import { CircleAlertIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 import {
   PRESENTATION_UNIT_FIELD,
   PresentationUnitSelect,
 } from '@/components/shared/presentation-unit-select';
+import { Spinner } from '@/components/shared/spinner';
 import {
   Autocomplete,
   AutocompleteClear,
@@ -31,11 +32,10 @@ import {
 } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /** Campo del formulario de producto que alimenta este selector, via su `input` espejo. */
 export const PRESENTATION_FIELD = 'presentationId';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /** La lista de presentaciones siempre empieza por su primera pagina. */
 const FIRST_PAGE = 1;
@@ -439,15 +439,9 @@ export function PresentationSelect({
                 <button
                   type="button"
                   aria-label="Qué es Presentación"
-                  // 44x44 DE VERDAD, no `size-6`: `docs/architecture.md > Componentes > Regla:
-                  // multiplataforma` exige ese objetivo tactil minimo y el `design.md` de QC-90
-                  // no declara excepcion. Se usa la constante que este mismo archivo ya define
-                  // arriba, en vez de reescribir las clases. Crece el BLANCO DE TOQUE del boton
-                  // -que es lo que busca el dedo-; el icono dibujado sigue en `size-4`, y
-                  // `items-center justify-center` lo mantiene pegado a la etiqueta dentro del
-                  // `flex items-center gap-1.5` del padre. `shrink-0` impide que el flex le
-                  // recorte los 44 px de ancho en pantallas estrechas.
-                  className={`flex ${TOUCH_TARGET} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
+                  // Crece el blanco de toque, no el icono, que sigue en `size-4`. `shrink-0` impide
+                  // que el flex del padre le recorte los 44 px en pantallas estrechas.
+                  className={`flex ${touchTarget} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
                   data-testid="presentation-helper"
                 />
               }
@@ -498,7 +492,7 @@ export function PresentationSelect({
             aria-labelledby={labelId}
             aria-invalid={error === undefined ? undefined : true}
             aria-describedby={error === undefined ? undefined : errorId}
-            className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT} pr-8`}
+            className={`w-full ${touchTarget} ${FIELD_TEXT} pr-8`}
             placeholder={PLACEHOLDER}
             data-testid="presentation-select"
           />
@@ -526,7 +520,7 @@ export function PresentationSelect({
                         index={index}
                         value={option}
                         disabled={withoutContent}
-                        className={`${TOUCH_TARGET} ${FIELD_TEXT} items-center`}
+                        className={`${touchTarget} ${FIELD_TEXT} items-center`}
                         data-testid="presentation-option"
                         data-presentation-id={option.id}
                         data-without-content={withoutContent ? 'true' : undefined}
@@ -574,7 +568,7 @@ export function PresentationSelect({
             >
               {cargando ? (
                 <>
-                  <Loader2Icon className="size-4 animate-spin" aria-hidden />
+                  <Spinner />
                   <span className="py-2">{LOADING_LABEL}</span>
                 </>
               ) : null}
@@ -598,7 +592,7 @@ export function PresentationSelect({
             id={createFieldId}
             ref={createFieldRef}
             type="text"
-            className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+            className={`${touchTarget} ${FIELD_TEXT}`}
             aria-invalid={createError === null ? undefined : true}
             aria-describedby={createError === null ? undefined : createErrorId}
             data-testid="presentation-create-name"
@@ -637,7 +631,7 @@ export function PresentationSelect({
           <div className="flex gap-2">
             <Button
               type="button"
-              className={TOUCH_TARGET}
+              touch
               disabled={createPending}
               aria-busy={createPending}
               data-testid="presentation-create-submit"
@@ -648,7 +642,7 @@ export function PresentationSelect({
             <Button
               type="button"
               variant="outline"
-              className={TOUCH_TARGET}
+              touch
               data-testid="presentation-create-cancel"
               onClick={() => {
                 setCreating(false);
@@ -664,7 +658,7 @@ export function PresentationSelect({
         <Button
           type="button"
           variant="outline"
-          className={TOUCH_TARGET}
+          touch
           data-testid="presentation-create-open"
           onClick={() => setCreating(true)}
         >

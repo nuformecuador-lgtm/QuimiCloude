@@ -50,7 +50,7 @@ const CARPETA_DE_COMPONENTES = `${CARPETA_DE_LA_RUTA}/components`;
 const BARREL_DE_LA_RUTA = `@/${CARPETA_DE_COMPONENTES}`;
 
 /** Cuantos componentes propios tiene la ruta hoy, sin contar el barrel (`design.md > 1`). */
-const COMPONENTES_ESPERADOS = 13;
+const COMPONENTES_ESPERADOS = 10;
 
 /** Carpetas del repo que se barren buscando importes por ruta profunda (R43). */
 const CARPETAS_DEL_REPO = ['app', 'components', 'lib', 'tests'] as const;
@@ -228,7 +228,7 @@ function fuentesBajo(carpeta: string): string[] {
   return encontradas.sort();
 }
 
-/** TODAS las fuentes de la ruta: `page.tsx`, el barrel y los trece componentes. */
+/** TODAS las fuentes de la ruta: `page.tsx`, el barrel y los diez componentes. */
 const FUENTES_DE_LA_RUTA = fuentesBajo(CARPETA_DE_LA_RUTA);
 
 /** Los componentes, sin el barrel: es de ellos de quien el barrel tiene que ser puerta. */
@@ -453,7 +453,7 @@ describe('los componentes de la ruta viven en `components/` y salen del barrel (
     expect(enLaRaiz, 'la ruta deberia tener su page.tsx').toContain('page.tsx');
   });
 
-  it('el barrel existe, no declara frontera de cliente y republica los trece componentes', () => {
+  it('el barrel existe, no declara frontera de cliente y republica los diez componentes', () => {
     const barrel = `${CARPETA_DE_COMPONENTES}/index.ts`;
     expect(existsSync(join(RAIZ, barrel)), 'falta el barrel de la ruta').toBe(true);
 
@@ -699,13 +699,9 @@ describe('la pantalla no repite la comprobacion de «unidad de sistema» (R30)',
 // --------------------------------------------------------------------------------------------
 
 describe('la lista usa la tabla compartida y no una propia (R15)', () => {
-  it('ningun componente de la ruta declara una tabla a mano, salvo el esqueleto de carga', () => {
-    // El esqueleto es la excepcion NOMBRADA: ocupa el hueco de la tabla antes de que exista
-    // ninguna fila, asi que no puede montarse sobre `<DataTable>`, que necesita datos.
-    const excepcion = `${CARPETA_DE_COMPONENTES}/unit-list-skeleton.tsx`;
-
-    const culpables = FUENTES_DE_LA_RUTA.filter((archivo) => archivo !== excepcion).flatMap(
-      (archivo) => tablaPropia(leer(archivo)).map((etiqueta) => `${archivo} declara <${etiqueta}>`),
+  it('ningun componente de la ruta declara una tabla a mano', () => {
+    const culpables = FUENTES_DE_LA_RUTA.flatMap((archivo) =>
+      tablaPropia(leer(archivo)).map((etiqueta) => `${archivo} declara <${etiqueta}>`),
     );
 
     expect(culpables, culpables.join(', ')).toEqual([]);

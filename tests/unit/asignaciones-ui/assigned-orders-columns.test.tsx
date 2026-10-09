@@ -16,6 +16,7 @@ import {
 } from '@/app/(private)/asignacion/components';
 import { MISSING_VALUE_MARK as ORDER_MISSING_VALUE_MARK } from '@/app/(private)/pedidos/components';
 import type { AssignedOrderView } from '@/lib/modules/asignaciones';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
 afterEach(() => {
   cleanup();
@@ -86,11 +87,15 @@ describe('R17 - la receta sin resolver pinta el marcador, NUNCA el uuid', () => 
     renderCell(ASSIGNED_ORDER_RECIPE_NAME_COLUMN_ID, { ...BASE_ORDER, recipeName: null });
 
     const marker = screen.getByTestId(`assigned-order-missing-${ASSIGNED_ORDER_RECIPE_NAME_COLUMN_ID}`);
-    expect(marker).toHaveTextContent(MISSING_VALUE_MARK);
+    expect(marker).toHaveTextContent(EMPTY_MARK);
   });
 
   it('el marcador de esta pantalla es el MISMO glifo que el de /pedidos (un test lo ata)', () => {
-    expect(MISSING_VALUE_MARK).toBe(ORDER_MISSING_VALUE_MARK);
+    expect(EMPTY_MARK).toBe(ORDER_MISSING_VALUE_MARK);
+  });
+
+  it('el barrel de la ruta sigue exportando el marcador con su nombre de antes', () => {
+    expect(MISSING_VALUE_MARK).toBe(EMPTY_MARK);
   });
 });
 

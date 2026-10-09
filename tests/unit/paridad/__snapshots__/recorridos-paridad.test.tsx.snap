@@ -1,0 +1,73 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`paridad de recorridos (dashboard) > R1 R17 — error de catalogo 1`] = `
+"
+div role=generic
+  div role=generic class="flex flex-1 flex-col gap-4 md:p-6 p-4"
+    h1 role=heading name="Dashboard" data-testid="dashboard-title" class="font-semibold text-2xl"
+      "Dashboard"
+    div role=generic data-testid="dashboard-content" class="flex flex-1 flex-col gap-4"
+      p role=status class="text-muted-foreground text-sm"
+        "Cargando pedidos ejecutados…"
+"
+`;
+
+exports[`paridad de recorridos (dashboard) > R1 R17 — error inesperado, con su identificador 1`] = `
+"
+div role=generic
+  div role=generic class="flex flex-1 flex-col gap-4 md:p-6 p-4"
+    h1 role=heading name="Dashboard" data-testid="dashboard-title" class="font-semibold text-2xl"
+      "Dashboard"
+    div role=generic data-testid="dashboard-content" class="flex flex-1 flex-col gap-4"
+      p role=status class="text-muted-foreground text-sm"
+        "Cargando pedidos ejecutados…"
+"
+`;
+
+exports[`paridad de recorridos (dashboard) > R1 — cargando 1`] = `
+"
+div role=generic
+  div role=generic class="flex flex-1 flex-col gap-4 md:p-6 p-4"
+    h1 role=heading name="Dashboard" data-testid="dashboard-title" class="font-semibold text-2xl"
+      "Dashboard"
+    div role=generic data-testid="dashboard-content" class="flex flex-1 flex-col gap-4"
+      p role=status class="text-muted-foreground text-sm"
+        "Cargando pedidos ejecutados…"
+"
+`;
+
+exports[`paridad de recorridos (dashboard) > R1 — con filas 1`] = `
+"
+div role=generic
+  div role=generic class="flex flex-1 flex-col gap-4 md:p-6 p-4"
+    h1 role=heading name="Dashboard" data-testid="dashboard-title" class="font-semibold text-2xl"
+      "Dashboard"
+    div role=generic data-testid="dashboard-content" class="flex flex-1 flex-col gap-4"
+      p role=status class="text-muted-foreground text-sm"
+        "Cargando pedidos ejecutados…"
+"
+`;
+
+exports[`paridad de recorridos (dashboard) > R1 — sin resultados, con filtro activo 1`] = `
+"
+div role=generic
+  div role=generic class="flex flex-1 flex-col gap-4 md:p-6 p-4"
+    h1 role=heading name="Dashboard" data-testid="dashboard-title" class="font-semibold text-2xl"
+      "Dashboard"
+    div role=generic data-testid="dashboard-content" class="flex flex-1 flex-col gap-4"
+      p role=status class="text-muted-foreground text-sm"
+        "Cargando pedidos ejecutados…"
+"
+`;
+
+exports[`paridad de recorridos (dashboard) > R1 — vacio, sin filtro 1`] = `
+"
+div role=generic
+  div role=generic class="flex flex-1 flex-col gap-4 md:p-6 p-4"
+    h1 role=heading name="Dashboard" data-testid="dashboard-title" class="font-semibold text-2xl"
+      "Dashboard"
+    div role=generic data-testid="dashboard-content" class="flex flex-1 flex-col gap-4"
+      p role=status class="text-muted-foreground text-sm"
+        "Cargando pedidos ejecutados…"
+"
+`;

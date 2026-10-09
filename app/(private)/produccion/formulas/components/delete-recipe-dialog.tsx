@@ -16,15 +16,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
-import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorState } from '@/lib/modules/errores';
 import {
   deleteRecipeAction,
   listRecipeVersionsAction,
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 const DELETE_SUCCESS = 'Receta borrada.';
 const DELETE_VERSION_SUCCESS = 'Versión borrada.';
@@ -115,7 +114,7 @@ export function DeleteRecipeDialog({
         render={
           <Button
             variant="ghost"
-            className={TOUCH_TARGET}
+            touch
             aria-label={`Borrar ${recipe.name}`}
             data-testid="recipe-delete-open"
           />
@@ -139,27 +138,22 @@ export function DeleteRecipeDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        {/*
-          QC-71 (R17, R18): el INESPERADO lo pinta el componente compartido -que necesita un
-          contenedor de bloque-; el CATALOGADO, exactamente como siempre y sin identificador.
-        */}
-        {error === null ? null : error.code === UNEXPECTED_ERROR_CODE ? (
-          <div role="alert" className="text-sm text-destructive" data-testid="delete-recipe-error">
-            <UnexpectedErrorNotice state={error} />
-          </div>
-        ) : (
-          <p role="alert" className="text-sm text-destructive" data-testid="delete-recipe-error">
-            {error.message}
-          </p>
+        {error === null ? null : (
+          <ErrorAlert
+            error={error}
+            cataloguedAs="p"
+            className="text-sm text-destructive"
+            testId="delete-recipe-error"
+          />
         )}
 
         <AlertDialogFooter>
-          <AlertDialogCancel className={TOUCH_TARGET} data-testid="delete-recipe-cancel">
+          <AlertDialogCancel className={touchTarget} data-testid="delete-recipe-cancel">
             Cancelar
           </AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
-            className={TOUCH_TARGET}
+            className={touchTarget}
             disabled={isPending || countBlocksConfirm}
             data-testid="delete-recipe-confirm"
             onClick={handleConfirm}

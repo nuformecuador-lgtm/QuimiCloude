@@ -24,8 +24,6 @@ import { CustomerSheet } from './customer-sheet';
  * base de datos, ni pide nada por su cuenta.
  */
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 export const CUSTOMER_ROW_ACTIONS_TESTID = 'customer-row-actions';
 export const CUSTOMER_ACTION_EDIT_TESTID = 'customer-action-edit';
 export const CUSTOMER_ACTION_DELETE_TESTID = 'customer-action-delete';
@@ -66,7 +64,7 @@ export function CustomerRowActions({ customer, canModify }: CustomerRowActionsPr
         type="button"
         variant="ghost"
         size="icon"
-        className={TOUCH_TARGET}
+        touch
         aria-label={editCustomerLabel(name)}
         data-testid={CUSTOMER_ACTION_EDIT_TESTID}
         onClick={() => setEditOpen(true)}
@@ -78,7 +76,7 @@ export function CustomerRowActions({ customer, canModify }: CustomerRowActionsPr
         type="button"
         variant="ghost"
         size="icon"
-        className={TOUCH_TARGET}
+        touch
         aria-label={deleteCustomerLabel(name)}
         data-testid={CUSTOMER_ACTION_DELETE_TESTID}
         onClick={() => setDeleteOpen(true)}

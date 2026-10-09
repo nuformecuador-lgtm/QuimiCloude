@@ -79,8 +79,11 @@ const BARREL_DE_LA_RUTA = `@/${CARPETA_DE_COMPONENTES}`;
  * |            | vacia —que es el estado en el que nace toda instalacion— | 30 |
  * | 2026-10-04 | `username-from-names.ts`: el nombre de usuario propuesto en el alta y el
  * |            | siguiente numero libre tras un `duplicate_username` | 31 |
+ * | 2026-10-08 | bajas: `user-list-{empty,error,skeleton}.tsx` y
+ * |            | `work-group-list-{empty,error,skeleton}.tsx`: los tres estados de cada lista los
+ * |            | pinta ahora la tabla compartida | 25 |
  */
-const COMPONENTES_ESPERADOS = 31;
+const COMPONENTES_ESPERADOS = 25;
 
 /** Carpetas del repo que se barren buscando importes por ruta profunda (R38). */
 const CARPETAS_DEL_REPO = ['app', 'components', 'lib', 'tests'] as const;

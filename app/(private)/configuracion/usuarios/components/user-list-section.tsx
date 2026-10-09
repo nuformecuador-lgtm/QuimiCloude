@@ -3,8 +3,6 @@ import type { ErrorState } from '@/lib/modules/errores';
 import type { RoleOption } from '@/lib/modules/identity';
 import { listUsersAction } from '@/lib/modules/identity/adapters/driving/user-actions';
 
-import { UserListEmpty } from './user-list-empty';
-import { UserListError } from './user-list-error';
 import { FIRST_PAGE, userListHref } from './user-list-params';
 import { UserTable } from './user-table';
 
@@ -82,48 +80,65 @@ export async function UserListSection({
 }: UserListSectionProps) {
   const pageResult = await listUsersAction(params);
 
-  // R11 y R19: con error NO se pinta tabla, ni fila, ni un dato.
+  // Con error NO se pinta tabla, ni fila, ni un dato: la tabla pinta solo el estado de error.
   if (pageResult.status === 'error') {
-    return <UserListError error={pageResult} />;
+    return (
+      <UserTable
+        status="error"
+        error={pageResult}
+        users={[]}
+        params={params}
+        totalPages={0}
+        canModify={canModify}
+        currentUserId={currentUserId}
+        roles={roles}
+        rolesError={rolesError}
+      />
+    );
   }
 
   const { items, page: currentPage, totalPages } = pageResult.data;
 
+  if (items.length === 0) {
+    // El vacio **no** ofrece «crear el primero»: quien ofrece el alta es la pantalla, arriba. Con
+    // termino o filtro tambien es este vacio, no el «sin resultados» de la tabla.
+    return (
+      <UserTable
+        users={items}
+        params={params}
+        totalPages={totalPages}
+        canModify={canModify}
+        currentUserId={currentUserId}
+        roles={roles}
+        rolesError={rolesError}
+        empty={{
+          clearSearchHref: hasActiveQuery(params)
+            ? userListHref({ ...params, search: '', filters: {}, page: FIRST_PAGE })
+            : undefined,
+          firstPageHref:
+            currentPage > FIRST_PAGE ? userListHref({ ...params, page: FIRST_PAGE }) : undefined,
+        }}
+      />
+    );
+  }
+
   return (
-    <>
-      {items.length === 0 ? (
-        // R18 INTACTO: el vacio sigue siendo el de «la busqueda no encontro nada» y **no** ofrece
-        // «crear el primero». Quien ofrece el alta es la pantalla, arriba, no este estado.
-        <UserListEmpty
-          clearSearchHref={
-            hasActiveQuery(params)
-              ? userListHref({ ...params, search: '', filters: {}, page: FIRST_PAGE })
-              : undefined
-          }
-          firstPageHref={
-            currentPage > FIRST_PAGE ? userListHref({ ...params, page: FIRST_PAGE }) : undefined
-          }
-        />
-      ) : (
-        <div className="flex flex-col gap-4" data-testid={USER_LIST_TESTID}>
-          {/*
-            `user-table.tsx` es un modulo de CLIENTE —la columna de acciones declara una celda que
-            devuelve elementos—, asi que desde aqui solo bajan datos serializables: las filas, los
-            parametros vigentes, el total de paginas, la decision de R6 y el catalogo de roles con
-            su error. La tabla recibe `status: 'idle'` siempre: los tres estados se pintan FUERA de
-            `<DataTable>`.
-          */}
-          <UserTable
-            users={items}
-            params={params}
-            totalPages={totalPages}
-            canModify={canModify}
-            currentUserId={currentUserId}
-            roles={roles}
-            rolesError={rolesError}
-          />
-        </div>
-      )}
-    </>
+    <div className="flex flex-col gap-4" data-testid={USER_LIST_TESTID}>
+      {/*
+        `user-table.tsx` es un modulo de CLIENTE —la columna de acciones declara una celda que
+        devuelve elementos—, asi que desde aqui solo bajan datos serializables: las filas, los
+        parametros vigentes, el total de paginas, la decision de permisos y el catalogo de roles
+        con su error.
+      */}
+      <UserTable
+        users={items}
+        params={params}
+        totalPages={totalPages}
+        canModify={canModify}
+        currentUserId={currentUserId}
+        roles={roles}
+        rolesError={rolesError}
+      />
+    </div>
   );
 }

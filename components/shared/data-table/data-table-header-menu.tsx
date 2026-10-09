@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { TableHead } from '@/components/ui/table';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
 import type { DataTableColumn, DataTableSort, DataTableTexts } from './data-table-types';
@@ -33,9 +34,6 @@ import { DataTableColumnDivider } from './data-table-divider';
  *
  * Ninguna de las dos consulta ni navega (R2, R30): solo emiten por callback.
  */
-
-/** Objetivo tactil minimo (44 px), mismo criterio que `delete-product-dialog.tsx` (R27). */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /**
  * Alterna el orden de una columna al activar su cabecera (no el menu, que ordena de forma
@@ -107,7 +105,7 @@ export function DataTableHeaderMenu<TRow>({
             type="button"
             variant="ghost"
             size="icon"
-            className={cn(TOUCH_TARGET)}
+            className={cn(touchTarget)}
             aria-label={`${column.label} ${texts.columnMenu}`.trim()}
             data-testid={`data-table-header-menu-${column.id}`}
           />
@@ -227,7 +225,7 @@ export function DataTableHeaderCell<TRow>({
             type="button"
             className={cn(
               'flex items-center gap-1 rounded-md font-medium',
-              TOUCH_TARGET,
+              touchTarget,
             )}
             onClick={() => onSortChange(toggleHeaderSort(column, sort))}
           >

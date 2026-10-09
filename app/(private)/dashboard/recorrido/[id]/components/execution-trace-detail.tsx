@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorState } from '@/components/shared/error-state';
 import {
   ActiveOrderMark,
   DeletedOrderMark,
@@ -12,13 +12,14 @@ import {
   formatTraceInstant,
 } from '@/app/(private)/dashboard/components';
 import type { ExecutionTraceDetail as ExecutionTraceDetailData, ExecutionTraceDetailStep } from '@/lib/modules/asignaciones';
-import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorState as OperationError } from '@/lib/modules/errores';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 export const BACK_TO_LIST_TEXT = 'Volver a la lista';
-export const MISSING_PERSON_MARK = '—';
+export { EMPTY_MARK as MISSING_PERSON_MARK } from '@/lib/shared/ui/empty-mark';
 
-const BACK_LINK_CLASS =
-  'inline-flex min-h-11 min-w-11 items-center self-start rounded-md px-2 text-sm font-medium underline underline-offset-4 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none';
+const BACK_LINK_CLASS = `inline-flex ${touchTarget} items-center self-start rounded-md px-2 text-sm font-medium underline underline-offset-4 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`;
 
 function BackLink({ href }: { readonly href: string }) {
   return (
@@ -65,7 +66,7 @@ function TraceStepItem({ step }: { readonly step: ExecutionTraceDetailStep }) {
         {' · '}
         {step.userDisplayName === null ? (
           <span aria-label="Sin dato" data-testid="execution-trace-step-person">
-            {MISSING_PERSON_MARK}
+            {EMPTY_MARK}
           </span>
         ) : (
           <span data-testid="execution-trace-step-person">{step.userDisplayName}</span>
@@ -126,25 +127,20 @@ export function ExecutionTraceDetailError({
   error,
   backHref,
 }: {
-  readonly error: ErrorState;
+  readonly error: OperationError;
   readonly backHref: string;
 }) {
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
       <BackLink href={backHref} />
       <h1 className="text-2xl font-semibold">Recorrido</h1>
-      <div
-        role="alert"
-        data-testid="execution-trace-detail-error"
+      <ErrorState
+        error={error}
+        title="No se pudo cargar el recorrido."
+        testId="execution-trace-detail-error"
+        withCode={false}
         className="flex flex-col items-start gap-2 rounded-lg border border-destructive/40 p-4"
-      >
-        <p className="text-sm font-medium">No se pudo cargar el recorrido.</p>
-        {error.code === UNEXPECTED_ERROR_CODE ? (
-          <UnexpectedErrorNotice state={error} />
-        ) : (
-          <p className="text-sm text-muted-foreground">{error.message}</p>
-        )}
-      </div>
+      />
     </div>
   );
 }

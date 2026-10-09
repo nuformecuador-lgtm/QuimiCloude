@@ -7,10 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   DataTableFilterDate,
   computeDateShortcutRange,
-  formatDateLocalISO,
   type DateShortcutKind,
 } from '@/components/shared/data-table/data-table-filter-date'
 import type { DataTableFilterValue, DataTableTexts } from '@/components/shared/data-table/data-table-types'
+import { formatDateLocalISO } from '@/lib/shared/ui/date-civil'
 import { NARROW_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport'
 
 /**

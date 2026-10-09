@@ -6,7 +6,6 @@ import type { UnitRef } from '@/lib/modules/unidades';
 
 import { FinishedStockTable } from './finished-stock-table';
 import { TYPE_COLUMN_ID } from './product-list-params';
-import { ProductListError } from './product-list-error';
 
 type FinishedStockListSectionProps = {
   readonly params: DataTableParams;
@@ -28,7 +27,16 @@ export async function FinishedStockListSection({ params, units }: FinishedStockL
   });
 
   if (result.status === 'error') {
-    return <ProductListError error={result} />;
+    return (
+      <FinishedStockTable
+        status="error"
+        error={result}
+        rows={[]}
+        params={params}
+        totalPages={0}
+        units={units}
+      />
+    );
   }
 
   const { items, page: currentPage, totalPages } = result.data;

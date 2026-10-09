@@ -9,10 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
 import type { CatalogLineView } from '@/lib/modules/proveedores';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { CatalogLineForm } from './catalog-line-form';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 const CREATE_LABEL = 'Nueva línea';
 const CREATE_SUCCESS = 'Línea de catálogo creada.';
@@ -66,7 +65,7 @@ export function CatalogLineSheet({ supplierId, line, units }: CatalogLineSheetPr
         render={
           <Button
             variant={isEdit ? 'ghost' : 'default'}
-            className={TOUCH_TARGET}
+            className={touchTarget}
             aria-label={isEdit ? `Editar ${line.name}` : undefined}
             data-testid={isEdit ? 'catalog-line-edit-open' : 'catalog-line-create-open'}
           />

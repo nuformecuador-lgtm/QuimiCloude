@@ -1,11 +1,11 @@
 'use client';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorState } from '@/lib/modules/errores';
 
 import {
   DIALOG_CANCEL_LABEL,
@@ -18,7 +18,6 @@ import {
   dialogFieldTestId,
 } from './import-texts';
 
-export const TOUCH_TARGET = 'min-h-11 min-w-11';
 // El primitivo baja a 14 px desde `md`; iOS hace zoom al enfocar un campo de menos de 16 px.
 export const FIELD_TEXT = 'text-base md:text-base';
 export const DIALOG_CONTENT_CLASS = 'max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md';
@@ -70,14 +69,12 @@ export function DialogTextField({
 
 export function DialogFormError({ error }: { readonly error: ErrorState }) {
   return (
-    <div
-      role="alert"
+    <ErrorAlert
+      error={error}
       className="flex flex-col gap-1 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-      data-testid={DIALOG_FORM_ERROR_TESTID}
-      data-code={error.code}
-    >
-      {error.code === UNEXPECTED_ERROR_CODE ? <UnexpectedErrorNotice state={error} /> : <p>{error.message}</p>}
-    </div>
+      testId={DIALOG_FORM_ERROR_TESTID}
+      withDataCode
+    />
   );
 }
 
@@ -87,7 +84,7 @@ export function DialogActions({ pending, onCancel }: { readonly pending: boolean
       <Button
         type="button"
         variant="ghost"
-        className={TOUCH_TARGET}
+        touch
         onClick={onCancel}
         data-testid={DIALOG_CANCEL_TESTID}
       >
@@ -95,7 +92,7 @@ export function DialogActions({ pending, onCancel }: { readonly pending: boolean
       </Button>
       <Button
         type="submit"
-        className={TOUCH_TARGET}
+        touch
         disabled={pending}
         aria-busy={pending}
         data-testid={DIALOG_SUBMIT_TESTID}

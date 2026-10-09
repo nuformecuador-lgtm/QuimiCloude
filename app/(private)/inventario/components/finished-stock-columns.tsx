@@ -12,12 +12,12 @@ import type {
   PackagedStockEntry,
 } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { cn } from '@/lib/utils';
 
 import {
   ACTIONS_COLUMN_ID,
   ACTIONS_COLUMN_LABEL,
-  EMPTY_CELL,
   IMAGE_COLUMN_ID,
   IMAGE_COLUMN_LABEL,
   isBelowAlert,
@@ -63,7 +63,7 @@ export function finishedStockRowTitle(row: FinishedStockRow): string {
 /** Lo que pinta la columna «Nombre» en la fila agrupadora: el producto, sin el pedido. */
 export function finishedStockRowName(row: FinishedStockRow): string {
   if (row.kind === 'withoutOrder') return row.products[0].product.name;
-  return row.recipeName ?? EMPTY_CELL;
+  return row.recipeName ?? EMPTY_MARK;
 }
 
 function orderNumberCell(row: FinishedStockRow): ReactNode {
@@ -80,7 +80,7 @@ function packagedStockCell(
   units: readonly UnitRef[] | undefined,
   alerted = false,
 ): ReactNode {
-  if (entries === null) return EMPTY_CELL;
+  if (entries === null) return EMPTY_MARK;
   const label = packagedStockLabel(entries, units);
 
   return (
@@ -171,7 +171,8 @@ export function buildFinishedStockColumns({
               type="button"
               variant="ghost"
               size="icon"
-              className="min-h-11 min-w-11 shrink-0"
+              touch
+              className="shrink-0"
               aria-expanded={item.expanded}
               aria-label={`Productos de ${title}`}
               data-testid="finished-stock-toggle"

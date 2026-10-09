@@ -138,7 +138,7 @@ function fuentesBajo(carpeta: string): string[] {
   return encontradas.sort();
 }
 
-/** TODAS las fuentes de la ruta: `page.tsx`, el barrel y los once componentes. */
+/** TODAS las fuentes de la ruta: `page.tsx`, el barrel y los ocho componentes. */
 const FUENTES_DE_LA_RUTA = fuentesBajo(CARPETA_DE_LA_RUTA);
 
 /** Los componentes, sin el barrel: es de ellos de quien el barrel tiene que ser puerta. */
@@ -433,7 +433,7 @@ describe('los componentes de la ruta viven en `components/` y salen del barrel (
     expect(enLaRaiz, 'la ruta deberia tener su page.tsx').toContain('page.tsx');
   });
 
-  it('el barrel existe, no declara frontera de cliente y republica los doce componentes', () => {
+  it('el barrel existe, no declara frontera de cliente y republica los nueve componentes', () => {
     const barrel = `${CARPETA_DE_COMPONENTES}/index.ts`;
     expect(existsSync(join(RAIZ, barrel)), 'falta el barrel de la ruta').toBe(true);
 
@@ -443,11 +443,9 @@ describe('los componentes de la ruta viven en `components/` y salen del barrel (
       'el barrel no puede ser frontera cliente/servidor: cada componente la declara',
     ).toBe(false);
 
-    // Once desde QC-80 (T10): `presentation-unit-select.tsx`, que T8 creo aqui, se promovio a
-    // `components/shared/` en cuanto el alta rapida de `presentation-select.tsx` -que ya vivia
-    // alli- tuvo que pedir la unidad (R11). El barrel lo sigue republicando, ahora desde su
-    // ubicacion compartida, asi que ningun consumidor de la ruta cambio.
-    expect(COMPONENTES.length, 'el barrido no encontro los componentes').toBe(11);
+    // Ocho: `presentation-unit-select.tsx` vive en `components/shared/` y el barrel lo republica
+    // desde alli; el vacio, el error y el esqueleto los pinta la tabla compartida.
+    expect(COMPONENTES.length, 'el barrido no encontro los componentes').toBe(8);
 
     const sinPublicar = COMPONENTES.filter((ruta) => {
       const base = ruta.slice(`${CARPETA_DE_COMPONENTES}/`.length).replace(/\.tsx?$/, '');
@@ -522,7 +520,7 @@ describe('la ruta no escribe su propia URL a mano (R2)', () => {
     expect(
       FUENTES_DE_LA_RUTA.length,
       'el barrido no encontro las fuentes de la ruta',
-    ).toBeGreaterThan(10);
+    ).toBeGreaterThan(7);
 
     const culpables = FUENTES_DE_LA_RUTA.flatMap((archivo) =>
       literalesDeRuta(leer(archivo)).map((forma) => `${archivo} incrusta ${forma}`),

@@ -4,14 +4,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition, type MouseEvent } from 'react';
 
-import { DataTable, type DataTableParams } from '@/components/shared/data-table';
+import { DataTable, type DataTableParams, type DataTableStates } from '@/components/shared/data-table';
 import { buttonVariants } from '@/components/ui/button';
 import type { CustomerView } from '@/lib/modules/clientes';
+import type { ErrorState } from '@/lib/modules/errores';
 import { cn } from '@/lib/utils';
 
 import { CUSTOMER_TABLE_TEXTS } from './customer-labels';
 import { buildCustomerColumns } from './customer-columns';
-import { CUSTOMER_LIST_FIRST_PAGE_TESTID } from './customer-list-empty';
 import { FIRST_PAGE, customerListHref, withSearchResetsPage } from './customer-list-params';
 import { CustomerRowActions } from './customer-row-actions';
 import { CustomerSheet } from './customer-sheet';
@@ -28,10 +28,9 @@ import { CustomerSheet } from './customer-sheet';
  * (`customerListHref`, derivada de `CUSTOMERS_ROUTE`). Esta pantalla no ordena, no filtra y no
  * recorta nada en el cliente: pinta las filas tal cual llegan.
  *
- * **`status` es SIEMPRE `'idle'`**: el error y el vacio se pintan fuera de `<DataTable>`, con
- * copy y acciones propias. El «cargando» de la primera carga lo cubre el `<Suspense>` de la
- * pagina; el de cada navegacion posterior lo da esta tabla, mientras esta en vuelo, sin
- * desmontar nada.
+ * **Cargando, error y vacio sin busqueda los pinta `<DataTable>` en lugar de toda la tabla**, y en
+ * esos estados no se pinta el envoltorio de aqui. El de cada navegacion posterior lo da esta
+ * tabla, mientras esta en vuelo, sin desmontar nada.
  *
  * **La caja de busqueda esta sincronizada con «Atras»**, COPIA del mecanismo de
  * `order-table.tsx` sin tocar `components/shared`: es deuda con nombre, no una tercera
@@ -46,7 +45,21 @@ export const CUSTOMER_TABLE_ID = 'clientes';
 export const CUSTOMER_TABLE_TESTID = 'customer-table';
 export const CUSTOMER_LIST_NO_MATCHES_TESTID = 'customer-list-no-matches';
 export const CUSTOMER_LIST_CLEAR_SEARCH_TESTID = 'customer-list-clear-search';
+export const CUSTOMER_LIST_EMPTY_TESTID = 'customer-list-empty';
+export const CUSTOMER_LIST_EMPTY_MESSAGE_TESTID = 'customer-list-empty-message';
+export const CUSTOMER_LIST_FIRST_PAGE_TESTID = 'customer-list-first-page';
+export const CUSTOMER_LIST_ERROR_TESTID = 'customer-list-error';
+export const CUSTOMER_LIST_ERROR_MESSAGE_TESTID = 'customer-list-error-message';
+export const CUSTOMER_LIST_ERROR_CODE_TESTID = 'customer-list-error-code';
+export const CUSTOMER_LIST_RETRY_TESTID = 'customer-list-retry';
+export const CUSTOMER_LIST_SKELETON_TESTID = 'customer-list-skeleton';
+export const CUSTOMER_ROW_SKELETON_TESTID = 'customer-row-skeleton';
 
+/** Un test ata esta cuenta al largo de `buildCustomerColumns(...)`. */
+export const CUSTOMER_SKELETON_COLUMN_COUNT = 9;
+
+/** Copy del vacio sin ningun cliente. */
+export const CUSTOMER_EMPTY_MESSAGE = 'Todavía no hay clientes registrados.';
 /** Copy del estado «sin coincidencias», distinto del de «no hay clientes». */
 export const CUSTOMER_NO_MATCHES_MESSAGE = 'No hay clientes que coincidan con la búsqueda.';
 /** Copy de la página que se quedó atrás, con término o filtro vigentes. */
@@ -60,7 +73,11 @@ function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
   return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
 }
 
-export type CustomerTableProps = {
+type CustomerTableStatusProps =
+  | { readonly status?: 'idle' | 'loading'; readonly error?: undefined }
+  | { readonly status: 'error'; readonly error: ErrorState };
+
+export type CustomerTableProps = CustomerTableStatusProps & {
   /** Las filas **ya resueltas** por la consulta, en el orden en que las entrega. */
   readonly customers: readonly CustomerView[];
   /** Los parametros vigentes, los mismos con los que se pidio la lista. */
@@ -69,8 +86,13 @@ export type CustomerTableProps = {
   /** Si la sesion trae `clientes.modificar`. Decision de presentacion, bajada por props. */
   readonly canModify: boolean;
   /**
+   * Presente solo con cero filas y sin termino ni filtro vigentes: el vacio sustituye a toda la
+   * tabla. Con `firstPageHref` es la pagina que se quedo atras, y entonces no se ofrece el alta.
+   */
+  readonly empty?: { readonly firstPageHref?: string };
+  /**
    * Presente solo con cero filas y un termino vigente: pinta el estado «sin coincidencias»
-   * DENTRO de la tabla, con la caja montada, en vez del vacio de `customer-list-empty.tsx`.
+   * DENTRO de la tabla, con la caja montada, en vez del vacio.
    */
   readonly noMatches?: { readonly clearHref: string };
   /**
@@ -81,11 +103,67 @@ export type CustomerTableProps = {
   readonly outOfRange?: { readonly firstPageHref: string };
 };
 
+function buildStates(
+  params: DataTableParams,
+  canModify: boolean,
+  error: ErrorState | undefined,
+  empty: CustomerTableProps['empty'],
+): DataTableStates {
+  return {
+    loading: {
+      columns: CUSTOMER_SKELETON_COLUMN_COUNT,
+      rows: params.pageSize,
+      label: CUSTOMER_TABLE_TEXTS.loading,
+      testId: CUSTOMER_LIST_SKELETON_TESTID,
+      rowTestId: CUSTOMER_ROW_SKELETON_TESTID,
+      headCellClassName: 'h-4 w-full',
+    },
+    ...(error === undefined
+      ? {}
+      : {
+          error: {
+            error,
+            title: CUSTOMER_TABLE_TEXTS.error,
+            testId: CUSTOMER_LIST_ERROR_TESTID,
+            messageTestId: CUSTOMER_LIST_ERROR_MESSAGE_TESTID,
+            codeTestId: CUSTOMER_LIST_ERROR_CODE_TESTID,
+            retry: { kind: 'href', href: customerListHref(params) },
+            retryTestId: CUSTOMER_LIST_RETRY_TESTID,
+          },
+        }),
+    ...(empty === undefined
+      ? {}
+      : {
+          empty: {
+            testId: CUSTOMER_LIST_EMPTY_TESTID,
+            messageTestId: CUSTOMER_LIST_EMPTY_MESSAGE_TESTID,
+            message:
+              empty.firstPageHref === undefined
+                ? CUSTOMER_EMPTY_MESSAGE
+                : CUSTOMER_OUT_OF_RANGE_MESSAGE,
+            ...(empty.firstPageHref === undefined
+              ? {}
+              : {
+                  firstPage: {
+                    href: empty.firstPageHref,
+                    label: FIRST_PAGE_LABEL,
+                    testId: CUSTOMER_LIST_FIRST_PAGE_TESTID,
+                  },
+                }),
+            children: empty.firstPageHref === undefined && canModify ? <CustomerSheet /> : null,
+          },
+        }),
+  };
+}
+
 export function CustomerTable({
   customers,
   params,
   totalPages,
   canModify,
+  status = 'idle',
+  error,
+  empty,
   noMatches,
   outOfRange,
 }: CustomerTableProps) {
@@ -159,6 +237,59 @@ export function CustomerTable({
   };
 
   const visibleParams = clearing ? { ...params, search: '', page: FIRST_PAGE } : params;
+  const replacedByState = status !== 'idle' || (customers.length === 0 && empty !== undefined);
+
+  const table = (
+    <DataTable
+      key={boxEpoch}
+      tableId={CUSTOMER_TABLE_ID}
+      columns={columns}
+      rows={customers}
+      getRowId={(customer) => customer.id}
+      params={visibleParams}
+      totalPages={totalPages}
+      onParamsChange={handleParamsChange}
+      status={status}
+      states={buildStates(params, canModify, error, empty)}
+      texts={
+        outOfRange !== undefined
+          ? { ...CUSTOMER_TABLE_TEXTS, empty: CUSTOMER_OUT_OF_RANGE_MESSAGE }
+          : noMatches === undefined
+            ? CUSTOMER_TABLE_TEXTS
+            : { ...CUSTOMER_TABLE_TEXTS, empty: CUSTOMER_NO_MATCHES_MESSAGE }
+      }
+      toolbarActions={canModify ? <CustomerSheet /> : undefined}
+      emptyAction={
+        outOfRange !== undefined ? (
+          <Link
+            href={outOfRange.firstPageHref}
+            data-slot="button"
+            data-testid={CUSTOMER_LIST_FIRST_PAGE_TESTID}
+            className={cn(buttonVariants({ variant: 'outline', touch: true }))}
+          >
+            {FIRST_PAGE_LABEL}
+          </Link>
+        ) : noMatches === undefined ? undefined : (
+          <div
+            data-testid={CUSTOMER_LIST_NO_MATCHES_TESTID}
+            className="flex flex-wrap items-center justify-center gap-2"
+          >
+            <Link
+              href={noMatches.clearHref}
+              onClick={handleClearSearch}
+              data-slot="button"
+              data-testid={CUSTOMER_LIST_CLEAR_SEARCH_TESTID}
+              className={cn(buttonVariants({ variant: 'outline', touch: true }))}
+            >
+              {CLEAR_SEARCH_LABEL}
+            </Link>
+          </div>
+        )
+      }
+    />
+  );
+
+  if (replacedByState) return table;
 
   return (
     <div
@@ -169,52 +300,7 @@ export function CustomerTable({
       {isPending ? (
         <p className="text-xs text-muted-foreground">{CUSTOMER_TABLE_TEXTS.loading}</p>
       ) : null}
-      <DataTable
-        key={boxEpoch}
-        tableId={CUSTOMER_TABLE_ID}
-        columns={columns}
-        rows={customers}
-        getRowId={(customer) => customer.id}
-        params={visibleParams}
-        totalPages={totalPages}
-        onParamsChange={handleParamsChange}
-        status="idle"
-        texts={
-          outOfRange !== undefined
-            ? { ...CUSTOMER_TABLE_TEXTS, empty: CUSTOMER_OUT_OF_RANGE_MESSAGE }
-            : noMatches === undefined
-              ? CUSTOMER_TABLE_TEXTS
-              : { ...CUSTOMER_TABLE_TEXTS, empty: CUSTOMER_NO_MATCHES_MESSAGE }
-        }
-        toolbarActions={canModify ? <CustomerSheet /> : undefined}
-        emptyAction={
-          outOfRange !== undefined ? (
-            <Link
-              href={outOfRange.firstPageHref}
-              data-slot="button"
-              data-testid={CUSTOMER_LIST_FIRST_PAGE_TESTID}
-              className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11 min-w-11')}
-            >
-              {FIRST_PAGE_LABEL}
-            </Link>
-          ) : noMatches === undefined ? undefined : (
-            <div
-              data-testid={CUSTOMER_LIST_NO_MATCHES_TESTID}
-              className="flex flex-wrap items-center justify-center gap-2"
-            >
-              <Link
-                href={noMatches.clearHref}
-                onClick={handleClearSearch}
-                data-slot="button"
-                data-testid={CUSTOMER_LIST_CLEAR_SEARCH_TESTID}
-                className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11 min-w-11')}
-              >
-                {CLEAR_SEARCH_LABEL}
-              </Link>
-            </div>
-          )
-        }
-      />
+      {table}
     </div>
   );
 }

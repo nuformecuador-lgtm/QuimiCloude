@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /** Campo del formulario de la linea que alimenta este selector, via el `input` oculto del primitivo. */
 export const UNIT_FIELD = 'unitId';
@@ -20,8 +21,6 @@ export const UNIT_FIELD = 'unitId';
  * ningun centinela propio ni omitir el campo del envio.
  */
 export const NO_UNIT_VALUE = '';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /** 16 px en TODOS los anchos: el primitivo baja a 14 px en `md`, y R48 no distingue por ancho. */
 const FIELD_TEXT = 'text-base md:text-base';
@@ -82,7 +81,7 @@ export function UnitSelect({ units, defaultValue, error }: UnitSelectProps) {
           aria-labelledby={labelId}
           aria-invalid={error === undefined ? undefined : true}
           aria-describedby={error === undefined ? undefined : errorId}
-          className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT}`}
+          className={`w-full ${touchTarget} ${FIELD_TEXT}`}
           data-testid="unit-select"
         >
           <SelectValue />

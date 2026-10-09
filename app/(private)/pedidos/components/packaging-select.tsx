@@ -1,9 +1,10 @@
 'use client';
 
-import { CircleAlertIcon, Loader2Icon } from 'lucide-react';
+import { CircleAlertIcon } from 'lucide-react';
 import { useCallback, useId, useState } from 'react';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { Spinner } from '@/components/shared/spinner';
+import { ErrorAlert } from '@/components/shared/error-alert';
 
 import {
   Autocomplete,
@@ -28,6 +29,7 @@ import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/pr
 import { errorMessage, UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { trimDecimal } from '@/lib/shared/ui/decimal-display';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 export const PACKAGING_SELECT_TESTID = 'packaging-select';
 export const PACKAGING_SELECT_POPUP_TESTID = 'packaging-select-popup';
@@ -38,7 +40,6 @@ export const PACKAGING_SELECT_EMPTY_TESTID = 'packaging-select-empty';
 export const PACKAGING_SELECT_LOAD_ERROR_TESTID = 'packaging-select-load-error';
 export const PACKAGING_SELECT_FORBIDDEN_TESTID = 'packaging-select-forbidden';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base md:text-base';
 const SEARCH_DEBOUNCE_MS = 400;
 const MAX_LIST_HEIGHT = 256;
@@ -211,11 +212,11 @@ export function PackagingSelect({ unitIds, onSelect, disabled = false }: Packagi
             aria-labelledby={labelId}
             aria-describedby={forbidden ? forbiddenId : undefined}
             disabled={disabled}
-            className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT} pr-8`}
+            className={`w-full ${touchTarget} ${FIELD_TEXT} pr-8`}
             placeholder={LABELS.placeholder}
             data-testid={PACKAGING_SELECT_TESTID}
           />
-          <AutocompleteClear aria-label={LABELS.clear} className={TOUCH_TARGET} />
+          <AutocompleteClear aria-label={LABELS.clear} className={touchTarget} />
         </AutocompleteInputGroup>
 
         <AutocompleteContent className="min-w-56">
@@ -234,7 +235,7 @@ export function PackagingSelect({ unitIds, onSelect, disabled = false }: Packagi
                       index={index}
                       value={option}
                       disabled={option.presentationContent == null}
-                      className={`${TOUCH_TARGET} ${FIELD_TEXT} flex-col items-start gap-0.5`}
+                      className={`${touchTarget} ${FIELD_TEXT} flex-col items-start gap-0.5`}
                       data-testid={PACKAGING_OPTION_TESTID}
                       data-product-id={option.id}
                       onClick={() => choose(option)}
@@ -262,17 +263,13 @@ export function PackagingSelect({ unitIds, onSelect, disabled = false }: Packagi
                 ) : null}
               </>
             ) : (
-              <p
-                role="alert"
+              <ErrorAlert
+                error={loadFailure}
+                as="p"
                 className="p-2 text-sm text-destructive"
-                data-testid={PACKAGING_SELECT_LOAD_ERROR_TESTID}
-              >
-                {loadFailure.code === UNEXPECTED_ERROR_CODE ? (
-                  <UnexpectedErrorNotice state={loadFailure} />
-                ) : (
-                  loadFailure.message
-                )}
-              </p>
+                testId={PACKAGING_SELECT_LOAD_ERROR_TESTID}
+                renderCatalogued={(error) => error.message}
+              />
             )}
 
             <p
@@ -282,7 +279,7 @@ export function PackagingSelect({ unitIds, onSelect, disabled = false }: Packagi
             >
               {loading ? (
                 <>
-                  <Loader2Icon className="size-4 animate-spin" aria-hidden />
+                  <Spinner />
                   <span className="py-2">{LABELS.loading}</span>
                 </>
               ) : null}

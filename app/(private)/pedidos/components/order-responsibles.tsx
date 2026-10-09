@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -16,8 +16,9 @@ import {
   removeWorkGroupFromOrderAction,
   unassignResponsibleAction,
 } from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions';
-import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorState } from '@/lib/modules/errores';
 import { getInitials } from '@/lib/shared/ui/initials';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * QC-102 T8 y T9 — La seccion de responsables **dentro del panel de pedido que ya existe**
@@ -91,7 +92,6 @@ export const RESPONSIBLE_WORK_GROUP_IDS_FIELD = 'workGroupIds';
 export const RESPONSIBLE_USER_ID_FIELD = 'userId';
 export const RESPONSIBLE_WORK_GROUP_ID_FIELD = 'workGroupId';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 /** 16 px en TODOS los anchos: por debajo, Safari en iOS hace zoom al enfocar el campo (R35). */
 const FIELD_TEXT = 'text-base md:text-base';
 
@@ -404,7 +404,7 @@ export function OrderResponsibles({
                   <Button
                     type="button"
                     variant="ghost"
-                    className={TOUCH_TARGET}
+                    className={touchTarget}
                     disabled={busy}
                     aria-label={`${REMOVE_GROUP_LABEL}: ${group.workGroupName}`}
                     onClick={() => void removeGroup(group.workGroupId)}
@@ -438,7 +438,7 @@ export function OrderResponsibles({
                       <Button
                         type="button"
                         variant="ghost"
-                        className={TOUCH_TARGET}
+                        className={touchTarget}
                         disabled={busy}
                         aria-label={`${REMOVE_PERSON_LABEL}: ${responsible.displayName}`}
                         onClick={() => void removePerson(responsible.userId)}
@@ -465,7 +465,7 @@ export function OrderResponsibles({
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+              className={`${touchTarget} ${FIELD_TEXT}`}
               data-testid={RESPONSIBLE_SEARCH_TESTID}
             />
           </div>
@@ -492,7 +492,7 @@ export function OrderResponsibles({
                   <Checkbox
                     id={`${ORDER_RESPONSIBLES_TESTID}-person-${person.id}`}
                     aria-label={person.displayName}
-                    className={TOUCH_TARGET}
+                    className={touchTarget}
                     checked={pickedPeople.has(person.id)}
                     onCheckedChange={() => setPickedPeople((set) => toggle(set, person.id))}
                     data-testid={RESPONSIBLE_CANDIDATE_TESTID}
@@ -525,7 +525,7 @@ export function OrderResponsibles({
                     <Checkbox
                       id={`${ORDER_RESPONSIBLES_TESTID}-group-${group.id}`}
                       aria-label={group.name}
-                      className={TOUCH_TARGET}
+                      className={touchTarget}
                       checked={pickedGroups.has(group.id)}
                       onCheckedChange={() => setPickedGroups((set) => toggle(set, group.id))}
                       data-testid={RESPONSIBLE_WORK_GROUP_TESTID}
@@ -545,7 +545,7 @@ export function OrderResponsibles({
 
           <Button
             type="button"
-            className={TOUCH_TARGET}
+            className={touchTarget}
             disabled={busy || (pickedPeople.size === 0 && pickedGroups.size === 0)}
             aria-busy={busy}
             onClick={() => void confirmAssign()}
@@ -557,19 +557,13 @@ export function OrderResponsibles({
       ) : null}
 
       {error === null ? null : (
-        // R34: DENTRO de la seccion. El panel no se cierra y lo marcado sigue marcado.
-        <div
-          role="alert"
+        // DENTRO de la seccion: el panel no se cierra y lo marcado sigue marcado.
+        <ErrorAlert
+          error={error}
           className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-          data-testid={RESPONSIBLE_ERROR_TESTID}
-          data-code={error.code}
-        >
-          {error.code === UNEXPECTED_ERROR_CODE ? (
-            <UnexpectedErrorNotice state={error} />
-          ) : (
-            <p>{error.message}</p>
-          )}
-        </div>
+          testId={RESPONSIBLE_ERROR_TESTID}
+          withDataCode
+        />
       )}
     </section>
   );

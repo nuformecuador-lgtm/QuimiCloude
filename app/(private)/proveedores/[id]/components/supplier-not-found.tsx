@@ -32,7 +32,7 @@ export function SupplierNotFound() {
         href={SUPPLIERS_ROUTE}
         data-slot="button"
         data-testid="supplier-not-found-link"
-        className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11 min-w-11')}
+        className={cn(buttonVariants({ variant: 'outline', touch: true }))}
       >
         Volver a la lista de proveedores
       </Link>

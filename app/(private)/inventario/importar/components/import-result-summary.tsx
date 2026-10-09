@@ -80,7 +80,7 @@ function RestartButton({ onRestart }: { readonly onRestart: () => void }) {
     <Button
       type="button"
       variant="outline"
-      className="min-h-11 min-w-11"
+      touch
       data-testid={RESTART_TESTID}
       onClick={onRestart}
     >

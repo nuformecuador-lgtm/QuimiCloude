@@ -6,6 +6,7 @@ import { useId, useState } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { formatDateLocalISO, parseDateLocalISO } from '@/lib/shared/ui/date-civil';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Campo de fecha de compra del primer lote, en el alta de producto.
@@ -25,15 +26,6 @@ import { formatDateLocalISO, parseDateLocalISO } from '@/lib/shared/ui/date-civi
 
 /** Campo del formulario de producto que alimenta este componente, via su `input` espejo. */
 export const PURCHASE_DATE_FIELD = 'purchaseDate';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
-/**
- * Reexportada para que `product-form.tsx`, que necesita la misma fecha de "hoy" para el valor
- * por defecto, la tome de este componente -su dueño real- en vez de importar
- * `lib/shared/ui/date-civil` directamente.
- */
-export { formatDateLocalISO };
 
 /** "Hoy" a medianoche local, sin arrastrar la hora. */
 function today(): Date {
@@ -84,7 +76,7 @@ export function ProductBatchDateField({ initialValue, error }: ProductBatchDateF
           aria-labelledby={labelId}
           aria-invalid={error === undefined ? undefined : true}
           aria-describedby={error === undefined ? undefined : errorId}
-          className={`inline-flex items-center gap-1.5 rounded-lg border border-input bg-background px-2.5 text-sm hover:bg-muted ${TOUCH_TARGET}`}
+          className={`inline-flex items-center gap-1.5 rounded-lg border border-input bg-background px-2.5 text-sm hover:bg-muted ${touchTarget}`}
           data-testid="product-field-purchaseDate"
         >
           <CalendarIcon className="size-4" aria-hidden="true" />

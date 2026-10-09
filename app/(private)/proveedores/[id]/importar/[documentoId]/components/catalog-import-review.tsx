@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState, useTransition } from 'react';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import {
   confirmCatalogImportAction,
@@ -16,7 +16,7 @@ import {
   type CatalogImportSummary as CatalogImportSummaryData,
   type ReviewedLineInput,
 } from '@/lib/modules/documentos';
-import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorState } from '@/lib/modules/errores';
 import { normalizePresentationName } from '@/lib/modules/inventario';
 import { normalizeSupplierName } from '@/lib/modules/proveedores';
 import type { UnitRef } from '@/lib/modules/unidades';
@@ -345,22 +345,19 @@ export function CatalogImportReview({ supplierId, documentFileId, units, preview
       />
 
       {confirmError === null ? null : (
-        <div
-          role="alert"
+        <ErrorAlert
+          error={confirmError}
           className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-          data-testid="catalog-import-confirm-error"
-        >
-          {confirmError.code === UNEXPECTED_ERROR_CODE ? (
-            <UnexpectedErrorNotice state={confirmError} />
-          ) : (
+          testId="catalog-import-confirm-error"
+          renderCatalogued={(catalogued) => (
             <>
-              <p data-testid="catalog-import-confirm-error-message">{confirmError.message}</p>
+              <p data-testid="catalog-import-confirm-error-message">{catalogued.message}</p>
               <p className="text-xs" data-testid="catalog-import-confirm-error-code">
-                {confirmError.code}
+                {catalogued.code}
               </p>
             </>
           )}
-        </div>
+        />
       )}
 
       {reasons.length === 0 ? null : (
@@ -378,7 +375,7 @@ export function CatalogImportReview({ supplierId, documentFileId, units, preview
       <div>
         <Button
           type="button"
-          className="min-h-11 min-w-11"
+          touch
           disabled={reasons.length > 0 || isReclassifying || isConfirming}
           aria-busy={isConfirming || isReclassifying}
           onClick={handleConfirm}

@@ -127,9 +127,6 @@ const ARCHIVOS_DE_LA_LISTA = [
   join(COMPONENTES_PATH, 'recipe-columns.tsx'),
   join(COMPONENTES_PATH, 'recipe-columns-skeleton.ts'),
   join(COMPONENTES_PATH, 'recipe-table.tsx'),
-  join(COMPONENTES_PATH, 'recipe-table-skeleton.tsx'),
-  join(COMPONENTES_PATH, 'recipe-list-empty.tsx'),
-  join(COMPONENTES_PATH, 'recipe-list-error.tsx'),
   join(COMPONENTES_PATH, 'recipe-list-params.ts'),
   join(COMPONENTES_PATH, 'recipe-list-section.tsx'),
   join(COMPONENTES_PATH, 'delete-recipe-dialog.tsx'),
@@ -145,7 +142,6 @@ const ARCHIVOS_DE_TABLA_Y_COLUMNAS = [
   join(COMPONENTES_PATH, 'recipe-table.tsx'),
   join(COMPONENTES_PATH, 'recipe-columns.tsx'),
   join(COMPONENTES_PATH, 'recipe-columns-skeleton.ts'),
-  join(COMPONENTES_PATH, 'recipe-table-skeleton.tsx'),
 ].map(enRutaDePosix);
 
 /** Operaciones de array que reordenan, descartan o recortan una coleccion. */
@@ -289,6 +285,27 @@ function llevaLaClase(className: string | null, clase: string, constantes: strin
   if (className === null) return false;
   if (className.includes(clase)) return true;
   return constantes.some((nombre) => new RegExp(`(?<![\\w$])${nombre}(?![\\w$])`).test(className));
+}
+
+/**
+ * El control lleva la talla tactil por alguna de sus formas: la clase (literal o en una constante
+ * local), el eje `touch` de `Button`, `touch: true` en `buttonVariants(...)` o la constante
+ * compartida `touchTarget` en su `className`.
+ */
+function llevaLaTallaTactil(etiqueta: string, className: string | null, constantes: string[]): boolean {
+  if (/\stouch(?:=\{true\})?(?=\s|\/?>)/.test(etiqueta)) return true;
+  if (className === null) return false;
+  if (/(?<![\w$])touchTarget(?![\w$])/.test(className)) return true;
+  if (/buttonVariants\([^)]*\btouch:\s*true/.test(className)) return true;
+  return llevaLaClase(className, 'min-h-11', constantes);
+}
+
+/** Las constantes locales que llevan la talla: la clase literal o la constante compartida. */
+function constantesTactilesDe(codigo: string): string[] {
+  return [
+    ...constantesConLaClase(codigo, 'min-h-11'),
+    ...constantesConLaClase(codigo, '${touchTarget}'),
+  ];
 }
 
 function identificaAlControl(etiqueta: string): string {
@@ -1117,7 +1134,7 @@ describe('contrato de la ruta de recetas', () => {
 
       // Control a control: medido por archivo, un campo entero puede perder la clase sin que nada
       // se ponga rojo.
-      const constantesTactiles = constantesConLaClase(codigo, 'min-h-11');
+      const constantesTactiles = constantesTactilesDe(codigo);
       const constantesDeFuente = constantesConLaClase(codigo, 'text-base');
 
       for (const nombre of CONTROLES_VIGILADOS) {
@@ -1140,8 +1157,8 @@ describe('contrato de la ruta de recetas', () => {
           archivosConControles.add(ruta);
 
           expect(
-            llevaLaClase(className, 'min-h-11', constantesTactiles),
-            `${control} debe forzar el area tactil en SU className (min-h-11, literal o via constante local)`,
+            llevaLaTallaTactil(texto, className, constantesTactiles),
+            `${control} debe forzar el area tactil (touch, touchTarget o min-h-11 en SU className)`,
           ).toBe(true);
 
           if (CONTROLES_CON_FUENTE.includes(nombre)) {
@@ -1156,6 +1173,45 @@ describe('contrato de la ruta de recetas', () => {
 
     expect(controlesVigilados, 'R50 no esta vigilando ningun control').toBeGreaterThan(0);
     expect(archivosConControles.size).toBeGreaterThan(0);
+  });
+
+  it('R8 — la talla compartida cuenta como area tactil, y un control sin ninguna forma sigue fallando', () => {
+    const codigo = [
+      "const FIELD = `${touchTarget} text-base`;",
+      "const LOCAL = 'min-h-11 min-w-11';",
+    ].join('\n');
+    const constantes = constantesTactilesDe(codigo);
+
+    const conLaTalla = [
+      '<Button data-testid="eje" touch>',
+      '<Button data-testid="eje-explicito" touch={true} variant="outline">',
+      '<Button\n  variant="ghost"\n  touch\n  data-testid="multilinea"\n/>',
+      '<Input className={`w-full ${touchTarget} text-base`}>',
+      '<Input className={FIELD}>',
+      '<Input className={LOCAL}>',
+      "<Link data-slot=\"button\" className={buttonVariants({ variant: 'outline', touch: true })}>",
+      "<Link data-slot=\"button\" className={cn(buttonVariants({ variant: 'outline' }), touchTarget)}>",
+    ];
+    for (const etiqueta of conLaTalla) {
+      expect(
+        llevaLaTallaTactil(etiqueta, valorDeAtributo(etiqueta, 'className'), constantes),
+        etiqueta,
+      ).toBe(true);
+    }
+
+    const sinLaTalla = [
+      '<Button data-testid="sin-eje" variant="outline">',
+      '<Button data-testid="ontouch" ontouchstart={f}>',
+      '<Button data-testid="eje-apagado" touch={false}>',
+      '<Input className="w-full text-base">',
+      "<Link data-slot=\"button\" className={buttonVariants({ variant: 'outline', touch: false })}>",
+    ];
+    for (const etiqueta of sinLaTalla) {
+      expect(
+        llevaLaTallaTactil(etiqueta, valorDeAtributo(etiqueta, 'className'), constantes),
+        etiqueta,
+      ).toBe(false);
+    }
   });
 
   it('la feature no duplica el armazon heredado: layout, sidebar, avisos y primitivas siguen siendo unicos', () => {

@@ -12,8 +12,6 @@ import type { UnitRef } from '@/lib/modules/unidades';
 
 import { ProductForm } from './product-form';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 const CREATE_SUCCESS = 'Producto creado.';
 const UPDATE_SUCCESS = 'Producto actualizado.';
 
@@ -90,7 +88,7 @@ export function ProductSheet({
         render={
           <Button
             variant={isEdit ? 'ghost' : 'default'}
-            className={TOUCH_TARGET}
+            touch
             aria-label={isEdit ? `Editar ${product.name}` : undefined}
             data-testid={isEdit ? 'product-edit-open' : 'product-create-open'}
           />

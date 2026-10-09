@@ -3,6 +3,7 @@
 import Link from 'next/link';
 
 import type { DocumentFileStatusEntry } from '@/lib/modules/documentos';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import {
   BROWSER_PHASE_LABELS,
@@ -19,9 +20,6 @@ export const rowStatusTestId = (index: number): string => `document-upload-row-s
 export const rowErrorTestId = (index: number): string => `document-upload-row-error-${index}`;
 export const rowReasonTestId = (index: number): string => `document-upload-row-reason-${index}`;
 export const rowReviewLinkTestId = (index: number): string => `document-upload-row-review-${index}`;
-
-/** Objetivo tactil minimo, mismo criterio que el resto de la pieza. */
-const TOUCH_TARGET = 'inline-flex min-h-11 min-w-11 items-center text-base underline';
 
 export type DocumentUploadRowProps = {
   readonly index: number;
@@ -80,7 +78,11 @@ export function DocumentUploadRow({
       ) : null}
 
       {reviewHref !== null ? (
-        <Link href={reviewHref} data-testid={rowReviewLinkTestId(index)} className={TOUCH_TARGET}>
+        <Link
+          href={reviewHref}
+          data-testid={rowReviewLinkTestId(index)}
+          className={`inline-flex ${touchTarget} items-center text-base underline`}
+        >
           {REVIEW_LABEL}
         </Link>
       ) : null}

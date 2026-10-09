@@ -3,12 +3,12 @@
 import { useActionState, useEffect, useId } from 'react';
 import { useFormStatus } from 'react-dom';
 
+import { ErrorAlert } from '@/components/shared/error-alert';
 import {
   PRESENTATION_UNIT_FIELD,
   PRESENTATION_UNIT_LABEL,
   PresentationUnitSelect,
 } from '@/components/shared/presentation-unit-select';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,7 +19,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import {
   createPresentationSchema,
   updatePresentationSchema,
@@ -31,6 +31,7 @@ import {
 } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { trimDecimal } from '@/lib/shared/ui/decimal-display';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Formulario de alta y edicion de presentacion (R22, R23, R24, R31, R34, `design.md > 7`).
@@ -116,9 +117,6 @@ export const PRESENTATION_FIELD_CONTENT_TESTID = 'presentation-field-content';
 export const PRESENTATION_ERROR_CONTENT_TESTID = 'presentation-error-content';
 
 type PresentationFieldName = (typeof PRESENTATION_BUSINESS_FIELDS)[number];
-
-/** Objetivo tactil minimo (44x44 px) de R34. */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /** 16 px en TODOS los anchos: el primitivo baja a 14 px en `md` y R34 no distingue por ancho. */
 const FIELD_TEXT = 'text-base md:text-base';
@@ -391,28 +389,20 @@ export function PresentationForm({ presentation, units, onSaved }: PresentationF
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
         {formError === undefined ? null : (
-          // Region de error del formulario (R24): aqui van los rechazos que no senalan campo.
-          //
-          // QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
-          // identificador de la peticion. El CATALOGADO se pinta como siempre -mismo marcado,
-          // mismos `data-testid`- y sin identificador ninguno.
-          <div
-            role="alert"
+          <ErrorAlert
+            error={formError}
             id={formErrorId}
             className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={PRESENTATION_FORM_ERROR_TESTID}
-          >
-            {formError.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={formError} />
-            ) : (
+            testId={PRESENTATION_FORM_ERROR_TESTID}
+            renderCatalogued={(catalogued) => (
               <>
-                <p>{formError.message}</p>
+                <p>{catalogued.message}</p>
                 <p className="text-xs" data-testid={PRESENTATION_FORM_ERROR_CODE_TESTID}>
-                  {formError.code}
+                  {catalogued.code}
                 </p>
               </>
             )}
-          </div>
+          />
         )}
 
         <div className="flex flex-col gap-2">
@@ -525,7 +515,7 @@ function FormActions() {
           <Button
             type="button"
             variant="outline-dashed"
-            className={TOUCH_TARGET}
+            className={touchTarget}
             data-testid={PRESENTATION_FORM_CANCEL_TESTID}
           />
         }
@@ -548,7 +538,7 @@ function SaveButton() {
   return (
     <Button
       type="submit"
-      className={TOUCH_TARGET}
+      touch
       disabled={pending}
       aria-busy={pending}
       data-testid={PRESENTATION_FORM_SUBMIT_TESTID}

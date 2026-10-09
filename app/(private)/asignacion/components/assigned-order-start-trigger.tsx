@@ -19,8 +19,6 @@ export function assignedOrderStartConfirmTexts() {
   } as const;
 }
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 /**
  * «Entrar» de un pedido aun no comenzado. Abrir la ruta de ejecucion ya lo pasa a `EN_CURSO`,
  * asi que se pide confirmacion antes de navegar.
@@ -43,7 +41,7 @@ export function AssignedOrderStartTrigger({
       <Button
         type="button"
         variant="outline"
-        className={TOUCH_TARGET}
+        touch
         disabled={isPending}
         aria-busy={isPending}
         data-testid={testId}
