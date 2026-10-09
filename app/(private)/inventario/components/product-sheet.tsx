@@ -23,8 +23,8 @@ function createSuccessMessage(lot: string): string {
 }
 
 /**
- * Panel lateral de alta y edicion de producto, con su propio disparador y su propio estado: la
- * tabla no coordina que fila esta abierta.
+ * Panel lateral de alta y edicion de producto. Sin `open` trae su propio disparador y su propio
+ * estado; con `open` lo abre quien lo monta (el menu de la fila) y no pinta disparador.
  *
  * El formulario solo se monta con el panel abierto: `productType`, `template` y el estado de
  * `useActionState` viven en `ProductForm`, y si se quedara montado conservaria el ultimo tipo
@@ -34,6 +34,8 @@ export function ProductSheet({
   product,
   units,
   formUnits,
+  open,
+  onOpenChange,
 }: {
   readonly product?: ProductView;
   /**
@@ -43,9 +45,14 @@ export function ProductSheet({
   readonly units?: readonly UnitRef[];
   /** Unidades del selector «Unidad» del alta de insumo. La edicion no las usa. */
   readonly formUnits?: ProductFormUnits;
+  /** Apertura controlada desde fuera. Ausente = el panel trae su propio disparador. */
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 }) {
   const isEdit = product !== undefined;
-  const { isOpen, changeOpen, handleSaved } = useEntitySheet({
+  const { isOpen, isControlled, changeOpen, handleSaved } = useEntitySheet({
+    open,
+    onOpenChange,
     successMessage: isEdit ? UPDATE_SUCCESS : CREATE_SUCCESS,
   });
 
@@ -58,19 +65,21 @@ export function ProductSheet({
 
   return (
     <Sheet open={isOpen} onOpenChange={changeOpen}>
-      <SheetTrigger
-        render={
-          <Button
-            variant={isEdit ? 'ghost' : 'default'}
-            touch
-            aria-label={isEdit ? `Editar ${product.name}` : undefined}
-            data-testid={isEdit ? 'product-edit-open' : 'product-create-open'}
-          />
-        }
-      >
-        {isEdit ? <PencilIcon /> : <PlusIcon />}
-        {isEdit ? null : 'Nuevo producto'}
-      </SheetTrigger>
+      {isControlled ? null : (
+        <SheetTrigger
+          render={
+            <Button
+              variant={isEdit ? 'ghost' : 'default'}
+              touch
+              aria-label={isEdit ? `Editar ${product.name}` : undefined}
+              data-testid={isEdit ? 'product-edit-open' : 'product-create-open'}
+            />
+          }
+        >
+          {isEdit ? <PencilIcon /> : <PlusIcon />}
+          {isEdit ? null : 'Nuevo producto'}
+        </SheetTrigger>
+      )}
       {isOpen ? (
         <ProductForm
           product={product}

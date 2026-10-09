@@ -13,12 +13,10 @@ import type { ErrorState as OperationError } from '@/lib/modules/errores';
 import type { ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 
-import { DeleteProductDialog } from './delete-product-dialog';
 import { buildProductColumns } from './product-columns';
 import { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
 import { productListHref } from './product-list-params';
-import { ProductBatchesSheet } from './product-batches-sheet';
-import { ProductSheet } from './product-sheet';
+import { ProductRowActions } from './product-row-actions';
 import { ProductTypeTabs } from './product-type-tabs';
 
 /**
@@ -193,11 +191,7 @@ export function ProductTable({
     () =>
       buildProductColumns({
         rowActions: (product) => (
-          <>
-            <ProductBatchesSheet product={product} units={units} canAdjust={canAdjust} />
-            <ProductSheet product={product} units={units} />
-            <DeleteProductDialog product={product} />
-          </>
+          <ProductRowActions product={product} units={units} canAdjust={canAdjust} />
         ),
         units,
       }),
