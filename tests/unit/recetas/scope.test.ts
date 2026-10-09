@@ -153,11 +153,21 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
     // Anadida el 2026-09-17: la pantalla de ejecucion de un pedido asignado tiene RUTA PROPIA y
     // llega a la receta por el `recipeId` de un pedido, nunca navegando el catalogo. Se nombra el
     // archivo EXACTO, nunca la carpeta: cualquier OTRA segunda pantalla sigue prohibida.
-    const PANTALLA_DE_EJECUCION = join('app', '(private)', 'asignacion', '[id]', 'page.tsx')
+    // AMPLIADA el 2026-10-08 (QC-180, rojos-heredados-de-alta-de-grupos): el conjunto cerrado
+    // pasa de UNO a DOS archivos y entra `app/(private)/pedidos/page.tsx`. El alta de pedidos
+    // necesita la primera pagina del catalogo de recetas en la cabecera: es el consumo que aprobo
+    // QC-35 R31 (selector de receta con busqueda en el servidor), y `897a4f91` solo lo movio de
+    // `OrderListSection` a la pagina. Sigue prohibida cualquier OTRA segunda pantalla y el goteo
+    // suelto de abajo; que la pagina de pedidos consuma `recetas` solo por su contrato publico lo
+    // vigila `tests/unit/recetas/module-contract.test.ts`, con la misma lista de dos literales.
+    const PANTALLA_DE_EJECUCION = new Set([
+      join('app', '(private)', 'asignacion', '[id]', 'page.tsx'),
+      join('app', '(private)', 'pedidos', 'page.tsx'),
+    ])
 
     const segundasPantallas = filesIn(appDir, /^(page|layout)\.tsx$/)
       .filter((file) => relative(recipesRouteDir, file).startsWith(`..${sep}`))
-      .filter((file) => relative(repoRoot, file) !== PANTALLA_DE_EJECUCION)
+      .filter((file) => !PANTALLA_DE_EJECUCION.has(relative(repoRoot, file)))
       .filter(
         (file) =>
           screenPattern.test(file.slice(appDir.length)) || screenPattern.test(codeOf(file)),

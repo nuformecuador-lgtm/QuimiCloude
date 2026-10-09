@@ -587,7 +587,17 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
     // llega a la receta por el `recipeId` de un pedido, no navegando el catalogo. Se nombra el
     // archivo EXACTO, nunca la carpeta, y NO queda exenta: se le sigue exigiendo que consuma
     // `recetas` solo por su contrato publico, igual que a cualquier otro archivo de fuera.
-    const PANTALLAS_AUTORIZADAS = new Set(['app/(private)/asignacion/[id]/page.tsx'])
+    // AMPLIADA el 2026-10-08 (QC-180, rojos-heredados-de-alta-de-grupos): la lista pasa de UNO a
+    // DOS archivos y entra `app/(private)/pedidos/page.tsx`. El alta de pedidos necesita la
+    // primera pagina del catalogo de recetas en la cabecera: es el consumo que aprobo QC-35 R31,
+    // y `897a4f91` solo lo movio de `OrderListSection` a la pagina. Tampoco queda exenta: se le
+    // sigue aplicando `consumesOnlyPublicContract`. Cualquier OTRA segunda pantalla sigue
+    // prohibida. Los dos literales son los mismos que `PANTALLA_DE_EJECUCION` de
+    // `tests/unit/recetas/scope.test.ts`.
+    const PANTALLAS_AUTORIZADAS = new Set([
+      'app/(private)/asignacion/[id]/page.tsx',
+      'app/(private)/pedidos/page.tsx',
+    ])
 
     const fueraDeSuCarpeta = sourcesIn(appDir).filter(
       (file) => relative(recipesRouteDir, file).startsWith(`..${sep}`),
