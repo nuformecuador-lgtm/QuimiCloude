@@ -315,7 +315,7 @@ como «Entrega a cliente», con la cantidad negativa, el número de pedido, el a
 
 ---
 
-## [ ] TC — Barrido de censos y guardias
+## [x] TC — Barrido de censos y guardias
 Depende de: B1–B5 y F1–F4.
 
 - Corre `pnpm exec vitest run guard` y los censos de `design.md > 8`:
@@ -344,7 +344,7 @@ nuevos también y el gate de la tanda también.
 
 ---
 
-## [ ] TI — E2E
+## [x] TI — E2E
 Depende de: TC.
 
 Archivos:
@@ -376,7 +376,7 @@ Archivos:
 
 ---
 
-## [ ] TZ — Cierre
+## [x] TZ — Cierre
 Depende de: TI.
 
 - `./init.sh` en verde, y `gate-completo` de CI en verde en el PR.
