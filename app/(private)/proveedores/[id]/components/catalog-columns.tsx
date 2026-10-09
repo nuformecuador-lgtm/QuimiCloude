@@ -57,11 +57,8 @@ import {
  * precarga con `trimDecimal`, que no redondea. Mismo criterio que la tabla de pedidos.
  */
 
-// Solo la importa `supplier-detail-header.tsx`.
-export const EMPTY_CELL = EMPTY_MARK;
-
 /**
- * Marca de «no resuelto» de presentacion y unidad (R22). Es **distinta** de `EMPTY_CELL` en
+ * Marca de «no resuelto» de presentacion y unidad (R22). Es **distinta** de `EMPTY_MARK` en
  * significado -«no se pudo resolver el nombre» no es lo mismo que «este dato no existe»- y por eso
  * es tambien un glifo distinto: con la misma raya para los dos casos, una linea sin unidad -que
  * R40 permite expresamente- y un nombre que el diccionario no pudo resolver se leian igual en

@@ -34,9 +34,6 @@ import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
  * columna de imagen no ordena ni filtra: no se ordena por una ruta de archivo.
  */
 
-/** Lo sigue importando `product-batches-panel.tsx`; el resto usa `EMPTY_MARK`. */
-export const EMPTY_CELL = EMPTY_MARK;
-
 /**
  * Campos de `ProductView` que quedan FUERA de la tabla como columna propia: el identificador
  * tecnico, la ruta de la imagen y el id de la unidad -un UUID que esta pantalla no resuelve a
