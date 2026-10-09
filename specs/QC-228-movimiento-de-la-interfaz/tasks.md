@@ -51,7 +51,7 @@ la fase 3 entra. Las demás preguntas tienen propuesta por defecto y no bloquean
     que detecta cada patrón prohibido.
   - **Hecho cuando:** `pnpm exec vitest run guard` está verde.
 
-- [ ] **T6 (tras T2, T3). Paridad y tests de clases** (R24)
+- [ ] **T6 (tras T2, T3). Paridad y tests de clases** (R24) — pendiente de integrar dev con QC-232
   - Revisar el diff de `pnpm exec vitest run tests/unit/paridad` y, si solo cambian las clases
     previstas en `design.md > 8`, regenerar con `-u` en el commit
     `test(QC-228): paridad con las clases de movimiento`.
@@ -87,7 +87,7 @@ la fase 3 entra. Las demás preguntas tienen propuesta por defecto y no bloquean
 
 ## Cierre
 
-- [ ] **T9 (tras T1–T8). E2E de movimiento** (R4–R6, R10, R13–R15, R19–R22)
+- [x] **T9 (tras T1–T8). E2E de movimiento** (R4–R6, R10, R13–R15, R19–R22)
   - `e2e/movimiento.spec.ts`: duraciones y curvas calculadas de un diálogo, un `Sheet` y un toast
     al abrir y al cerrar; indicador sobre el ítem activo (expandido e icono); entrada de pantalla
     al cambiar de módulo y no dentro del módulo; todo con `emulateMedia({ reducedMotion: 'reduce' })`
@@ -96,7 +96,7 @@ la fase 3 entra. Las demás preguntas tienen propuesta por defecto y no bloquean
   - **Hecho cuando:** los dos specs están verdes. Si la base local no responde, se anota la salida
     en `progress/impl_QC-228.md` como rojo de entorno.
 
-- [ ] **T10. Notas de enmienda y trazabilidad** (R24, R25)
+- [x] **T10. Notas de enmienda y trazabilidad** (R24, R25)
   - Notas en `specs/QC-226-tema-y-marca-base/requirements.md` (R11 y R32).
   - Mapa `R<n> -> test` en `progress/impl_QC-228.md`.
   - `./init.sh` en verde.
