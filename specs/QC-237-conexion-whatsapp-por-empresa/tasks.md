@@ -55,19 +55,19 @@
 
 ## T5–T7 — Adaptadores driven
 
-- [ ] **T5. [P]** Persistencia (`design.md > 4.2`): `persistence/company-scope.ts` y
+- [x] **T5. [P]** Persistencia (`design.md > 4.2`): `persistence/company-scope.ts` y
       `persistence/whatsapp-connection-prisma.ts`; guardia nueva
       `tests/guards/guard-ambito-empresa-integraciones.test.ts`; test
       `tests/integration/integraciones/whatsapp-connection-prisma.int.test.ts`.
       **Hecho cuando:** el `.int` y la guardia en verde. Cubre R2, R3, R5, R6, R7, R9 (base).
       Depende de: T1, T3.
 
-- [ ] **T6. [P]** Graph y configuración (`design.md > 4.3`, `> 4.5`): `whatsapp-config-env.ts`,
+- [x] **T6. [P]** Graph y configuración (`design.md > 4.3`, `> 4.5`): `whatsapp-config-env.ts`,
       `whatsapp-graph-client-fetch.ts`, `public-base-url-env.ts`; tests
       `whatsapp-graph-client-fetch.test.ts`, `whatsapp-config-env.test.ts`.
       **Hecho cuando:** los dos tests en verde. Cubre R17, R18, R42 (parte). Depende de: T3.
 
-- [ ] **T7. [P]** Aleatoriedad y doble (`design.md > 4.4`, `> 9`): `random-source-node.ts`,
+- [x] **T7. [P]** Aleatoriedad y doble (`design.md > 4.4`, `> 9`): `random-source-node.ts`,
       `e2e-doubles-env.ts`, `whatsapp-graph-client-canned.ts`; tests `random-source-node.test.ts` y
       `whatsapp-graph-client-canned.test.ts`.
       **Hecho cuando:** los dos tests en verde. Cubre R14 (generación), R41 (doble). Depende de: T3.

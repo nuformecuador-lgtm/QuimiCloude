@@ -128,7 +128,15 @@ export function isAllowedHolderOfTheCode(relativePath: string): boolean {
 
 /** Los archivos de codigo del modulo, uno a uno. Un archivo nuevo entra aqui con su ruta exacta. */
 const MODULE_CODE_FILES = [
+  'adapters/driven/config/e2e-doubles-env.ts',
   'adapters/driven/config/encryption-keys-env.ts',
+  'adapters/driven/config/public-base-url-env.ts',
+  'adapters/driven/config/whatsapp-config-env.ts',
+  'adapters/driven/graph/whatsapp-graph-client-canned.ts',
+  'adapters/driven/graph/whatsapp-graph-client-fetch.ts',
+  'adapters/driven/persistence/company-scope.ts',
+  'adapters/driven/persistence/whatsapp-connection-prisma.ts',
+  'adapters/driven/security/random-source-node.ts',
   'adapters/driven/security/secret-cipher-aes-gcm.ts',
   'adapters/driven/security/secret-digest-sha256.ts',
   'domain/actor.ts',
