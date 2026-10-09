@@ -224,19 +224,20 @@ describe.each(VIEWPORTS)('pantalla de clientes en viewport %s (%i px)', (_nombre
   it('las acciones de fila y el disparador de alta miden al menos 44x44 px (R39)', async () => {
     await renderPantalla();
 
-    const fila = await openRowActionsMenu(setupUser(), screen.getByTestId(CUSTOMER_ROW_ACTIONS_TESTID));
-    const controles = [
-      ...[CUSTOMER_ACTION_EDIT_TESTID, CUSTOMER_ACTION_DELETE_TESTID].map(
-        (accion) => within(fila).queryByTestId(accion) as HTMLElement,
-      ),
-      screen.getByTestId(CUSTOMER_CREATE_OPEN_TESTID),
-    ];
-
-    for (const control of controles) {
-      expect(control, 'el control deberia existir en el DOM').not.toBeNull();
+    // Disparador del menu de fila y alta: 44x44 (min-h-11 + min-w-11). Los items del menu
+    // compartido son anchos (el menu mide >= 200 px), asi que solo llevan min-h-11 (design.md > 11).
+    const disparador = screen.getByTestId(CUSTOMER_ROW_ACTIONS_TESTID);
+    for (const control of [disparador, screen.getByTestId(CUSTOMER_CREATE_OPEN_TESTID)]) {
       for (const token of AREA_TACTIL) {
         expect(control.className, `${control.getAttribute('data-testid')} a ${ancho}px`).toContain(token);
       }
+    }
+
+    const fila = await openRowActionsMenu(setupUser(), disparador);
+    for (const accion of [CUSTOMER_ACTION_EDIT_TESTID, CUSTOMER_ACTION_DELETE_TESTID]) {
+      const item = within(fila).queryByTestId(accion);
+      expect(item, `${accion} deberia existir en el DOM`).not.toBeNull();
+      expect(item?.className, `${accion} a ${ancho}px`).toContain('min-h-11');
     }
   });
 
