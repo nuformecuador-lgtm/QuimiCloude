@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { USUARIOS_TABS, isUsuariosTab, usuariosTabHref, type UsuariosTab } from './usuarios-tabs';
 import { USUARIOS_TABS_LABEL, USUARIOS_TAB_LABELS } from './work-group-labels';
@@ -45,9 +46,6 @@ export const USUARIOS_TAB_TESTIDS: Readonly<Record<UsuariosTab, string>> = {
   grupos: 'usuarios-tab-grupos',
 };
 
-/** Objetivo tactil minimo (44x44 px) de R40; la primitiva mide 32 px de alto por defecto. */
-const TOUCH_TARGET = 'h-auto min-h-11 min-w-11 px-4 text-base';
-
 export type UsuariosTabsSwitchProps = {
   /** La pestana vigente, resuelta en el servidor a partir de la direccion (R1, R2). */
   readonly tab: UsuariosTab;
@@ -80,7 +78,7 @@ export function UsuariosTabsSwitch({ tab }: UsuariosTabsSwitchProps) {
             key={value}
             value={value}
             data-testid={USUARIOS_TAB_TESTIDS[value]}
-            className={TOUCH_TARGET}
+            className={`h-auto ${touchTarget} px-4 text-base`}
           >
             {USUARIOS_TAB_LABELS[value]}
           </TabsTrigger>

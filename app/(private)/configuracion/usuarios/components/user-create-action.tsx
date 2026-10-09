@@ -43,9 +43,6 @@ export const USER_CREATE_OPEN_TESTID = 'user-create-open';
 /** El copy del disparador. Ningun test afirma sobre el (R41). */
 const CREATE_LABEL = 'Nuevo usuario';
 
-/** Objetivo tactil minimo de R40. */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 export type UserCreateActionProps = {
   /**
    * Si la sesion trae `usuarios.modificar` (R6). **Decision de PRESENTACION**, resuelta en el
@@ -84,7 +81,7 @@ export function UserCreateAction({
         <Button
           type="button"
           variant="default"
-          className={TOUCH_TARGET}
+          touch
           data-testid={USER_CREATE_OPEN_TESTID}
           onClick={() => setOpen(true)}
         >

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Sheet,
@@ -13,7 +13,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorState } from '@/lib/modules/errores';
 import type { RoleOption, UserDetail, UserRow } from '@/lib/modules/identity';
 import { getUserAction } from '@/lib/modules/identity/adapters/driving/user-actions';
 
@@ -191,24 +191,21 @@ export function UserSheet({
                 ))}
               </div>
             ) : (
-              // R26: con error NO se pinta un formulario con campos en blanco.
-              <div
-                role="alert"
+              // Con error NO se pinta un formulario con campos en blanco.
+              <ErrorAlert
+                error={shown.error}
                 className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-                data-testid={USER_SHEET_ERROR_TESTID}
-                data-code={shown.error.code}
-              >
-                {shown.error.code === UNEXPECTED_ERROR_CODE ? (
-                  <UnexpectedErrorNotice state={shown.error} />
-                ) : (
+                testId={USER_SHEET_ERROR_TESTID}
+                withDataCode
+                renderCatalogued={(catalogued) => (
                   <>
-                    <p>{shown.error.message}</p>
+                    <p>{catalogued.message}</p>
                     <p className="text-xs" data-testid={USER_SHEET_ERROR_CODE_TESTID}>
-                      {shown.error.code}
+                      {catalogued.code}
                     </p>
                   </>
                 )}
-              </div>
+              />
             )}
           </div>
         </SheetContent>

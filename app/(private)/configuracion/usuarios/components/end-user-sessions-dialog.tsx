@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,12 +15,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import type { UserRow } from '@/lib/modules/identity';
 import {
   endAllSessionsAction,
   type EndSessionsFormState,
 } from '@/lib/modules/identity/adapters/driving/session-actions';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { endUserSessionsMessage, endUserSessionsSuccess, endUserSessionsTitle } from './user-labels';
 
@@ -59,8 +59,6 @@ export const END_USER_SESSIONS_ID_TESTID = 'end-user-sessions-id';
 
 /** El `id` viaja como campo OCULTO: es el unico campo que lee `endAllSessionsAction`. */
 export const END_USER_SESSIONS_ID_FIELD = 'id';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 const CONFIRM_LABEL = 'Cerrar sesiones';
 const CONFIRM_PENDING_LABEL = 'Cerrando…';
@@ -104,19 +102,16 @@ export function EndUserSessionsDialog({ user, open, onOpenChange }: EndUserSessi
         </AlertDialogHeader>
 
         {error === undefined ? null : (
-          <div
-            role="alert"
+          <ErrorAlert
+            error={error}
             id={errorId}
             className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={END_USER_SESSIONS_ERROR_TESTID}
-            data-code={error.code}
-          >
-            {error.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={error} />
-            ) : (
-              <p data-testid={END_USER_SESSIONS_ERROR_MESSAGE_TESTID}>{error.message}</p>
+            testId={END_USER_SESSIONS_ERROR_TESTID}
+            withDataCode
+            renderCatalogued={(catalogued) => (
+              <p data-testid={END_USER_SESSIONS_ERROR_MESSAGE_TESTID}>{catalogued.message}</p>
             )}
-          </div>
+          />
         )}
 
         <form action={formAction} data-testid={END_USER_SESSIONS_FORM_TESTID}>
@@ -128,7 +123,7 @@ export function EndUserSessionsDialog({ user, open, onOpenChange }: EndUserSessi
           />
           <AlertDialogFooter>
             <AlertDialogCancel
-              className={TOUCH_TARGET}
+              className={touchTarget}
               data-testid={END_USER_SESSIONS_DISMISS_TESTID}
             >
               {DISMISS_LABEL}
@@ -136,7 +131,7 @@ export function EndUserSessionsDialog({ user, open, onOpenChange }: EndUserSessi
             <AlertDialogAction
               type="submit"
               variant="destructive"
-              className={TOUCH_TARGET}
+              className={touchTarget}
               disabled={isPending}
               aria-busy={isPending}
               aria-describedby={error === undefined ? undefined : errorId}

@@ -19,8 +19,8 @@ import {
   USER_LIST_EMPTY_TESTID,
   USER_LIST_FIRST_PAGE_TESTID,
   USER_LIST_TESTID,
-  UserListEmpty,
   UserListSection,
+  UserTable,
   userListHref,
 } from '@/app/(private)/configuracion/usuarios/components';
 import type { DataTableParams } from '@/components/shared/data-table';
@@ -186,9 +186,20 @@ describe('las salidas del vacio derivan de la constante de ruta (R1, R18)', () =
 
 describe('las salidas son enlaces reales y alcanzables con el dedo (R40, R41)', () => {
   it('son `<a>` con destino, no botones disfrazados, y miden al menos 44x44', () => {
-    // Aqui el componente se monta SOLO, con las dos salidas presentes: es el unico caso en el que
-    // las dos coinciden, y lo que se mira es su forma, no cuando se ofrecen.
-    render(<UserListEmpty clearSearchHref="/a?x=1" firstPageHref="/b?y=2" />);
+    // Aqui la tabla se monta SOLA, con las dos salidas presentes: es el unico caso en el que las
+    // dos coinciden, y lo que se mira es su forma, no cuando se ofrecen.
+    render(
+      <UserTable
+        users={[]}
+        params={parametros()}
+        totalPages={0}
+        canModify
+        currentUserId={null}
+        roles={[]}
+        rolesError={null}
+        empty={{ clearSearchHref: '/a?x=1', firstPageHref: '/b?y=2' }}
+      />,
+    );
 
     for (const testid of [USER_LIST_CLEAR_SEARCH_TESTID, USER_LIST_FIRST_PAGE_TESTID]) {
       const enlace = screen.getByTestId(testid);
