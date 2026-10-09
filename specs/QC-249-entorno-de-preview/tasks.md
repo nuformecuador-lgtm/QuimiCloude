@@ -83,7 +83,7 @@
 
 ## Bloque D — cierre
 
-### T8 — Gate local · depende de T1–T7
+### [x] T8 — Gate local · depende de T1–T7
 - `./init.sh` en verde.
 - **Hecho:** verde, y el mapa `R<n> -> test` de `design.md > 10` queda en `progress/impl_QC-249.md`.
 
