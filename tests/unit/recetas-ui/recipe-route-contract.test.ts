@@ -127,9 +127,6 @@ const ARCHIVOS_DE_LA_LISTA = [
   join(COMPONENTES_PATH, 'recipe-columns.tsx'),
   join(COMPONENTES_PATH, 'recipe-columns-skeleton.ts'),
   join(COMPONENTES_PATH, 'recipe-table.tsx'),
-  join(COMPONENTES_PATH, 'recipe-table-skeleton.tsx'),
-  join(COMPONENTES_PATH, 'recipe-list-empty.tsx'),
-  join(COMPONENTES_PATH, 'recipe-list-error.tsx'),
   join(COMPONENTES_PATH, 'recipe-list-params.ts'),
   join(COMPONENTES_PATH, 'recipe-list-section.tsx'),
   join(COMPONENTES_PATH, 'delete-recipe-dialog.tsx'),
@@ -145,7 +142,6 @@ const ARCHIVOS_DE_TABLA_Y_COLUMNAS = [
   join(COMPONENTES_PATH, 'recipe-table.tsx'),
   join(COMPONENTES_PATH, 'recipe-columns.tsx'),
   join(COMPONENTES_PATH, 'recipe-columns-skeleton.ts'),
-  join(COMPONENTES_PATH, 'recipe-table-skeleton.tsx'),
 ].map(enRutaDePosix);
 
 /** Operaciones de array que reordenan, descartan o recortan una coleccion. */

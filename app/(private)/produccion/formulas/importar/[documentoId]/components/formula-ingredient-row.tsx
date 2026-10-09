@@ -9,12 +9,12 @@ import { Label } from '@/components/ui/label';
 import type { RowProblem } from '@/lib/modules/documentos';
 import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { ProductPicker, sanitizePercentageInput, type ProductPickerOption } from '../../../components';
 
 import type { IngredientRowState } from './formula-import-review';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base';
 
 const ROW_PROBLEM_LABELS: Record<RowProblem, string> = {
@@ -87,7 +87,7 @@ export function FormulaIngredientRow({
         <Button
           type="button"
           variant="ghost"
-          className={TOUCH_TARGET}
+          touch
           onClick={onRemove}
           data-testid={`formula-import-row-remove-${index}`}
         >
@@ -110,7 +110,7 @@ export function FormulaIngredientRow({
               value={row.percentage}
               onChange={(event) => handlePercentageChange(event.target.value)}
               inputMode="decimal"
-              className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+              className={`${touchTarget} ${FIELD_TEXT}`}
               data-testid={`formula-import-row-percentage-${index}`}
             />
             {row.percentageRead === null ? null : (
@@ -127,7 +127,7 @@ export function FormulaIngredientRow({
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium">Referencia del PDF</span>
               <p
-                className={`${TOUCH_TARGET} ${FIELD_TEXT} flex items-center`}
+                className={`${touchTarget} ${FIELD_TEXT} flex items-center`}
                 data-testid={`formula-import-row-reference-${index}`}
               >
                 {reference}
@@ -141,7 +141,7 @@ export function FormulaIngredientRow({
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium">Producto</span>
               <p
-                className={`${TOUCH_TARGET} ${FIELD_TEXT} flex items-center`}
+                className={`${touchTarget} ${FIELD_TEXT} flex items-center`}
                 data-testid={`formula-import-row-preselected-product-${index}`}
               >
                 {row.productLabel}
@@ -179,7 +179,7 @@ export function FormulaIngredientRow({
                 id={`${fieldId}-new-name`}
                 value={row.newProductName}
                 onChange={(event) => onChange({ newProductName: event.target.value })}
-                className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+                className={`${touchTarget} ${FIELD_TEXT}`}
                 data-testid={`formula-import-row-new-name-${index}`}
               />
             </div>
@@ -190,7 +190,7 @@ export function FormulaIngredientRow({
               <Button
                 type="button"
                 variant="outline"
-                className={TOUCH_TARGET}
+                touch
                 onClick={switchToChoose}
                 data-testid={`formula-import-row-choose-button-${index}`}
               >
@@ -201,7 +201,7 @@ export function FormulaIngredientRow({
               <Button
                 type="button"
                 variant="outline"
-                className={TOUCH_TARGET}
+                touch
                 onClick={switchToCreate}
                 data-testid={`formula-import-row-create-button-${index}`}
               >

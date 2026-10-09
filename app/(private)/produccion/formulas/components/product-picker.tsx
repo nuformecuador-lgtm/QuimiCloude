@@ -1,6 +1,5 @@
 'use client';
 
-import { Loader2Icon } from 'lucide-react';
 import { useCallback, useId, useState } from 'react';
 
 import {
@@ -11,6 +10,7 @@ import {
   AutocompleteItem,
   AutocompleteList,
 } from '@/components/ui/autocomplete';
+import { Spinner } from '@/components/shared/spinner';
 import {
   useAsyncPaginatedOptions,
   type AsyncPageRequest,
@@ -19,6 +19,7 @@ import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/pr
 import type { ProductType } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Selector de ingrediente con autocompletado y paginación (T14, R28; `design.md > 6`).
@@ -103,7 +104,6 @@ export type ProductPickerOption = {
   readonly unitId: string | null;
 };
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base';
 const FIRST_PAGE = 1;
 /** Rebote del autocompletado: agrupa las pulsaciones seguidas en una sola consulta. */
@@ -274,7 +274,7 @@ export function ProductPicker({
             aria-label={ariaLabel}
             aria-invalid={error === undefined ? undefined : true}
             aria-describedby={error === undefined ? undefined : errorId}
-            className={`${TOUCH_TARGET} ${FIELD_TEXT} w-full`}
+            className={`${touchTarget} ${FIELD_TEXT} w-full`}
             placeholder={label}
             data-testid={testId}
           />
@@ -295,7 +295,7 @@ export function ProductPicker({
                       key={option.id}
                       index={index}
                       value={option}
-                      className={`${TOUCH_TARGET} ${FIELD_TEXT} items-center`}
+                      className={`${touchTarget} ${FIELD_TEXT} items-center`}
                       data-testid={`${testId}-option`}
                       onClick={() => choose(option)}
                     >
@@ -328,7 +328,7 @@ export function ProductPicker({
             >
               {cargando ? (
                 <>
-                  <Loader2Icon className="size-4 animate-spin" aria-hidden />
+                  <Spinner />
                   <span className="py-2">Cargando ingredientes...</span>
                 </>
               ) : null}

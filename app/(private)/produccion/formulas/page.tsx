@@ -10,13 +10,11 @@ import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/r
 import { BRAND_LABEL, RECIPES_LABEL } from '@/lib/shared/navigation/private-nav';
 import { NEW_RECIPE_ROUTE } from '@/lib/shared/routes';
 
-import { FormulaPdfUpload, parseRecipeListParams, RecipeListSection, RecipeTableSkeleton } from './components';
+import { FormulaPdfUpload, parseRecipeListParams, RecipeListSection, RecipeTable } from './components';
 
 export const metadata: Metadata = {
   title: `${RECIPES_LABEL} · ${BRAND_LABEL}`,
 };
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 // El contenedor es un `div`: el landmark principal ya lo pone el layout privado y debe ser único.
 export default async function FormulasPage({
@@ -41,7 +39,7 @@ export default async function FormulasPage({
             href={NEW_RECIPE_ROUTE}
             data-slot="button"
             data-testid="recipe-create-open"
-            className={cn(buttonVariants({ variant: 'default' }), TOUCH_TARGET)}
+            className={cn(buttonVariants({ variant: 'default', touch: true }))}
           >
             Nueva fórmula
           </Link>
@@ -49,7 +47,9 @@ export default async function FormulasPage({
         </div>
       </div>
       {/* Sin `key`: remontar el límite en cada consulta borraría el foco del campo de búsqueda. */}
-      <Suspense fallback={<RecipeTableSkeleton rows={params.pageSize} />}>
+      <Suspense
+        fallback={<RecipeTable status="loading" recipes={[]} params={params} totalPages={0} />}
+      >
         <RecipeListSection params={params} />
       </Suspense>
     </div>

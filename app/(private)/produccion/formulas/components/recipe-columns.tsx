@@ -5,9 +5,7 @@ import type { ReactNode } from 'react';
 import type { DataTableColumn } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
 import type { RecipeSummary } from '@/lib/modules/recetas';
-
-/** Marca de "sin dato". Constante para que ningun test dependa del glifo. */
-export const EMPTY_CELL = '—';
+import { formatCivilDate } from '@/lib/shared/ui/date-civil';
 
 /** Id de la columna de la miniatura: no es un campo de `RecipeSummary`, es marcado. */
 export const IMAGE_COLUMN_ID = 'image';
@@ -15,8 +13,8 @@ export const IMAGE_COLUMN_ID = 'image';
 /** Id de la columna de acciones: tampoco es un campo. */
 export const ACTIONS_COLUMN_ID = 'actions';
 
-export const IMAGE_COLUMN_LABEL = 'Imagen';
-export const ACTIONS_COLUMN_LABEL = 'Acciones';
+const IMAGE_COLUMN_LABEL = 'Imagen';
+const ACTIONS_COLUMN_LABEL = 'Acciones';
 
 /**
  * Los ids de autoria no se resuelven a nombres y pintarlos seria mostrar un UUID; la descripcion
@@ -31,14 +29,6 @@ export type RecipeColumnId =
   | typeof ACTIONS_COLUMN_ID;
 
 export type RecipeColumn = DataTableColumn<RecipeSummary> & { readonly id: RecipeColumnId };
-
-/**
- * UTC y no `toLocaleDateString`: servidor y navegador tienen husos distintos y la fecha local
- * provoca un desajuste de hidratacion.
- */
-function formatDate(value: Date): string {
-  return value.toISOString().slice(0, 10);
-}
 
 export type RecipeColumnsDeps = {
   /** Slot: quien monta la tabla enchufa el enlace de edicion y el dialogo de borrado. */
@@ -88,14 +78,14 @@ export function buildRecipeColumns({ rowActions }: RecipeColumnsDeps): readonly 
       align: 'start',
       sortable: true,
       filter: { kind: 'dateRange' },
-      cell: (recipe) => formatDate(recipe.createdAt),
+      cell: (recipe) => formatCivilDate(recipe.createdAt),
     },
     {
       id: 'updatedAt',
       label: 'Actualizado',
       align: 'start',
       sortable: true,
-      cell: (recipe) => formatDate(recipe.updatedAt),
+      cell: (recipe) => formatCivilDate(recipe.updatedAt),
     },
     {
       id: ACTIONS_COLUMN_ID,

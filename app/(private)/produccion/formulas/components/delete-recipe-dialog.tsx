@@ -23,8 +23,7 @@ import {
   deleteRecipeAction,
   listRecipeVersionsAction,
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 const DELETE_SUCCESS = 'Receta borrada.';
 const DELETE_VERSION_SUCCESS = 'Versión borrada.';
@@ -115,7 +114,7 @@ export function DeleteRecipeDialog({
         render={
           <Button
             variant="ghost"
-            className={TOUCH_TARGET}
+            touch
             aria-label={`Borrar ${recipe.name}`}
             data-testid="recipe-delete-open"
           />
@@ -154,12 +153,12 @@ export function DeleteRecipeDialog({
         )}
 
         <AlertDialogFooter>
-          <AlertDialogCancel className={TOUCH_TARGET} data-testid="delete-recipe-cancel">
+          <AlertDialogCancel className={touchTarget} data-testid="delete-recipe-cancel">
             Cancelar
           </AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
-            className={TOUCH_TARGET}
+            className={touchTarget}
             disabled={isPending || countBlocksConfirm}
             data-testid="delete-recipe-confirm"
             onClick={handleConfirm}
