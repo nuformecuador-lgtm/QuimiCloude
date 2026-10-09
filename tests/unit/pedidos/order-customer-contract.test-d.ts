@@ -73,7 +73,9 @@ expectTypeOf<OrderCustomer>().toEqualTypeOf<{
   readonly name: string
   readonly isDeleted: boolean
 }>()
-expectTypeOf<OrderCustomerSearchPurpose>().toEqualTypeOf<'assign' | 'filter'>()
+// QC-223 2026-10-08: el proposito gana `'deliver'`; `'assign'` y `'filter'` siguen.
+expectTypeOf<OrderCustomerSearchPurpose>().toEqualTypeOf<'assign' | 'filter' | 'deliver'>()
+expectTypeOf<'assign' | 'filter'>().toMatchTypeOf<OrderCustomerSearchPurpose>()
 expectTypeOf<OrderView['customer']>().toEqualTypeOf<OrderCustomer | null>()
 expectTypeOf<OrderSummary['customer']>().toEqualTypeOf<OrderCustomer | null>()
 expectTypeOf<OrderRow['customerId']>().toEqualTypeOf<string | null>()

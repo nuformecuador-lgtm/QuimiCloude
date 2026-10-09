@@ -329,6 +329,11 @@ export const E2E_ESPERADOS = [
   // y cancelar con motivo desde la ejecucion. No lee ni afirma nada sobre el identificador de
   // peticion.
   'registro-ejecucion.spec.ts',
+  // Alta el 2026-10-08 (QC-223) por el mismo motivo que las demas. Recorre la entrega de un pedido
+  // terminado desde el menu de fila: borrador que sobrevive a la recarga, entrega parcial a otro
+  // cliente, entrega que completa y usuario sin permiso. No lee ni afirma nada sobre el
+  // identificador de peticion ni sobre `reference`.
+  'entregar-producto-terminado.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -519,6 +524,11 @@ export const MIGRACIONES_ESPERADAS = [
   '20261008120843_integrations_permission',
   // El equipo de acondicionamiento; no toca el identificador.
   '20261008150000_order_conditioning_team',
+  // QC-223 2026-10-08: la entrega de producto terminado (valor de enum, tablas y permiso); ninguna
+  // toca el identificador.
+  '20261008150050_inventory_movement_kind_delivery',
+  '20261008150100_order_deliveries',
+  '20261008150200_delivery_permission',
 ] as const
 
 export function hallazgosDeMigraciones(

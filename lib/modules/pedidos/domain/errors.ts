@@ -303,3 +303,31 @@ export class ActionNotAllowedError extends PedidosError {
     super('action_not_allowed', diagnostic);
   }
 }
+
+/** Una entrega pide para alguna linea del reparto mas envases de los que le faltan. */
+export class DeliveryExceedsRemainingError extends PedidosError {
+  readonly code = 'delivery_exceeds_remaining';
+
+  constructor(diagnostic?: string) {
+    super('delivery_exceeds_remaining', diagnostic);
+  }
+}
+
+/** Una entrega pide a un lote mas envases enteros de los que tiene, leidos bajo bloqueo. */
+export class DeliveryBatchInsufficientError extends PedidosError {
+  readonly code = 'delivery_batch_insufficient';
+
+  constructor(diagnostic?: string) {
+    super('delivery_batch_insufficient', diagnostic);
+  }
+}
+
+/** El lote de una entrega no existe, es de otra empresa, no es del producto terminado de la linea
+ *  o no guarda contenido de envase. Codigo compartido con `inventario`. */
+export class DeliveryBatchNotFoundError extends PedidosError {
+  readonly code = 'batch_not_found';
+
+  constructor(diagnostic?: string) {
+    super('batch_not_found', diagnostic);
+  }
+}

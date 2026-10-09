@@ -84,7 +84,15 @@ export type BatchHistoryEntry = {
   /** El id de la fila en su propio libro (`inventory_movements.id` o `reservation_movements.id`);
    *  los dos libros usan conjuntos de `kind` disjuntos, asi que `kind` + `id` es unico en la union. */
   readonly id: string;
-  readonly kind: 'opening' | 'adjustment' | 'consumption' | 'reserve' | 'release' | 'expire' | 'consume';
+  readonly kind:
+    | 'opening'
+    | 'adjustment'
+    | 'consumption'
+    | 'delivery'
+    | 'reserve'
+    | 'release'
+    | 'expire'
+    | 'consume';
   readonly quantity: string;
   readonly reason: MovementReason | null;
   /** `null` cuando el asiento no viene de un pedido: alta, ajuste. */

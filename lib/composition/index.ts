@@ -120,6 +120,8 @@ import {
   createReservationQueries,
 } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
+import { createFinishedGoodsDispatch } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-dispatch-prisma';
+import { findDeliverableBatches } from '@/lib/modules/inventario/adapters/driven/persistence/deliverable-batches-prisma';
 import { listStockGroups } from '@/lib/modules/inventario/adapters/driven/persistence/finished-stock-prisma';
 import {
   claimImport,
@@ -142,6 +144,7 @@ import type { OrderNumberFormatter } from '@/lib/modules/inventario/ports/order-
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 import type {
+  FinishedBatchCatalog,
   OrderNumberDirectory,
   PackagingCatalog,
   PresentationCatalog,
@@ -257,12 +260,14 @@ import {
   createCancelOrder,
   createCreateOrder,
   createDeleteOrder,
+  createDeliverOrder,
   createExpireStaleOrders,
   createFindCoverage,
   createFinishConditioning,
   createFinishPacking,
   createGetOrder,
   createGetOrderCustomerFilterOption,
+  createGetOrderDelivery,
   createListAliveSummariesByIds,
   createListAliveSummariesInCompany,
   createListSummariesByIdsIncludingDeleted,
@@ -292,6 +297,7 @@ import {
   createOrderConditioningRepository,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
+import { createOrderDeliveryRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma';
 import {
   withOrderTransaction,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
@@ -301,6 +307,7 @@ import type { OrderConditioningRepository } from '@/lib/modules/pedidos/ports/or
 import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-packing-repository';
 import type { OrderSummaryReader } from '@/lib/modules/pedidos/ports/order-summary-reader';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
+import type { OrderDeliveryUnitOfWork } from '@/lib/modules/pedidos/ports/order-delivery-unit-of-work';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import {
   createRecipeExecutionReader,
@@ -1372,6 +1379,20 @@ const reviewBlockedOrders = createReviewBlockedOrders({
  */
 const customerCatalog = buildCustomerCatalog();
 
+const finishedBatchCatalog: FinishedBatchCatalog = { findDeliverableBatches };
+
+/** La entrega, la salida de `inventario` y el estado del pedido confirman o se deshacen juntos. */
+const orderDeliveryUnitOfWork: OrderDeliveryUnitOfWork = {
+  run: (work) =>
+    withOrderTransaction((tx) =>
+      work({
+        orders: createOrderWriteRepository(tx),
+        deliveries: createOrderDeliveryRepository(tx),
+        finishedGoods: createFinishedGoodsDispatch(tx),
+      }),
+    ),
+};
+
 export const pedidos = {
   createOrder: createCreateOrder({
     recipes: recipeCatalog,
@@ -1450,6 +1471,20 @@ export const pedidos = {
   }),
   searchOrderCustomers: createSearchOrderCustomers({ customerCatalog }),
   getOrderCustomerFilterOption: createGetOrderCustomerFilterOption({ customerCatalog }),
+  getOrderDelivery: createGetOrderDelivery({
+    orders: orderRepository,
+    deliveries: createOrderDeliveryRepository(),
+    lines: createOrderWriteRepository(),
+    presentations: presentationCatalog,
+    finishedBatches: finishedBatchCatalog,
+    customerCatalog,
+  }),
+  deliverOrder: createDeliverOrder({
+    customerCatalog,
+    unitOfWork: orderDeliveryUnitOfWork,
+    deliveries: createOrderDeliveryRepository(),
+    orders: orderRepository,
+  }),
 } as const;
 
 // ---------------------------------------------------------------------------------------

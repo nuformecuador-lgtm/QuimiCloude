@@ -27,6 +27,7 @@
     "clientes/customers-search-migration.int.test.ts",
     "documentos/document-batches-and-files-constraints.int.test.ts",
     "identity/conditioning-role-migration.int.test.ts",
+    "identity/delivery-permission-migration.int.test.ts",
     "identity/documents-permissions-migration.int.test.ts",
     "identity/execution-permission-migration.int.test.ts",
     "identity/identity-constraints.int.test.ts",
@@ -39,6 +40,7 @@
     "inventario/company-scope.int.test.ts",
     "inventario/inventario-constraints.int.test.ts",
     "inventario/inventory-movements-constraints.int.test.ts",
+    "inventario/finished-goods-dispatch.int.test.ts",
     "inventario/presentation-uniqueness.int.test.ts",
     "inventario/product-batch-require-unit.int.test.ts",
     "inventario/product-batch-write.int.test.ts",
@@ -50,6 +52,8 @@
     "pedidos/order-conditioning-constraints.int.test.ts",
     "pedidos/order-conditioning-states-rollback.int.test.ts",
     "pedidos/order-crud.int.test.ts",
+    "pedidos/order-delivery-constraints.int.test.ts",
+    "pedidos/order-delivery-repository.int.test.ts",
     "pedidos/order-packing-constraints.int.test.ts",
     "pedidos/order-packing-states-rollback.int.test.ts",
     "pedidos/order-status-blocked-rollback.int.test.ts",
@@ -543,6 +547,11 @@
       "desde": "2026-10-06"
     },
     {
+      "archivo": "inventario/deliverable-batches.int.test.ts",
+      "motivo": "Lotes que se pueden entregar: 'findDeliverableBatches' (deliverable-batches-prisma.ts) lee con el cliente Prisma GLOBAL, y los lotes se siembran con 'receiveFinishedGoods' y 'addImportedFinishedGoodsBatch' en 'prisma.$transaction' que CONFIRMAN: una transaccion del test con ROLLBACK no los envolveria. Cada caso fabrica dos empresas efimeras con randomUUID (usuario, rol, tipo de documento, unidad, recetas, presentaciones, pedido, linea, productos terminados y lotes) y las limpia en un 'finally' por 'company_id' en orden de FK (asientos -> lotes -> productos -> lineas -> pedidos -> recetas -> presentaciones -> unidad; usuario, rol, tipo de documento y empresa en 'afterAll'). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-08"
+    },
+    {
       "archivo": "pedidos/order-customer.int.test.ts",
       "motivo": "B6 (QC-156): ejercita el cambio de cliente, la edicion que solo cambia el cliente y los filtros de cliente del listado con los adaptadores reales; 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' sobre el cliente GLOBAL y el listado y el catalogo de clientes leen con ese mismo cliente, asi que una transaccion del test con ROLLBACK no los envolveria. Cada caso fabrica sus empresas efimeras con randomUUID (dos usuarios, rol, tipo de documento, unidad, presentacion, recetas, materias primas, clientes) y las limpia en un 'finally' en orden de FK (los tres libros -> pedidos -> clientes -> recetas -> lotes y productos -> presentacion -> unidad -> usuarios -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-06"
@@ -560,6 +569,16 @@
     {
       "archivo": "scripts/seed-demo.int.test.ts",
       "motivo": "Corre el seed de demostracion (scripts/seed-demo) dos veces con su gateway real, que escribe por los casos de uso de 'lib/composition'; esos casos de uso abren sus PROPIAS transacciones sobre el cliente Prisma GLOBAL, asi que una transaccion del test con ROLLBACK no los envolveria. Corre sobre una empresa efimera (randomUUID) con su Administrador, creada en 'beforeAll', y la borra entera en 'afterAll' por su company_id, en el orden que exigen las FK; no toca la empresa inicial de la plantilla. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-08"
+    },
+    {
+      "archivo": "pedidos/order-delivery.int.test.ts",
+      "motivo": "La entrega de producto terminado por la fachada real de 'lib/composition': 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' sobre el cliente GLOBAL (entrega, salida de inventario y estado del pedido), y la lectura del sheet usa ese mismo cliente, asi que una transaccion del test con ROLLBACK no las envolveria. Cada caso fabrica dos empresas efimeras con randomUUID (tres usuarios, roles, tipos de documento, unidad, receta, clientes, presentaciones, pedidos, lineas, productos terminados y lotes; tests/helpers/order-delivery-seed.ts) y las borra en un 'finally' por 'company_id' en orden de FK (asientos -> lineas de entrega -> entregas -> lotes -> productos -> lineas -> pedidos -> clientes -> receta -> presentaciones -> unidad -> usuarios -> roles -> tipos de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-08"
+    },
+    {
+      "archivo": "pedidos/order-delivery-concurrency.int.test.ts",
+      "motivo": "Dos entregas reales a la vez por la fachada de 'lib/composition' (y, en el caso de la misma clave, por 'createDeliverOrder' cableado con los mismos adaptadores reales y solo la lectura previa de la clave sincronizada): cada 'withOrderTransaction' tiene que CONFIRMAR para que la otra vea lo que escribio despues de esperar el bloqueo del pedido o del producto, asi que una transaccion del test con ROLLBACK no puede envolverlas. Cada caso fabrica su empresa efimera con randomUUID (tests/helpers/order-delivery-seed.ts) y la borra en un 'finally' por 'company_id' en orden de FK (asientos -> lineas de entrega -> entregas -> lotes -> productos -> lineas -> pedidos -> clientes -> receta -> presentaciones -> unidad -> usuarios -> roles -> tipos de documento -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-08"
     }
   ]

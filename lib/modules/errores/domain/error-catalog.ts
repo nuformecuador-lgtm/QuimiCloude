@@ -81,6 +81,8 @@ export const ERROR_MESSAGE_KEY = {
   adjustment_reason_not_allowed: 'errors.adjustment_reason_not_allowed',
   conditioning_team_member_not_allowed: 'errors.conditioning_team_member_not_allowed',
   conditioning_team_empty: 'errors.conditioning_team_empty',
+  delivery_exceeds_remaining: 'errors.delivery_exceeds_remaining',
+  delivery_batch_insufficient: 'errors.delivery_batch_insufficient',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -206,4 +208,8 @@ export const ERROR_MESSAGES_ES = {
   'errors.conditioning_team_member_not_allowed':
     'Esta persona no puede formar parte del equipo de acondicionamiento.',
   'errors.conditioning_team_empty': 'El equipo de acondicionamiento necesita al menos una persona.',
+  'errors.delivery_exceeds_remaining':
+    'La entrega supera los envases que faltan por entregar en alguna presentacion.',
+  'errors.delivery_batch_insufficient':
+    'Algun lote ya no tiene los envases elegidos: revisa los lotes y confirma de nuevo.',
 } as const satisfies Record<ErrorMessageKey, string>;

@@ -477,11 +477,16 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // `Prisma.TransactionClient` -el `tx` que le pasa a `order-prisma.ts` y a `inventario`-, sin
     // un solo `prisma.<modelo>` propio.
     const UNIDAD_DE_TRABAJO = 'lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma.ts'
-    const DUENOS_DE_PRISMA = [AMBITO_DE_EMPRESA, DUENO_DE_PRISMA, UNIDAD_DE_TRABAJO]
+    // QC-223 2026-10-08: `order-delivery-prisma.ts` (entregas de producto terminado) importa
+    // `@prisma/client` -`Prisma.Decimal` y el `P2002` de la clave de entrega- y el cliente
+    // compartido como defecto de su fabrica. Las dos listas siguen CERRADAS.
+    const ENTREGAS = 'lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma.ts'
+    const DUENOS_DE_PRISMA = [AMBITO_DE_EMPRESA, ENTREGAS, DUENO_DE_PRISMA, UNIDAD_DE_TRABAJO]
     // `order-number-directory-prisma.ts` (`OrderNumberDirectory` de `inventario`) tambien abre
     // el cliente compartido, sin importar `@prisma/client`.
     const DUENOS_DEL_CLIENTE = [
       'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
+      ENTREGAS,
       'lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma.ts',
       DUENO_DE_PRISMA,
       UNIDAD_DE_TRABAJO,
@@ -639,9 +644,13 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // `assertTransition` con la transicion fija que cada uno alcanza -`POR_EMPACAR -> EN_EMPAQUE`
     // y `EN_EMPAQUE -> POR_ACONDICIONAR`- antes de delegar en `OrderPackingRepository`. Lo mismo
     // `order-conditioning.ts` con las dos del acondicionamiento.
+    //
+    // QC-223 2026-10-08: `deliver-order.ts` tambien la consume, con `TERMINADO -> ENTREGADO`,
+    // antes de abrir la unidad de trabajo de la entrega.
     expect(
       pedidosSources.filter((file) => CONSUME_LA_GUARDIA.test(read(file))).map(etiqueta),
     ).toEqual([
+      'lib/modules/pedidos/domain/deliver-order.ts',
       'lib/modules/pedidos/domain/order-conditioning.ts',
       'lib/modules/pedidos/domain/order-packing.ts',
       DUENO,

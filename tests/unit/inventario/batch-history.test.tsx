@@ -203,6 +203,8 @@ describe('BatchHistory', () => {
       'release',
       'expire',
       'consume',
+      // QC-223 2026-10-08: el asiento de entrega a cliente entra en el libro.
+      'delivery',
     ];
     const etiquetas = kinds.map(movementKindLabel);
 
@@ -303,5 +305,32 @@ describe('BatchHistory', () => {
 
     expect(await screen.findByTestId('batch-history-entry-fisico-9')).toBeInTheDocument();
     expect(screen.getByTestId('batch-history-entry-reserva-9')).toBeInTheDocument();
+  });
+
+  it('R38 — un asiento de entrega se pinta como «Entrega a cliente», con la cantidad en negativo, el pedido, el autor y la fecha', async () => {
+    const entrega = asiento({
+      id: 'entrega-1',
+      kind: 'delivery',
+      quantity: '-8.0000',
+      reason: null,
+      orderNumberText: '2026-0000007',
+      authorName: 'Carla Duarte',
+      createdAt: '2026-10-08T14:20:00.000Z',
+    });
+    listBatchMovementsActionMock.mockResolvedValue({ status: 'success', data: [entrega] });
+
+    render(<BatchHistory batchId={BATCH_ID} />);
+    await abrirDespliegue();
+
+    const fila = await screen.findByTestId('batch-history-entry-entrega-1');
+    expect(within(fila).getByTestId('batch-history-entry-kind')).toHaveTextContent('Entrega a cliente');
+    expect(movementKindLabel('delivery')).toBe('Entrega a cliente');
+    const cantidad = within(fila).getByTestId('batch-history-entry-quantity');
+    expect(cantidad).toHaveAttribute('aria-label', '-8');
+    expect(cantidad.textContent).toMatch(/^-8/);
+    expect(within(fila).getByTestId('batch-history-entry-order')).toHaveTextContent('2026-0000007');
+    expect(within(fila).getByTestId('batch-history-entry-author')).toHaveTextContent('Carla Duarte');
+    expect(within(fila).getByTestId('batch-history-entry-date')).toHaveTextContent('2026-10-08');
+    expect(within(fila).queryByTestId('batch-history-entry-reason')).toBeNull();
   });
 });

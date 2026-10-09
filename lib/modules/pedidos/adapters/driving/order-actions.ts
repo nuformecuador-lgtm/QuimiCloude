@@ -27,9 +27,12 @@ import {
   requirePermission,
   updateOrderDistributionSchema,
   type Actor,
+  type DeliverOrderResult,
+  type DeliveryAllocation,
   type OrderCostQuote,
   type OrderCustomer,
   type OrderCustomerSearchPurpose,
+  type OrderDeliveryView,
   type OrderPresentationAvailabilityNext,
   type OrderSummary,
   type OrderView,
@@ -531,6 +534,45 @@ export async function getOrderCustomerFilterOptionAction(id: string): Promise<Or
 
   try {
     const data = await pedidos.getOrderCustomerFilterOption(id, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// La entrega de producto terminado.
+// ---------------------------------------------------------------------------------------------
+
+export type OrderDeliveryResult = { status: 'success'; data: OrderDeliveryView } | ErrorState;
+
+/** Lo que el sheet de entrega pinta de un pedido `TERMINADO`. */
+export async function getOrderDeliveryAction(orderId: string): Promise<OrderDeliveryResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await pedidos.getOrderDelivery(orderId, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export type DeliverOrderInput = {
+  readonly orderId: string;
+  readonly deliveryKey: string;
+  readonly customerId: string;
+  readonly allocations: readonly DeliveryAllocation[];
+};
+
+export type DeliverOrderActionResult = { status: 'success'; data: DeliverOrderResult } | ErrorState;
+
+/** Registra una entrega. `input` tiene la forma de `DeliverOrderInput`; la valida el caso de uso. */
+export async function deliverOrderAction(input: unknown): Promise<DeliverOrderActionResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await pedidos.deliverOrder(input, actor);
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);

@@ -61,7 +61,9 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // 72 y no 70: entran `batch_stock_changed` y `adjustment_reason_not_allowed`.
       // 74 y no 72: entran `order_conditioning_taken` y `order_not_conditionable`.
       // 76 y no 74: entran `conditioning_team_member_not_allowed` y `conditioning_team_empty`.
-      expect(ERROR_CODES).toHaveLength(76)
+      // QC-223 2026-10-08: 78 y no 76: entran `delivery_exceeds_remaining` y
+      // `delivery_batch_insufficient`.
+      expect(ERROR_CODES).toHaveLength(78)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
