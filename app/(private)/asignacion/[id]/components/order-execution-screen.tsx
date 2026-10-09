@@ -2,7 +2,7 @@
 
 import { useActionState, useRef, useState } from 'react';
 
-import { ConfirmActionDialog } from '@/components/shared/confirm-action-dialog';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import { StepReader } from '@/components/shared/step-reader';
@@ -167,13 +167,21 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
         />
       </form>
 
-      <ConfirmActionDialog
+      <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         onConfirm={() => formRef.current?.requestSubmit()}
-        texts={ORDER_EXECUTION_FINISH_CONFIRM_TEXTS}
-        testId={ORDER_EXECUTION_FINISH_DIALOG_TESTID}
-        confirmTestId={ORDER_EXECUTION_FINISH_CONFIRM_TESTID}
+        texts={{
+          title: ORDER_EXECUTION_FINISH_CONFIRM_TEXTS.title,
+          description: ORDER_EXECUTION_FINISH_CONFIRM_TEXTS.description,
+          dismiss: ORDER_EXECUTION_FINISH_CONFIRM_TEXTS.cancel,
+          confirm: ORDER_EXECUTION_FINISH_CONFIRM_TEXTS.confirm,
+        }}
+        testIds={{
+          dialog: ORDER_EXECUTION_FINISH_DIALOG_TESTID,
+          dismiss: `${ORDER_EXECUTION_FINISH_DIALOG_TESTID}-cancel`,
+          confirm: ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
+        }}
       />
 
       {error !== undefined ? (

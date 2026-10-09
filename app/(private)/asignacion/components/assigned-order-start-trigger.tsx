@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useTransition, type ReactNode } from 'react';
 
-import { ConfirmActionDialog } from '@/components/shared/confirm-action-dialog';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { Button } from '@/components/ui/button';
 
 export const ASSIGNED_ORDER_START_DIALOG_TESTID = 'assigned-order-start-dialog';
@@ -35,6 +35,7 @@ export function AssignedOrderStartTrigger({
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const texts = assignedOrderStartConfirmTexts();
 
   return (
     <>
@@ -49,13 +50,21 @@ export function AssignedOrderStartTrigger({
       >
         {children}
       </Button>
-      <ConfirmActionDialog
+      <ConfirmDialog
         open={open}
         onOpenChange={setOpen}
         onConfirm={() => startTransition(() => router.push(href))}
-        texts={assignedOrderStartConfirmTexts()}
-        testId={ASSIGNED_ORDER_START_DIALOG_TESTID}
-        confirmTestId={ASSIGNED_ORDER_START_CONFIRM_TESTID}
+        texts={{
+          title: texts.title,
+          description: texts.description,
+          dismiss: texts.cancel,
+          confirm: texts.confirm,
+        }}
+        testIds={{
+          dialog: ASSIGNED_ORDER_START_DIALOG_TESTID,
+          dismiss: `${ASSIGNED_ORDER_START_DIALOG_TESTID}-cancel`,
+          confirm: ASSIGNED_ORDER_START_CONFIRM_TESTID,
+        }}
       />
     </>
   );
