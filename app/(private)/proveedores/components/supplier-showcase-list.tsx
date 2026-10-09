@@ -4,12 +4,11 @@ import { useCallback, useRef, useState } from 'react';
 
 import { listSupplierShowcaseAction } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
 import type { ShowcaseRow as ShowcaseRowData } from '@/lib/modules/proveedores';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { ShowcaseLoadTrigger } from './showcase-load-trigger';
 import { appendWithoutDuplicates, type ShowcaseFilters } from './supplier-showcase-params';
 import { SupplierShowcaseRow } from './supplier-showcase-row';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 export type SupplierShowcaseInitialPage = {
   readonly items: readonly ShowcaseRowData[];
@@ -82,7 +81,7 @@ export function SupplierShowcaseList({ initialPage, filters }: SupplierShowcaseL
           <p className="text-sm text-muted-foreground">No se pudieron cargar más proveedores.</p>
           <button
             type="button"
-            className={TOUCH_TARGET}
+            className={touchTarget}
             aria-busy={loading}
             disabled={loading}
             onClick={loadMore}

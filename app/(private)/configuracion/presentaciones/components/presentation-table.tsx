@@ -6,13 +6,17 @@ import { useMemo } from 'react';
 import {
   DataTable,
   type DataTableParams,
+  type DataTableStates,
   type DataTableTexts,
 } from '@/components/shared/data-table';
+import type { ErrorStateProps } from '@/components/shared/error-state';
+import type { ErrorState } from '@/lib/modules/errores';
 import type { PresentationView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 import { buildPresentationColumns } from './presentation-columns';
 import { presentationListHref } from './presentation-list-params';
+import { PresentationSheet } from './presentation-sheet';
 
 /**
  * La tabla de la lista de presentaciones (R8, R10, R11, R12, R13, R18, `design.md > 5.3` y `> 6`).
@@ -34,9 +38,7 @@ import { presentationListHref } from './presentation-list-params';
  * blanca del contrato dice `PRESENTATION_QUERYABLE.searchable === true`, asi que la caja de
  * busqueda **no miente** —el termino viaja a la consulta y la lista se recalcula entera (R10)—.
  *
- * **`status` es SIEMPRE `'idle'`**: los tres estados de R15/R16/R17 se pintan fuera de
- * `<DataTable>`, con copy y acciones propias, y el «cargando» lo aporta el `<Suspense>` del
- * servidor. Aqui solo llegan filas ya resueltas.
+ * **Cargando, error y vacio los pinta `<DataTable>` en lugar de toda la tabla.**
  *
  * **QC-80 (R16): `units` solo ATRAVIESA la tabla.** No se pinta ninguna columna de unidad
  * (`design.md > 5`); el catalogo baja hasta la celda de acciones, que es quien monta el panel de
@@ -81,7 +83,41 @@ export const PRESENTATION_TABLE_TEXTS: DataTableTexts = {
   lastYear: 'Último año',
 };
 
-export type PresentationTableProps = {
+export const PRESENTATION_LIST_EMPTY_TESTID = 'presentation-list-empty';
+export const PRESENTATION_LIST_EMPTY_MESSAGE_TESTID = 'presentation-list-empty-message';
+export const PRESENTATION_LIST_FIRST_PAGE_TESTID = 'presentation-list-first-page';
+export const PRESENTATION_LIST_ERROR_TESTID = 'presentation-list-error';
+export const PRESENTATION_LIST_ERROR_MESSAGE_TESTID = 'presentation-list-error-message';
+export const PRESENTATION_LIST_ERROR_CODE_TESTID = 'presentation-list-error-code';
+export const PRESENTATION_LIST_RETRY_TESTID = 'presentation-list-retry';
+export const PRESENTATION_LIST_SKELETON_TESTID = 'presentation-list-skeleton';
+export const PRESENTATION_ROW_SKELETON_TESTID = 'presentation-row-skeleton';
+
+/** Un test ata esta cuenta al largo de las columnas de la lista. */
+export const PRESENTATION_SKELETON_COLUMN_COUNT = 3;
+
+function buildErrorState(error: ErrorState): ErrorStateProps {
+  return {
+    error,
+    title: PRESENTATION_TABLE_TEXTS.error,
+    testId: PRESENTATION_LIST_ERROR_TESTID,
+    messageTestId: PRESENTATION_LIST_ERROR_MESSAGE_TESTID,
+    codeTestId: PRESENTATION_LIST_ERROR_CODE_TESTID,
+    retry: { kind: 'refresh' },
+    retryTestId: PRESENTATION_LIST_RETRY_TESTID,
+  };
+}
+
+type PresentationTableStatusProps =
+  | { readonly status?: 'idle' | 'loading'; readonly error?: undefined }
+  | { readonly status: 'error'; readonly error: ErrorState };
+
+export type PresentationTableEmpty = {
+  /** Solo cuando la pagina pedida se quedo sin elementos por ser mayor que el total. */
+  readonly firstPageHref?: string;
+};
+
+export type PresentationTableProps = PresentationTableStatusProps & {
   /** Las filas **ya resueltas** por la consulta, en el orden en que las entrega (R10, R11). */
   readonly presentations: readonly PresentationView[];
   /** Los parametros vigentes, los mismos con los que se pidio la lista. */
@@ -89,13 +125,59 @@ export type PresentationTableProps = {
   readonly totalPages: number;
   /** Catalogo entero de unidades (QC-80 R16). Solo lo consume el panel de edicion de la fila. */
   readonly units: readonly UnitRef[];
+  /** Presente solo con cero filas: el vacio sustituye a toda la tabla. */
+  readonly empty?: PresentationTableEmpty;
 };
+
+function buildStates(
+  params: DataTableParams,
+  units: readonly UnitRef[],
+  error: ErrorState | undefined,
+  empty: PresentationTableEmpty | undefined,
+): DataTableStates {
+  return {
+    loading: {
+      columns: PRESENTATION_SKELETON_COLUMN_COUNT,
+      rows: params.pageSize,
+      label: PRESENTATION_TABLE_TEXTS.loading,
+      testId: PRESENTATION_LIST_SKELETON_TESTID,
+      rowTestId: PRESENTATION_ROW_SKELETON_TESTID,
+      headCellClassName: 'h-4 w-full',
+    },
+    ...(error === undefined ? {} : { error: buildErrorState(error) }),
+    ...(empty === undefined
+      ? {}
+      : {
+          empty: {
+            testId: PRESENTATION_LIST_EMPTY_TESTID,
+            messageTestId: PRESENTATION_LIST_EMPTY_MESSAGE_TESTID,
+            message:
+              empty.firstPageHref === undefined
+                ? 'Todavía no hay presentaciones registradas.'
+                : 'Esta página ya no tiene presentaciones.',
+            ...(empty.firstPageHref === undefined
+              ? {}
+              : {
+                  firstPage: {
+                    href: empty.firstPageHref,
+                    label: 'Volver a la primera página',
+                    testId: PRESENTATION_LIST_FIRST_PAGE_TESTID,
+                  },
+                }),
+            children: <PresentationSheet units={units} />,
+          },
+        }),
+  };
+}
 
 export function PresentationTable({
   presentations,
   params,
   totalPages,
   units,
+  status = 'idle',
+  error,
+  empty,
 }: PresentationTableProps) {
   const router = useRouter();
   const columns = useMemo(() => buildPresentationColumns(units), [units]);
@@ -109,7 +191,8 @@ export function PresentationTable({
       params={params}
       totalPages={totalPages}
       onParamsChange={(next) => router.push(presentationListHref(next))}
-      status="idle"
+      status={status}
+      states={buildStates(params, units, error, empty)}
       texts={PRESENTATION_TABLE_TEXTS}
     />
   );

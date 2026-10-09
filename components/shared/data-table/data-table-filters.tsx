@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
 import { DataTableFilterDate } from './data-table-filter-date';
@@ -31,7 +32,6 @@ import type {
  * objeto en vez de emitirla vacia (R16, via `withFilter`).
  */
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base';
 
 export type DataTableFiltersProps<TRow> = {
@@ -90,7 +90,7 @@ function DataTableSearchField({
       aria-label={texts.search}
       placeholder={texts.search}
       data-testid="data-table-search"
-      className={cn(TOUCH_TARGET, FIELD_TEXT)}
+      className={cn(touchTarget, FIELD_TEXT)}
       onChange={(event) => handleChange(event.target.value)}
     />
   );
@@ -111,7 +111,7 @@ function DataTableFilterClearButton({
       type="button"
       variant="ghost"
       size="icon"
-      className={TOUCH_TARGET}
+      touch
       aria-label={texts.clearFilter}
       data-testid={`data-table-filter-clear-${columnId}`}
       onClick={onClear}
@@ -190,7 +190,7 @@ export function DataTableFilters<TRow>({
                         aria-label={column.label}
                         value={min === null ? '' : min}
                         data-testid={`data-table-filter-min-${column.id}`}
-                        className={cn(TOUCH_TARGET, FIELD_TEXT, 'w-24')}
+                        className={cn(touchTarget, FIELD_TEXT, 'w-24')}
                         onChange={(event) =>
                           emitRange(event.target.value === '' ? null : Number(event.target.value), max)
                         }
@@ -201,7 +201,7 @@ export function DataTableFilters<TRow>({
                         aria-label={column.label}
                         value={max === null ? '' : max}
                         data-testid={`data-table-filter-max-${column.id}`}
-                        className={cn(TOUCH_TARGET, FIELD_TEXT, 'w-24')}
+                        className={cn(touchTarget, FIELD_TEXT, 'w-24')}
                         onChange={(event) =>
                           emitRange(min, event.target.value === '' ? null : Number(event.target.value))
                         }
@@ -231,7 +231,7 @@ export function DataTableFilters<TRow>({
                     <DropdownMenuTrigger
                       className={cn(
                         'inline-flex items-center gap-1.5 rounded-lg border border-input bg-background px-2.5 text-sm hover:bg-muted',
-                        TOUCH_TARGET,
+                        touchTarget,
                       )}
                       data-testid={`data-table-filter-${column.id}`}
                     >
@@ -267,7 +267,7 @@ export function DataTableFilters<TRow>({
                     aria-label={column.label}
                     value={textValue}
                     data-testid={`data-table-filter-${column.id}`}
-                    className={cn(TOUCH_TARGET, FIELD_TEXT)}
+                    className={cn(touchTarget, FIELD_TEXT)}
                     onChange={(event) => {
                       const next = event.target.value;
                       onParamsChange(

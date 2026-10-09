@@ -559,12 +559,18 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // por `data-table-row-<id>`. El centinela pasa de TREINTA a TREINTA Y UNO; la lista sigue
   // CERRADA, y un spec mas que referencie `data-table` vuelve a ponerla en rojo.
   //
+  // 2026-10-08: entra `e2e/acondicionamiento.spec.ts`, y no afloja la lista. No estrena tabla:
+  // recorre las pestanas del acondicionador en la pantalla de asignacion, ya en esta lista, y
+  // localiza la fila de cada pedido por `data-table-row-<id>` y `data-table-cell-orderNumber`. El
+  // centinela pasa de TREINTA Y UNO a TREINTA Y DOS; la lista sigue CERRADA, y un spec mas que
+  // referencie `data-table` vuelve a ponerla en rojo.
+  //
   // 2026-10-08: entra `e2e/entregar-producto-terminado.spec.ts` (QC-223), y no afloja la lista. No
   // estrena pantalla: recorre la lista de pedidos, ya en esta lista, y localiza la fila del pedido
   // por `data-table-row-<id>` para abrir «Entregar» y leer su estado. El centinela pasa de TREINTA
-  // Y UNO a TREINTA Y DOS; la lista sigue CERRADA, y un spec mas que referencie `data-table` vuelve
-  // a ponerla en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos treinta y dos', () => {
+  // Y DOS a TREINTA Y TRES; la lista sigue CERRADA, y un spec mas que referencie `data-table`
+  // vuelve a ponerla en rojo.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos treinta y tres', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -574,7 +580,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos treinta y dos E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos treinta y tres E2E pueden referenciar la tabla compartida (R36)').toEqual([
+      // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
+      'e2e/acondicionamiento.spec.ts',
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
       // ya consumen la tabla compartida -inventario y presentaciones- y localiza
       // `data-table-cell-name` porque lo que afirma son LAS FILAS SERVIDAS: ninguna de la empresa
@@ -665,6 +673,13 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   })
 })
 
+/** La rama de QC-56: la UNICA en la que R20 y R28 miden algo. */
+const RAMA_DE_QC56 = 'feature/QC-56-migrar-listas-a-tabla-compartida'
+
+export function esLaRamaDeQC56(rama: string | null): boolean {
+  return rama === RAMA_DE_QC56
+}
+
 describe('Alcance QC-56: la migracion no abre la tabla compartida (R20)', () => {
   // Mide el CAMBIO, no el arbol: R20 mira `origin/dev...HEAD` mas el arbol de trabajo, para morder
   // antes de commitear; R28 solo el rango commiteado. Si el rango no resuelve, lanza: una guardia
@@ -672,8 +687,17 @@ describe('Alcance QC-56: la migracion no abre la tabla compartida (R20)', () => 
   //
   // PRECONDICION DE RAMA: solo mide en la rama de QC-56. Una vez mergeada, cualquier otra rama
   // que tuviera motivo para tocar la tabla compartida saldria roja aqui por una regla ajena.
-  // La senal es conjuntiva -la pagina de recetas y la carpeta de spec de la ficha-, porque la
-  // carpeta de spec solo aparece en el rango de esta rama. Fuera de ella el caso queda `skipped`.
+  //
+  // La senal es el NOMBRE de la rama, por igualdad exacta, como en `guard-piezas-base.test.ts`.
+  // Hasta el 2026-10-08 se deducia del diff -la pagina de recetas mas algo bajo la carpeta de
+  // spec de la ficha-, con la premisa de que esa carpeta solo aparece en el rango de esta rama.
+  // QC-231 la desmintio: toca la pagina de recetas y enmienda este spec con todo derecho, y R20 y
+  // R28 la midieron con el alcance de QC-56. Que el diff traiga archivos compartidos no dice de
+  // quien es la rama. En HEAD separado (CI hace checkout del PR asi) se cae a `GITHUB_HEAD_REF`.
+  // Fuera de la rama el caso queda `skipped`, con el motivo escrito.
+  //
+  // Los diffs de aqui NO llevan `--diff-filter=d`: solo listan nombres, no leen ningun archivo, y
+  // borrar un archivo de la tabla compartida o de producto TIENE que contar como tocarlo.
   const RANGO = 'origin/dev...HEAD'
   const CARPETA_DE_LA_TABLA = 'components/shared/data-table/'
   const PAGINA_DE_RECETAS = `app/(private)${FORMULAS_ROUTE}/page.tsx`
@@ -681,6 +705,18 @@ describe('Alcance QC-56: la migracion no abre la tabla compartida (R20)', () => 
 
   function git(comando: string): string {
     return execSync(comando, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+  }
+
+  /** La rama del checkout; en HEAD separado (CI), la rama de origen del PR. `null` si no hay. */
+  function ramaActual(): string | null {
+    let rama: string
+    try {
+      rama = git('git rev-parse --abbrev-ref HEAD').trim()
+    } catch {
+      return null
+    }
+    if (rama === 'HEAD') rama = (process.env.GITHUB_HEAD_REF ?? '').trim()
+    return rama.length === 0 ? null : rama
   }
 
   function aPosix(ruta: string): string {
@@ -720,20 +756,55 @@ describe('Alcance QC-56: la migracion no abre la tabla compartida (R20)', () => 
     return [...tocados].sort()
   }
 
-  function saltarSiNoEsLaRamaDeQC56(ctx: Pick<TestContext, 'skip'>, tocados: readonly string[]): void {
-    const esLaRama =
-      tocados.includes(PAGINA_DE_RECETAS) && tocados.some((archivo) => archivo.startsWith(CARPETA_SPEC))
-    if (!esLaRama) {
+  function saltarSiNoEsLaRamaDeQC56(ctx: Pick<TestContext, 'skip'>): void {
+    const rama = ramaActual()
+    if (!esLaRamaDeQC56(rama)) {
       ctx.skip(
-        `el rango \`${RANGO}\` no trae a la vez \`${PAGINA_DE_RECETAS}\` y \`${CARPETA_SPEC}\`: ` +
-          'esta NO es la rama de QC-56, asi que este caso NO ha comprobado nada.',
+        (rama === null
+          ? 'no se pudo leer la rama actual (ni con git ni por `GITHUB_HEAD_REF`)'
+          : `la rama actual es '${rama}' y no '${RAMA_DE_QC56}'`) +
+          ': esta NO es la rama de QC-56, asi que este caso NO ha comprobado nada, aunque el diff ' +
+          `traiga \`${PAGINA_DE_RECETAS}\` o algo bajo \`${CARPETA_SPEC}\`.`,
       )
     }
   }
 
+  describe('la senal de RAMA discrimina de verdad la rama de QC-56', () => {
+    it('con el nombre exacto de su rama, es la rama de QC-56', () => {
+      expect(esLaRamaDeQC56(RAMA_DE_QC56)).toBe(true)
+    })
+
+    it('es IGUALDAD, no prefijo: ni un sufijo, ni una ficha vecina, ni dev cuentan', () => {
+      expect(esLaRamaDeQC56(`${RAMA_DE_QC56}-bis`)).toBe(false)
+      expect(esLaRamaDeQC56('feature/QC-560-migrar-listas-a-tabla-compartida')).toBe(false)
+      expect(esLaRamaDeQC56('QC-56-migrar-listas-a-tabla-compartida')).toBe(false)
+      expect(esLaRamaDeQC56('dev')).toBe(false)
+    })
+
+    it('sin rama legible -HEAD separado sin GITHUB_HEAD_REF- no lo es: salta, no mide', () => {
+      expect(esLaRamaDeQC56(null)).toBe(false)
+      expect(esLaRamaDeQC56('HEAD')).toBe(false)
+    })
+
+    it('la rama de QC-231, que trae la pagina de recetas y enmienda el spec de QC-56, NO cuenta', () => {
+      // El caso que motivo el cambio de senal, como muestra que muerde: la senal vieja -la pagina
+      // de recetas mas algo bajo la carpeta de spec- daba positivo con este diff.
+      const diffDeQC231 = [
+        PAGINA_DE_RECETAS,
+        `${CARPETA_SPEC}requirements.md`,
+        'components/shared/data-table/data-table.tsx',
+      ]
+      const senalVieja =
+        diffDeQC231.includes(PAGINA_DE_RECETAS) && diffDeQC231.some((archivo) => archivo.startsWith(CARPETA_SPEC))
+
+      expect(senalVieja).toBe(true)
+      expect(esLaRamaDeQC56('feature/QC-231-componentizacion-piezas-base')).toBe(false)
+    })
+  })
+
   it('R20: el diff de la rama no toca ningun archivo de components/shared/data-table/', (ctx) => {
+    saltarSiNoEsLaRamaDeQC56(ctx)
     const tocados = archivosTocados()
-    saltarSiNoEsLaRamaDeQC56(ctx, tocados)
 
     const violaciones = tocados.filter((ruta) => ruta.startsWith(CARPETA_DE_LA_TABLA))
     expect(violaciones, 'la migracion no puede modificar la tabla compartida (R20)').toEqual([])
@@ -749,8 +820,8 @@ describe('Alcance QC-56: la migracion no abre la tabla compartida (R20)', () => 
   }
 
   it('R28: en el rango commiteado, fuera de las dos rutas ningun archivo de producto cambia salvo el barrel de proveedores, y nada de db/', (ctx) => {
+    saltarSiNoEsLaRamaDeQC56(ctx)
     const tocados = archivosDelRango()
-    saltarSiNoEsLaRamaDeQC56(ctx, tocados)
 
     const carpetasDeRuta = [`app/(private)${FORMULAS_ROUTE}/`, `app/(private)${SUPPLIERS_ROUTE}/`]
     const fuera = tocados

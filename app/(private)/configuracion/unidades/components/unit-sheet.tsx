@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
 import type { UnitView } from '@/lib/modules/unidades';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { UnitForm } from './unit-form';
 
@@ -41,8 +42,6 @@ export const UNIT_CREATE_OPEN_TESTID = 'unit-create-open';
  * del panel —y sus tests— tienen un solo sitio del que importarlo.
  */
 export { UNIT_SHEET_TESTID } from './unit-form';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 const CREATE_LABEL = 'Nueva unidad';
 const CREATE_SUCCESS = 'Unidad creada.';
@@ -86,7 +85,7 @@ export function UnitSheet({ unit, baseUnits, open, onOpenChange }: UnitSheetProp
       {isControlled ? null : (
         <SheetTrigger
           render={
-            <Button variant="default" className={TOUCH_TARGET} data-testid={UNIT_CREATE_OPEN_TESTID} />
+            <Button variant="default" className={touchTarget} data-testid={UNIT_CREATE_OPEN_TESTID} />
           }
         >
           <PlusIcon aria-hidden="true" />

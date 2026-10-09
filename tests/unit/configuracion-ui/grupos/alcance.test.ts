@@ -17,9 +17,10 @@
 // traga todo lo que `dev` traia y se lo atribuye a esta feature —565 archivos ajenos en el caso de
 // unidades—.
 //
-// **La precondicion de rama se COPIA de `data-table-intacta-usuarios.test.ts`, no se inventa una
-// segunda**: que el repo tenga dos maneras de decir lo mismo es la mitad del problema que esa
-// cabecera arreglo. Lo unico que cambia es la SENAL, que es la de esta ficha.
+// **La precondicion de rama es el NOMBRE de la rama**, igual que en `guard-piezas-base.test.ts` y en
+// los `qc1xx-alcance.test.ts` de documentos: no se inventa una segunda manera. Hasta el 2026-10-08
+// se deducia del diff (archivo central + carpeta de spec), y QC-231 la rompio: esa rama trae
+// legitimamente `work-group-table.tsx` y enmienda specs ajenos, y este archivo se creyo en casa.
 //
 // **Anti-vacuidad.** Cada `toEqual([])` de aqui lleva su caso simetrico que demuestra que el
 // detector muerde: que el mismo barrido, apuntado a la carpeta de la pantalla, NO devuelve vacio;
@@ -106,9 +107,21 @@ function lineas(salida: string): readonly string[] {
  * Los archivos cambiados bajo `rutas` respecto del merge-base. El base va como commit suelto y no
  * como `origin/dev...HEAD` a proposito: la forma de tres puntos solo mira commits, y aqui hace
  * falta que el ARBOL DE TRABAJO cuente.
+ *
+ * Los BORRADOS cuentan aqui a proposito: un «diff vacio en tal carpeta» tiene que morder tambien
+ * si alguien borra un archivo de ella. Quien vaya a LEER los archivos usa
+ * `archivosPresentesCambiados`, que los excluye.
  */
 function archivosCambiados(base: string, rutas: readonly string[]): readonly string[] {
   return lineas(git(['diff', '--name-only', base, '--', ...rutas]));
+}
+
+/**
+ * Lo mismo, sin los borrados (`--diff-filter=d`): es la lista que se puede LEER del disco. Sin el
+ * filtro, un archivo borrado por la rama sale en el diff y `readFileSync` revienta con ENOENT.
+ */
+function archivosPresentesCambiados(base: string, rutas: readonly string[]): readonly string[] {
+  return lineas(git(['diff', '--name-only', '--diff-filter=d', base, '--', ...rutas]));
 }
 
 /**
@@ -135,83 +148,94 @@ function archivosVersionados(rutas: readonly string[]): readonly string[] {
  * Un centinela de alcance que no comprueba QUE RAMA esta midiendo acaba aplicando las reglas de
  * SU ficha al trabajo legitimo de otra. Ya paso: `data-table-intacta-usuarios.test.ts` empezo a
  * medir cualquier rama con el alcance de QC-67 en cuanto QC-67 se mergeo en `dev`, y lo destapo
- * QC-84 con un `expected 0 to be greater than 0`. Esta ficha acaba de curar tres centinelas por
- * ese mismo motivo; este nace ya curado.
+ * QC-84 con un `expected 0 to be greater than 0`.
  *
- * LA SENAL es CONJUNTIVA: el archivo central de la pantalla de grupos **mas** la carpeta de spec
- * de la propia ficha. La carpeta de spec discrimina de verdad porque nace y vive dentro del rango
- * de QC-85 y no aparece jamas en el rango de otra ficha, que trae la SUYA.
+ * LA SENAL es el NOMBRE de la rama, comparado por IGUALDAD exacta. Antes era CONJUNTIVA sobre el
+ * diff —`work-group-table.tsx` mas algo bajo la carpeta de spec de QC-85—, con la premisa de que
+ * esa carpeta «no aparece jamas en el rango de otra ficha». QC-231 desmintio la premisa: una
+ * ficha de componentizacion toca `work-group-table.tsx` y enmienda specs ajenos con todo derecho,
+ * y este archivo midio su rama con el alcance de QC-85. Que el diff contenga archivos compartidos
+ * NO dice de quien es la rama; su nombre si.
  *
- * El archivo central es `work-group-table.tsx` y **no** `usuarios/page.tsx`: esa segunda es la
- * senal de QC-67 —que tambien vive en esta pantalla— y confundirlas haria que las dos fichas se
- * midieran la una a la otra.
+ * Fuera de un checkout con rama —CI hace checkout del PR en HEAD separado— se cae a
+ * `GITHUB_HEAD_REF`, que GitHub Actions rellena con la rama de origen del PR.
  *
- * **Esto ENDURECE la precondicion, no relaja la comprobacion**: en la rama real de QC-85 las dos
- * senales estan presentes y todos los casos corren igual, con las mismas listas cerradas y las
- * mismas igualdades. Fuera de su rama quedan `skipped` —nunca verdes—: un verde diria «he
- * revisado el diff de QC-85» sin haber mirado nada.
+ * **Esto ENDURECE la precondicion, no relaja la comprobacion**: en la rama de QC-85 todos los
+ * casos corren igual, con las mismas listas cerradas y las mismas igualdades, y el ancla de abajo
+ * exige ademas que su diff traiga la obra de la ficha. Fuera de su rama quedan `skipped` —nunca
+ * verdes—: un verde diria «he revisado el diff de QC-85» sin haber mirado nada.
+ */
+const RAMA_DE_QC85 = 'feature/QC-85-pantalla-de-grupos-de-trabajo';
+
+/** La rama del checkout; en HEAD separado (CI), la rama de origen del PR. `null` si no hay ninguna. */
+function ramaActual(): string | null {
+  let rama: string;
+  try {
+    rama = git(['rev-parse', '--abbrev-ref', 'HEAD']).trim();
+  } catch {
+    return null;
+  }
+  if (rama === 'HEAD') rama = (process.env.GITHUB_HEAD_REF ?? '').trim();
+  return rama.length === 0 ? null : rama;
+}
+
+/** Se calcula una sola vez: la rama no cambia mientras corre la suite. */
+const RAMA_ACTUAL = ramaActual();
+
+export function esLaRamaDeQC85(rama: string | null): boolean {
+  return rama === RAMA_DE_QC85;
+}
+
+/**
+ * LA OBRA de QC-85 en el diff: el archivo central de la pantalla de grupos **mas** la carpeta de
+ * spec de la ficha. YA NO decide si un caso mide —eso lo decide el nombre de la rama—: sirve al
+ * ancla de no-vacuidad, que en la rama de QC-85 exige que el diff traiga de verdad su trabajo.
+ *
+ * El archivo central es `work-group-table.tsx` y **no** `usuarios/page.tsx`: esa segunda es de
+ * QC-67 —que tambien vive en esta pantalla—.
  */
 const ARCHIVO_CENTRAL_DE_QC85 =
   'app/(private)/configuracion/usuarios/components/work-group-table.tsx';
 const CARPETA_SPEC_DE_QC85 = 'specs/QC-85-pantalla-de-grupos-de-trabajo/';
 
-export function esLaRamaDeQC85(tocados: readonly string[]): boolean {
+function diffTraeLaObraDeQC85(tocados: readonly string[]): boolean {
   return (
     tocados.includes(ARCHIVO_CENTRAL_DE_QC85) &&
     tocados.some((archivo) => archivo.startsWith(CARPETA_SPEC_DE_QC85))
   );
 }
 
-/**
- * LA SENAL, EN DISYUNTIVA: «aqui hay algo de QC-85 que medir».
- *
- * No sustituye a `esLaRamaDeQC85` ni la afloja —esa sigue siendo CONJUNTIVA y es la que decide si
- * un caso mide o se salta—. Esta responde una pregunta distinta y estrictamente mas debil: si el
- * rango trae AL MENOS UNA de las dos senales. Sirve solo para el ancla de no-vacuidad de mas abajo,
- * que necesita distinguir «no hay nada de esta ficha que medir» (correr el gate sobre `dev`, donde
- * QC-85 ya esta mergeada y por tanto no la aporta la rama: se salta con el motivo escrito) de «hay
- * trabajo de QC-85 delante y la precondicion NO lo reconoce» (el fallo que el ancla persigue: sigue
- * rojo). Con la conjuntiva, el ancla se volveria un test que pasa siempre.
- */
-function traeAlgunaSenalDeQC85(tocados: readonly string[]): boolean {
+/** El motivo que se escribe fuera de la rama de QC-85. Lo comparten el preambulo y el ancla. */
+function motivoNoEsLaRamaDeQC85(rama: string | null): string {
   return (
-    tocados.includes(ARCHIVO_CENTRAL_DE_QC85) ||
-    tocados.some((archivo) => archivo.startsWith(CARPETA_SPEC_DE_QC85))
+    (rama === null
+      ? 'no se pudo leer la rama actual (ni con git ni por `GITHUB_HEAD_REF`)'
+      : `la rama actual es '${rama}' y no '${RAMA_DE_QC85}'`) +
+    ': esta NO es la rama de QC-85, asi que este caso NO ha comprobado nada. El alcance de esta ' +
+    'ficha no le aplica a ninguna otra rama, aunque su diff traiga archivos de esta pantalla.'
   );
 }
 
 /**
  * El motivo que se escribe cuando la rama no aporta NADA. Vive suelto porque lo comparten el
- * preambulo de los casos que miden el diff y el ancla de no-vacuidad: que el repo tenga dos
- * maneras de decir lo mismo es la mitad del problema que esta cabecera arreglo.
+ * preambulo de los casos que miden el diff y el ancla de no-vacuidad.
  */
 const RAMA_SIN_APORTES =
   'la rama no toca ningun archivo respecto del merge-base con `dev`: no hay diff que revisar, ' +
-  'asi que este caso NO ha comprobado nada. Ocurre al correr el gate sobre `dev` con el arbol ' +
-  'limpio.';
+  'asi que este caso NO ha comprobado nada.';
 
 /**
- * Salta el caso —ruidosamente, con el motivo escrito— cuando la rama no es la de QC-85. Se pide
- * TODO el arbol (`.`) y no solo las rutas vigiladas: la senal vive fuera de ellas. Y se mira
- * tambien lo SIN SEGUIMIENTO, porque el archivo central de esta ficha es un alta.
+ * Salta el caso —ruidosamente, con el motivo escrito— cuando la rama no es la de QC-85, o cuando
+ * siendolo no aporta nada. Se pide TODO el arbol (`.`) y tambien lo SIN SEGUIMIENTO.
  */
 function saltarSiNoEsLaRamaDeQC85(ctx: Pick<TestContext, 'skip'>, base: string): void {
-  const tocados = aportadosPorLaRama(base, ['.']);
-
-  if (tocados.length === 0) {
-    ctx.skip(RAMA_SIN_APORTES);
+  if (!esLaRamaDeQC85(RAMA_ACTUAL)) {
+    ctx.skip(motivoNoEsLaRamaDeQC85(RAMA_ACTUAL));
     return;
   }
 
-  if (!esLaRamaDeQC85(tocados)) {
-    ctx.skip(
-      'el rango no trae a la vez `' +
-        ARCHIVO_CENTRAL_DE_QC85 +
-        '` y `' +
-        CARPETA_SPEC_DE_QC85 +
-        '`: esta NO es la rama de QC-85, asi que este caso NO ha comprobado nada. El alcance de ' +
-        'esta ficha no le aplica a ninguna otra rama.',
-    );
+  if (aportadosPorLaRama(base, ['.']).length === 0) {
+    ctx.skip(RAMA_SIN_APORTES);
   }
 }
 
@@ -242,62 +266,75 @@ function fuenteSinComentarios(ruta: string): string {
     .replace(/\/\*[\s\S]*?\*\//g, ' ');
 }
 
-/** Los archivos de la pantalla que ESTA rama aporta: se derivan del diff, no de una lista a mano. */
+/**
+ * Los archivos de la pantalla que ESTA rama aporta: se derivan del diff, no de una lista a mano.
+ * Son archivos que se van a LEER, asi que los borrados quedan fuera (`archivosPresentesCambiados`):
+ * un archivo que la rama borro no tiene contenido que revisar y leerlo revienta con ENOENT.
+ */
 function archivosDeLaPantalla(): readonly string[] {
   if (BASE_DE_LA_RAMA === null) return [];
-  return aportadosPorLaRama(BASE_DE_LA_RAMA, [CARPETA_DE_LA_PANTALLA]).filter((archivo) =>
-    /\.tsx?$/.test(archivo),
-  );
+  return [
+    ...archivosPresentesCambiados(BASE_DE_LA_RAMA, [CARPETA_DE_LA_PANTALLA]),
+    ...archivosSinSeguimiento([CARPETA_DE_LA_PANTALLA]),
+  ]
+    .sort()
+    .filter((archivo) => /\.tsx?$/.test(archivo));
 }
 
 // ---------------------------------------------------------------------------------------------
 // La precondicion, probada como lo que es: una funcion pura
 // ---------------------------------------------------------------------------------------------
 
-describe('la senal CONJUNTIVA discrimina de verdad la rama de QC-85', () => {
-  const SENAL_COMPLETA = [
+describe('la senal de RAMA discrimina de verdad la rama de QC-85', () => {
+  /** Lo que el diff de QC-85 traia: el archivo central y su carpeta de spec. */
+  const OBRA_COMPLETA = [
     ARCHIVO_CENTRAL_DE_QC85,
     `${CARPETA_SPEC_DE_QC85}requirements.md`,
     'progress/current.md',
   ];
 
-  it('con las dos senales presentes, es la rama de QC-85', () => {
-    expect(esLaRamaDeQC85(SENAL_COMPLETA)).toBe(true);
+  it('con el nombre exacto de su rama, es la rama de QC-85', () => {
+    expect(esLaRamaDeQC85(RAMA_DE_QC85)).toBe(true);
   });
 
-  it('sin el archivo central no lo es: una rama que solo escribe el spec no se mide aqui', () => {
-    expect(esLaRamaDeQC85(SENAL_COMPLETA.filter((a) => a !== ARCHIVO_CENTRAL_DE_QC85))).toBe(false);
+  it('es IGUALDAD, no prefijo ni parecido: ni una ficha vecina ni un sufijo cuentan', () => {
+    expect(esLaRamaDeQC85(`${RAMA_DE_QC85}-bis`)).toBe(false);
+    expect(esLaRamaDeQC85('feature/QC-850-pantalla-de-grupos-de-trabajo')).toBe(false);
+    expect(esLaRamaDeQC85('QC-85-pantalla-de-grupos-de-trabajo')).toBe(false);
+    expect(esLaRamaDeQC85('dev')).toBe(false);
   });
 
-  it('sin la carpeta de spec tampoco: es CONJUNTIVA, no una de las dos', () => {
-    expect(esLaRamaDeQC85([ARCHIVO_CENTRAL_DE_QC85, 'progress/current.md'])).toBe(false);
+  it('sin rama legible —HEAD separado sin `GITHUB_HEAD_REF`— no lo es: salta, no mide', () => {
+    expect(esLaRamaDeQC85(null)).toBe(false);
+    expect(esLaRamaDeQC85('HEAD')).toBe(false);
   });
 
   it('y la rama de QC-67 —que vive en esta MISMA pantalla— no cuenta como la de QC-85', () => {
-    // El motivo de no usar `usuarios/page.tsx` como senal, escrito como caso: QC-67 toca esta
-    // pantalla y trae SU carpeta de spec. Con `page.tsx` de senal, las dos fichas se medirian la
-    // una a la otra.
-    expect(
-      esLaRamaDeQC85([
-        'app/(private)/configuracion/usuarios/page.tsx',
-        'specs/QC-67-pantalla-de-usuarios/requirements.md',
-      ]),
-    ).toBe(false);
+    expect(esLaRamaDeQC85('feature/QC-67-pantalla-de-usuarios')).toBe(false);
   });
 
-  it('la senal disyuntiva es MAS DEBIL que la precondicion: el ancla de abajo sigue mordiendo', () => {
-    // El caso que justifica que el ancla se pueda saltar sin volverse decorativa. Una rama que
-    // trae SOLO una de las dos senales —aqui, la carpeta de spec de QC-85— si tiene «algo de
-    // QC-85 que medir», asi que el ancla NO se salta y, como la precondicion conjuntiva da falso,
-    // se pone roja. Que es exactamente el fallo que persigue.
-    const soloUnaSenal = [`${CARPETA_SPEC_DE_QC85}requirements.md`, 'progress/current.md'];
+  it('la rama de QC-231, que trae `work-group-table.tsx` y enmienda specs ajenos, NO cuenta', () => {
+    // El caso que motivo el cambio de senal, escrito como muestra que muerde. El diff de esa rama
+    // toca el archivo central de esta pantalla; si ademas enmendara el spec de QC-85, la senal
+    // vieja —la obra en el diff— la habria tomado por la rama de QC-85. El nombre no se equivoca.
+    const diffDeQC231 = [
+      ARCHIVO_CENTRAL_DE_QC85,
+      `${CARPETA_SPEC_DE_QC85}design.md`,
+      'specs/QC-231-componentizacion-piezas-base/design.md',
+    ];
 
-    expect(traeAlgunaSenalDeQC85(soloUnaSenal)).toBe(true);
-    expect(esLaRamaDeQC85(soloUnaSenal)).toBe(false);
+    expect(diffTraeLaObraDeQC85(diffDeQC231)).toBe(true);
+    expect(esLaRamaDeQC85('feature/QC-231-componentizacion-piezas-base')).toBe(false);
+  });
 
-    // Y sobre una rama sin nada de esta ficha —el gate corriendo en `dev`— no hay nada que medir.
+  it('la obra en el diff sigue siendo CONJUNTIVA: el ancla de abajo exige las dos piezas', () => {
+    expect(diffTraeLaObraDeQC85(OBRA_COMPLETA)).toBe(true);
+    expect(diffTraeLaObraDeQC85(OBRA_COMPLETA.filter((a) => a !== ARCHIVO_CENTRAL_DE_QC85))).toBe(
+      false,
+    );
+    expect(diffTraeLaObraDeQC85([ARCHIVO_CENTRAL_DE_QC85, 'progress/current.md'])).toBe(false);
     expect(
-      traeAlgunaSenalDeQC85([
+      diffTraeLaObraDeQC85([
         'app/(private)/configuracion/usuarios/page.tsx',
         'specs/QC-67-pantalla-de-usuarios/requirements.md',
       ]),
@@ -305,44 +342,33 @@ describe('la senal CONJUNTIVA discrimina de verdad la rama de QC-85', () => {
   });
 
   it('esta ejecucion SI es la rama de QC-85: ningun caso de abajo se ha saltado en silencio', (ctx) => {
-    // Ancla de no-vacuidad de la propia precondicion. Si esto fuera falso ESTANDO delante el
-    // trabajo de QC-85, todos los casos que miden el diff estarian `skipped` y el archivo entero
-    // seria decorativo. Sin base no se pasa de largo: se salta con el motivo escrito, como todos
-    // sus hermanos.
+    // Ancla de no-vacuidad. En la rama de QC-85 los casos que miden el diff corren, y este exige
+    // ademas que ese diff traiga de verdad la obra de la ficha: si la rama se llamara asi pero no
+    // aportara su pantalla, todos los casos medirian un diff ajeno y el archivo seria decorativo.
+    //
+    // Fuera de la rama de QC-85 —el estado NORMAL desde su merge en `dev` (PR #64)— se salta
+    // ruidosamente, con el motivo escrito, por la misma via que sus hermanos.
     if (BASE_DE_LA_RAMA === null) {
       ctx.skip(SIN_BASE);
       return;
     }
 
+    if (!esLaRamaDeQC85(RAMA_ACTUAL)) {
+      ctx.skip(motivoNoEsLaRamaDeQC85(RAMA_ACTUAL));
+      return;
+    }
+
     const tocados = aportadosPorLaRama(BASE_DE_LA_RAMA, ['.']);
 
-    // «No hay nada que medir» NO es el fallo que este caso persigue, y desde el merge de QC-85 en
-    // `dev` (PR #64) es el estado NORMAL: sus archivos ya no los aporta ninguna rama, asi que la
-    // precondicion no puede reconocerla jamas corriendo sobre `dev`. Se salta ruidosamente, con el
-    // motivo escrito, igual que hacen sus hermanos por la via de `saltarSiNoEsLaRamaDeQC85`.
-    //
-    // Lo que NO se salta es «hay trabajo de QC-85 delante y la precondicion no lo reconoce»: ahi
-    // la senal disyuntiva da positivo, el caso corre y se pone rojo. Esa es la linea, y es la misma
-    // que traza `saltarSiNoEsLaRamaDeQC85`: no hay diff que revisar vs. hay diff y no cuadra.
     if (tocados.length === 0) {
       ctx.skip(RAMA_SIN_APORTES);
       return;
     }
 
-    if (!traeAlgunaSenalDeQC85(tocados)) {
-      ctx.skip(
-        'la rama no aporta ni `' +
-          ARCHIVO_CENTRAL_DE_QC85 +
-          '` ni nada bajo `' +
-          CARPETA_SPEC_DE_QC85 +
-          '`: no hay trabajo de QC-85 que medir, asi que este ancla NO ha comprobado nada. Ocurre ' +
-          'al correr el gate sobre `dev`, donde QC-85 ya esta mergeada y por tanto no la aporta ' +
-          'ninguna rama.',
-      );
-      return;
-    }
-
-    expect(esLaRamaDeQC85(tocados)).toBe(true);
+    expect(
+      diffTraeLaObraDeQC85(tocados),
+      `la rama de QC-85 tiene que aportar \`${ARCHIVO_CENTRAL_DE_QC85}\` y algo bajo \`${CARPETA_SPEC_DE_QC85}\``,
+    ).toBe(true);
   });
 });
 
@@ -466,9 +492,14 @@ describe('las dos listas blancas de consulta de grupos no se amplian (R16)', () 
     expect(tocados, 'R16: la lista blanca de grupos se toco desde la pantalla').toEqual([]);
   });
 
-  it('ningun archivo de la pantalla declara un filtro de columna', () => {
+  it('ningun archivo de la pantalla declara un filtro de columna', (ctx) => {
     // La lista blanca no declara ningun filtrable —lo congela `work-group-list-params.test.ts`—,
     // asi que ofrecer un filtro seria pedirle al modulo algo que no admite.
+    //
+    // `archivosDeLaPantalla()` sale del DIFF de la rama: sin el preambulo, cualquier rama que tocara
+    // la pantalla de usuarios —p.ej. la columna con filtro de la pestana de personas— le caeria.
+    baseDeEstaRama(ctx);
+
     const conFiltro = archivosDeLaPantalla().filter((archivo) =>
       DECLARACION_DE_FILTRO.test(fuenteSinComentarios(archivo)),
     );
@@ -597,7 +628,10 @@ describe('toda escritura y toda lectura pasan por operaciones YA publicadas (R36
     }
   });
 
-  it('ningun archivo de la pantalla llama a una ruta propia con `fetch`', () => {
+  it('ningun archivo de la pantalla llama a una ruta propia con `fetch`', (ctx) => {
+    // Mismo preambulo que sus hermanos: la lista sale del diff de la rama.
+    baseDeEstaRama(ctx);
+
     const conFetch = archivosDeLaPantalla().filter((archivo) =>
       /\bfetch\s*\(/.test(fuenteSinComentarios(archivo)),
     );

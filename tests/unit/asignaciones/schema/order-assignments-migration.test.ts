@@ -880,6 +880,7 @@ describe('down.sql — revertir deja la base exactamente como estaba antes del U
       'empresas.consultar',
       'empresas.modificar',
       'acondicionamiento.modificar',
+      'integraciones.modificar',
       // QC-223 2026-10-08
       'entregas.modificar',
     ]

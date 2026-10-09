@@ -191,6 +191,10 @@ pantalla o spec no declarados DEBEN seguir poniendo la guardia en rojo. *[D1]*
 de tabla ni de barra de paginación. Cada lista DEBE conservar sus componentes propios de estado
 vacío, de estado de error y de esqueleto de carga. *[Alcance revisado en F1.4; D12]*
 
+> *Enmienda del 2026-10-08 (QC-231 D4):* D12 y R30 quedan **sin efecto** para el vacío, el error y
+> el esqueleto: los pinta la tabla compartida, salvo las excepciones por lista que apunta QC-231 D4.
+> D15 sigue igual.
+
 ### Añadidos tras F1.4
 
 **R31** — El módulo de proveedores DEBE publicar por su contrato público su lista blanca de
@@ -266,7 +270,7 @@ filtros, conservando el tamaño de página y el orden. *[D15; R14]*
 | 2026-09-15 | ¿E2E? | **Si: se amplian `e2e/recetas.spec.ts` y `e2e/proveedores.spec.ts`** con busqueda y orden, sin archivo nuevo. **QC-55 lo difirio aqui** |
 | 2026-09-15 | ¿Dependencia nueva? | **Ninguna.** La tabla y sus primitivas ya estan montadas |
 | 2026-09-15 · **matizada por D13** | ¿Zona y complejidad? | **`frontend` / `medium`.** El backend ya soporta todo; son dos pantallas y dos requisitos invertidos. *(Matiz: entra UNA linea en `lib/` para publicar `SUPPLIER_QUERYABLE`, D13; la zona no cambia.)* |
-| 2026-09-15 · **F1.4** | ¿Donde se pintan vacio, error y carga? (hallazgos H1 y H3) | **Fuera de la tabla, como productos, catalogo y pedidos.** Cada lista conserva su vacio, su error y su **esqueleto propio**; el error sigue ofreciendo reintentar y el identificador del error inesperado (QC-71), y la carga pinta tantas filas como el tamano de pagina. **No se toca el componente compartido.** Sustituye la mitad «la tabla pinta los tres estados» de D5 |
+| 2026-09-15 · **F1.4** · **sin efecto para vacio, error y esqueleto desde el 2026-10-08 (QC-231 D4)** | ¿Donde se pintan vacio, error y carga? (hallazgos H1 y H3) | **Fuera de la tabla, como productos, catalogo y pedidos.** Cada lista conserva su vacio, su error y su **esqueleto propio**; el error sigue ofreciendo reintentar y el identificador del error inesperado (QC-71), y la carga pinta tantas filas como el tamano de pagina. **No se toca el componente compartido.** Sustituye la mitad «la tabla pinta los tres estados» de D5 |
 | 2026-09-15 · **F1.4** | ¿Se publica `SUPPLIER_QUERYABLE`? (hallazgo H2) | **Si: una linea en `lib/modules/proveedores/index.ts`**, igual que `recetas` ya publica `RECIPE_QUERYABLE`. Solo publica lo que existe; no cambia ninguna logica ni lista blanca |
 | 2026-09-15 · **F1.4** | ¿Como se muestra la descripcion de receta? (pregunta 2) | **Sale de la lista.** La lista de recetas deja de mostrar la columna de descripcion; se ve al abrir la receta. Esto **cambia lo que conservaba** QC-26 R8/R18 respecto a esa columna |
 | 2026-09-15 · **F1.4** | ¿Que dice la lista si una busqueda o filtro no encuentra nada? (pregunta 3) | **Un estado propio de «sin resultados», distinto del catalogo vacio, con la accion de limpiar busqueda y filtros**, y sin que desaparezca la caja de busqueda. El vacio con la accion de crear queda solo para cuando no hay busqueda ni filtro activos |

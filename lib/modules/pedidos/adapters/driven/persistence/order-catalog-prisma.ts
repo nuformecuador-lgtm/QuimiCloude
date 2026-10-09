@@ -9,6 +9,7 @@ import type {
   AssignedOrderSummary,
   OrderAssignmentTarget,
   OrderHistorySummary,
+  OrderSummaryFilter,
   OrderSummaryOrdering,
 } from '../../../domain/order-catalog';
 import type { OrderNumber } from '../../../domain/order-number';
@@ -81,6 +82,7 @@ type AssignedOrderSummaryRow = {
   readonly presentationLines: readonly AssignedOrderPresentationLineRow[];
   readonly finishedAt: Date | null;
   readonly packedBy: string | null;
+  readonly conditionedBy: string | null;
 };
 
 /** `select` unico de los dos listados de resumen: si uno gana una columna y el otro no, el
@@ -105,6 +107,7 @@ const SUMMARY_SELECT = {
   },
   finishedAt: true,
   packedBy: true,
+  conditionedBy: true,
 };
 
 /** El «orden de la lista de trabajo»: prioridad, antiguedad y numero, con `id ASC` de
@@ -147,6 +150,7 @@ export function toOrderSummaryRecord(row: AssignedOrderSummaryRow): OrderSummary
     ),
     finishedAt: row.finishedAt,
     packedBy: row.packedBy,
+    conditionedBy: row.conditionedBy,
   };
 }
 
@@ -261,7 +265,7 @@ export async function listAliveOrderSummariesInCompany(
   ordering: OrderSummaryOrdering,
   page: number,
   pageSize?: number,
-  filter?: { readonly packedBy?: string },
+  filter?: OrderSummaryFilter,
 ): Promise<Page<OrderSummaryRecord>> {
   const { offset, limit } = toOffsetLimit(page, pageSize);
   const where = {
@@ -271,6 +275,7 @@ export async function listAliveOrderSummariesInCompany(
         status: { in: [...statuses] },
         deletedAt: null,
         ...(filter?.packedBy === undefined ? {} : { packedBy: filter.packedBy }),
+        ...(filter?.conditionedBy === undefined ? {} : { conditionedBy: filter.conditionedBy }),
       },
     ],
   };

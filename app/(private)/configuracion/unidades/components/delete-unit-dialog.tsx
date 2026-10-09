@@ -14,9 +14,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode } from '@/lib/modules/errores';
+import { ErrorAlert } from '@/components/shared/error-alert';
+import type { ErrorCode } from '@/lib/modules/errores';
 import type { UnitView } from '@/lib/modules/unidades';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 import {
   deleteUnitAction,
   type UnitMutationFormState,
@@ -70,8 +71,6 @@ export const DELETE_UNIT_ID_FIELD = 'id';
  */
 export const UNIT_IN_USE_CODE: ErrorCode = 'unit_in_use';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 const TITLE = 'Eliminar la unidad';
 const CONFIRM_LABEL = 'Eliminar';
 const CONFIRM_PENDING_LABEL = 'Eliminando…';
@@ -114,24 +113,16 @@ export function DeleteUnitDialog({ unit, open, onOpenChange }: DeleteUnitDialogP
         </AlertDialogHeader>
 
         {error === undefined ? null : (
-          <div
-            role="alert"
+          <ErrorAlert
+            error={error}
             id={errorId}
             className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={DELETE_UNIT_ERROR_TESTID}
-            data-code={error.code}
-          >
-            {/*
-              QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
-              identificador de la peticion. El CATALOGADO -`unit_in_use` entre otros- se pinta como
-              siempre y sin identificador.
-            */}
-            {error.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={error} />
-            ) : (
-              <p data-testid={DELETE_UNIT_ERROR_MESSAGE_TESTID}>{error.message}</p>
+            testId={DELETE_UNIT_ERROR_TESTID}
+            withDataCode
+            renderCatalogued={(catalogued) => (
+              <p data-testid={DELETE_UNIT_ERROR_MESSAGE_TESTID}>{catalogued.message}</p>
             )}
-          </div>
+          />
         )}
 
         <form action={formAction} data-testid={DELETE_UNIT_FORM_TESTID}>
@@ -142,13 +133,13 @@ export function DeleteUnitDialog({ unit, open, onOpenChange }: DeleteUnitDialogP
             data-testid={DELETE_UNIT_ID_TESTID}
           />
           <AlertDialogFooter>
-            <AlertDialogCancel className={TOUCH_TARGET} data-testid={DELETE_UNIT_DISMISS_TESTID}>
+            <AlertDialogCancel className={touchTarget} data-testid={DELETE_UNIT_DISMISS_TESTID}>
               {DISMISS_LABEL}
             </AlertDialogCancel>
             <AlertDialogAction
               type="submit"
               variant="destructive"
-              className={TOUCH_TARGET}
+              className={touchTarget}
               disabled={isPending}
               aria-busy={isPending}
               data-testid={DELETE_UNIT_CONFIRM_TESTID}

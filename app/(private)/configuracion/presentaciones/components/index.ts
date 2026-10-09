@@ -3,7 +3,7 @@
 //
 // Sin `'use client'`: la frontera cliente/servidor se declara en CADA archivo de componente,
 // nunca aqui. Asi `page.tsx` sigue siendo Server Component aunque importe desde el barrel, y
-// `presentation-list-error.tsx` (cliente) convive con `presentation-list-section.tsx` (servidor).
+// `presentation-table.tsx` (cliente) convive con `presentation-list-section.tsx` (servidor).
 //
 // La pagina y todo consumidor de fuera de la carpeta importan SIEMPRE desde aqui, nunca por ruta
 // profunda. Entre hermanos de la propia carpeta los importes siguen siendo RELATIVOS: entrar por
@@ -54,21 +54,6 @@ export {
   type PresentationSheetTarget,
 } from './presentation-form';
 export {
-  PRESENTATION_LIST_EMPTY_MESSAGE_TESTID,
-  PRESENTATION_LIST_EMPTY_TESTID,
-  PRESENTATION_LIST_FIRST_PAGE_TESTID,
-  PresentationListEmpty,
-  type PresentationListEmptyProps,
-} from './presentation-list-empty';
-export {
-  PRESENTATION_LIST_ERROR_CODE_TESTID,
-  PRESENTATION_LIST_ERROR_MESSAGE_TESTID,
-  PRESENTATION_LIST_ERROR_TESTID,
-  PRESENTATION_LIST_RETRY_TESTID,
-  PresentationListError,
-  type PresentationListErrorProps,
-} from './presentation-list-error';
-export {
   FIRST_PAGE,
   NAME_COLUMN_ID,
   PAGE_PARAM,
@@ -87,12 +72,6 @@ export {
   type PresentationListSectionProps,
 } from './presentation-list-section';
 export {
-  PRESENTATION_LIST_SKELETON_TESTID,
-  PRESENTATION_ROW_SKELETON_TESTID,
-  PRESENTATION_SKELETON_COLUMN_COUNT,
-  PresentationListSkeleton,
-} from './presentation-list-skeleton';
-export {
   PRESENTATION_ACTION_DELETE_TESTID,
   PRESENTATION_ACTION_EDIT_TESTID,
   PRESENTATION_ROW_ACTIONS_TESTID,
@@ -107,9 +86,20 @@ export {
   type PresentationSheetProps,
 } from './presentation-sheet';
 export {
+  PRESENTATION_LIST_EMPTY_MESSAGE_TESTID,
+  PRESENTATION_LIST_EMPTY_TESTID,
+  PRESENTATION_LIST_ERROR_CODE_TESTID,
+  PRESENTATION_LIST_ERROR_MESSAGE_TESTID,
+  PRESENTATION_LIST_ERROR_TESTID,
+  PRESENTATION_LIST_FIRST_PAGE_TESTID,
+  PRESENTATION_LIST_RETRY_TESTID,
+  PRESENTATION_LIST_SKELETON_TESTID,
+  PRESENTATION_ROW_SKELETON_TESTID,
+  PRESENTATION_SKELETON_COLUMN_COUNT,
   PRESENTATION_TABLE_ID,
   PRESENTATION_TABLE_TEXTS,
   PresentationTable,
+  type PresentationTableEmpty,
   type PresentationTableProps,
 } from './presentation-table';
 // `PresentationUnitSelect` ya no es propio de esta ruta: QC-80 (T10) lo promovio a

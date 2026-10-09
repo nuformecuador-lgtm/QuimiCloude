@@ -76,6 +76,7 @@ export const CODIGOS_QC74 = [
   'empresas.consultar',
   'empresas.modificar',
   'acondicionamiento.modificar',
+  'integraciones.modificar',
   // QC-223 2026-10-08
   'entregas.modificar',
 ] as const;
@@ -152,7 +153,7 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
     // `dashboard` es una pantalla y no un modulo del ERP (solo lleva `consultar`); `usuarios`,
     // `terminados`, `empaque`, `empresas` y `acondicionamiento` no son carpetas de `lib/modules/`
     // -viven dentro de `identity`-. `empaque` y `acondicionamiento` ademas son solo de escritura:
-    // unicamente llevan `modificar`.
+    // unicamente llevan `modificar`. `integraciones` tambien solo escribe, pero si es carpeta.
     const esperados = [
       ...new Set([
         ...MODULOS_DE_NEGOCIO,
@@ -162,6 +163,7 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
         'empaque',
         'empresas',
         'acondicionamiento',
+        'integraciones',
         // QC-223 2026-10-08: `entregas` tampoco es carpeta de `lib/modules/` y solo escribe.
         'entregas',
       ]),

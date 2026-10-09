@@ -228,6 +228,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       ],
       finishedAt: null,
       packedBy: null,
+      conditionedBy: null,
     })
     expect(conReparto.presentationLines).toEqual([
       { presentationId: 'p-1', packages: 5, packagingProductId: null },
@@ -246,6 +247,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       presentationLines: [],
       finishedAt: null,
       packedBy: null,
+      conditionedBy: null,
     })
     expect(sinReparto.presentationLines).toEqual([])
   })
@@ -262,6 +264,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       presentationLines: [],
       finishedAt: null,
       packedBy: null,
+      conditionedBy: null,
     } as const
 
     expect(toOrderSummaryRecord({ ...filaBase, unitId: 'u-1' }).unitId).toBe('u-1')
@@ -282,6 +285,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       presentationLines: [],
       finishedAt: fecha,
       packedBy: null,
+      conditionedBy: null,
     })
     expect(conFecha.finishedAt).toBe(fecha)
 
@@ -297,6 +301,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       presentationLines: [],
       finishedAt: null,
       packedBy: null,
+      conditionedBy: null,
     })
     expect(sinFecha.finishedAt).toBeNull()
   })
@@ -314,6 +319,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       presentationLines: [],
       finishedAt: null,
       packedBy: 'u-1',
+      conditionedBy: null,
     })
     expect(conEmpacador.packedBy).toBe('u-1')
 
@@ -329,8 +335,39 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       presentationLines: [],
       finishedAt: null,
       packedBy: null,
+      conditionedBy: null,
     })
     expect(sinEmpacador.packedBy).toBeNull()
+  })
+
+  it('R7: copia conditionedBy tal cual, con y sin quien acondiciona', () => {
+    const filaBase = {
+      orderYear: 2026,
+      orderSequence: 13,
+      recipeId: 'r-1',
+      quantity: { toFixed: () => '10.0000' },
+      priority: 'MEDIA',
+      unitId: null,
+      presentationLines: [],
+      finishedAt: null,
+      packedBy: 'u-1',
+    } as const
+
+    const conAcondicionador = toOrderSummaryRecord({
+      ...filaBase,
+      id: 'o-7',
+      status: 'EN_ACONDICIONAMIENTO',
+      conditionedBy: 'u-2',
+    })
+    expect(conAcondicionador.conditionedBy).toBe('u-2')
+
+    const sinAcondicionador = toOrderSummaryRecord({
+      ...filaBase,
+      id: 'o-8',
+      status: 'POR_ACONDICIONAR',
+      conditionedBy: null,
+    })
+    expect(sinAcondicionador.conditionedBy).toBeNull()
   })
 })
 
@@ -519,6 +556,33 @@ describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
     expect(findMany.mock.calls[0]?.[0]?.where).toEqual(sinFiltro)
     expect(findMany.mock.calls[1]?.[0]?.where).toEqual(sinFiltro)
     expect(JSON.stringify(findMany.mock.calls[1]?.[0]?.where)).not.toContain('packedBy')
+  })
+
+  it('R11: con `conditionedBy`, el WHERE de la pagina y el del total llevan empresa, estado y quien acondiciona', async () => {
+    await listAliveSummariesInCompany(EMPRESA, ['TERMINADO'], 'finished_recent_first', 2, 10, {
+      conditionedBy: 'acon-1',
+    })
+
+    const esperado = {
+      AND: [{ companyId: EMPRESA }, { status: { in: ['TERMINADO'] }, deletedAt: null, conditionedBy: 'acon-1' }],
+    }
+    const llamada = findMany.mock.calls[0]?.[0]
+    expect(llamada.where).toEqual(esperado)
+    expect(llamada.skip).toBe(10)
+    expect(llamada.take).toBe(10)
+    expect(count.mock.calls[0]?.[0]?.where).toEqual(esperado)
+  })
+
+  it('R11: sin `conditionedBy` el WHERE no acota por quien acondiciona', async () => {
+    await listAliveSummariesInCompany(EMPRESA, ['TERMINADO'], 'finished_recent_first', 1, undefined, {})
+
+    expect(JSON.stringify(findMany.mock.calls[0]?.[0]?.where)).not.toContain('conditionedBy')
+  })
+
+  it('R7: el SELECT del resumen pide `conditionedBy`', async () => {
+    await listAliveSummariesInCompany(EMPRESA, ['POR_ACONDICIONAR'], 'work_queue', 1)
+
+    expect(findMany.mock.calls[0]?.[0]?.select).toHaveProperty('conditionedBy', true)
   })
 
   it('con `work_queue`, el ORDER BY es IDENTICO al de listAliveSummariesByIds', async () => {

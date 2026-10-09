@@ -1,14 +1,17 @@
 import {
+  AI_PROVIDER_INTEGRATION_ROUTE,
   ASSIGNED_ORDERS_ROUTE,
   CUSTOMERS_ROUTE,
   DASHBOARD_ROUTE,
   FORMULAS_ROUTE,
+  INVENTORY_INTEGRATION_ROUTE,
   INVENTORY_ROUTE,
   ORDERS_ROUTE,
   PRESENTATIONS_ROUTE,
   SUPPLIERS_ROUTE,
   UNITS_ROUTE,
   USERS_ROUTE,
+  WHATSAPP_INTEGRATION_ROUTE,
 } from '../routes';
 
 /**
@@ -118,23 +121,16 @@ export const CUSTOMERS_LABEL = 'Clientes';
 /** Lleva tilde a proposito: es el texto que se lee en pantalla, no el segmento de la URL. */
 export const ASSIGNED_ORDERS_LABEL = 'Asignación';
 
+export const INTEGRATIONS_LABEL = 'Integraciones';
+export const AI_PROVIDER_INTEGRATION_LABEL = 'Proveedor IA';
+export const INVENTORY_INTEGRATION_LABEL = 'Inventarios';
+export const WHATSAPP_INTEGRATION_LABEL = 'WhatsApp';
+
 /** Nombre accesible del landmark de navegacion de la barra lateral (R3). */
 export const PRIVATE_NAV_LABEL = 'Navegación principal';
 
-/** Marca larga, modo expandido (R4, D7). */
+/** Nombre accesible de la marca, que en pantalla se pinta solo como logo. */
 export const BRAND_LABEL = 'QuimiCloude';
-
-/** Marca corta, modo icono (R24, D7). */
-export const BRAND_SHORT_LABEL = 'QC';
-
-/**
- * Bajada de la marca, bajo el nombre y solo en modo expandido.
- *
- * **Es texto quemado a proposito** (decision humana del 2026-09-02): no hay identidad visual
- * definida para este producto y no la decide este archivo. Cuando la haya, esto y el simbolo
- * de `AppSidebar` salen de donde diga esa ficha.
- */
-export const BRAND_TAGLINE = 'ERP Químico';
 
 /** Titulos de las secciones en las que se agrupan los items de nivel superior. */
 export const NAV_SECTION_OPERATION = 'Operación';
@@ -181,7 +177,8 @@ export type NavIconName =
   // El item de clientes. Ninguno de los anteriores habla de una persona externa a la
   // organizacion, y `users` ya lo usa el item de usuarios internos. `lucide-react` ya esta
   // instalado (no es dependencia nueva) y el `Record` de `NAV_ICONS` obliga a que su fila exista.
-  | 'contact';
+  | 'contact'
+  | 'puzzle';
 
 export type NavLink = {
   readonly kind: 'link';
@@ -418,6 +415,36 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     permission: 'clientes.consultar',
     icon: 'contact',
     section: NAV_SECTION_CHAIN,
+  },
+  {
+    kind: 'group',
+    label: INTEGRATIONS_LABEL,
+    testId: 'nav-integraciones',
+    icon: 'puzzle',
+    section: NAV_SECTION_CONFIGURATION,
+    items: [
+      {
+        kind: 'link',
+        href: AI_PROVIDER_INTEGRATION_ROUTE,
+        label: AI_PROVIDER_INTEGRATION_LABEL,
+        testId: 'nav-integraciones-proveedor-ia',
+        permission: 'integraciones.modificar',
+      },
+      {
+        kind: 'link',
+        href: INVENTORY_INTEGRATION_ROUTE,
+        label: INVENTORY_INTEGRATION_LABEL,
+        testId: 'nav-integraciones-inventarios',
+        permission: 'integraciones.modificar',
+      },
+      {
+        kind: 'link',
+        href: WHATSAPP_INTEGRATION_ROUTE,
+        label: WHATSAPP_INTEGRATION_LABEL,
+        testId: 'nav-integraciones-whatsapp',
+        permission: 'integraciones.modificar',
+      },
+    ],
   },
 ];
 

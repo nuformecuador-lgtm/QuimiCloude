@@ -14,6 +14,7 @@ import type { ExecutionLineView } from '@/lib/modules/asignaciones';
 import { formatPercentage } from '@/lib/modules/recetas';
 import { convertQuantity, type UnitRef } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Las lineas de la receta, en modo lectura, con selector de unidad de visualizacion.
@@ -37,7 +38,6 @@ export const ORDER_EXECUTION_LINE_APPROXIMATE_TESTID = 'order-execution-line-app
 export const ORDER_EXECUTION_LINE_NOT_CONVERTIBLE_TESTID = 'order-execution-line-not-convertible';
 export const PRODUCT_NAME_FALLBACK = 'Producto no disponible';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base';
 
 function unitLabel(unit: UnitRef): string {
@@ -101,7 +101,7 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
         >
           <SelectTrigger
             aria-label={`Unidad de ${productLabel}`}
-            className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+            className={`${touchTarget} ${FIELD_TEXT}`}
             data-testid={`${ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID}-${index}`}
           >
             <SelectValue data-testid={`${ORDER_EXECUTION_LINE_UNIT_TESTID}-${index}`} />

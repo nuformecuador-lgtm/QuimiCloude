@@ -8,8 +8,8 @@ import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import {
   UNITS_LABEL,
   UnitListSection,
-  UnitListSkeleton,
   UnitSheet,
+  UnitTable,
   buildUnitListQuery,
   parseUnitListParams,
   type UnitListSearchParams,
@@ -88,7 +88,16 @@ export default async function UnidadesPage({
       </div>
       <Suspense
         key={buildUnitListQuery(params)}
-        fallback={<UnitListSkeleton rows={params.pageSize} />}
+        fallback={
+          <UnitTable
+            status="loading"
+            units={[]}
+            baseIndex={{}}
+            baseUnits={[]}
+            params={params}
+            totalPages={0}
+          />
+        }
       >
         <UnitListSection params={params} catalog={catalog} />
       </Suspense>

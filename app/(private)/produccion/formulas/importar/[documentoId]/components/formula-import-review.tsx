@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useTransition } from 'react';
 import type { FocusEvent } from 'react';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,9 +22,10 @@ import {
   type FormulaReviewIssues,
   type RowProblem,
 } from '@/lib/modules/documentos';
-import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorState } from '@/lib/modules/errores';
 import { createRecipeSchema, formatPercentage } from '@/lib/modules/recetas';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import {
   createLocalKey,
@@ -37,7 +38,6 @@ import { FormulaImportSummary } from './formula-import-summary';
 import { FormulaIngredientRow } from './formula-ingredient-row';
 import { FormulaNameClash } from './formula-name-clash';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base';
 
 const PACKING_STEPS_TITLE = 'Pasos de envasado';
@@ -337,7 +337,7 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
             value={name}
             onChange={(event) => handleNameChange(event.target.value)}
             onBlur={handleNameBlur}
-            className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+            className={`${touchTarget} ${FIELD_TEXT}`}
             aria-invalid={issues.name === 'ok' ? undefined : true}
             data-testid="formula-import-name"
           />
@@ -359,7 +359,7 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
             rows={3}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+            className={`${touchTarget} ${FIELD_TEXT}`}
             aria-invalid={issues.description === 'ok' ? undefined : true}
             data-testid="formula-import-description"
           />
@@ -392,7 +392,7 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
       </div>
 
       <div>
-        <Button type="button" className={TOUCH_TARGET} onClick={addRow} data-testid="formula-import-add-ingredient">
+        <Button type="button" touch onClick={addRow} data-testid="formula-import-add-ingredient">
           Añadir ingrediente
         </Button>
       </div>
@@ -413,22 +413,19 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
       />
 
       {confirmError === null ? null : (
-        <div
-          role="alert"
+        <ErrorAlert
+          error={confirmError}
           className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-          data-testid="formula-import-confirm-error"
-        >
-          {confirmError.code === UNEXPECTED_ERROR_CODE ? (
-            <UnexpectedErrorNotice state={confirmError} />
-          ) : (
+          testId="formula-import-confirm-error"
+          renderCatalogued={(catalogued) => (
             <>
-              <p data-testid="formula-import-confirm-error-message">{confirmError.message}</p>
+              <p data-testid="formula-import-confirm-error-message">{catalogued.message}</p>
               <p className="text-xs" data-testid="formula-import-confirm-error-code">
-                {confirmError.code}
+                {catalogued.code}
               </p>
             </>
           )}
-        </div>
+        />
       )}
 
       {reasons.length === 0 ? null : (
@@ -442,7 +439,7 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
       <div>
         <Button
           type="button"
-          className={TOUCH_TARGET}
+          touch
           disabled={!canConfirm || isConfirming}
           aria-busy={isConfirming}
           onClick={handleConfirm}

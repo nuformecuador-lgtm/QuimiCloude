@@ -3,9 +3,17 @@
 import { useRouter } from 'next/navigation';
 import { useId, useMemo, useTransition } from 'react';
 
-import { DataTable, type DataTableTexts } from '@/components/shared/data-table';
+import {
+  DataTable,
+  type DataTableParams,
+  type DataTableStates,
+  type DataTableTexts,
+} from '@/components/shared/data-table';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { ExecutionTracePerson, ExecutionTraceRow } from '@/lib/modules/asignaciones';
+import type { ErrorState } from '@/lib/modules/errores';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
+import { cn } from '@/lib/utils';
 
 import { buildExecutionTraceColumns } from './execution-trace-columns';
 import {
@@ -41,14 +49,45 @@ export const EXECUTION_TRACE_TABLE_TEXTS: DataTableTexts = {
   lastYear: 'Último año',
 };
 
-export type ExecutionTraceTableProps = {
+const EXECUTION_TRACE_ERROR_TESTID = 'execution-trace-error';
+const EXECUTION_TRACE_ERROR_MESSAGE_TESTID = 'execution-trace-error-message';
+
+type ExecutionTraceTableStatusProps =
+  | { readonly status?: 'idle'; readonly error?: undefined }
+  | { readonly status: 'error'; readonly error: ErrorState };
+
+export type ExecutionTraceTableProps = ExecutionTraceTableStatusProps & {
   readonly rows: readonly ExecutionTraceRow[];
   readonly personOptions: readonly ExecutionTracePerson[];
   readonly params: ExecutionTraceListParams;
   readonly totalPages: number;
 };
 
-export function ExecutionTraceTable({ rows, personOptions, params, totalPages }: ExecutionTraceTableProps) {
+function buildStates(error: ErrorState | undefined): DataTableStates | undefined {
+  if (error === undefined) {
+    return undefined;
+  }
+  return {
+    error: {
+      error,
+      title: EXECUTION_TRACE_TABLE_TEXTS.error,
+      testId: EXECUTION_TRACE_ERROR_TESTID,
+      messageTestId: EXECUTION_TRACE_ERROR_MESSAGE_TESTID,
+      withCode: false,
+      className: 'flex flex-col items-start gap-2 rounded-lg border border-destructive/40 p-4',
+    },
+  };
+}
+
+/** Con error devuelve solo la tabla, que pinta el estado sin el envoltorio de la lista. */
+export function ExecutionTraceTable({
+  rows,
+  personOptions,
+  params,
+  totalPages,
+  status = 'idle',
+  error,
+}: ExecutionTraceTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const cancelledLabelId = useId();
@@ -67,7 +106,7 @@ export function ExecutionTraceTable({ rows, personOptions, params, totalPages }:
   const cancelledToggle = (
     <div className="flex items-center gap-2">
       <Checkbox
-        className="min-h-11 min-w-11 shrink-0"
+        className={cn(touchTarget, 'shrink-0')}
         aria-labelledby={cancelledLabelId}
         checked={params.cancelledOnly}
         onCheckedChange={(checked: boolean) =>
@@ -80,6 +119,27 @@ export function ExecutionTraceTable({ rows, personOptions, params, totalPages }:
       </span>
     </div>
   );
+
+  const states = buildStates(error);
+  const onParamsChange = (next: DataTableParams) =>
+    navigate(fromDataTableParams(params, next));
+
+  if (status === 'error') {
+    return (
+      <DataTable
+        tableId={EXECUTION_TRACE_TABLE_ID}
+        columns={columns}
+        rows={rows}
+        getRowId={(row) => row.orderId}
+        params={tableParams}
+        totalPages={totalPages}
+        onParamsChange={onParamsChange}
+        status="error"
+        texts={EXECUTION_TRACE_TABLE_TEXTS}
+        states={states}
+      />
+    );
+  }
 
   return (
     <div
@@ -97,7 +157,7 @@ export function ExecutionTraceTable({ rows, personOptions, params, totalPages }:
         getRowId={(row) => row.orderId}
         params={tableParams}
         totalPages={totalPages}
-        onParamsChange={(next) => navigate(fromDataTableParams(params, next))}
+        onParamsChange={onParamsChange}
         status="idle"
         texts={EXECUTION_TRACE_TABLE_TEXTS}
         toolbarActions={cancelledToggle}

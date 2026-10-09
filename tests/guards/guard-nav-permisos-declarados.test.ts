@@ -103,17 +103,22 @@ describe('guardia — los permisos declarados en el menu existen en el catalogo 
   // 2026-10-08 (QC-167): el humano pide volver a mostrar el item Dashboard. El ancla vuelve a
   // diez y nombra `nav-dashboard`; su permiso lo valida ya el recorrido general, asi que el caso
   // aparte del enlace oculto desaparece con la constante.
-  it('ancla: el recorrido encuentra hoy los diez enlaces reales del menu', () => {
+  it('ancla: el recorrido encuentra hoy los trece enlaces reales del menu', () => {
     // Anti-vacuidad. Si el recorrido se rompiera —un grupo que deja de visitarse, un cambio de
     // forma en `PRIVATE_NAV_ITEMS`—, `findUndeclaredNavPermissions` devolveria [] sobre una lista
     // vacia y la guardia pasaria en verde sin comprobar nada. Esto lo convierte en rojo.
     const enlaces = flattenNavLinks(PRIVATE_NAV_ITEMS);
 
-    expect(enlaces).toHaveLength(10);
+    // Sube de diez a trece con los tres hijos del grupo de integraciones: el recorrido baja al
+    // grupo y cuenta sus enlaces, no el grupo.
+    expect(enlaces).toHaveLength(13);
     expect(enlaces.map((enlace) => enlace.testId).sort()).toEqual([
       'nav-asignacion',
       'nav-clientes',
       'nav-dashboard',
+      'nav-integraciones-inventarios',
+      'nav-integraciones-proveedor-ia',
+      'nav-integraciones-whatsapp',
       'nav-inventario',
       'nav-pedidos',
       'nav-presentaciones',

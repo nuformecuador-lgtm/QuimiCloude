@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useActionState, useEffect, useId } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import {
   SheetClose,
@@ -13,7 +13,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import {
   createSupplierSchema,
   updateSupplierSchema,
@@ -24,10 +24,9 @@ import {
   updateSupplierAction,
 } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
 import { SUPPLIERS_ROUTE } from '@/lib/shared/routes';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { SupplierField } from './supplier-field';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /**
  * Los tres campos del proveedor, en el orden en que los nombra R27 y con el MISMO nombre que el
@@ -290,39 +289,33 @@ export function SupplierForm({ supplier, onSaved }: SupplierFormProps) {
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
         {formError === undefined ? null : (
-          // Region de error del formulario (R32): aqui van los rechazos que no senalan campo.
-          //
-          // QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
-          // identificador de la peticion. El CATALOGADO se pinta como siempre y sin identificador.
-          <div
-            role="alert"
+          // Aqui van los rechazos que no senalan campo.
+          <ErrorAlert
+            error={formError}
             id={formErrorId}
             className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid="supplier-form-error"
-          >
-            {formError.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={formError} />
-            ) : (
+            testId="supplier-form-error"
+            renderCatalogued={(catalogued) => (
               <>
-                <p data-testid="supplier-form-error-message">{formError.message}</p>
+                <p data-testid="supplier-form-error-message">{catalogued.message}</p>
                 <p className="text-xs" data-testid="supplier-form-error-code">
-                  {formError.code}
+                  {catalogued.code}
                 </p>
               </>
             )}
-            {isMissing ? (
-              // `supplier_not_found`: el proveedor dejo de existir mientras el panel estaba
-              // abierto, asi que lo unico util que queda es volver a la lista (`design.md > 7`).
-              // El destino sale de la constante de ruta, nunca de un literal (R2).
-              <Link
-                href={SUPPLIERS_ROUTE}
-                className={`${TOUCH_TARGET} inline-flex items-center underline underline-offset-4`}
-                data-testid="supplier-form-back-to-list"
-              >
-                {BACK_TO_LIST_LABEL}
-              </Link>
-            ) : null}
-          </div>
+            after={
+              isMissing ? (
+                // El proveedor dejo de existir con el panel abierto: solo queda volver a la lista.
+                <Link
+                  href={SUPPLIERS_ROUTE}
+                  className={`${touchTarget} inline-flex items-center underline underline-offset-4`}
+                  data-testid="supplier-form-back-to-list"
+                >
+                  {BACK_TO_LIST_LABEL}
+                </Link>
+              ) : null
+            }
+          />
         )}
 
         <SupplierField
@@ -369,7 +362,7 @@ function FormActions() {
           <Button
             type="button"
             variant="outline-dashed"
-            className={TOUCH_TARGET}
+            className={touchTarget}
             data-testid="supplier-form-cancel"
           />
         }
@@ -392,7 +385,7 @@ function SaveButton() {
   return (
     <Button
       type="submit"
-      className={TOUCH_TARGET}
+      touch
       disabled={pending}
       aria-busy={pending}
       data-testid="supplier-form-submit"

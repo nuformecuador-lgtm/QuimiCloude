@@ -36,9 +36,10 @@ vi.mock('next/headers', () => ({ cookies: cookiesMock }));
 // `next/font/google` necesita el compilador de Next.js para resolver los archivos de fuente;
 // fuera de `next build`/`next dev` (aquí, bajo Vitest) no hay nada que resolver, así que se
 // sustituye por un doble que devuelve la misma forma (`{ variable }`) que consume el layout.
+// ENMIENDA QC-226 (D4): el layout pasa de Geist a IBM Plex Sans / Plex Mono.
 vi.mock('next/font/google', () => ({
-  Geist: () => ({ variable: '--font-geist-sans' }),
-  Geist_Mono: () => ({ variable: '--font-geist-mono' }),
+  IBM_Plex_Sans: () => ({ variable: '--font-plex-sans' }),
+  IBM_Plex_Mono: () => ({ variable: '--font-plex-mono' }),
 }));
 
 const RAIZ = join(__dirname, '..', '..', '..');

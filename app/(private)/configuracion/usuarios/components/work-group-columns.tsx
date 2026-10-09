@@ -60,9 +60,8 @@ export const WORK_GROUP_ACTIONS_COLUMN_ID = 'actions';
 
 /**
  * Cuantas columnas hay: el nombre, los miembros y las acciones. Existe para que el esqueleto de
- * carga —que lo pinta un Server Component y por tanto **no puede importar este modulo de
- * cliente**— pinte tantas celdas como columnas, y para que el test lo ate a la longitud real en
- * vez de dejarlo desincronizarse en silencio.
+ * carga pinte tantas celdas como columnas, y para que el test lo ate a la longitud real en vez de
+ * dejarlo desincronizarse en silencio.
  */
 export const WORK_GROUP_COLUMN_COUNT = 3;
 

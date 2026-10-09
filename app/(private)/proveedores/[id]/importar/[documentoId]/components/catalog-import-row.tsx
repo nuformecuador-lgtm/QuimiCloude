@@ -10,11 +10,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { CatalogImportPreviewCrop } from '@/lib/modules/documentos';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { CropPicker } from './crop-picker';
 import type { MeasurementUnit, RowFormState } from './catalog-import-review';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 /** 16 px en TODOS los anchos: por debajo, Safari en iOS hace zoom al enfocar el campo. */
 const FIELD_TEXT = 'text-base md:text-base';
 const DECIMAL_INPUT_PATTERN = '\\d{1,10}(\\.\\d{1,4})?';
@@ -87,7 +88,7 @@ export function CatalogImportRow({
         <div className="flex items-center gap-2">
           <Checkbox
             id={`${fieldId}-included`}
-            className={TOUCH_TARGET}
+            className={touchTarget}
             checked={row.included}
             onCheckedChange={onToggleIncluded}
             aria-label={`Incluir fila ${index + 1}`}
@@ -120,7 +121,7 @@ export function CatalogImportRow({
             <Button
               type="button"
               variant="outline"
-              className={TOUCH_TARGET}
+              touch
               disabled={row.imagePath === null}
               onClick={onRemoveImage}
               data-testid={`catalog-import-row-remove-image-${index}`}
@@ -272,10 +273,10 @@ function RowField({ label, value, readOnly, onChange, onBlur, inputMode, pattern
         </span>
         <p
           aria-labelledby={`${fieldId}-label`}
-          className={`${TOUCH_TARGET} ${FIELD_TEXT} flex items-center`}
+          className={`${touchTarget} ${FIELD_TEXT} flex items-center`}
           data-testid={testId}
         >
-          {value === '' ? '—' : value}
+          {value === '' ? EMPTY_MARK : value}
         </p>
       </div>
     );
@@ -292,7 +293,7 @@ function RowField({ label, value, readOnly, onChange, onBlur, inputMode, pattern
         type={type ?? 'text'}
         inputMode={inputMode}
         pattern={pattern}
-        className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+        className={`${touchTarget} ${FIELD_TEXT}`}
         data-testid={testId}
       />
     </div>
@@ -315,7 +316,7 @@ function MeasurementUnitField({ label, value, readOnly, onChange, testId }: Meas
     return (
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium">{label}</span>
-        <p className={`${TOUCH_TARGET} ${FIELD_TEXT} flex items-center`} data-testid={testId}>
+        <p className={`${touchTarget} ${FIELD_TEXT} flex items-center`} data-testid={testId}>
           {value}
         </p>
       </div>
@@ -330,7 +331,7 @@ function MeasurementUnitField({ label, value, readOnly, onChange, testId }: Meas
       <Select value={value} onValueChange={(next) => onChange(next as MeasurementUnit)} items={MEASUREMENT_UNIT_OPTIONS}>
         <SelectTrigger
           aria-labelledby={`${fieldId}-label`}
-          className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT}`}
+          className={`w-full ${touchTarget} ${FIELD_TEXT}`}
           data-testid={testId}
         >
           <SelectValue />

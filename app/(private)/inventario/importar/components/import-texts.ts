@@ -93,8 +93,6 @@ export const ROWS_COLUMN_LABELS = {
   detail: 'Detalle',
 } as const;
 
-export const EMPTY_CELL = '—';
-
 export const PREVIEW_DETAIL_CREATE = 'Se crea como producto nuevo.';
 export const PREVIEW_DETAIL_ADD_EXISTING = 'Suma un lote a un producto que ya existe.';
 

@@ -6,7 +6,8 @@ import { toast } from 'sonner';
 import PrivateLayout from '@/app/(private)/layout';
 import InventarioPage from '@/app/(private)/inventario/page';
 import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
-import { formatDateLocalISO } from '@/components/shared/data-table/data-table-filter-date';
+import { formatDateLocalISO } from '@/lib/shared/ui/date-civil';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import {
   PRESENTATION_UNIT_ERROR_TESTID,
   PRESENTATION_UNIT_FIELD,
@@ -20,7 +21,6 @@ import {
 } from '@/components/shared/unexpected-error-notice';
 import { UNEXPECTED_ERROR_CODE, errorMessage } from '@/lib/modules/errores';
 import {
-  EMPTY_CELL,
   PAGE_PARAM,
   PAGE_SIZE_OPTIONS,
   PAGE_SIZE_PARAM,
@@ -892,8 +892,8 @@ describe('pantalla de productos — lista', () => {
 
     await renderPantalla();
 
-    expect(screen.getByTestId('data-table-cell-reserved')).toHaveTextContent(EMPTY_CELL);
-    expect(screen.getByTestId('data-table-cell-available')).toHaveTextContent(EMPTY_CELL);
+    expect(screen.getByTestId('data-table-cell-reserved')).toHaveTextContent(EMPTY_MARK);
+    expect(screen.getByTestId('data-table-cell-available')).toHaveTextContent(EMPTY_MARK);
     expect(screen.queryByTestId('product-reserved')).toBeNull();
     expect(screen.queryByTestId('product-available')).toBeNull();
   });

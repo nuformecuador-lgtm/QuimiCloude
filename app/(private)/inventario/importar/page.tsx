@@ -6,6 +6,7 @@ import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/r
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
 import {
@@ -45,7 +46,7 @@ export default async function InventoryImportPage() {
           href={INVENTORY_ROUTE}
           data-slot="button"
           data-testid={IMPORT_BACK_LINK_TESTID}
-          className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11 min-w-11')}
+          className={cn(buttonVariants({ variant: 'outline' }), touchTarget)}
         >
           {IMPORT_BACK_LABEL}
         </Link>

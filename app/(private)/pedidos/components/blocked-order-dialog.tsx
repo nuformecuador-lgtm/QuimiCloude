@@ -10,13 +10,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 export const BLOCKED_ORDER_DIALOG_TESTID = 'blocked-order-dialog';
 export const BLOCKED_ORDER_MESSAGE_TESTID = 'blocked-order-message';
 export const BLOCKED_ORDER_CONFIRM_TESTID = 'blocked-order-confirm';
 export const BLOCKED_ORDER_DISMISS_TESTID = 'blocked-order-dismiss';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 const DEFAULT_TITLE = 'Material insuficiente';
 const DEFAULT_CONFIRM_LABEL = 'Guardar bloqueado';
@@ -59,14 +58,14 @@ export function BlockedOrderDialog({
         <AlertDialogFooter>
           <AlertDialogCancel
             type="button"
-            className={TOUCH_TARGET}
+            className={touchTarget}
             data-testid={BLOCKED_ORDER_DISMISS_TESTID}
           >
             {dismissLabel}
           </AlertDialogCancel>
           <AlertDialogAction
             type="button"
-            className={TOUCH_TARGET}
+            className={touchTarget}
             onClick={onConfirm}
             data-testid={BLOCKED_ORDER_CONFIRM_TESTID}
           >

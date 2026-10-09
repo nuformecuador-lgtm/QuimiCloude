@@ -7,8 +7,6 @@ import type { FormulaImportSummary as FormulaImportSummaryData } from '@/lib/mod
 import { recipeEditRoute } from '@/lib/shared/routes';
 import { cn } from '@/lib/utils';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 const OUTCOME_LABELS: Record<FormulaImportSummaryData['outcome'], string> = {
   created: 'Se creó una fórmula nueva.',
   replaced: 'Se reemplazó la fórmula existente.',
@@ -48,7 +46,7 @@ export function FormulaImportSummary({ summary }: FormulaImportSummaryProps) {
       <Link
         href={recipeEditRoute(summary.recipeId)}
         data-slot="button"
-        className={cn(buttonVariants({ variant: 'outline' }), TOUCH_TARGET)}
+        className={cn(buttonVariants({ variant: 'outline', touch: true }))}
         data-testid="formula-import-summary-link"
       >
         Ver la fórmula

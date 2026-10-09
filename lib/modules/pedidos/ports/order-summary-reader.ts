@@ -1,5 +1,10 @@
 import type { OrderStatus } from '../domain/order-classification';
-import type { AssignedOrderSummary, OrderHistorySummary, OrderSummaryOrdering } from '../domain/order-catalog';
+import type {
+  AssignedOrderSummary,
+  OrderHistorySummary,
+  OrderSummaryFilter,
+  OrderSummaryOrdering,
+} from '../domain/order-catalog';
 import type { OrderNumber } from '../domain/order-number';
 import type { Page } from '../domain/page';
 
@@ -31,7 +36,7 @@ export interface OrderSummaryReader {
     ordering: OrderSummaryOrdering,
     page: number,
     pageSize?: number,
-    filter?: { readonly packedBy?: string },
+    filter?: OrderSummaryFilter,
   ): Promise<Page<OrderSummaryRecord>>;
 
   /** Sin paginar ni ordenar: solo para decidir en el dominio que numeros casan con el filtro. */

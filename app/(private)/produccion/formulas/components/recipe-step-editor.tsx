@@ -8,6 +8,7 @@ import {
   countRecipeStepElements,
   type RecipeStepDocument,
 } from '@/lib/modules/recetas';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { editorJsonToStepDocument, stepDocumentToEditorJson } from './recipe-step-document';
 import { RECIPE_STEP_EXTENSIONS } from './recipe-step-schema';
@@ -31,9 +32,6 @@ import { RECIPE_STEP_EXTENSIONS } from './recipe-step-schema';
  * **Barra de formato SIEMPRE visible (R26)**: tres `<button>` reales, nunca una barra flotante que
  * asoma al pasar el raton sobre la seleccion —en tactil no hay `:hover` y esa barra no existiria—.
  */
-
-/** Objetivo tactil minimo (R26). Misma clase que el resto de la ruta. */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /**
  * Textos de la interfaz en UNA constante, para que la i18n futura sea sustituirla. No se aceptan
@@ -217,7 +215,7 @@ function ToolbarButton({ label, pressed, testId, onActivate, children }: Toolbar
       aria-pressed={pressed}
       data-testid={testId}
       onClick={onActivate}
-      className={`${TOUCH_TARGET} flex items-center justify-center rounded-md border bg-background text-base ${
+      className={`${touchTarget} flex items-center justify-center rounded-md border bg-background text-base ${
         pressed ? 'bg-accent' : ''
       }`}
     >

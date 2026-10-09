@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select';
 import type { RecipeVersionSummary } from '@/lib/modules/recetas';
 import { listRecipeVersionsAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /** Nombre del campo del `FormData` que lee el adaptador driving de `pedidos`. */
 export const RECIPE_VERSION_FIELD = 'recipeVersionId';
@@ -20,8 +21,6 @@ export const RECIPE_VERSION_SELECT_TESTID = 'recipe-version-select';
 
 /** Valor de «Original»: el campo viaja vacio y el servidor lo lee como «sin version». */
 export const ORIGINAL_VERSION_VALUE = '';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /** 16 px en todos los anchos: por debajo, Safari en iOS hace zoom al enfocar el control. */
 const FIELD_TEXT = 'text-base md:text-base';
@@ -143,7 +142,7 @@ export function RecipeVersionSelect({
           aria-labelledby={labelId}
           aria-invalid={error === undefined ? undefined : true}
           aria-describedby={error === undefined ? undefined : errorId}
-          className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT}`}
+          className={`w-full ${touchTarget} ${FIELD_TEXT}`}
           data-testid={RECIPE_VERSION_SELECT_TESTID}
         >
           <SelectValue />
@@ -153,7 +152,7 @@ export function RecipeVersionSelect({
             <SelectItem
               key={option.value}
               value={option.value}
-              className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+              className={`${touchTarget} ${FIELD_TEXT}`}
               data-testid={`${RECIPE_VERSION_SELECT_TESTID}-option`}
               data-value={option.value}
             >

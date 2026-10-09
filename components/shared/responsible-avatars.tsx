@@ -3,6 +3,8 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getInitials } from '@/lib/shared/ui/initials';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Componente de UI generico — circulo con iniciales, tooltip y overflow "+N" — sin atarse a
@@ -53,11 +55,8 @@ export const RESPONSIBLE_MISSING_TESTID = 'order-missing-responsibles';
 /** Cuantas iniciales caben en la fila antes de que aparezca el `+N` (R17, decision cerrada 8). */
 export const RESPONSIBLE_AVATARS_LIMIT = 3;
 
-/** Glifo del marcador de ausencia. Atado por test a `MISSING_VALUE_MARK` de `order-columns`. */
-export const MISSING_RESPONSIBLES_MARK = '—';
-
-/** 44x44 de verdad: `docs/architecture.md > Componentes > Regla: multiplataforma`. */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
+/** Se conserva como alias porque el barrel de `pedidos` la reexporta. */
+export const MISSING_RESPONSIBLES_MARK = EMPTY_MARK;
 
 /**
  * Ancho CONSTANTE de la celda (R18). Tres circulos de 32 px solapados 8 px (80 px) mas el
@@ -124,7 +123,7 @@ export function ResponsibleAvatars({
     return (
       <div className={`flex ${AVATARS_WIDTH} items-center`} data-testid={RESPONSIBLE_AVATARS_TESTID}>
         <span aria-label="Sin dato" data-testid={RESPONSIBLE_MISSING_TESTID}>
-          {MISSING_RESPONSIBLES_MARK}
+          {EMPTY_MARK}
         </span>
       </div>
     );
@@ -155,7 +154,7 @@ export function ResponsibleAvatars({
                   aria-label={overflowLabel(rest.length)}
                   aria-describedby={namesId}
                   onClick={onShowAll}
-                  className={`flex ${TOUCH_TARGET} shrink-0 items-center justify-center rounded-full text-sm text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
+                  className={`flex ${touchTarget} shrink-0 items-center justify-center rounded-full text-sm text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
                   data-testid={RESPONSIBLE_OVERFLOW_TESTID}
                 />
               }

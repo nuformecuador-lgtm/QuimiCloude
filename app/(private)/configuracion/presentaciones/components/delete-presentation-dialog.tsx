@@ -14,13 +14,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode } from '@/lib/modules/errores';
+import { ErrorAlert } from '@/components/shared/error-alert';
+import type { ErrorCode } from '@/lib/modules/errores';
 import type { PresentationView } from '@/lib/modules/inventario';
 import {
   deletePresentationAction,
   type PresentationMutationFormState,
 } from '@/lib/modules/inventario/adapters/driving/presentation-actions';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Confirmacion del borrado de una presentacion (R27, R28, R25, `design.md > 7`).
@@ -71,8 +72,6 @@ export const DELETE_PRESENTATION_ID_FIELD = 'id';
 // tipo ancho arrastraria el codigo generico, que desde esta ficha exige `reference`.
 export const PRESENTATION_IN_USE_CODE = 'presentation_in_use' satisfies ErrorCode;
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 const TITLE = 'Eliminar la presentación';
 const CONFIRM_LABEL = 'Eliminar';
 const CONFIRM_PENDING_LABEL = 'Eliminando…';
@@ -119,24 +118,16 @@ export function DeletePresentationDialog({
         </AlertDialogHeader>
 
         {error === undefined ? null : (
-          <div
-            role="alert"
+          <ErrorAlert
+            error={error}
             id={errorId}
             className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={DELETE_PRESENTATION_ERROR_TESTID}
-            data-code={error.code}
-          >
-            {/*
-              QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
-              identificador de la peticion. El CATALOGADO -`presentation_in_use` entre otros- se
-              pinta como siempre y sin identificador.
-            */}
-            {error.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={error} />
-            ) : (
-              <p data-testid={DELETE_PRESENTATION_ERROR_MESSAGE_TESTID}>{error.message}</p>
+            testId={DELETE_PRESENTATION_ERROR_TESTID}
+            withDataCode
+            renderCatalogued={(catalogued) => (
+              <p data-testid={DELETE_PRESENTATION_ERROR_MESSAGE_TESTID}>{catalogued.message}</p>
             )}
-          </div>
+          />
         )}
 
         <form action={formAction} data-testid={DELETE_PRESENTATION_FORM_TESTID}>
@@ -148,7 +139,7 @@ export function DeletePresentationDialog({
           />
           <AlertDialogFooter>
             <AlertDialogCancel
-              className={TOUCH_TARGET}
+              className={touchTarget}
               data-testid={DELETE_PRESENTATION_DISMISS_TESTID}
             >
               {DISMISS_LABEL}
@@ -156,7 +147,7 @@ export function DeletePresentationDialog({
             <AlertDialogAction
               type="submit"
               variant="destructive"
-              className={TOUCH_TARGET}
+              className={touchTarget}
               disabled={isPending}
               aria-busy={isPending}
               data-testid={DELETE_PRESENTATION_CONFIRM_TESTID}

@@ -44,7 +44,6 @@ const testId = {
   sidebar: 'private-sidebar',
   brand: 'private-brand',
   brandLink: 'private-brand-link',
-  brandLong: 'private-brand-long',
   nav: 'private-nav',
   user: 'private-user',
 } as const;
@@ -120,6 +119,13 @@ function sessionUser(): SessionUser {
     // QC-74 T8: `SessionUser` exige `permissions`. Vacio: este test no autoriza nada.
     permissions: [],
   };
+}
+
+/** La unica imagen del enlace de marca. */
+function imagenDeLaMarca(): HTMLImageElement {
+  const imagenes = screen.getByTestId(testId.brandLink).querySelectorAll('img');
+  expect(imagenes).toHaveLength(1);
+  return imagenes[0];
 }
 
 /** `AppSidebar` usa `useSidebar()`: sin el provider no monta. */
@@ -203,8 +209,38 @@ describe('barra lateral privada', () => {
     expect(enlace).toHaveRole('link');
     expect(enlace).toHaveAttribute('href', ASSIGNED_ORDERS_ROUTE);
     expect(enlace).toHaveAccessibleName(BRAND_LABEL);
-    // En viewport ancho y modo expandido se muestra la version larga de la marca.
-    expect(screen.getByTestId(testId.brandLong)).toBeInTheDocument();
+  });
+
+  // ENMIENDA QC-226: la marca larga de texto pasa a ser el logo horizontal.
+  it('R12: expandida, la marca pinta el logo horizontal oscuro a 28px sin texto visible', () => {
+    renderSidebar();
+
+    const enlace = screen.getByTestId(testId.brandLink);
+    const logo = imagenDeLaMarca();
+
+    expect(logo).toHaveAttribute('src', '/brand/logo-horizontal-dark.svg');
+    expect(logo).toHaveAttribute('height', '28');
+    expect(logo).toHaveAttribute('alt', '');
+    expect(enlace.textContent?.trim()).toBe('');
+    expect(enlace).toHaveAccessibleName(BRAND_LABEL);
+  });
+
+  // ENMIENDA QC-226: la marca corta «QC» pasa a ser el isotipo.
+  it('R13: en modo icono, la marca pinta el isotipo oscuro a 32px y conserva el nombre accesible', () => {
+    render(
+      <SidebarProvider defaultOpen={false}>
+        <AppSidebar user={sessionUser()} navItems={PRIVATE_NAV_ITEMS} />
+      </SidebarProvider>,
+    );
+
+    const enlace = screen.getByTestId(testId.brandLink);
+    const isotipo = imagenDeLaMarca();
+
+    expect(isotipo).toHaveAttribute('src', '/brand/isotipo-dark.svg');
+    expect(isotipo).toHaveAttribute('height', '32');
+    expect(isotipo).toHaveAttribute('alt', '');
+    expect(enlace.textContent?.trim()).toBe('');
+    expect(enlace).toHaveAccessibleName(BRAND_LABEL);
   });
 
   it('renderiza una entrada por cada item de PRIVATE_NAV_ITEMS y en su orden', () => {
@@ -237,6 +273,8 @@ describe('barra lateral privada', () => {
       'nav-clientes',
       'nav-presentaciones',
       'nav-unidades',
+      // «Integraciones» es el ultimo item de «Configuración»: se dibuja detras de Unidades.
+      'nav-integraciones',
     ];
 
     expect(enDom).toEqual(esperado);
@@ -557,7 +595,7 @@ describe('el borrado de items de relleno (QC-13)', () => {
     // El dashboard esta fuera temporalmente: vive en `HIDDEN_DASHBOARD_NAV_ITEM`.
     // 2026-10-08 (QC-167): el humano pide volver a mostrar el item Dashboard. Vuelve a DIEZ, con
     // el dashboard SEGUNDO, detras de «Asignación», para no cambiar el aterrizaje de nadie.
-    expect(PRIVATE_NAV_ITEMS).toHaveLength(10);
+    expect(PRIVATE_NAV_ITEMS).toHaveLength(11);
     expect(PRIVATE_NAV_ITEMS.map((item) => item.testId)).toEqual([
       'nav-asignacion',
       'nav-dashboard',
@@ -569,6 +607,7 @@ describe('el borrado de items de relleno (QC-13)', () => {
       'nav-unidades',
       'nav-usuarios',
       'nav-clientes',
+      'nav-integraciones',
     ]);
   });
 

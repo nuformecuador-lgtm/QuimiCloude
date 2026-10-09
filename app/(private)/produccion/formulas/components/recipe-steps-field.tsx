@@ -23,6 +23,7 @@ import { useId } from 'react';
 
 import { Button } from '@/components/ui/button';
 import type { RecipeStepDocument } from '@/lib/modules/recetas';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { createLocalKey, type RecipeStepErrors, type RecipeStepFormValue } from './recipe-form-state';
 import { RecipeStepEditor } from './recipe-step-editor';
@@ -54,8 +55,6 @@ import { RecipeStepEditor } from './recipe-step-editor';
  * Este archivo NO importa la librería del editor (`design.md > 7`): monta el componente que la
  * aísla y habla con él en documentos del contrato.
  */
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /**
  * Documento de un paso RECIEN AÑADIDO: un solo parrafo SIN fragmentos (QC-64 R4). No es `{blocks:
@@ -158,7 +157,7 @@ export function RecipeStepsField({
         <h2 id={headingId} className="text-lg font-medium">
           {title}
         </h2>
-        <Button type="button" className={TOUCH_TARGET} data-testid={`${testIdPrefix}-add`} onClick={addStep}>
+        <Button type="button" touch data-testid={`${testIdPrefix}-add`} onClick={addStep}>
           {addLabel}
         </Button>
       </div>
@@ -227,7 +226,7 @@ function RecipeStepRow({
         type="button"
         {...attributes}
         {...listeners}
-        className={`${TOUCH_TARGET} flex shrink-0 touch-none items-center justify-center rounded-lg border bg-muted`}
+        className={`${touchTarget} flex shrink-0 touch-none items-center justify-center rounded-lg border bg-muted`}
         aria-label={`Arrastrar el paso en la posición ${index + 1} de ${total}`}
         data-testid={`${testIdPrefix}-handle-${index}`}
       >
@@ -262,7 +261,7 @@ function RecipeStepRow({
       <Button
         type="button"
         variant="ghost"
-        className={TOUCH_TARGET}
+        touch
         aria-label={`Quitar paso ${index + 1}`}
         data-testid={`${testIdPrefix}-remove-${index}`}
         onClick={onRemove}

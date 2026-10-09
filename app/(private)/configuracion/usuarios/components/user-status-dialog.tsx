@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,12 +22,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import { USER_ACCOUNT_STATUSES, type UserRow } from '@/lib/modules/identity';
 import {
   setUserAccountStatusAction,
   type UserMutationFormState,
 } from '@/lib/modules/identity/adapters/driving/user-actions';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { USER_ACCOUNT_STATUS_LABELS } from './user-labels';
 
@@ -68,7 +68,6 @@ export const USER_STATUS_ID_TESTID = 'user-status-id';
 export const USER_STATUS_ID_FIELD = 'id';
 export const USER_STATUS_FIELD = 'accountStatus';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base md:text-base';
 
 const TITLE = 'Cambiar el estado de la cuenta';
@@ -115,19 +114,16 @@ export function UserStatusDialog({ user, open, onOpenChange }: UserStatusDialogP
         </AlertDialogHeader>
 
         {error === undefined ? null : (
-          <div
-            role="alert"
+          <ErrorAlert
+            error={error}
             id={errorId}
             className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={USER_STATUS_ERROR_TESTID}
-            data-code={error.code}
-          >
-            {error.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={error} />
-            ) : (
-              <p data-testid={USER_STATUS_ERROR_MESSAGE_TESTID}>{error.message}</p>
+            testId={USER_STATUS_ERROR_TESTID}
+            withDataCode
+            renderCatalogued={(catalogued) => (
+              <p data-testid={USER_STATUS_ERROR_MESSAGE_TESTID}>{catalogued.message}</p>
             )}
-          </div>
+          />
         )}
 
         <form
@@ -158,7 +154,7 @@ export function UserStatusDialog({ user, open, onOpenChange }: UserStatusDialogP
           >
             <SelectTrigger
               aria-labelledby={labelId}
-              className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT}`}
+              className={`w-full ${touchTarget} ${FIELD_TEXT}`}
               data-testid={USER_STATUS_SELECT_TESTID}
             >
               <SelectValue />
@@ -178,12 +174,12 @@ export function UserStatusDialog({ user, open, onOpenChange }: UserStatusDialogP
           </Select>
 
           <AlertDialogFooter>
-            <AlertDialogCancel className={TOUCH_TARGET} data-testid={USER_STATUS_DISMISS_TESTID}>
+            <AlertDialogCancel className={touchTarget} data-testid={USER_STATUS_DISMISS_TESTID}>
               {DISMISS_LABEL}
             </AlertDialogCancel>
             <AlertDialogAction
               type="submit"
-              className={TOUCH_TARGET}
+              className={touchTarget}
               disabled={isPending}
               aria-busy={isPending}
               data-testid={USER_STATUS_CONFIRM_TESTID}

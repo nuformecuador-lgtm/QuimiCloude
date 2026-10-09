@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { DataTableColumn } from '@/components/shared/data-table';
 import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import type { ExecutionTracePerson, ExecutionTraceRow } from '@/lib/modules/asignaciones';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import {
   ACTIVE_ORDER_MARK,
@@ -132,7 +133,7 @@ export function buildExecutionTraceColumns({
         <Link
           href={executionTraceDetailHref(row.orderId, params)}
           data-testid="execution-trace-link"
-          className="inline-flex min-h-11 min-w-11 items-center rounded-md px-2 text-sm font-medium underline underline-offset-4 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          className={`inline-flex ${touchTarget} items-center rounded-md px-2 text-sm font-medium underline underline-offset-4 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
         >
           {TRACE_LINK_TEXT}
           <span className="sr-only"> del pedido {row.numberText}</span>

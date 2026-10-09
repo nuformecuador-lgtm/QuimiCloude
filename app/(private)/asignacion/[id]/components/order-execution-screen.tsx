@@ -3,19 +3,18 @@
 import { useActionState, useRef, useState } from 'react';
 
 import { ConfirmActionDialog } from '@/components/shared/confirm-action-dialog';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import { StepReader } from '@/components/shared/step-reader';
 import { clampStepPosition } from '@/components/shared/step-reader/step-reader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
 import type { StartedOrderExecution } from '@/lib/modules/asignaciones';
 import {
   finishAssignedOrderAction,
   recordStepMoveAction,
   type FinishAssignedOrderResult,
 } from '@/lib/modules/asignaciones/adapters/driving/order-execution-actions';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 import { OrderCancelDialog } from './order-cancel-dialog';
@@ -178,17 +177,11 @@ export function OrderExecutionScreen({ execution }: OrderExecutionScreenProps) {
       />
 
       {error !== undefined ? (
-        <div
-          role="alert"
-          data-testid={ORDER_EXECUTION_FINISH_ERROR_TESTID}
+        <ErrorAlert
+          error={error}
+          testId={ORDER_EXECUTION_FINISH_ERROR_TESTID}
           className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-        >
-          {error.code === UNEXPECTED_ERROR_CODE ? (
-            <UnexpectedErrorNotice state={error} />
-          ) : (
-            <p>{error.message}</p>
-          )}
-        </div>
+        />
       ) : null}
     </div>
   );

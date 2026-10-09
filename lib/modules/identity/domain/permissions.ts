@@ -68,6 +68,11 @@ import {
  * `lib/modules/` y solo escribe. Lo recibe unicamente el Administrador de acondicionamiento: el
  * Administrador no.
  *
+ * **Otra enmienda al catalogo cerrado**: suma `integraciones.modificar`, ver y configurar las
+ * integraciones con servicios externos. Su modulo si es una carpeta de `lib/modules/` y, como
+ * `empaque`, solo declara `modificar`: quien configura una integracion la ve con el mismo permiso.
+ * Lo recibe unicamente el Administrador.
+ *
  * `entregas` suma `entregas.modificar`, entregar al cliente el producto terminado de un pedido.
  * Como `empaque`, su modulo no es una carpeta de `lib/modules/` y solo escribe. Lo recibe el
  * Administrador.
@@ -228,6 +233,12 @@ export const PERMISSIONS = [
       'Comenzar y terminar el acondicionamiento de los pedidos de la empresa y registrar sus datos de lote.',
   },
   {
+    code: 'integraciones.modificar',
+    module: 'integraciones',
+    action: 'modificar',
+    description: 'Ver y configurar las integraciones con servicios externos.',
+  },
+  {
     code: 'entregas.modificar',
     module: 'entregas',
     action: 'modificar',
@@ -281,6 +292,7 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
     'clientes.modificar',
     'documentos.consultar',
     'documentos.modificar',
+    'integraciones.modificar',
     'entregas.modificar',
   ],
   [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar'],

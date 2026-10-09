@@ -1,10 +1,9 @@
 'use client';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
+import { ErrorAlert } from '@/components/shared/error-alert';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
 import { formatOrderAmount, orderAmountTitle } from './order-amount';
-import { MISSING_VALUE_MARK } from './order-columns';
 import type { OrderCostQuoteState } from './use-order-cost-quote';
 
 export const ORDER_COST_QUOTE_TESTID = 'order-cost-quote';
@@ -52,7 +51,7 @@ export function OrderCostQuote(props: OrderCostQuoteProps) {
               {formatOrderAmount(amount)}
             </span>
           ) : error === null && !quoting ? (
-            <span data-testid={ORDER_COST_QUOTE_VALUE_TESTID}>{MISSING_VALUE_MARK}</span>
+            <span data-testid={ORDER_COST_QUOTE_VALUE_TESTID}>{EMPTY_MARK}</span>
           ) : null}
           {quoting ? (
             <span className="text-muted-foreground" data-testid={ORDER_COST_QUOTE_QUOTING_TESTID}>
@@ -66,13 +65,15 @@ export function OrderCostQuote(props: OrderCostQuoteProps) {
           </span>
         ) : null}
         {error === null ? null : (
-          <div className="text-destructive" data-testid={ORDER_COST_QUOTE_ERROR_TESTID}>
-            {error.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={error} />
-            ) : (
-              <span>{`${ERROR_PREFIX} ${error.message}`}</span>
+          <ErrorAlert
+            error={error}
+            role={null}
+            className="text-destructive"
+            testId={ORDER_COST_QUOTE_ERROR_TESTID}
+            renderCatalogued={(catalogued) => (
+              <span>{`${ERROR_PREFIX} ${catalogued.message}`}</span>
             )}
-          </div>
+          />
         )}
       </div>
     </div>

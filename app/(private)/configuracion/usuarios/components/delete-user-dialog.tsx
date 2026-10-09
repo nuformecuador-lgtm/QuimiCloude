@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,12 +15,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import type { UserRow } from '@/lib/modules/identity';
 import {
   deleteUserAction,
   type UserMutationFormState,
 } from '@/lib/modules/identity/adapters/driving/user-actions';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * La confirmacion del borrado de un usuario (R30, R31; `design.md > 9`).
@@ -52,8 +52,6 @@ export const DELETE_USER_ID_TESTID = 'delete-user-id';
 
 /** El `id` viaja como campo OCULTO, que es lo que `readTargetId` espera. */
 export const DELETE_USER_ID_FIELD = 'id';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 const TITLE = 'Eliminar al usuario';
 const CONFIRM_LABEL = 'Eliminar';
@@ -97,19 +95,16 @@ export function DeleteUserDialog({ user, open, onOpenChange }: DeleteUserDialogP
         </AlertDialogHeader>
 
         {error === undefined ? null : (
-          <div
-            role="alert"
+          <ErrorAlert
+            error={error}
             id={errorId}
             className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={DELETE_USER_ERROR_TESTID}
-            data-code={error.code}
-          >
-            {error.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={error} />
-            ) : (
-              <p data-testid={DELETE_USER_ERROR_MESSAGE_TESTID}>{error.message}</p>
+            testId={DELETE_USER_ERROR_TESTID}
+            withDataCode
+            renderCatalogued={(catalogued) => (
+              <p data-testid={DELETE_USER_ERROR_MESSAGE_TESTID}>{catalogued.message}</p>
             )}
-          </div>
+          />
         )}
 
         <form action={formAction} data-testid={DELETE_USER_FORM_TESTID}>
@@ -120,13 +115,13 @@ export function DeleteUserDialog({ user, open, onOpenChange }: DeleteUserDialogP
             data-testid={DELETE_USER_ID_TESTID}
           />
           <AlertDialogFooter>
-            <AlertDialogCancel className={TOUCH_TARGET} data-testid={DELETE_USER_DISMISS_TESTID}>
+            <AlertDialogCancel className={touchTarget} data-testid={DELETE_USER_DISMISS_TESTID}>
               {DISMISS_LABEL}
             </AlertDialogCancel>
             <AlertDialogAction
               type="submit"
               variant="destructive"
-              className={TOUCH_TARGET}
+              className={touchTarget}
               disabled={isPending}
               aria-busy={isPending}
               data-testid={DELETE_USER_CONFIRM_TESTID}

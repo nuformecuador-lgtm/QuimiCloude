@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 
+import { ErrorState } from '@/components/shared/error-state';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
@@ -7,13 +8,23 @@ import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-ac
 import { BRAND_LABEL, RECIPES_LABEL } from '@/lib/shared/navigation/private-nav';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
-import { RecipeForm, RecipeListError } from '../components';
+import { RecipeForm } from '../components';
 
 export const metadata: Metadata = {
   title: `Nueva fórmula · ${RECIPES_LABEL} · ${BRAND_LABEL}`,
 };
 
 const FIRST_PAGE = 1;
+
+// Los mismos testids que el error de la lista: los vigila el E2E de errores.
+const LOAD_ERROR = {
+  title: 'No se pudo cargar el catálogo.',
+  testId: 'recipe-list-error',
+  messageTestId: 'recipe-list-error-message',
+  codeTestId: 'recipe-list-error-code',
+  retry: { kind: 'refresh' },
+  retryTestId: 'recipe-list-retry',
+} as const;
 
 /**
  * Página de alta de una receta (R2, R20; `design.md > 5`).
@@ -60,7 +71,7 @@ export default async function NuevaRecetaPage() {
   if (unitsResult.status === 'error') {
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-        <RecipeListError error={unitsResult} />
+        <ErrorState error={unitsResult} {...LOAD_ERROR} />
       </div>
     );
   }
@@ -68,7 +79,7 @@ export default async function NuevaRecetaPage() {
   if (productsResult.status === 'error') {
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-        <RecipeListError error={productsResult} />
+        <ErrorState error={productsResult} {...LOAD_ERROR} />
       </div>
     );
   }
@@ -76,7 +87,7 @@ export default async function NuevaRecetaPage() {
   if (machinesResult.status === 'error') {
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-        <RecipeListError error={machinesResult} />
+        <ErrorState error={machinesResult} {...LOAD_ERROR} />
       </div>
     );
   }

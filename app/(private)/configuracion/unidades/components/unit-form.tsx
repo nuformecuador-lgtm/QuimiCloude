@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useId } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,12 +21,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import type { UnitView } from '@/lib/modules/unidades';
 import {
   createUnitAction,
   updateUnitAction,
 } from '@/lib/modules/unidades/adapters/driving/unit-actions';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { formatFactor, unitLabel } from './unit-equivalence';
 
@@ -112,9 +113,6 @@ export const UNIT_ERROR_SYMBOL_TESTID = 'unit-error-symbol';
 export const UNIT_ERROR_BASE_TESTID = 'unit-error-base';
 
 type UnitFieldName = (typeof UNIT_BUSINESS_FIELDS)[number];
-
-/** Objetivo tactil minimo (44x44 px) de R48. */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /** 16 px en TODOS los anchos: el primitivo baja a 14 px en `md` y R48 no distingue por ancho. */
 const FIELD_TEXT = 'text-base md:text-base';
@@ -319,27 +317,21 @@ export function UnitForm({ unit, baseUnits, onSaved }: UnitFormProps) {
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
         {formError === undefined ? null : (
-          // Region de error del formulario (R37): aqui van los rechazos que no senalan campo.
-          //
-          // QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
-          // identificador de la peticion. El CATALOGADO se pinta como siempre y sin identificador.
-          <div
-            role="alert"
+          // Aqui van los rechazos que no senalan ningun campo.
+          <ErrorAlert
+            error={formError}
             id={formErrorId}
             className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={UNIT_FORM_ERROR_TESTID}
-          >
-            {formError.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={formError} />
-            ) : (
+            testId={UNIT_FORM_ERROR_TESTID}
+            renderCatalogued={(catalogued) => (
               <>
-                <p>{formError.message}</p>
+                <p>{catalogued.message}</p>
                 <p className="text-xs" data-testid={UNIT_FORM_ERROR_CODE_TESTID}>
-                  {formError.code}
+                  {catalogued.code}
                 </p>
               </>
             )}
-          </div>
+          />
         )}
 
         <UnitTextField
@@ -384,7 +376,7 @@ export function UnitForm({ unit, baseUnits, onSaved }: UnitFormProps) {
               aria-labelledby={baseLabelId}
               aria-invalid={fieldErrors.baseUnitId === undefined ? undefined : true}
               aria-describedby={fieldErrors.baseUnitId === undefined ? undefined : baseErrorId}
-              className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT}`}
+              className={`w-full ${touchTarget} ${FIELD_TEXT}`}
               data-testid={UNIT_FIELD_BASE_TESTID}
             >
               <SelectValue />
@@ -501,7 +493,7 @@ function FormActions() {
           <Button
             type="button"
             variant="outline-dashed"
-            className={TOUCH_TARGET}
+            className={touchTarget}
             data-testid={UNIT_FORM_CANCEL_TESTID}
           />
         }
@@ -524,7 +516,7 @@ function SaveButton() {
   return (
     <Button
       type="submit"
-      className={TOUCH_TARGET}
+      touch
       disabled={pending}
       aria-busy={pending}
       data-testid={UNIT_FORM_SUBMIT_TESTID}

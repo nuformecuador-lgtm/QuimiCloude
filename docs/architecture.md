@@ -201,6 +201,18 @@ lote de producto terminado en la misma operacion, pero ahora deja el pedido `POR
 `ENTREGADO`. El Empacador lo **comienza** (`EN_EMPAQUE`, a su nombre) y lo **termina**, y es
 Terminar quien deja el pedido `ENTREGADO` con su fecha de terminado, sin tocar inventario.
 Detalle en `specs/QC-168-estado-por-empacar/requirements.md`.
+**Avanza el 2026-10-06 (acotacion de QC-215 a QC-219): el vencimiento gana su primer
+escritor.** Tras el empaque entra el acondicionamiento (`POR_ACONDICIONAR` →
+`EN_ACONDICIONAMIENTO` → `ENTREGADO`): Terminar el empaque deja el pedido `POR_ACONDICIONAR`,
+ya no `ENTREGADO`. **Entregado el 2026-10-08:** los estados y sus transiciones (QC-215) y la
+pestaña «Por acondicionar» (QC-217). **Sin implementar todavia:** el rol (QC-216), comenzar y
+terminar con equipo (QC-218) y los datos de lote (QC-219). Con QC-219, el Administrador de
+acondicionamiento escribira, por cada lote de producto terminado del pedido, el **lote real**
+(sustituye al automatico y sigue siendo unico por empresa), la **fecha de vencimiento**
+(posterior a hoy) y el **dia de produccion** (hoy o antes). La pregunta **sigue abierta** para
+los insumos: nada consume el vencimiento todavia (QC-196). Detalle en
+`specs/QC-215-estados-de-acondicionamiento/requirements.md` y
+`specs/QC-219-datos-de-lote-en-acondicionamiento/requirements.md`.
 
 **4. Contabilidad e impuestos.** **CERRADA el 2026-09-03 (QC-33).** El ERP **no factura ni
 liquida impuestos**. Texto original: «El dinero **si** entra al modelo —el precio de venta del
@@ -628,6 +640,34 @@ Proceso:
 **`migrate resolve --rolled-back`:** Prisma lleva su propio registro en la tabla
 `_prisma_migrations`, y deshacer el SQL sin avisarle deja el historial mintiendo — la siguiente
 migracion se aplica sobre un estado que Prisma cree que es otro.
+
+## Despliegue a produccion (QC-229, 2026-10-08)
+
+- **Un push a `prod` despliega a produccion.** Lo hace `.github/workflows/desplegar.yml` con la
+  CLI de Vercel (`vercel deploy --prod`, version fija); tambien se lanza a mano
+  (`workflow_dispatch`). El build corre en Vercel, no en el runner.
+- **Tres secrets** en Settings > Secrets and variables > Actions del repo: `VERCEL_TOKEN` (se
+  crea en vercel.com/account/tokens), `VERCEL_ORG_ID` y `VERCEL_PROJECT_ID` (los de
+  `.vercel/project.json`). Sin uno, el workflow falla diciendo cual falta.
+- **En Vercel, migrate y seed solo con `VERCEL_ENV=production`.** `pnpm run build` es
+  `scripts/build.mjs`. Con `VERCEL` definida (Vercel la pone en todo build) corre
+  `prisma migrate deploy` y el seed solo si `VERCEL_ENV=production`; con preview, development,
+  vacio o ausente se los salta (solo `prisma generate` y `next build`). Sin `VERCEL` (local, CI)
+  corre todo, como antes, sea cual sea `VERCEL_ENV`. El build imprime siempre una linea
+  `[build] ...` con la decision y el porque.
+
+`tests/guards/guard-despliegue-produccion.test.ts` lo fija.
+
+### Por qué
+
+**CLI y token, no la integracion de Git.** Vercel no se puede conectar al repo: la cuenta de
+Vercel tiene vinculada otra cuenta de GitHub y el repo vive en otra.
+
+**Migrate y seed solo en produccion.** Preview y produccion comparten base: una preview que
+migrara aplicaria a produccion las migraciones de una rama sin mergear. Por eso tampoco hay
+previews automaticas; esperan a una base separada (otra ficha). Dentro de Vercel, si
+`VERCEL_ENV` falta o viene vacio no se sabe si es produccion, y se falla hacia el lado seguro:
+no se toca la base.
 
 ## Componentes
 - `components/ui/`: primitivas de shadcn/ui. **Nunca crees un componente si ya existe en shadcn/ui.**

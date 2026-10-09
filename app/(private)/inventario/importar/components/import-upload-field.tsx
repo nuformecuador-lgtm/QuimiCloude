@@ -71,7 +71,7 @@ export function ImportUploadField({ file, onSelect, disabled = false }: ImportUp
         <Button
           type="button"
           variant={file === null ? 'default' : 'outline'}
-          className="min-h-11 min-w-11"
+          touch
           disabled={disabled}
           data-testid={UPLOAD_TRIGGER_TESTID}
           onClick={() => inputRef.current?.click()}
