@@ -4,6 +4,9 @@
 #   PR hacia `prod`           -> gate-completo + e2e          (los dos, informativos)
 #   workflow_dispatch         -> los dos, a mano, sobre la rama elegida
 #
+# El E2E corre un job por navegador (`e2e-navegador`, matriz chromium/webkit) y el check `e2e` los
+# une y da el veredicto (ver el job).
+#
 # `gate-completo` es el check que manda, pero ya no corre la suite el solo: la reparten los jobs
 # `estatico` y `vitest` (3 shards) y el une los informes y da el veredicto (ver `jobs:`).
 #
@@ -282,14 +285,25 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  e2e:
-    name: e2e
+  # UN JOB POR NAVEGADOR. Con chromium y webkit en el mismo job, la suite no cabia en sus 60 min y
+  # un flake de WebKit tumbaba tambien lo de Chromium (PR #199). Cada job de la matriz es un runner
+  # propio, con su Postgres de servicio, su base `quimicloude_e2e` y su servidor en el 3117: no se
+  # pisan. `fail-fast: false`: si un navegador cae, el otro termina igual y se sabe que paso en el.
+  # El veredicto lo da el job `e2e` de abajo, que es el check que se mira.
+  e2e-navegador:
+    name: e2e (${{ matrix.project }})
     # Solo en el PR de despliegue (base `prod`), fuera de borrador, y a mano.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.base_ref == 'prod' && github.event.pull_request.draft == false)
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # Los `projects[].name` de playwright.config.ts, exactamente: lo vigila
+        # `tests/guards/guard-e2e-presupuesto.test.ts`.
+        project: [chromium, webkit]
 
     services:
       postgres:
@@ -374,8 +388,9 @@ jobs:
           echo "DIRECT_URL=postgresql://postgres:postgres@localhost:5432/quimicloude_e2e" >> "$GITHUB_ENV"
 
       # Los DOS navegadores de playwright.config.ts, y no solo chromium: WebKit es el motor de
-      # iOS y docs/architecture.md exige ejercitarlo de verdad. Para ahorrar minutos se cachean
-      # los binarios por version de Playwright; las dependencias del sistema se instalan siempre.
+      # iOS y docs/architecture.md exige ejercitarlo de verdad. Cada job de la matriz instala el
+      # suyo. Para ahorrar minutos se cachean los binarios por version de Playwright y navegador;
+      # las dependencias del sistema se instalan siempre.
       - name: Version de Playwright
         id: pw
         shell: bash
@@ -386,27 +401,48 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium-webkit
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-${{ matrix.project }}
 
       - name: Navegadores de Playwright
         if: steps.pw-cache.outputs.cache-hit != 'true'
         shell: bash
-        run: pnpm exec playwright install --with-deps chromium webkit
+        run: pnpm exec playwright install --with-deps ${{ matrix.project }}
 
       - name: Dependencias de sistema de los navegadores
         if: steps.pw-cache.outputs.cache-hit == 'true'
         shell: bash
-        run: pnpm exec playwright install-deps chromium webkit
+        run: pnpm exec playwright install-deps ${{ matrix.project }}
 
       - name: Playwright
         shell: bash
-        run: pnpm run e2e
+        run: pnpm run e2e --project=${{ matrix.project }}
 
       - name: Trazas de Playwright
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-test-results
+          name: e2e-test-results-${{ matrix.project }}
           path: test-results/
           if-no-files-found: ignore
           retention-days: 14
+
+  # El check `e2e`: verde solo si los DOS navegadores salieron en verde. Conserva el nombre de
+  # siempre, asi que una regla de rama o un habito que lo nombren no cambian. `always()`: tiene que
+  # correr aunque un navegador falle o se cancele, para ponerse en rojo; sin el quedaria «skipped»,
+  # y un check saltado no es un rojo.
+  e2e:
+    name: e2e
+    needs: e2e-navegador
+    if: >-
+      always() && (github.event_name == 'workflow_dispatch' ||
+      (github.base_ref == 'prod' && github.event.pull_request.draft == false))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Los dos navegadores pasaron
+        shell: bash
+        env:
+          NAVEGADORES: ${{ needs.e2e-navegador.result }}
+        run: |
+          [ "$NAVEGADORES" = "success" ] || { echo "el E2E por navegador salio '$NAVEGADORES': mira los jobs e2e (chromium) y e2e (webkit)"; exit 1; }
