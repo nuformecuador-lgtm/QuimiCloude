@@ -195,6 +195,12 @@ test.afterAll(async () => {
   // absoluto —borrar por `name: ROLE_ADMINISTRADOR` se llevaria por delante el rol real que usan
   // otros tests y el propio seed—.
   try {
+    // Antes que los usuarios, sus sesiones cerradas: `revoked_sessions.user_id` es
+    // `onDelete: Restrict` (QC-23) y el ciclo de sesion de este spec cierra sesion. Mismo orden
+    // que `login.spec.ts`.
+    await prisma.revokedSession.deleteMany({
+      where: { user: { username: { startsWith: `${USERNAME_PREFIX}${RUN_ID}` } } },
+    });
     await prisma.user.deleteMany({
       where: { username: { startsWith: `${USERNAME_PREFIX}${RUN_ID}` } },
     });
