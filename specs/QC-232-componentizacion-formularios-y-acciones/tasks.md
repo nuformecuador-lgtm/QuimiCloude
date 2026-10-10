@@ -174,21 +174,21 @@ Se conservan los exports, los testids y los textos (R5, R10, R15, R17).
 
 ## Tanda 5 — Guardias y cierre (depende de todo lo anterior)
 
-- [ ] **T5a. `tests/guards/guard-formularios-y-acciones.test.ts`** (R4, R28, R30, R31; `design.md > 9`).
+- [x] **T5a. `tests/guards/guard-formularios-y-acciones.test.ts`** (R4, R28, R30, R31; `design.md > 9`).
   - **Hecho cuando:**
     - está en verde;
     - tiene una muestra que muerde por regla;
     - sus excepciones son la lista cerrada, sin archivos muertos;
     - el caso de diff corre en esta rama y hace `skip` ruidoso fuera.
-- [ ] **T5b. `guard-piezas-base` apretada** (R26, R28).
+- [x] **T5b. `guard-piezas-base` apretada** (R26, R28).
   - **Qué se hace:** se retiran las excepciones que esta rama resolvió (`design.md > 6`).
   - **Hecho cuando:** la guardia está en verde y ninguna excepción retirada vuelve a hacer falta.
-- [ ] **T5c. Deudas** (R29).
+- [x] **T5c. Deudas** (R29).
   - **Qué se escribe:** en `progress/deudas.md`, cada excepción que sigue citando QC-232 en las dos
     guardias y cada punto de `design.md > 7`, con su archivo, su motivo y la ficha que lo resuelve
     (QC-223, QC-217 o QC-227).
   - **Hecho cuando:** no queda ninguna excepción sin su fila.
-- [ ] **T5d. `./init.sh` en verde**, y `progress/impl_QC-232-componentizacion-formularios-y-acciones.md`
+- [x] **T5d. `./init.sh` en verde**, y `progress/impl_QC-232-componentizacion-formularios-y-acciones.md`
   completo:
   - el mapa R → test (`design.md > 14`);
   - el resultado de TA;
@@ -199,7 +199,7 @@ Se conservan los exports, los testids y los textos (R5, R10, R15, R17).
   cada tabla con acciones.
   - **Hecho cuando:** cada captura «antes» tiene su pareja y la tabla de parejas queda lista para el
     reviewer.
-- [ ] **T5f. `archivos-en-vuelo` antes del merge** (R32).
+- [x] **T5f. `archivos-en-vuelo` antes del merge** (R32).
   - **Hecho cuando:** `node scripts/archivos-en-vuelo.mjs --candidata QC-232` no da `CHOCA`, y la
     salida queda anotada en `progress/features/QC-232.md`.
 

@@ -119,22 +119,171 @@ la regla común. No entran los 57 `<p className="text-sm text-destructive">` de 
 - `guard-convenciones-proveedores` prohíbe importar `proveedores/[id]/components` por ruta
   profunda también desde los tests: los tres archivos importan del barrel.
 
-## Mapa R -> test
-_(completo en T5d; base: `design.md > 14`)_
+### Tandas 1–5: producción (base `bfc41570`, `git diff --name-status`)
+Rutas relativas a `app/(private)/` salvo `components/` y `hooks/`. A = nuevo, D = borrado.
 
-| R | Test (tanda 0) |
+- **Piezas (tanda 1):** A `components/shared/form-sheet.tsx`, A `hooks/use-entity-sheet.ts`,
+  A `components/shared/confirm-dialog.tsx`, A `components/shared/delete-confirm-dialog.tsx`,
+  A `components/shared/field-error.tsx`, A `components/shared/text-field.tsx`,
+  A `components/shared/select-field.tsx`, A `components/shared/date-picker.tsx`,
+  M `components/shared/shared-select.tsx` (aditivo: `SharedSelectControl`),
+  M `components/shared/row-actions-menu.tsx` (items `href`), A `components/shared/data-table/actions-column.tsx`,
+  M `components/shared/data-table/index.ts`.
+- **clientes:** customer-form, customer-sheet, delete-customer-dialog, customer-row-actions, customer-columns.
+- **configuracion/presentaciones:** presentation-form, presentation-sheet, delete-presentation-dialog,
+  presentation-row-actions, presentation-columns.
+- **configuracion/unidades:** unit-form, unit-sheet, delete-unit-dialog, unit-row-actions, unit-columns.
+- **configuracion/usuarios:** user-form, user-sheet, work-group-form, work-group-sheet,
+  delete-user-dialog, delete-work-group-dialog, user-status-dialog, end-user-sessions-dialog,
+  user-table, work-group-table, user-columns, work-group-columns, index.ts (barrel).
+- **inventario:** product-form, product-sheet, product-field, product-batch-date-field,
+  delete-product-dialog, product-batches-sheet, product-batches-panel, product-table,
+  product-columns, A product-row-actions, finished-stock-table, finished-stock-columns,
+  importar/components/import-dialog-parts.
+- **produccion/formulas:** delete-recipe-dialog, recipe-table, recipe-columns, A recipe-row-actions.
+- **proveedores/[id] y components/shared/supplier:** catalog-line-form, catalog-line-sheet,
+  delete-catalog-line-dialog, delete-supplier-dialog, unit-select, catalog-table, catalog-columns,
+  A catalog-line-row-actions, supplier-detail-header; supplier-form, supplier-sheet, supplier-field.
+- **pedidos:** order-form, order-sheet, order-field, delete-order-dialog, cancel-order-dialog.
+- **asignacion:** [id]/order-cancel-dialog, [id]/order-execution-screen, empaque/[id]/packing-order-screen,
+  assigned-order-start-trigger, A assignment-list-parts y los 15 archivos de
+  assigned/company/finished/packing-orders-{columns,empty,list-section,skeleton};
+  D `components/shared/confirm-action-dialog.tsx` (el borrado entró por error en el commit
+  `546c9863` de pedidos porque ya estaba en el índice; pertenece a T2i).
+- **filtro:** `components/shared/data-table/data-table-filter-date.tsx` (P6).
+
+### Tandas 1–5: tests
+- **Nuevos:** `tests/unit/shared-ui/{form-sheet,use-entity-sheet,confirm-dialog,campos,row-actions-menu-href,actions-column,confirm-dialog-montado}.test.tsx`,
+  `tests/helpers/row-actions-menu.ts`, `tests/guards/guard-formularios-y-acciones.test.ts`.
+- **Editados:** ver `## Ediciones de test (R4)`.
+- **Otros:** `progress/deudas.md` (D37–D50); `specs/…/requirements.md` (enmienda R33);
+  `specs/…/tasks.md` (marcas, T2k, barrel de usuarios, `user-table`/`work-group-table`,
+  `data-table.test.tsx`, y sale `step-document-view` por P5).
+
+## Desvíos y decisiones durante la implementación
+
+- **API de las piezas** distinta en detalle de `design.md > 3` (el design lo permite si la paridad
+  pasa sin regenerar):
+  - `FormSheet`: `handleSaved(message?)` para el aviso con lote del producto; sin `beforeBody` (el
+    `ErrorAlert` va en `children`); props aditivas `beforeHeader`, `headerExtra`, `bodyClassName`,
+    `sheetData`, `noValidate`, `minScreenWidth`, `testIds.title`, `cancelTouch`.
+  - `ConfirmDialog`: `trigger` es `{ render, children }`; `isPending` arriba; `hidden` es array;
+    se exportan `ConfirmDialogFrame`/`ConfirmDialogBody` (y `DeleteConfirmDialogBody`) para que el
+    estado del cuerpo se reinicie en cada apertura; props `layout`, `aside`, `errorStyle`,
+    `confirmAs`, `announceBusy`, `confirmDisabled`, `confirmDescribedBy`, `dismissDisabled`.
+  - `SharedSelect`: las ampliaciones van en el nuevo `SharedSelectControl` del mismo archivo.
+  - `DatePicker` usa `formatDateLocalISO` (lo que usaba el sitio), no `formatCivilDate` (UTC) como
+    citaba el design.
+  - `actionsColumn`: el id común `'actions'` y la etiqueta «Acciones» son privados del archivo.
+- **R13 frente a los borrados con disparador propio** (producto, línea de catálogo, proveedor): hoy
+  no tienen estado pendiente y la paridad lo congela; se conserva (R1 manda).
+- **`FieldError` sin `role="alert"`** donde el sitio no lo tenía (`alert={false}`): choca con el
+  texto literal de R18; se prioriza R1.
+- **R5 y P2:** `editUnitLabel`/`deleteUnitLabel` y `editPresentationLabel`/`deletePresentationLabel`
+  conservan el export pero ya no reciben el nombre (devuelven solo el verbo). `editCustomerLabel`,
+  `deleteCustomerLabel`, `editWorkGroupLabel`, `deleteWorkGroupLabel` quedan exportados sin uso
+  (deuda D48).
+- **Testids y `data-*` nuevos** en los disparadores donde hoy no había contenedor: `product-row-actions`
+  + `data-product-id`, `recipe-row-actions` + `data-recipe-id`, `catalog-line-row-actions` +
+  `data-catalog-line-id`.
+- **Verbo del item de edición de grupos:** «Abrir» (el del `aria-label` de hoy), no «Editar».
+- **Tamaño táctil (decisión del implementer, según `design.md > 11`):** el disparador mide 44×44 y
+  los items llevan `min-h-11` (sin `min-w-11`, el menú mide ≥200 px). Los tests de viewport que
+  exigían `min-w-11` en cada acción pasan a medir el disparador (clientes, presentaciones, unidades,
+  grupos, recetas, catálogo), como ya hacía usuarios.
+- **R33 (enmienda del humano):** los diálogos de baja/confirmación quedan siempre montados una vez
+  abiertos (estado `boolean | null`: `null` = nunca abierto, así el árbol inicial y las paridades
+  no cambian). Base UI marca el cierre con `data-closed` (no `data-state="closed"`, que es de Radix);
+  el test lo documenta. En inventario y proveedores/[id] el error del intento anterior reaparece al
+  reabrir el borrado, como ya pasaba en `dev` (diálogo siempre montado con `useActionState`): se
+  conserva y el caso queda `skipIf`.
+- **step-document-view a deuda (P5):** cambiarlo rompe la lista cerrada R18 de
+  `order-execution-screen.test.tsx`.
+- **Fuera de la lista de Campos:** nombre del grupo (lleva `data-code`/`data-issue`), selects
+  especializados (P4), vacío de packing (EmptyState pone `data-testid` en el envoltorio).
+
+## Mapa R -> test
+
+| R | Test |
 |---|---|
-| R1 | `formularios-paridad`, `confirmaciones-paridad`, `campos-paridad`, `acciones-por-fila`, `asignacion-listas-paridad` (sin regenerar desde la tanda 0) |
-| R6–R11 | `formularios-paridad` (alta, edición, error general, error de campo, enviando, disparadores cerrados, pie deshabilitado del grupo y del pedido) |
-| R12–R15 | `confirmaciones-paridad` (abierto, pendiente, error, disparador propio cerrado; receta con transición; los 3 de `ConfirmActionDialog`) |
-| R16–R19 | `campos-paridad` (cada sitio de `## Campos`, con y sin error, selects abiertos, fechas abiertas) y `formularios-paridad > R19` (`FormData`) |
-| R20–R23 | `acciones-por-fila` (con permiso y solo consulta) |
-| R27 | `asignacion-listas-paridad` + `asignacion-paridad` (QC-231) |
+| R1 | `formularios-paridad`, `confirmaciones-paridad`, `campos-paridad`, `acciones-por-fila`, `asignacion-listas-paridad` (sin regenerar desde la tanda 0) y las paridades de QC-231 sin regenerar en las tandas 1–2 |
+| R2 | tests de cada panel y diálogo sin editar en la tanda 2 (`vitest related` 230 archivos / 3651 tests verdes); E2E en CI |
+| R3 | capturas antes/después (leader, T0c/T5e) |
+| R4 | `guard-formularios-y-acciones > caso por diff R4` (todo test existente editado está en `Archivos esperados`) + revisión del diff de snapshots de la tanda 3 (abajo) |
+| R5 | `pnpm run typecheck` y las guardias `*-convenciones` (barrels) en verde |
+| R6 | `form-sheet.test.tsx > compone cabecera, cuerpo con scroll y pie fijo con cancelar y guardar dentro del form` |
+| R7 | `form-sheet.test.tsx > «Cancelar» cierra el panel sin enviar el formulario` |
+| R8 | `form-sheet.test.tsx > mientras el form envía, guardar queda deshabilitado, con aria-busy y el texto de pendiente` |
+| R9 | `form-sheet.test.tsx > con busy… / con canSave = false… / con disabled… / la envoltura del pie…` |
+| R10 | `form-sheet.test.tsx > los data-testid del panel, form, título, cancelar y guardar… llegan por props` + `formularios-paridad` |
+| R11 | `use-entity-sheet.test.tsx > al guardar con éxito: cerrar, toast de éxito del modo y refresh, en ese orden` |
+| R12 | `confirm-dialog.test.tsx > con form: envía el id oculto por la Server Action… / con transición: sin form…` |
+| R13 | `confirm-dialog.test.tsx > mientras envía: confirmar deshabilitado, aria-busy y «Eliminando…»` |
+| R14 | `confirm-dialog.test.tsx > al confirmar cierra con onOpenChange(false) antes de llamar a onConfirm / si la operación responde con error, el diálogo sigue abierto` |
+| R15 | `confirm-dialog.test.tsx > disparador propio: cerrado no pinta el diálogo / controlada: sin disparador` + `confirmaciones-paridad` |
+| R16 | `campos.test.tsx` (TextField etiqueta/16 px/`min-h-11`; SelectField `aria-labelledby` y opción «ninguna»; DatePicker single y rango) |
+| R17 | `campos.test.tsx` (OrderField, SupplierField, UnitSelect, ProductBatchDateField, DataTableFilterDate contra su pieza) + `campos-paridad` |
+| R18 | `campos.test.tsx > FieldError… / aria-invalid y aria-describedby solo con error` |
+| R19 | `campos.test.tsx > FormData…` + `formularios-paridad > R19` |
+| R20, R22, R23 | `acciones-por-fila.test.tsx` (sin regenerar tras la tanda 3) |
+| R21 | `row-actions-menu-href.test.tsx > el item con href se pinta como <a href> / al pulsarlo navega` + `acciones-por-fila` (href de recetas) |
+| R24 | `actions-column.test.tsx` + paridades de QC-231 regeneradas solo en la celda |
+| R25 | tests unit y E2E editados con `tests/helpers/row-actions-menu.ts` / `e2e/helpers/row-actions-menu.ts` |
+| R26 | `guard-piezas-base > QC-232 (R26, R28)` (cada excepción retirada vuelve a morder) |
+| R27 | `asignacion-paridad` (QC-231) y `asignacion-listas-paridad` sin regenerar tras T4a |
+| R28 | `guard-formularios-y-acciones` (4 reglas con muestra que muerde; excepciones cerradas) |
+| R29 | `progress/deudas.md` D37–D50 |
+| R30, R31 | `guard-formularios-y-acciones > casos por diff R30 y R31` (solo en esta rama) + `guard-dependencias-aprobadas` |
+| R32 | `node scripts/archivos-en-vuelo.mjs --candidata QC-232` (abajo, `## T5f`) |
+| R33 | `tests/unit/shared-ui/confirm-dialog-montado.test.tsx` (pieza, usuarios, grupos, pedidos y las 6 tablas de la tanda 3 + panel de lotes) |
 
 ## Ediciones de test (R4)
-_(cada edición con su tipo (a), (b) o (c))_
 
-Tanda 0: ninguna. Solo tests nuevos.
+| Archivo | Tipo | Qué |
+|---|---|---|
+| `tests/unit/shared/data-table.test.tsx` | (a)-equivalente | +1 línea `'actionsColumn'` en la lista cerrada de exports del barrel |
+| `tests/unit/paridad/{campos,confirmaciones,formularios}-paridad.test.tsx`, `tests/unit/shared-ui/campos.test.tsx` | (a) | imports por barrel (fallaban las guardias `*-convenciones`); tests de esta rama |
+| `tests/guards/guard-piezas-base.test.ts` | R28 | sale `order-field` de `CONSTANTES_QUE_NO_SON_EL_PAR`; T5b retira las excepciones resueltas |
+| `tests/unit/clientes-ui/clientes-page.test.tsx` | (b) | abre el menú |
+| `tests/unit/clientes-ui/clientes-viewport.test.tsx` | (b) + tamaño táctil | items en el menú; 44×44 al disparador, items `min-h-11` |
+| `tests/unit/clientes-ui/delete-customer-dialog.test.tsx` | (b) + P2 | `clickRowAction`; `aria-label` con el nombre pasa al disparador; fila montada por el disparador |
+| `tests/unit/configuracion-ui/presentation-columns.test.tsx` | (b) + P2 + táctil | `menuitem` + verbo; 44×44 al disparador |
+| `tests/unit/configuracion-ui/presentation-page.test.tsx` | (b) | abre el menú |
+| `tests/unit/configuracion-ui/configuracion-viewport.test.tsx` | (b) + táctil | items en el menú; diálogo con `clickRowAction`; 44×44 al disparador |
+| `tests/unit/configuracion-ui/unit-columns.test.tsx` | (b) + P2 + táctil | ídem unidades |
+| `tests/unit/configuracion-ui/delete-unit-dialog.test.tsx` | (b) + P2 | `clickRowAction`; nombre en el disparador; fila montada por el disparador |
+| `tests/unit/configuracion-ui/unidades-viewport.test.tsx` | (b) + táctil | ídem |
+| `tests/unit/configuracion-ui/grupos/work-group-table.test.tsx` | (b) | `clickRowAction` ×4 |
+| `tests/unit/configuracion-ui/grupos/work-group-columns.test.tsx` | (b) + P2 | disparador «Acciones de X» y verbo; import por barrel |
+| `tests/unit/configuracion-ui/grupos/work-group-a11y.test.tsx` | (b) + táctil | 44×44 y «siempre en el DOM» pasan al disparador |
+| `tests/unit/inventario/product-page.test.tsx` | (b) | 16 clics + 2 visibilidades dentro del menú |
+| `tests/unit/inventario/finished-stock-table.test.tsx` | (b) | 4 clics + 3 existencias dentro del menú + Escape |
+| `tests/unit/inventario/product-batches-sheet.test.tsx` | (b) + P2 | `abrirPanel`; «Lotes de X» → «Acciones de X» |
+| `tests/unit/proveedores-ui/catalog-line-form.test.tsx`, `catalog-line-sheet.test.tsx` | (b) | helper `abrirEdicion` |
+| `tests/unit/proveedores-ui/delete-catalog-line-dialog.test.tsx` | (b) + táctil | `abrirBaja`; disparador en la fila; área táctil al disparador |
+| `tests/unit/recetas-ui/recipe-page.test.tsx` | (b) + táctil | `clickRowAction`; 44×44 al disparador |
+| `e2e/clientes.spec.ts` | (b) | pasos 10 y 12 |
+| `e2e/grupos-de-trabajo.spec.ts` | (b) | 3 clics |
+| `e2e/producto-terminado.spec.ts` | (b) | lotes y `setPresentationContent` |
+| `e2e/ajuste-de-inventario.spec.ts`, `insumo-por-unidad.spec.ts`, `reserva-de-material.spec.ts` | (b) | lotes |
+| `e2e/aislamiento-inventario.spec.ts` | (b) + | `toHaveCount(1)` cuenta disparadores en vez del botón de borrar |
+| `e2e/recetas-pasos.spec.ts` | (b) | paso 6 |
+| `e2e/versiones-en-la-receta.spec.ts` | (b) + P2 | cuenta el disparador; `aria-label` esperado «Editar X» → «Acciones de X» |
+| `__snapshots__/clientes-paridad` | (c) | +2 −5, solo la celda |
+| `__snapshots__/presentaciones-paridad` | (c) | +2 −5, solo la celda |
+| `__snapshots__/unidades-paridad` | (c) | +2 −5, solo la celda de Gramo |
+| `__snapshots__/grupos-paridad` | (c) | +4 −10, solo las 2 celdas |
+| `__snapshots__/catalogo-paridad` | (c) | +2 −5, solo la celda |
+| `__snapshots__/recetas-paridad` | (c) | +8 −14: celdas y, fuera de ellas, el nombre calculado de cada `tr` pierde «Editar X» (sale del texto de la celda) |
+| `__snapshots__/inventario-paridad` | (c) | +4 −9: celda y el nombre calculado del `tr`/celda pierde « Lotes» |
+
+No se editó: `usuarios-paridad`, `proveedores-paridad`, `asignacion-paridad`, ningún test de QC-223
+ni QC-217, `order-execution-screen.test.tsx`, `delete-recipe-dialog.test.tsx`,
+`recipe-version-list.test.tsx`, ni los de `customer-list-section`/`customer-table`.
+
+**A revisar por el reviewer:** las ediciones marcadas «+ P2» y «+ táctil» van más allá del paso
+de abrir el menú: cambian el objetivo de la aserción porque la etiqueta con nombre pasa al
+disparador (P2) y los items del menú no llevan `min-w-11`.
 
 ## Salidas
 
@@ -166,3 +315,133 @@ Sin `prisma generate` y `next typegen` el typecheck del worktree da ~978 errores
 
 **Veredicto tanda 0:** T0a y T0b cerradas; cinco paridades congeladas y estables contra producción
 sin tocar.
+
+### Tanda 1 (cierre)
+```
+$ pnpm run typecheck                      -> exit 0
+$ pnpm run lint                           -> ✖ 7 problems (0 errors, 7 warnings)  (previos, ajenos)
+$ pnpm exec vitest run guard tests/unit/shared-ui tests/unit/paridad
+ Test Files  102 passed (102)
+      Tests  1457 passed | 15 skipped (1472)
+```
+Por pieza: form-sheet + use-entity-sheet 14/14; confirm-dialog 10/10; campos 23/23 (campos-paridad
+30/30 sin regenerar; `vitest related shared-select` 22 archivos / 436 tests, product-form sin
+editar); row-actions-menu-href + actions-column 13/13 (tests de usuarios y pedidos con
+`RowActionsMenu`: 191 verdes sin editar).
+
+### Tanda 2 (cierre)
+```
+$ pnpm run typecheck                      -> exit 0
+$ pnpm run lint                           -> ✖ 7 problems (0 errors, 7 warnings)
+$ pnpm exec vitest run guard convenciones tests/unit/paridad tests/unit/shared-ui
+ Test Files  112 passed (112)
+      Tests  1629 passed | 37 skipped (1666)
+$ pnpm exec vitest related --run <producción cambiada en la tanda>
+ Test Files  230 passed (230)
+      Tests  3651 passed | 1 skipped (3652)
+```
+Ninguna paridad regenerada; ningún test de pantalla editado (`guard-identificador-de-request`
+verde sin tocar).
+
+### Tanda 3 y 4 (por tabla, informes de los subagentes)
+- clientes: related 17/353 → tras la tanda 3, `clientes-ui` 16 archivos / 231 tests.
+- presentaciones: related 13/301. unidades: related 14/335. grupos: related 40/759.
+- productos: related 20/434. recetas: related 26/479. catálogo: related 18/377; `proveedores-ui` 24/260.
+- T4a: asignación (paridades + `asignaciones-ui`) 37/450 sin regenerar ni editar.
+- T4b: related 66/1176.
+- R33 por tabla: `confirm-dialog-montado` 27 passed, 2 skipped (los `skipIf` de inventario y catálogo).
+```
+$ pnpm exec vitest run convenciones guard     (tras T3f)
+ Test Files  71 passed (71)
+      Tests  996 passed | 37 skipped (1033)
+```
+
+### Tanda 5
+`pnpm exec vitest run guard`: 63 archivos, 858 passed, 15 skipped. Ver `## Tanda 5` y `## T5d`.
+
+## E2E de los specs editados por QC-232 (chromium, 2026-10-09)
+
+Archivo modificado: `e2e/producto-terminado.spec.ts` (`setPresentationContent`: abre
+`presentation-action-edit` con `openRowActionsMenuItem` sobre el disparador
+`presentation-row-actions` de la presentacion). Ningun otro uso de items de fila fuera del helper.
+
+`.env` copiado de la raiz (ignorado por `.gitignore:41`); `DATABASE_URL` exportada al proceso de
+Playwright. La base local (localhost:5433) tiene 4 migraciones sin aplicar
+(`20261008150000..150200`, de QC-219): falta `inventory_movements.order_delivery_id`.
+
+| Spec | Resultado | Causa |
+|---|---|---|
+| clientes | 2 passed | |
+| recetas-pasos | 1 passed | |
+| versiones-en-la-receta | 1 passed (2o intento) | 1o: 404 de primer compilado de `next dev` |
+| aislamiento-inventario | 1 passed | |
+| grupos-de-trabajo | 1 failed | `work-group-member-search` no existe en la UI desde 527a9902 (dev); ajeno a QC-232 |
+| producto-terminado | 1 failed | entorno: columna `order_delivery_id` ausente (migracion) |
+| reserva-de-material | 1 failed | entorno: misma columna |
+| ajuste-de-inventario | 1 passed, 3 failed | entorno: misma columna (el servidor la rechaza al ajustar) |
+| insumo-por-unidad | 1 failed | entorno: misma columna (alta de insumo con lote) |
+
+**Veredicto:** paso del menu arreglado; los rojos restantes son entorno (base sin migrar) o un
+spec ya roto en dev, ninguno por la UI de QC-232.
+
+## Tanda 5: T5a, T5b, T5c (frontend_dev, 2026-10-09)
+
+**Archivos:** `tests/guards/guard-formularios-y-acciones.test.ts` (nuevo),
+`tests/guards/guard-piezas-base.test.ts`, `progress/deudas.md` (D37–D50).
+
+**R → test:** R28 → `guard-formularios-y-acciones` (las 4 reglas, cada una con su muestra que
+muerde; excepciones cerradas, sin muertas y todas muerden); R30, R31 y R4 → sus casos por diff (solo
+en `feature/QC-232-…`, `skip` ruidoso fuera); R26 → `guard-piezas-base > QC-232 (R26, R28)`;
+R29 → `progress/deudas.md` D37–D50.
+
+**Comprobación de que la regla de acciones muerde el código de antes:** sobre el merge-base, la regla
+`accion-de-fila-local` da hallazgos en las 8 tablas que la tanda 3 migró (clientes, presentaciones,
+unidades, grupos, productos, producto terminado, recetas, catálogo).
+
+**Salida:**
+- `pnpm exec vitest run guard`: 63 archivos pasan; 858 tests pasan y 15 se saltan (los casos por
+  diff de otras fichas).
+- `eslint` de las dos guardias: sin problemas.
+- `pnpm run typecheck`: sin errores.
+
+**Veredicto:** T5a, T5b y T5c hechas, con las guardias en verde.
+
+## T5d: `./init.sh` (modo rápido, 2026-10-09)
+
+Primera corrida: rojo en `test:rapido` con dos rojos NUEVOS (no en el baseline):
+`tests/unit/inventario/product-route-contract.test.ts` y `tests/unit/recetas-ui/recipe-route-contract.test.ts`
+(«el barrel debe reexportar ./product-row-actions / ./recipe-row-actions»). Arreglo: los barrels de
+inventario, fórmulas y proveedores/[id] entran en `Archivos esperados` y exportan sus menús de fila
+(`6328954c`; resuelve D49). Segunda corrida:
+
+```
+$ ./init.sh
+ Test Files  236 passed (236)
+      Tests  3741 passed | 4 skipped (3745)
+ Test Files  101 passed (101)
+      Tests  1412 passed | 32 skipped (1444)
+✓ test:rapido paso
+✓ todas las migraciones tienen down.sql
+✓ .env presente
+== init OK ==   (exit 0)
+```
+
+## T5f: archivos en vuelo (R32)
+
+```
+$ node scripts/archivos-en-vuelo.mjs --candidata QC-232
+AVISO: QC-96 (Christian Quevedo) esta en vuelo y su rama no esta publicada: no se puede comprobar el conflicto
+AVISO: QC-131 (Christian Quevedo): su tasks.md no tiene `## Archivos esperados`: se leen las rutas de todo el archivo
+QC-232: sin conflicto de archivos con 7 feature(s) en vuelo
+```
+Repetido tras añadir los barrels a `Archivos esperados`: mismo resultado.
+
+## Pendiente para el leader
+- **T0c y T5e (capturas antes/después):** no hechas por el implementer (son del leader).
+- **E2E con base migrada:** producto-terminado, reserva-de-material, ajuste-de-inventario e
+  insumo-por-unidad no se pudieron verificar en local: la base compartida (5433) no tiene 4
+  migraciones de `dev`. No se migró una base compartida sin permiso. Corren en CI.
+- **`e2e/grupos-de-trabajo.spec.ts:495`** ya está roto en `dev` (`work-group-member-search` no existe
+  en la UI desde `527a9902`): ajeno a QC-232.
+- **Ediciones de test «+ P2» y «+ táctil»** (ver `## Ediciones de test (R4)`): van más allá del
+  tipo (b) literal; las fuerza el cambio de la tanda 3. Decide el reviewer.
