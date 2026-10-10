@@ -244,9 +244,11 @@ async function setPresentationContent(page: Page, content: string): Promise<void
   await gotoSettled(page, presentationsUrl(PRESENTATION_NAME));
   await expect(page.getByTestId('presentaciones-title')).toBeVisible({ timeout: 60_000 });
 
-  const rowActions = page.locator(`[data-presentation-id="${presentationId}"]`);
+  const rowActions = page.locator(
+    `[data-testid="presentation-row-actions"][data-presentation-id="${presentationId}"]`,
+  );
   await expect(rowActions).toBeVisible({ timeout: 60_000 });
-  await rowActions.getByTestId('presentation-action-edit').click();
+  await (await openRowActionsMenuItem(page, rowActions, 'presentation-action-edit')).click();
   await expect(page.getByTestId('presentation-sheet')).toBeVisible({ timeout: 60_000 });
 
   await page.getByTestId('presentation-field-content').fill(content);
