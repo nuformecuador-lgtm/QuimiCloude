@@ -376,3 +376,5 @@ quiere también el del encabezado en escritorio, tiene que revocar la decisión 
 (`--sidebar-foreground`/`--sidebar`, QC-226 R5) y es más exigente.
 
 > 2026-10-09: el humano aprobó la enmienda del sidebar colapsado (R31–R37, T12) con los defaults de P10–P12. Quedan cerradas.
+
+> 2026-10-09: el humano aprobó R38–R39 con los defaults de P13–P15 (en escritorio solo la pastilla del borde). Quedan cerradas.
