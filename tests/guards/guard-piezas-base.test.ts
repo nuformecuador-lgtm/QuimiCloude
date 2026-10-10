@@ -98,7 +98,10 @@ export const ARCHIVOS_D11 = [
   'app/(private)/pedidos/components/order-table.tsx',
 ] as const
 
-/** Los vacios y esqueletos de las 5 listas de asignacion: van en QC-232 (D7). */
+/**
+ * Los vacios y esqueletos de las 5 listas de asignacion que QC-231 no toco (D7). R33 los vigila en
+ * el diff de QC-231, asi que esta lista no cambia aunque QC-232 resolviera la mayoria.
+ */
 export const VACIOS_Y_ESQUELETOS_D7 = [
   'app/(private)/asignacion/components/assigned-orders-empty.tsx',
   'app/(private)/asignacion/components/assigned-orders-skeleton.tsx',
@@ -109,6 +112,27 @@ export const VACIOS_Y_ESQUELETOS_D7 = [
   'app/(private)/asignacion/components/finished-orders-empty.tsx',
   'app/(private)/asignacion/components/finished-orders-skeleton.tsx',
   'app/(private)/asignacion/components/packing-orders-skeleton.tsx',
+] as const
+
+/**
+ * Los de D7 que siguen exceptuados de la talla: el vacio de acondicionamiento, que es de QC-217
+ * (QC-232 design.md > 7). QC-232 resolvio los de assigned, company, finished y packing (T4a); el
+ * esqueleto de acondicionamiento ya no daba hallazgos y su exclusion se retiro (T5b).
+ */
+export const VACIOS_Y_ESQUELETOS_D7_PENDIENTES = [
+  'app/(private)/asignacion/components/conditioning-orders-empty.tsx',
+] as const
+
+/**
+ * Archivos D11 que ya no dan ningun hallazgo: su exclusion no mordia y QC-232 la retiro (T5b). Siguen
+ * en `ARCHIVOS_D11` porque R33 vigila que la rama de QC-231 no los toque. El test que estaba en la
+ * lista no se recorre nunca (la guardia solo mira `app/`, `components/` y `hooks/`).
+ */
+export const D11_SIN_HALLAZGOS = [
+  'app/(private)/asignacion/components/conditioned-orders-list-section.tsx',
+  'app/(private)/asignacion/components/conditioning-orders-list-section.tsx',
+  'tests/unit/asignaciones-ui/conditioning-orders-list-section.test.tsx',
+  'app/(private)/pedidos/components/order-list-section.tsx',
 ] as const
 
 /** La credencial sale de QC-231 (D3): solo `components/submit-button.tsx` se toca (D12). */
@@ -137,28 +161,22 @@ type Exclusion = {
 }
 
 export const EXCLUSIONES: readonly Exclusion[] = [
-  ...ARCHIVOS_D11.map(
+  ...ARCHIVOS_D11.filter((a) => !(D11_SIN_HALLAZGOS as readonly string[]).includes(a)).map(
     (archivo): Exclusion => ({
       archivo,
       reglas: TODAS,
       motivo: 'D11: choque de archivos con QC-217/QC-223; la adopcion de piezas es de QC-232',
     }),
   ),
-  ...VACIOS_Y_ESQUELETOS_D7.map(
+  ...VACIOS_Y_ESQUELETOS_D7_PENDIENTES.map(
     (archivo): Exclusion => ({
       archivo,
       reglas: TALLA,
-      motivo: 'D7: los vacios y esqueletos de las 5 listas de asignacion van en QC-232',
+      motivo:
+        'D7: el vacio de acondicionamiento iba en QC-232, pero es archivo de QC-217 ' +
+        '(QC-232 design.md > 7): se parametrizan cuando QC-217 cierre',
     }),
   ),
-  {
-    archivo: 'app/(private)/asignacion/components/packing-orders-list-section.tsx',
-    reglas: ['par-literal'],
-    hasta: 1,
-    motivo:
-      'D7: el vacio en linea de la lista de acondicionado (enlace `packing-orders-first-page`) ' +
-      'va en QC-232. Solo ese literal: un segundo par en el archivo cuenta',
-  },
   {
     archivo: `${CARPETA_ASISTENTE}/step-document-view.tsx`,
     reglas: ['par-en-constante'],
@@ -166,12 +184,6 @@ export const EXCLUSIONES: readonly Exclusion[] = [
     motivo:
       'decision del humano (2026-10-08): sale de QC-231 y va en QC-232, sin enmendar la lista ' +
       'cerrada R18 de order-execution-screen.test.tsx',
-  },
-  {
-    archivo: 'app/(private)/configuracion/usuarios/components/work-group-columns.tsx',
-    reglas: ['par-en-constante'],
-    simbolo: 'TOUCH_TARGET',
-    motivo: 'D13: `WorkGroupRowActions` no se toca; se rehace en QC-232 con su TOUCH_TARGET local',
   },
   // Fuente de la rama del error inesperado (R12).
   {
@@ -184,23 +196,7 @@ export const EXCLUSIONES: readonly Exclusion[] = [
     reglas: ['compara-inesperado'],
     motivo: 'R12: `UnexpectedErrorNotice` es la otra pieza que la spec deja comparar',
   },
-  // R31: alias de EMPTY_MARK que importan archivos fuera de Archivos esperados.
-  {
-    archivo: 'app/(private)/inventario/components/product-columns.tsx',
-    reglas: ['simbolo-borrado'],
-    simbolo: 'EMPTY_CELL',
-    motivo:
-      'alias `EMPTY_CELL = EMPTY_MARK`: lo importa product-batches-panel.tsx, fuera de la lista ' +
-      'de Archivos esperados; decision del humano (2026-10-08): el alias pasa a QC-232',
-  },
-  {
-    archivo: 'app/(private)/proveedores/[id]/components/catalog-columns.tsx',
-    reglas: ['simbolo-borrado'],
-    simbolo: 'EMPTY_CELL',
-    motivo:
-      'alias `EMPTY_CELL = EMPTY_MARK`: lo importa supplier-detail-header.tsx, fuera de la lista ' +
-      'de Archivos esperados; decision del humano (2026-10-08): el alias pasa a QC-232',
-  },
+  // R31: alias de EMPTY_MARK que reexporta un barrel fuera de alcance.
   {
     archivo: 'app/(private)/asignacion/components/assigned-orders-columns.tsx',
     reglas: ['simbolo-borrado'],
@@ -228,8 +224,6 @@ export const USOS_SOLO_LOGICA = [
  * fuera de la lista. NO estan excluidos: no son el literal `—`, asi que pasan la regla 5.
  */
 export const ALIAS_DE_EMPTY_MARK = [
-  ['app/(private)/inventario/components/product-columns.tsx', 'EMPTY_CELL'],
-  ['app/(private)/proveedores/[id]/components/catalog-columns.tsx', 'EMPTY_CELL'],
   ['app/(private)/asignacion/components/assigned-orders-columns.tsx', 'MISSING_VALUE_MARK'],
   ['components/shared/responsible-avatars.tsx', 'MISSING_RESPONSIBLES_MARK'],
   ['app/(private)/configuracion/unidades/components/unit-equivalence.ts', 'NO_EQUIVALENCE_LABEL'],
@@ -790,20 +784,44 @@ describe('QC-231 — las reglas MUERDEN (muestras sinteticas)', () => {
   })
 
   it('las exclusiones son estrechas: por archivo, regla, simbolo y cupo', () => {
-    // work-group-columns: solo su TOUCH_TARGET; otra constante con el par en el mismo archivo cuenta.
-    const wg = 'app/(private)/configuracion/usuarios/components/work-group-columns.tsx'
-    expect(reglasDe("const TOUCH_TARGET = 'min-h-11 min-w-11'", wg)).toEqual([])
-    expect(reglasDe("const OTRA = 'min-h-11 min-w-11'", wg)).toEqual(['par-en-constante'])
-    // packing-orders-list-section: un literal; el segundo cuenta.
-    const packing = 'app/(private)/asignacion/components/packing-orders-list-section.tsx'
+    // step-document-view: solo su TOUCH_TARGET; otra constante con el par en el mismo archivo cuenta.
+    const paso = `${CARPETA_ASISTENTE}/step-document-view.tsx`
+    expect(reglasDe("const TOUCH_TARGET = 'min-h-11 min-w-11'", paso)).toEqual([])
+    expect(reglasDe("const OTRA = 'min-h-11 min-w-11'", paso)).toEqual(['par-en-constante'])
+    // El cupo: una exclusion con `hasta: 1` deja pasar un literal; el segundo cuenta.
+    const conCupo = 'app/x/con-cupo.tsx'
     const dos = "export const A = () => <><a className='min-h-11 min-w-11' /><b className='min-h-11 min-w-11' /></>"
-    expect(reglasDe(dos, packing)).toEqual(['par-literal'])
+    const cupo: Exclusion = { archivo: conCupo, reglas: ['par-literal'], hasta: 1, motivo: 'muestra' }
+    expect(quitarExcluidos(analizar(conCupo, dos), [cupo]).map((h) => h.regla)).toEqual(['par-literal'])
     // Un dialogo de borrado de R12 sigue sin poder escribir el par.
     const del = 'app/(private)/inventario/components/delete-product-dialog.tsx'
     expect(reglasDe("const T = 'min-h-11 min-w-11'", del)).toEqual(['par-en-constante'])
     // La credencial no cuenta para las reglas de talla ni de comparacion (D3).
     const cred = 'app/(public)/establecer-contrasena/[token]/components/set-credential-form.tsx'
     expect(reglasDe("const T = 'min-h-11 min-w-11'", cred)).toEqual([])
+  })
+
+  it('QC-232 (R26, R28): las exclusiones que QC-232 resolvio ya no existen y su forma vuelve a contar', () => {
+    const wg = 'app/(private)/configuracion/usuarios/components/work-group-columns.tsx'
+    expect(reglasDe("const TOUCH_TARGET = 'min-h-11 min-w-11'", wg)).toEqual(['par-en-constante'])
+    expect(reglasDe('export const EMPTY_CELL = EMPTY_MARK', 'app/(private)/inventario/components/product-columns.tsx')).toEqual([
+      'simbolo-borrado',
+    ])
+    expect(
+      reglasDe('export const EMPTY_CELL = EMPTY_MARK', 'app/(private)/proveedores/[id]/components/catalog-columns.tsx'),
+    ).toEqual(['simbolo-borrado'])
+    const packing = 'app/(private)/asignacion/components/packing-orders-list-section.tsx'
+    expect(reglasDe("export const A = () => <a className='min-h-11 min-w-11' />", packing)).toEqual(['par-literal'])
+    for (const archivo of VACIOS_Y_ESQUELETOS_D7) {
+      const pendiente = (VACIOS_Y_ESQUELETOS_D7_PENDIENTES as readonly string[]).includes(archivo)
+      expect(reglasDe("const T = 'min-h-11 min-w-11'", archivo), archivo).toEqual(pendiente ? [] : ['par-en-constante'])
+    }
+    expect(ALIAS_DE_EMPTY_MARK.map(([, simbolo]) => simbolo)).not.toContain('EMPTY_CELL')
+    // Los D11 sin hallazgos ya no estan excluidos: un par nuevo en ellos cuenta.
+    for (const archivo of D11_SIN_HALLAZGOS.filter((a) => a.startsWith('app/'))) {
+      expect(reglasDe("const T = 'min-h-11 min-w-11'", archivo), archivo).toEqual(['par-en-constante'])
+      expect(analizar(archivo, leer(archivo)), `${archivo} vuelve a dar hallazgos`).toEqual([])
+    }
   })
 
   it('R33: el detector ve D11, credencial, la carpeta de establecer-contrasena y D7', () => {
