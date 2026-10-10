@@ -54,7 +54,7 @@ hace push y el leader vuelve a correr `archivos-en-vuelo`.
     - `asignacion-paridad.test.tsx` cubre los estados de lista de las 4 listas de `design.md > 5`.
       Si falta alguno, se añade aquí;
     - no ha cambiado ni un archivo de producción.
-- [ ] **T0c [P]. Capturas «antes»** (R3). **Las hace el leader**, con el seed demo (QC-230), en
+- [x] **T0c [P]. Capturas «antes»** (R3). **Las hace el leader**, con el seed demo (QC-230), en
   claro, oscuro y móvil, en `_trabajo/marca/capturas-formularios-antes/`.
   - **Qué se fotografía:** cada formulario abierto en alta, cada diálogo de borrado abierto y cada
     tabla con acciones con una fila visible.
@@ -194,7 +194,7 @@ Se conservan los exports, los testids y los textos (R5, R10, R15, R17).
   - el resultado de TA;
   - la lista de campos de T0a;
   - cada edición de test de R4, con su tipo (a), (b) o (c).
-- [ ] **T5e. Capturas «después»** (R3). **Las hace el leader**, en
+- [x] **T5e. Capturas «después»** (R3). **Las hace el leader**, en
   `_trabajo/marca/capturas-formularios-despues/`, con lo mismo que T0c y, además, el menú abierto en
   cada tabla con acciones.
   - **Hecho cuando:** cada captura «antes» tiene su pareja y la tabla de parejas queda lista para el
