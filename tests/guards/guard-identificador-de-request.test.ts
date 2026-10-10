@@ -537,8 +537,13 @@ export const MIGRACIONES_ESPERADAS = [
   '20261008150050_inventory_movement_kind_delivery',
   '20261008150100_order_deliveries',
   '20261008150200_delivery_permission',
+  // QC-224 2026-10-09: la anulacion de entregas (valor de enum, tablas y permiso); ninguna toca el
+  // identificador.
+  '20261009120000_inventory_movement_kind_delivery_void',
   // El dia de produccion del lote; no toca el identificador.
   '20261009120000_product_batches_production_date',
+  '20261009120100_order_delivery_voids',
+  '20261009120200_delivery_void_permission',
 ] as const
 
 export function hallazgosDeMigraciones(

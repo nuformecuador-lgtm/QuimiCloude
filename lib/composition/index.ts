@@ -310,6 +310,16 @@ import type { OrderSummaryReader } from '@/lib/modules/pedidos/ports/order-summa
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import type { OrderDeliveryUnitOfWork } from '@/lib/modules/pedidos/ports/order-delivery-unit-of-work';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
+import { createListOrderDeliveries, createVoidDelivery } from '@/lib/modules/pedidos';
+import {
+  createOrderDeliveryHistoryReader,
+  createOrderDeliveryVoidRepository,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-void-prisma';
+import {
+  batchLotDirectoryPrisma,
+  createFinishedGoodsReturn,
+} from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-return-prisma';
+import type { OrderDeliveryVoidUnitOfWork } from '@/lib/modules/pedidos/ports/order-delivery-void-unit-of-work';
 import {
   createRecipeExecutionReader,
   findAliveRecipeByNormalizedName,
@@ -1399,6 +1409,18 @@ const orderDeliveryUnitOfWork: OrderDeliveryUnitOfWork = {
     ),
 };
 
+/** La anulacion, la devolucion a `inventario` y el regreso del pedido confirman o se deshacen juntos. */
+const orderDeliveryVoidUnitOfWork: OrderDeliveryVoidUnitOfWork = {
+  run: (work) =>
+    withOrderTransaction((tx) =>
+      work({
+        orders: createOrderWriteRepository(tx),
+        voids: createOrderDeliveryVoidRepository(tx),
+        finishedGoods: createFinishedGoodsReturn(tx),
+      }),
+    ),
+};
+
 export const pedidos = {
   createOrder: createCreateOrder({
     recipes: recipeCatalog,
@@ -1489,6 +1511,21 @@ export const pedidos = {
     customerCatalog,
     unitOfWork: orderDeliveryUnitOfWork,
     deliveries: createOrderDeliveryRepository(),
+    orders: orderRepository,
+  }),
+  listOrderDeliveries: createListOrderDeliveries({
+    orders: orderRepository,
+    lines: createOrderWriteRepository(),
+    history: createOrderDeliveryHistoryReader(),
+    presentations: presentationCatalog,
+    customerCatalog,
+    // El adaptador importado y no `peopleDirectory`, que se declara mas abajo.
+    people: assignmentDirectoryPrisma,
+    batchLots: batchLotDirectoryPrisma,
+  }),
+  voidDelivery: createVoidDelivery({
+    unitOfWork: orderDeliveryVoidUnitOfWork,
+    voids: createOrderDeliveryVoidRepository(),
     orders: orderRepository,
   }),
 } as const;

@@ -89,6 +89,7 @@ export type BatchHistoryEntry = {
     | 'adjustment'
     | 'consumption'
     | 'delivery'
+    | 'delivery_void'
     | 'reserve'
     | 'release'
     | 'expire'

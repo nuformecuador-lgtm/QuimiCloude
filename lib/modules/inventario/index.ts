@@ -151,6 +151,12 @@ export {
   type FinishedGoodsDispatchInput,
   type FinishedGoodsDispatchOutcome,
 } from './domain/finished-goods-dispatch';
+export type {
+  BatchLotDirectory,
+  FinishedGoodsReturn,
+  FinishedGoodsReturnInput,
+  FinishedGoodsReturnOutcome,
+} from './domain/finished-goods-return';
 // `pedidos` deriva el coste unitario unico del pedido con la MISMA division que ya usa
 // este modulo para un lote sin costo de compra -mismo criterio de redondeo, misma escala-.
 export { deriveUnitCost } from './domain/unit-cost';

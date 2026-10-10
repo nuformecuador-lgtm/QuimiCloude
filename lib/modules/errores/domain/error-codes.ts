@@ -29,6 +29,7 @@
  * **2026-10-09**: `integration_secret_unreadable`.
  * **2026-10-09**: `batch_expiry_not_future`, `batch_production_date_future`,
  * `conditioning_batch_data_missing`.
+ * **2026-10-09**: `delivery_not_found`, `delivery_already_voided`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -180,6 +181,11 @@ export const ERROR_CODES = [
   // los envases enteros que la entrega le pide.
   'delivery_batch_insufficient',
   'integration_secret_unreadable',
+  // Distinto de `order_not_found`: lo que falta es la entrega, no el pedido.
+  'delivery_not_found',
+  // Distinto de `action_not_allowed`: el pedido admite anular, pero alguna presentacion elegida ya
+  // estaba anulada en esa entrega.
+  'delivery_already_voided',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

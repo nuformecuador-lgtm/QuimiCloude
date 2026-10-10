@@ -66,7 +66,8 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // QC-234 2026-10-09: 79 y no 78: entra `integration_secret_unreadable`.
       // QC-219 2026-10-09: 82 y no 79: entran `batch_expiry_not_future`,
       // `batch_production_date_future` y `conditioning_batch_data_missing`.
-      expect(ERROR_CODES).toHaveLength(82)
+      // QC-224 2026-10-09: 84 y no 82: entran `delivery_not_found` y `delivery_already_voided`.
+      expect(ERROR_CODES).toHaveLength(84)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 

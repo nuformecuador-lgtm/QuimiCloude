@@ -274,9 +274,17 @@ function llamaAMetodoFueraDe(
 }
 
 /** El `update` (singular) del ajuste: sigue viviendo SOLO en `adjustBatchStock`. */
-export function llamaAUpdateFueraDe(fuente: string, nombreFuncionPermitida: string): boolean {
+// QC-224 2026-10-09: admite tambien una lista de nombres, para el `update` de `returnFinishedGoods`;
+// con un solo nombre se comporta exactamente igual.
+export function llamaAUpdateFueraDe(
+  fuente: string,
+  nombreFuncionPermitida: string | readonly string[],
+): boolean {
   return llamaAMetodoFueraDe(fuente, 'update', nombreFuncionPermitida);
 }
+
+/** QC-224 2026-10-09 (D12, R31): las dos funciones donde el `update` simple es legitimo. */
+const UPDATE_PERMITIDO = ['adjustBatchStock', 'returnFinishedGoods'] as const;
 
 /** El `updateMany` del decremento condicional: vive SOLO en `consumeBatchStock` y, desde
  *  QC-223 2026-10-08, en `dispatchFinishedGoods` (la salida de producto terminado). */
@@ -478,6 +486,12 @@ describe('QC-91 R11 — ProductRef expone stockByUnit; ProductView expone la exi
 // `DELETE`/`UPDATE` crudo sobre la tabla. No se afirma en positivo que `adjustBatchStock` DEBA
 // tener un `update` -esta guardia no fija ese estado-, solo que si hay uno en el archivo, no
 // puede estar en ningun otro sitio.
+//
+// Nota (2026-10-09, QC-224 D12/R31): se admite exactamente UN `update` mas sobre `productBatch`,
+// dentro del cuerpo de `returnFinishedGoods` (la devolucion de producto terminado al anular una
+// entrega: incremento no condicional del lote). Fuera de `adjustBatchStock` y `returnFinishedGoods`
+// sigue prohibido; `delete`, `deleteMany`, `upsert`, el SQL crudo y el censo de `updateMany` no
+// cambian. Decision humana del 2026-10-09.
 describe('QC-91 R21 — calcular y dejar de escribir la existencia no toca ninguna fila de lote', () => {
   it('R21: product_batches.stock sigue siendo la existencia del lote, ahora decimal(14,4)', () => {
     const cuerpo = cuerpoDeModelo(leer(SCHEMA), 'ProductBatch');
@@ -495,10 +509,17 @@ describe('QC-91 R21 — calcular y dejar de escribir la existencia no toca ningu
     expect(llamaAUpdateFueraDe(leer(PRODUCT_CATALOG_PRISMA), 'adjustBatchStock')).toBe(false);
   });
 
-  it('R21: el alta y el agregado de lote siguen creando; los unicos update viven en adjustBatchStock y writeFinishedBatchLabels', () => {
+  // QC-219 2026-10-09: + writeFinishedBatchLabels (UPDATES_PERMITIDOS).
+  // QC-224 2026-10-09: el update se admite tambien en returnFinishedGoods, exactamente uno. Solo
+  // adjustBatchStock ya NO basta: el real tiene los tres (QC-219 + QC-224).
+  it('R21: el alta y el agregado de lote siguen creando; los unicos update viven en adjustBatchStock, writeFinishedBatchLabels y returnFinishedGoods', () => {
     const fuente = leer(PRODUCT_PRISMA);
     expect(fuente).toMatch(/tx\.productBatch\.create\s*\(/);
-    expect(llamaAUpdateFueraDeLas(fuente, UPDATES_PERMITIDOS)).toBe(false);
+    expect(llamaAUpdateFueraDeLas(fuente, [...UPDATES_PERMITIDOS, ...UPDATE_PERMITIDO])).toBe(false);
+    expect(llamaAUpdateFueraDe(fuente, 'adjustBatchStock')).toBe(true);
+    const cuerpoDevolucion = cuerpoDeFuncion(fuente, 'returnFinishedGoods');
+    expect(cuerpoDevolucion, 'returnFinishedGoods no existe: el sujeto de esta prueba cambio').not.toBeNull();
+    expect(stripComments(cuerpoDevolucion ?? '').match(/\.productBatch\.update\s*\(/g) ?? []).toHaveLength(1);
   });
 
   // QC-223 2026-10-08: el updateMany se admite tambien en dispatchFinishedGoods (decremento
@@ -580,6 +601,26 @@ describe('QC-91 R21 — calcular y dejar de escribir la existencia no toca ningu
       expect(
         escrituraDestructivaDeLotes('await tx.$executeRaw`DELETE FROM "product_batches" WHERE id = ${id}`;'),
       ).not.toEqual([]);
+    });
+
+    // QC-224 2026-10-09: con dos funciones permitidas, un update en una tercera sigue en rojo.
+    it('R27: update en adjustBatchStock y returnFinishedGoods no es hallazgo; uno en una tercera funcion si', () => {
+      const permitidas = [
+        'export async function adjustBatchStock(batchId) {',
+        '  return tx.productBatch.update({ where: { id: batchId } });',
+        '}',
+        'export async function returnFinishedGoods(batchId) {',
+        '  return tx.productBatch.update({ where: { id: batchId } });',
+        '}',
+      ];
+      expect(llamaAUpdateFueraDe(permitidas.join('\n'), UPDATE_PERMITIDO)).toBe(false);
+      const conTercera = [
+        ...permitidas,
+        'export function otraFuncion() {',
+        '  return tx.productBatch.update({ where: { id: 1 } });',
+        '}',
+      ].join('\n');
+      expect(llamaAUpdateFueraDe(conTercera, UPDATE_PERMITIDO)).toBe(true);
     });
   });
 

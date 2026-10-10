@@ -37,6 +37,7 @@ import {
 import type { FinishedGoodsOutcome } from '../../../domain/finished-goods';
 import type { FinishedBatchLabel, FinishedBatchLabelsOutcome } from '../../../domain/finished-batch-labels';
 import type { FinishedGoodsDispatchOutcome } from '../../../domain/finished-goods-dispatch';
+import type { FinishedGoodsReturnOutcome } from '../../../domain/finished-goods-return';
 import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
@@ -1404,6 +1405,77 @@ export async function dispatchFinishedGoods(
   await recalculateProductStock(tx, product.id, scope);
 
   return { kind: 'dispatched', lines };
+}
+
+/**
+ * La vuelta al lote de lo que salio en una entrega anulada, sobre la MISMA transaccion de quien
+ * llama. Los productos se bloquean ordenados por `id` para que dos devoluciones concurrentes no se
+ * crucen, y sin mirar `deleted_at`: un producto dado de baja tambien recupera su existencia. El
+ * incremento no es condicional porque sumar no puede dejar el lote en negativo.
+ *
+ * No lanza por un lote ausente o de otra empresa: lo devuelve, y quien llama deshace todo.
+ */
+export async function returnFinishedGoods(
+  tx: Prisma.TransactionClient,
+  input: {
+    readonly orderId: string;
+    readonly orderDeliveryVoidId: string;
+    readonly lines: readonly { readonly batchId: string; readonly quantity: string }[];
+    readonly actorId: string;
+    readonly now: Date;
+  },
+  scope: InventoryScope,
+): Promise<FinishedGoodsReturnOutcome> {
+  const { companyId } = companyScopeColumns(scope);
+  if (input.lines.length === 0) return { kind: 'returned' };
+
+  const batchRows = await tx.productBatch.findMany({
+    where: { AND: [batchCompanyScope(scope), { id: { in: input.lines.map((line) => line.batchId) } }] },
+    select: { id: true, productId: true },
+  });
+  const productByBatch = new Map(batchRows.map((row) => [row.id, row.productId]));
+  const missing = input.lines.find((line) => !productByBatch.has(line.batchId));
+  if (missing !== undefined) return { kind: 'batch_not_found', batchId: missing.batchId };
+
+  const productIds = [...new Set(productByBatch.values())].sort();
+  await tx.$queryRaw(Prisma.sql`
+    SELECT "id"
+      FROM "products"
+     WHERE "company_id" = ${companyId}::uuid
+       AND "id" IN (${Prisma.join(productIds.map((id) => Prisma.sql`${id}::uuid`))})
+     ORDER BY "id"
+       FOR NO KEY UPDATE
+  `);
+
+  for (const line of input.lines) {
+    await tx.productBatch.update({
+      where: { id: line.batchId, companyId },
+      data: { stock: { increment: new Prisma.Decimal(line.quantity) }, updatedBy: input.actorId, updatedAt: input.now },
+      select: { id: true },
+    });
+
+    await writeMovement(
+      tx,
+      {
+        batchId: line.batchId,
+        kind: 'delivery_void',
+        quantity: line.quantity,
+        reason: null,
+        orderId: input.orderId,
+        orderPresentationLineId: null,
+        orderDeliveryVoidId: input.orderDeliveryVoidId,
+        createdBy: input.actorId,
+      },
+      input.now,
+      scope,
+    );
+  }
+
+  for (const productId of productIds) {
+    await recalculateProductStock(tx, productId, scope);
+  }
+
+  return { kind: 'returned' };
 }
 
 /** Lote de producto terminado que entra por importacion: asiento `opening`, no `production`,

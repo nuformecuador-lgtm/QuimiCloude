@@ -624,7 +624,16 @@ describe('db/schema.prisma — modelo de pedido', () => {
       .map(([modelName]) => modelName)
       .sort()
     // QC-223 2026-10-08: + `OrderDelivery` y `OrderDeliveryLine`, la entrega y sus lotes.
-    expect(pedidosModels).toEqual(['Order', 'OrderDelivery', 'OrderDeliveryLine', 'OrderPresentationLine'])
+    expect(pedidosModels).toEqual(expect.arrayContaining(['Order', 'OrderDelivery', 'OrderDeliveryLine', 'OrderPresentationLine']))
+    // QC-224 2026-10-09: + `OrderDeliveryVoid` y `OrderDeliveryVoidLine`, la anulacion y sus lineas.
+    expect(pedidosModels).toEqual([
+      'Order',
+      'OrderDelivery',
+      'OrderDeliveryLine',
+      'OrderDeliveryVoid',
+      'OrderDeliveryVoidLine',
+      'OrderPresentationLine',
+    ])
     expect(owners.get('Recipe')).toBe('recetas')
     expect(owners.get('Unit')).toBe('unidades')
     expect(owners.get('User')).toBe('identity')
@@ -733,7 +742,16 @@ describe('db/schema.prisma — modelo de pedido', () => {
       .filter((modelName): modelName is string => modelName !== undefined)
       .sort()
     // QC-223 2026-10-08: + `OrderDelivery` y `OrderDeliveryLine`, la entrega y sus lotes.
-    expect(pedidosModels).toEqual(['Order', 'OrderDelivery', 'OrderDeliveryLine', 'OrderPresentationLine'])
+    expect(pedidosModels).toEqual(expect.arrayContaining(['Order', 'OrderDelivery', 'OrderDeliveryLine', 'OrderPresentationLine']))
+    // QC-224 2026-10-09: + `OrderDeliveryVoid` y `OrderDeliveryVoidLine`, la anulacion y sus lineas.
+    expect(pedidosModels).toEqual([
+      'Order',
+      'OrderDelivery',
+      'OrderDeliveryLine',
+      'OrderDeliveryVoid',
+      'OrderDeliveryVoidLine',
+      'OrderPresentationLine',
+    ])
     // `import` aqui es «importe». `InventoryImport` (QC-209, 2026-10-06) es el registro de una
     // importacion de archivo, sin dinero: se exime solo ese nombre; el patron sigue entero.
     const IMPORTACION_DE_ARCHIVO = new Set(['InventoryImport'])

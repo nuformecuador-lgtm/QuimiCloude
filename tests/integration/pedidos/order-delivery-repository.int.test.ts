@@ -422,4 +422,59 @@ describe('OrderDeliveryRepository contra Postgres real', () => {
       expect([...(await repo.sumDeliveredPackages(b.orderId, { companyId: a.companyId }))]).toEqual([])
     })
   })
+
+  // Nota 2026-10-09: caso añadido por la anulacion de entregas; los anteriores no cambian.
+  it('R26: sumDeliveredPackages no suma las lineas anuladas, y una linea con todo anulado no aparece', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const repo = createOrderDeliveryRepository(tx)
+      const scope = { companyId: a.companyId }
+      const otroLote = await newBatch(tx, a)
+
+      const deliveryId = await createdId(repo, a)
+      await repo.addLines(
+        deliveryId,
+        [
+          { presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 2, quantity: '2.0000' },
+          { presentationLineId: a.lineIds[1], batchId: otroLote, packages: 3, quantity: '3.0000' },
+        ],
+        scope,
+      )
+      const segunda = await createdId(repo, a)
+      await repo.addLines(
+        segunda,
+        [{ presentationLineId: a.lineIds[0], batchId: a.batchId, packages: 4, quantity: '4.0000' }],
+        scope,
+      )
+      expect(new Map(await repo.sumDeliveredPackages(a.orderId, scope))).toEqual(
+        new Map([
+          [a.lineIds[0], 6],
+          [a.lineIds[1], 3],
+        ]),
+      )
+
+      const anuladas = await tx.orderDeliveryLine.findMany({
+        where: { deliveryId, orderPresentationLineId: a.lineIds[1] },
+        select: { id: true },
+      })
+      const { id: voidId } = await tx.orderDeliveryVoid.create({
+        data: {
+          companyId: a.companyId,
+          deliveryId,
+          voidKey: randomUUID(),
+          reason: 'Devuelto por el cliente',
+          createdBy: a.userId,
+          createdAt: AHORA,
+        },
+        select: { id: true },
+      })
+      await tx.orderDeliveryVoidLine.createMany({
+        data: anuladas.map((l) => ({ companyId: a.companyId, voidId, deliveryId, deliveryLineId: l.id })),
+      })
+
+      const suma = await repo.sumDeliveredPackages(a.orderId, scope)
+      expect([...suma]).toEqual([[a.lineIds[0], 6]])
+      expect(suma.has(a.lineIds[1])).toBe(false)
+    })
+  })
 })

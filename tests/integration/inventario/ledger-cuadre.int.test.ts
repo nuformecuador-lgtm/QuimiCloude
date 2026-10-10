@@ -27,6 +27,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { createFinishedGoodsDispatch } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-dispatch-prisma';
+import { createFinishedGoodsReturn } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-return-prisma';
 import {
   addBatchToAlive,
   addImportedFinishedGoodsBatch,
@@ -382,6 +383,135 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
       await assertLedgerBalances(batchId);
     } finally {
       await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
+      await prisma.orderDelivery.deleteMany({ where: { companyId: fixture.companyId } });
+      await prisma.productBatch.deleteMany({ where: { companyId: fixture.companyId } });
+      if (productId !== null) await prisma.product.deleteMany({ where: { id: productId } });
+      if (orderId !== null) await prisma.order.deleteMany({ where: { id: orderId } });
+      if (customerId !== null) await prisma.customer.deleteMany({ where: { id: customerId } });
+      if (recipeId !== null) await prisma.recipe.deleteMany({ where: { id: recipeId } });
+      await dropFixture(fixture, []);
+    }
+  });
+
+  // QC-224 2026-10-09: la anulacion de la entrega devuelve el producto y el libro sigue cuadrado.
+  it('QC-224 R23, R24: cuadra con un lote del que sale una entrega y vuelve con su anulacion', async () => {
+    const fixture = await createFixture();
+    const marker = token();
+    let recipeId: string | null = null;
+    let orderId: string | null = null;
+    let customerId: string | null = null;
+    let productId: string | null = null;
+
+    try {
+      const recipe = await prisma.recipe.create({
+        data: { name: `Receta ${marker}`, nameNormalized: `receta${marker}`, companyId: fixture.companyId },
+        select: { id: true },
+      });
+      recipeId = recipe.id;
+      const product = await prisma.product.create({
+        data: {
+          name: `Terminado ${marker}`,
+          nameNormalized: `terminado${marker}`,
+          type: 'FINISHED_PRODUCT',
+          unitId: await unidadDeSistema(prisma),
+          recipeId,
+          presentationId: fixture.presentationId,
+          companyId: fixture.companyId,
+        },
+        select: { id: true },
+      });
+      productId = product.id;
+      const order = await prisma.order.create({
+        data: {
+          orderYear: new Date().getUTCFullYear(),
+          orderSequence: 1,
+          recipeId,
+          quantity: '10',
+          companyId: fixture.companyId,
+        },
+        select: { id: true },
+      });
+      orderId = order.id;
+      const customer = await prisma.customer.create({
+        data: {
+          firstNames: 'Luis',
+          firstNamesNormalized: 'luis',
+          lastNames: 'Rojas',
+          lastNamesNormalized: 'rojas',
+          city: 'Cali',
+          cityNormalized: 'cali',
+          companyId: fixture.companyId,
+        },
+        select: { id: true },
+      });
+      customerId = customer.id;
+      const delivery = await prisma.orderDelivery.create({
+        data: {
+          companyId: fixture.companyId,
+          orderId,
+          customerId,
+          deliveryKey: randomUUID(),
+          createdBy: fixture.actorId,
+        },
+        select: { id: true },
+      });
+
+      const finishedProductId = productId;
+      const { batchId } = await prisma.$transaction((tx) =>
+        addImportedFinishedGoodsBatch(
+          tx,
+          finishedProductId,
+          newBatch(fixture, { stock: '12' }),
+          '2.0000',
+          new Date(),
+          ambito(fixture),
+        ),
+      );
+      const deliveryOrderId = orderId;
+      const finishedRecipeId = recipeId;
+      const dispatched = await prisma.$transaction((tx) =>
+        createFinishedGoodsDispatch(tx).dispatchForDelivery({
+          companyId: fixture.companyId,
+          orderId: deliveryOrderId,
+          orderDeliveryId: delivery.id,
+          recipeId: finishedRecipeId,
+          presentationId: fixture.presentationId,
+          allocations: [{ batchId, packages: 4 }],
+          actorId: fixture.actorId,
+          now: new Date(),
+        }),
+      );
+      if (dispatched.kind !== 'dispatched') throw new Error('la entrega deberia salir');
+      await assertLedgerBalances(batchId);
+
+      const deliveryVoid = await prisma.orderDeliveryVoid.create({
+        data: {
+          companyId: fixture.companyId,
+          deliveryId: delivery.id,
+          voidKey: randomUUID(),
+          reason: 'Cliente devolvio el pedido',
+          createdBy: fixture.actorId,
+        },
+        select: { id: true },
+      });
+      const returned = await prisma.$transaction((tx) =>
+        createFinishedGoodsReturn(tx).returnForDeliveryVoid({
+          companyId: fixture.companyId,
+          orderId: deliveryOrderId,
+          orderDeliveryVoidId: deliveryVoid.id,
+          lines: dispatched.lines.map((line) => ({ batchId: line.batchId, quantity: line.quantity })),
+          actorId: fixture.actorId,
+          now: new Date(),
+        }),
+      );
+      expect(returned.kind).toBe('returned');
+
+      const batch = await prisma.productBatch.findUniqueOrThrow({ where: { id: batchId }, select: { stock: true } });
+      expect(batch.stock.toFixed(4)).toBe('12.0000');
+      await assertLedgerBalances(batchId);
+    } finally {
+      await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
+      await prisma.orderDeliveryVoid.deleteMany({ where: { companyId: fixture.companyId } });
       await prisma.orderDelivery.deleteMany({ where: { companyId: fixture.companyId } });
       await prisma.productBatch.deleteMany({ where: { companyId: fixture.companyId } });
       if (productId !== null) await prisma.product.deleteMany({ where: { id: productId } });

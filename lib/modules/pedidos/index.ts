@@ -296,3 +296,10 @@ export {
   DeliveryBatchNotFoundError,
   DeliveryExceedsRemainingError,
 } from './domain/errors';
+
+/** La anulacion de entregas: la lista de entregas del pedido, el caso de uso que anula y sus errores. */
+export { createListOrderDeliveries } from './domain/list-order-deliveries';
+export type { ListOrderDeliveriesDeps, OrderDeliveryHistoryView } from './domain/list-order-deliveries';
+export { createVoidDelivery } from './domain/void-delivery';
+export type { VoidDeliveryDeps, VoidDeliveryResult } from './domain/void-delivery';
+export { DeliveryAlreadyVoidedError, DeliveryNotFoundError } from './domain/errors';

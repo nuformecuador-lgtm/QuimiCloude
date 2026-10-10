@@ -35,6 +35,7 @@ export async function writeMovement(
       orderPresentationLineId: movement.orderPresentationLineId,
       // Solo una entrega lo lleva; los demas asientos lo dejan NULL por omision.
       ...(movement.orderDeliveryId != null ? { orderDeliveryId: movement.orderDeliveryId } : {}),
+      ...(movement.orderDeliveryVoidId != null ? { orderDeliveryVoidId: movement.orderDeliveryVoidId } : {}),
       // Sin ellos la columna queda NULL por omision: solo un ajuste los escribe.
       ...(movement.previousStock != null || movement.countedStock != null
         ? { stockBefore: movement.previousStock ?? null, countedStock: movement.countedStock ?? null }

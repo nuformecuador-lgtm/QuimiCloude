@@ -360,6 +360,7 @@ enum InventoryMovementKind {
   consumption
   production
   delivery
+  delivery_void
 }
 
 /// Un asiento no se corrige: se corrige con otro. Sin `updatedAt` ni `deletedAt`, a proposito.
@@ -389,6 +390,10 @@ model InventoryMovement {
   /// `pedidos`; FK compuesta con `companyId` escrita a mano, drift.
   orderDeliveryId String? @map("order_delivery_id") @db.Uuid
 
+  /// La anulacion de un asiento `delivery_void`, y solo de ese. Sin `@relation`:
+  /// `OrderDeliveryVoid` es de `pedidos`; FK compuesta con `companyId` escrita a mano, drift.
+  orderDeliveryVoidId String? @map("order_delivery_void_id") @db.Uuid
+
   /// Solo en un ajuste: la existencia leida con el lote bloqueado y el total contado. Van los
   /// dos o ninguno, y `countedStock = stockBefore + quantity`; los `CHECK` son drift.
   stockBefore   Decimal? @map("stock_before") @db.Decimal(14, 4)
@@ -402,6 +407,7 @@ model InventoryMovement {
   @@index([orderId], map: "inventory_movements_order_id_idx")
   @@index([orderPresentationLineId], map: "inventory_movements_order_presentation_line_id_idx")
   @@index([orderDeliveryId], map: "inventory_movements_order_delivery_id_idx")
+  @@index([orderDeliveryVoidId], map: "inventory_movements_order_delivery_void_id_idx")
   @@map("inventory_movements")
 }
 
@@ -796,6 +802,7 @@ model OrderDelivery {
 
   order Order               @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   lines OrderDeliveryLine[]
+  voids OrderDeliveryVoid[]
 
   @@unique([id, companyId], map: "order_deliveries_id_company_id_key")
   @@unique([companyId, deliveryKey], map: "order_deliveries_company_key_unique")
@@ -821,12 +828,59 @@ model OrderDeliveryLine {
 
   delivery         OrderDelivery         @relation(fields: [deliveryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   presentationLine OrderPresentationLine @relation(fields: [orderPresentationLineId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  voidLine         OrderDeliveryVoidLine?
 
   @@unique([deliveryId, batchId], map: "order_delivery_lines_delivery_batch_unique")
+  @@unique([id, deliveryId], map: "order_delivery_lines_id_delivery_id_key")
   @@index([companyId], map: "order_delivery_lines_company_id_idx")
   @@index([orderPresentationLineId], map: "order_delivery_lines_presentation_line_id_idx")
   @@index([batchId], map: "order_delivery_lines_batch_id_idx")
   @@map("order_delivery_lines")
+}
+
+/// La anulacion de una entrega. Solo de insercion: sin `updatedAt` ni `deletedAt`. `voidKey` la
+/// hace idempotente por empresa. `createdBy` y `companyId` no llevan `@relation`: `User` y
+/// `Company` son de otros modulos; sus FK estan escritas a mano y son drift, y la del autor es
+/// compuesta con `companyId`. La FK de `delivery` tambien es compuesta en la base
+/// (`(delivery_id, company_id)`), y el CHECK del motivo es drift.
+/// @module pedidos
+model OrderDeliveryVoid {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId  String   @map("company_id") @db.Uuid
+  deliveryId String   @map("delivery_id") @db.Uuid
+  voidKey    String   @map("void_key") @db.Uuid
+  reason     String
+  createdBy  String   @map("created_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  delivery OrderDelivery           @relation(fields: [deliveryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  lines    OrderDeliveryVoidLine[]
+
+  @@unique([id, companyId], map: "order_delivery_voids_id_company_id_key")
+  @@unique([id, deliveryId], map: "order_delivery_voids_id_delivery_id_key")
+  @@unique([companyId, voidKey], map: "order_delivery_voids_company_key_unique")
+  @@index([deliveryId], map: "order_delivery_voids_delivery_id_idx")
+  @@index([createdBy], map: "order_delivery_voids_created_by_idx")
+  @@map("order_delivery_voids")
+}
+
+/// Una linea de entrega anulada; cada una se anula una sola vez. Solo de insercion. Las FK de
+/// `void` y `deliveryLine` son compuestas en la base y comparten `delivery_id`, y hay una tercera
+/// `(void_id, company_id)`: las tres son drift.
+/// @module pedidos
+model OrderDeliveryVoidLine {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId      String @map("company_id") @db.Uuid
+  voidId         String @map("void_id") @db.Uuid
+  deliveryId     String @map("delivery_id") @db.Uuid
+  deliveryLineId String @unique(map: "order_delivery_void_lines_delivery_line_unique") @map("delivery_line_id") @db.Uuid
+
+  void         OrderDeliveryVoid @relation(fields: [voidId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  deliveryLine OrderDeliveryLine @relation(fields: [deliveryLineId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([voidId], map: "order_delivery_void_lines_void_id_idx")
+  @@index([companyId], map: "order_delivery_void_lines_company_id_idx")
+  @@map("order_delivery_void_lines")
 }
 
 /// Las tres FK y el CHECK van escritos a mano y sin `@relation`, porque los padres son de otros

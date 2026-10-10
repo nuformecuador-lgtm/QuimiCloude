@@ -883,6 +883,8 @@ describe('down.sql — revertir deja la base exactamente como estaba antes del U
       'integraciones.modificar',
       // QC-223 2026-10-08
       'entregas.modificar',
+      // QC-224 2026-10-09
+      'entregas.anular',
     ]
     const CODIGOS_QC66 = [
       'dashboard.consultar',
