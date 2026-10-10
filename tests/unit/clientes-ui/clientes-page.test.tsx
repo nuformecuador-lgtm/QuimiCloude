@@ -34,6 +34,8 @@ import {
 } from '@/lib/modules/identity';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { CUSTOMERS_ROUTE, LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
+import { openRowActionsMenu } from '../../helpers/row-actions-menu';
+import { setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
 const { getSessionUserMock, listCustomersActionMock, notFoundMock, redirectMock, routerMock } = vi.hoisted(
@@ -360,6 +362,9 @@ describe('a nivel de pantalla, con los tres conjuntos de permisos del seed (R6)'
 
     expect(notFoundMock).not.toHaveBeenCalled();
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+    if (escribe) {
+      await openRowActionsMenu(setupUser(), screen.getByTestId(CUSTOMER_ROW_ACTIONS_TESTID));
+    }
     for (const testid of ESCRITURAS) {
       if (escribe) {
         expect(screen.getByTestId(testid), testid).toBeInTheDocument();

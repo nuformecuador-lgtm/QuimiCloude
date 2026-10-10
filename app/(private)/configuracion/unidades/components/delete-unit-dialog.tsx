@@ -4,20 +4,9 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { ErrorAlert } from '@/components/shared/error-alert';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import type { ErrorCode } from '@/lib/modules/errores';
 import type { UnitView } from '@/lib/modules/unidades';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
 import {
   deleteUnitAction,
   type UnitMutationFormState,
@@ -72,8 +61,6 @@ export const DELETE_UNIT_ID_FIELD = 'id';
 export const UNIT_IN_USE_CODE: ErrorCode = 'unit_in_use';
 
 const TITLE = 'Eliminar la unidad';
-const CONFIRM_LABEL = 'Eliminar';
-const CONFIRM_PENDING_LABEL = 'Eliminando…';
 const DISMISS_LABEL = 'Volver';
 const DELETE_SUCCESS = 'Unidad eliminada.';
 
@@ -103,52 +90,31 @@ export function DeleteUnitDialog({ unit, open, onOpenChange }: DeleteUnitDialogP
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent data-testid={DELETE_UNIT_DIALOG_TESTID}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{TITLE}</AlertDialogTitle>
-          <AlertDialogDescription data-testid={DELETE_UNIT_MESSAGE_TESTID}>
-            Se va a eliminar la unidad {unit.name}. Esta acción no se puede deshacer.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        {error === undefined ? null : (
-          <ErrorAlert
-            error={error}
-            id={errorId}
-            className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            testId={DELETE_UNIT_ERROR_TESTID}
-            withDataCode
-            renderCatalogued={(catalogued) => (
-              <p data-testid={DELETE_UNIT_ERROR_MESSAGE_TESTID}>{catalogued.message}</p>
-            )}
-          />
-        )}
-
-        <form action={formAction} data-testid={DELETE_UNIT_FORM_TESTID}>
-          <input
-            type="hidden"
-            name={DELETE_UNIT_ID_FIELD}
-            defaultValue={unit.id}
-            data-testid={DELETE_UNIT_ID_TESTID}
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel className={touchTarget} data-testid={DELETE_UNIT_DISMISS_TESTID}>
-              {DISMISS_LABEL}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              type="submit"
-              variant="destructive"
-              className={touchTarget}
-              disabled={isPending}
-              aria-busy={isPending}
-              data-testid={DELETE_UNIT_CONFIRM_TESTID}
-            >
-              {isPending ? CONFIRM_PENDING_LABEL : CONFIRM_LABEL}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </form>
-      </AlertDialogContent>
-    </AlertDialog>
+    <DeleteConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      texts={{
+        title: TITLE,
+        description: <>Se va a eliminar la unidad {unit.name}. Esta acción no se puede deshacer.</>,
+        dismiss: DISMISS_LABEL,
+      }}
+      testIds={{
+        dialog: DELETE_UNIT_DIALOG_TESTID,
+        message: DELETE_UNIT_MESSAGE_TESTID,
+        dismiss: DELETE_UNIT_DISMISS_TESTID,
+        confirm: DELETE_UNIT_CONFIRM_TESTID,
+        form: DELETE_UNIT_FORM_TESTID,
+        error: DELETE_UNIT_ERROR_TESTID,
+        errorMessage: DELETE_UNIT_ERROR_MESSAGE_TESTID,
+      }}
+      submit={{
+        kind: 'action',
+        action: formAction,
+        hidden: [{ name: DELETE_UNIT_ID_FIELD, value: unit.id, testId: DELETE_UNIT_ID_TESTID }],
+      }}
+      isPending={isPending}
+      error={error}
+      errorId={errorId}
+    />
   );
 }

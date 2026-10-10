@@ -23,6 +23,7 @@ import { INVENTORY_ROUTE, PRESENTATIONS_ROUTE } from '@/lib/shared/routes';
 
 // QC-93 (R8): el aterrizaje tras el login se deriva de los permisos del usuario en el helper unico.
 import { loginAndLand } from './helpers/landing';
+import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 const FIXTURE_PREFIX = 'qc49_e2e_';
 
@@ -65,6 +66,7 @@ const SEARCH_PARAM = 'q';
 const INVENTORY_TITLE = 'inventario-title';
 const PRESENTATIONS_TITLE = 'presentaciones-title';
 const NAME_CELL = 'data-table-cell-name';
+const ROW_ACTIONS = 'product-row-actions';
 const DELETE_OPEN = 'product-delete-open';
 const DELETE_DIALOG = 'delete-product-dialog';
 const DELETE_ID_FIELD = 'delete-product-id';
@@ -340,11 +342,11 @@ test.describe('aislamiento por empresa del inventario', () => {
     await page.goto(listUrl(INVENTORY_ROUTE, SHARED_TOKEN));
     await expect(page.getByTestId(INVENTORY_TITLE)).toBeVisible({ timeout: 60_000 });
 
-    const abrirBorrado = page.getByTestId(DELETE_OPEN);
-    await expect(abrirBorrado, 'la lista de A debe ofrecer el borrado de su unico producto').toHaveCount(1, {
+    const menuDeFila = page.getByTestId(ROW_ACTIONS);
+    await expect(menuDeFila, 'la lista de A debe ofrecer el borrado de su unico producto').toHaveCount(1, {
       timeout: 60_000,
     });
-    await abrirBorrado.click();
+    await (await openRowActionsMenuItem(page, menuDeFila, DELETE_OPEN)).click();
     await expect(page.getByTestId(DELETE_DIALOG)).toBeVisible({ timeout: 60_000 });
 
     const campoOculto = page.getByTestId(DELETE_ID_FIELD);

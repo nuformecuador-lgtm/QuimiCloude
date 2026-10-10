@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { REFERENCIA_DEL_CASO, errorInesperado } from '../../helpers/identificador-de-request';
+import { clickRowAction } from '../../helpers/row-actions-menu';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 
@@ -191,6 +192,7 @@ const testId = {
   vacio: CATALOG_LIST_EMPTY_TESTID,
   tabla: 'data-table',
   abrirAlta: 'catalog-line-create-open',
+  menuFila: 'catalog-line-row-actions',
   abrirEdicion: 'catalog-line-edit-open',
   panel: 'catalog-line-sheet',
   formulario: 'catalog-line-form',
@@ -381,7 +383,7 @@ async function abrirAlta(user: ReturnType<typeof setupUser>) {
 
 /** Abre el panel de edicion de la primera fila. */
 async function abrirEdicion(user: ReturnType<typeof setupUser>) {
-  await user.click(screen.getAllByTestId(testId.abrirEdicion)[0]);
+  await clickRowAction(user, screen.getAllByTestId(testId.menuFila)[0], testId.abrirEdicion);
   await screen.findByTestId(testId.formulario);
 }
 

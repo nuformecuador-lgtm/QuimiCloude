@@ -21,8 +21,11 @@
  * de correo (R27). Aqui solo se leen cadenas del entorno.
  */
 
-/** Los transportes admitidos (`design.md > 7.3`, § 9.2). `resend` es el de produccion. */
-export const MAIL_TRANSPORTS = ['resend', 'outbox', 'smtp'] as const;
+/**
+ * Los transportes admitidos. `resend` va el primero porque es el valor por defecto; `desactivado`
+ * no envia nada y solo se usa si alguien lo pone a proposito.
+ */
+export const MAIL_TRANSPORTS = ['resend', 'outbox', 'smtp', 'desactivado'] as const;
 
 export type MailTransport = (typeof MAIL_TRANSPORTS)[number];
 

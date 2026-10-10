@@ -65,6 +65,11 @@ export {
   OrderWithoutDistributionError,
   ConditioningTeamMemberNotAllowedError,
   ConditioningTeamEmptyError,
+  BatchExpiryNotFutureError,
+  BatchProductionDateFutureError,
+  ConditioningBatchDataMissingError,
+  ConditioningBatchDuplicateLotError,
+  ConditioningBatchNotFoundError,
 } from './domain/errors';
 
 // Los TRES esquemas del borde (R14, R29, R31, R32, R42) y sus tipos inferidos. Se publican para
@@ -278,6 +283,18 @@ export {
   createGetConditioningOrder,
   type GetConditioningOrderDeps,
 } from './domain/get-conditioning-order';
+export type { ConditioningBatchData, ConditioningBatchLineView } from './domain/conditioning-order-view';
+export {
+  createListDeliveredConditionedOrders,
+  type ListDeliveredConditionedOrdersDeps,
+} from './domain/list-delivered-conditioned-orders';
+export {
+  createSaveConditioningBatchData,
+  saveConditioningBatchDataSchema,
+  type SaveConditioningBatchDataDeps,
+  type SaveConditioningBatchDataInput,
+} from './domain/save-conditioning-batch-data';
+export { missingBatchDataLines } from './domain/conditioning-batch-data';
 
 // ---------------------------------------------------------------------------------------
 // El equipo de acondicionamiento: la entrada de Comenzar y los candidatos del modal.

@@ -1,10 +1,9 @@
 'use client';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
+import { TextField } from '@/components/shared/text-field';
 import { Button } from '@/components/ui/button';
 import { DialogFooter } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import type { ErrorState } from '@/lib/modules/errores';
 
 import {
@@ -41,29 +40,20 @@ export function DialogTextField({
   readonly required?: boolean;
   readonly inputMode?: 'decimal';
 }) {
-  const errorId = `${id}-error`;
   return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={id}>{label}</Label>
-      <Input
-        id={id}
-        type="text"
-        autoComplete="off"
-        inputMode={inputMode}
-        required={required}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={`min-h-11 ${FIELD_TEXT}`}
-        aria-invalid={error === undefined ? undefined : true}
-        aria-describedby={error === undefined ? undefined : errorId}
-        data-testid={dialogFieldTestId(field)}
-      />
-      {error === undefined ? null : (
-        <p id={errorId} role="alert" className="text-sm text-destructive" data-testid={dialogFieldErrorTestId(field)}>
-          {error}
-        </p>
-      )}
-    </div>
+    <TextField
+      id={id}
+      label={label}
+      autoComplete="off"
+      inputMode={inputMode}
+      required={required}
+      value={value}
+      onValueChange={onChange}
+      inputClassName={`min-h-11 ${FIELD_TEXT}`}
+      error={error}
+      testId={dialogFieldTestId(field)}
+      errorTestId={dialogFieldErrorTestId(field)}
+    />
   );
 }
 

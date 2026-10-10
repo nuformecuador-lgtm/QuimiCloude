@@ -1,12 +1,10 @@
 'use client';
 
 import { PlusIcon } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
-import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
+import { useEntitySheet } from '@/hooks/use-entity-sheet';
 import type { UnitView } from '@/lib/modules/unidades';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
@@ -58,27 +56,12 @@ export type UnitSheetProps = {
 };
 
 export function UnitSheet({ unit, baseUnits, open, onOpenChange }: UnitSheetProps) {
-  const [selfOpen, setSelfOpen] = useState(false);
-  const router = useRouter();
   const isEdit = unit !== undefined;
-  const isControlled = open !== undefined;
-  const isOpen = open ?? selfOpen;
-
-  const changeOpen = useCallback(
-    (next: boolean) => {
-      if (!isControlled) setSelfOpen(next);
-      onOpenChange?.(next);
-    },
-    [isControlled, onOpenChange],
-  );
-
-  const handleSaved = useCallback(() => {
-    changeOpen(false);
-    toast.success(isEdit ? UPDATE_SUCCESS : CREATE_SUCCESS);
-    // Ni `push` ni `replace`: `refresh` reejecuta el Server Component con la MISMA URL, asi que
-    // pagina, tamano, orden y busqueda siguen siendo los de antes de abrir (R32, R38).
-    router.refresh();
-  }, [changeOpen, isEdit, router]);
+  const { isOpen, isControlled, changeOpen, handleSaved } = useEntitySheet({
+    open,
+    onOpenChange,
+    successMessage: isEdit ? UPDATE_SUCCESS : CREATE_SUCCESS,
+  });
 
   return (
     <Sheet open={isOpen} onOpenChange={changeOpen}>

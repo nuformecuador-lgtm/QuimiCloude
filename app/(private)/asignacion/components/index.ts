@@ -115,8 +115,14 @@ export {
 export {
   conditionedOrdersHref,
   conditioningOrdersHref,
+  deliveredConditionedOrdersHref,
   type ConditioningListView,
 } from './conditioning-orders-href';
+export {
+  DELIVERED_CONDITIONED_ORDERS_EMPTY_TEXT,
+  DELIVERED_CONDITIONED_ORDERS_SECTION_TESTID,
+  DeliveredConditionedOrdersListSection,
+} from './delivered-conditioned-orders-list-section';
 export {
   CONDITIONING_ORDERS_SECTION_TESTID,
   ConditioningOrdersListSection,

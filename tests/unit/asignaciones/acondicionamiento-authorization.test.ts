@@ -342,9 +342,13 @@ describe('R15 — sensibilidad: el puerto falso si registra a quien lo toca', ()
   });
 });
 
-describe('R2 — en /asignacion el rol recibe exactamente sus dos vistas (enmienda la vista de reserva)', () => {
-  it("R2: resolveAssignmentViews con los permisos del rol devuelve exactamente ['por_acondicionar', 'acondicionados']", () => {
-    expect(resolveAssignmentViews(ACTOR_ASIGNACIONES)).toEqual(['por_acondicionar', 'acondicionados']);
+describe('R2 — en /asignacion el rol recibe exactamente sus vistas (enmienda la vista de reserva)', () => {
+  it("R2, QC-219 R20: resolveAssignmentViews con los permisos del rol devuelve exactamente ['por_acondicionar', 'acondicionados', 'acondicionados_entregados']", () => {
+    expect(resolveAssignmentViews(ACTOR_ASIGNACIONES)).toEqual([
+      'por_acondicionar',
+      'acondicionados',
+      'acondicionados_entregados',
+    ]);
   });
 
   it('R2: no incluye asignados, todos, terminados ni por_empacar', () => {

@@ -2,17 +2,9 @@
 
 import Link from 'next/link';
 import { useActionState, useEffect, useId } from 'react';
-import { useFormStatus } from 'react-dom';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
-import { Button } from '@/components/ui/button';
-import {
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { FormSheet } from '@/components/shared/form-sheet';
 import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import {
   createSupplierSchema,
@@ -262,135 +254,75 @@ export function SupplierForm({ supplier, onSaved }: SupplierFormProps) {
   const isEdit = supplier !== undefined;
 
   return (
-    /*
-      `isForm`: el panel ENTERO es el <form>, asi que el boton de guardar vive en el pie y
-      `useFormStatus()` lo sigue viendo, porque el formulario es su ancestro.
-
-      `w-full` en angosto y `sm:max-w-md` a partir de ahi, y `pb-[env(safe-area-inset-bottom)]`
-      para que el pie no quede bajo la barra de gestos de iOS (R48). El desbordamiento vertical
-      lo absorbe el CUERPO, no el panel: asi la cabecera y el pie no se van con el scroll.
-    */
-    <SheetContent
-      side="right"
-      className="w-full pb-[env(safe-area-inset-bottom)] data-[side=right]:w-full sm:max-w-md"
-      data-testid="supplier-sheet"
-      isForm
-      formProps={{ action: formAction, 'data-testid': 'supplier-form' }}
-      footer={<FormActions />}
+    <FormSheet
+      title={isEdit ? 'Editar proveedor' : 'Nuevo proveedor'}
+      description={
+        isEdit
+          ? 'Cambia los datos del proveedor. Se guardan todos los campos.'
+          : 'Completa los datos del proveedor. Hace falta al menos un teléfono o un correo.'
+      }
+      formAction={formAction}
+      testIds={{
+        sheet: 'supplier-sheet',
+        form: 'supplier-form',
+        cancel: 'supplier-form-cancel',
+        submit: 'supplier-form-submit',
+      }}
     >
-      <SheetHeader>
-        <SheetTitle>{isEdit ? 'Editar proveedor' : 'Nuevo proveedor'}</SheetTitle>
-        <SheetDescription>
-          {isEdit
-            ? 'Cambia los datos del proveedor. Se guardan todos los campos.'
-            : 'Completa los datos del proveedor. Hace falta al menos un teléfono o un correo.'}
-        </SheetDescription>
-      </SheetHeader>
-
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-        {formError === undefined ? null : (
-          // Aqui van los rechazos que no senalan campo.
-          <ErrorAlert
-            error={formError}
-            id={formErrorId}
-            className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            testId="supplier-form-error"
-            renderCatalogued={(catalogued) => (
-              <>
-                <p data-testid="supplier-form-error-message">{catalogued.message}</p>
-                <p className="text-xs" data-testid="supplier-form-error-code">
-                  {catalogued.code}
-                </p>
-              </>
-            )}
-            after={
-              isMissing ? (
-                // El proveedor dejo de existir con el panel abierto: solo queda volver a la lista.
-                <Link
-                  href={SUPPLIERS_ROUTE}
-                  className={`${touchTarget} inline-flex items-center underline underline-offset-4`}
-                  data-testid="supplier-form-back-to-list"
-                >
-                  {BACK_TO_LIST_LABEL}
-                </Link>
-              ) : null
-            }
-          />
-        )}
-
-        <SupplierField
-          name="name"
-          label={FIELD_LABELS.name}
-          required
-          autoComplete="organization"
-          defaultValue={initialValue('name', supplier?.name ?? '')}
-          error={fieldErrors.name}
+      {formError === undefined ? null : (
+        <ErrorAlert
+          error={formError}
+          id={formErrorId}
+          className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
+          testId="supplier-form-error"
+          renderCatalogued={(catalogued) => (
+            <>
+              <p data-testid="supplier-form-error-message">{catalogued.message}</p>
+              <p className="text-xs" data-testid="supplier-form-error-code">
+                {catalogued.code}
+              </p>
+            </>
+          )}
+          after={
+            isMissing ? (
+              <Link
+                href={SUPPLIERS_ROUTE}
+                className={`${touchTarget} inline-flex items-center underline underline-offset-4`}
+                data-testid="supplier-form-back-to-list"
+              >
+                {BACK_TO_LIST_LABEL}
+              </Link>
+            ) : null
+          }
         />
+      )}
 
-        <SupplierField
-          name="phone"
-          label={FIELD_LABELS.phone}
-          inputMode="tel"
-          autoComplete="tel"
-          defaultValue={initialValue('phone', supplier?.phone ?? '')}
-          error={fieldErrors.phone}
-        />
+      <SupplierField
+        name="name"
+        label={FIELD_LABELS.name}
+        required
+        autoComplete="organization"
+        defaultValue={initialValue('name', supplier?.name ?? '')}
+        error={fieldErrors.name}
+      />
 
-        <SupplierField
-          name="email"
-          label={FIELD_LABELS.email}
-          inputMode="email"
-          autoComplete="email"
-          defaultValue={initialValue('email', supplier?.email ?? '')}
-          error={fieldErrors.email}
-        />
-      </div>
-    </SheetContent>
-  );
-}
+      <SupplierField
+        name="phone"
+        label={FIELD_LABELS.phone}
+        inputMode="tel"
+        autoComplete="tel"
+        defaultValue={initialValue('phone', supplier?.phone ?? '')}
+        error={fieldErrors.phone}
+      />
 
-/**
- * Acciones del pie: cancelar y guardar. **Cancelar es `type="button"`** —y no un submit— porque
- * desde que el panel entero es un `<form>` cualquier boton sin tipo dentro de el lo enviaria.
- * Cierra por el primitivo (`SheetClose`), asi que no necesita saber nada del estado de apertura.
- */
-function FormActions() {
-  return (
-    <>
-      <SheetClose
-        render={
-          <Button
-            type="button"
-            variant="outline-dashed"
-            className={touchTarget}
-            data-testid="supplier-form-cancel"
-          />
-        }
-      >
-        Cancelar
-      </SheetClose>
-      <SaveButton />
-    </>
-  );
-}
-
-/**
- * Boton de envio. Componente aparte por una necesidad tecnica: `useFormStatus()` solo lee el
- * estado del `<form>` ANCESTRO, asi que dentro del componente que renderiza el `<form>`
- * devolveria siempre `pending: false` y el boton no se deshabilitaria nunca.
- */
-function SaveButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button
-      type="submit"
-      touch
-      disabled={pending}
-      aria-busy={pending}
-      data-testid="supplier-form-submit"
-    >
-      {pending ? 'Guardando…' : 'Guardar'}
-    </Button>
+      <SupplierField
+        name="email"
+        label={FIELD_LABELS.email}
+        inputMode="email"
+        autoComplete="email"
+        defaultValue={initialValue('email', supplier?.email ?? '')}
+        error={fieldErrors.email}
+      />
+    </FormSheet>
   );
 }

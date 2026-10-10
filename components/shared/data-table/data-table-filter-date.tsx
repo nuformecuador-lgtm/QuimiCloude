@@ -1,15 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CalendarIcon } from 'lucide-react';
 import type { DateRange } from 'react-day-picker';
 
+import { DatePicker } from '@/components/shared/date-picker';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { formatDateLocalISO, parseDateLocalISO } from '@/lib/shared/ui/date-civil';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
-import { cn } from '@/lib/utils';
 
 import type { DataTableFilterValue, DataTableTexts } from './data-table-types';
 
@@ -145,20 +141,14 @@ export function DataTableFilterDate({ columnId, label, value, texts, onChange }:
   };
 
   return (
-    <Popover>
-      <PopoverTrigger
-        type="button"
-        className={cn(
-          'inline-flex items-center gap-1.5 rounded-lg border border-input bg-background px-2.5 text-sm hover:bg-muted',
-          touchTarget,
-        )}
-        data-testid={`data-table-filter-date-${columnId}`}
-      >
-        <CalendarIcon className="size-4" aria-hidden="true" />
-        {label}
-      </PopoverTrigger>
-
-      <PopoverContent className="w-auto">
+    <DatePicker
+      mode="range"
+      triggerContent={label}
+      triggerTestId={`data-table-filter-date-${columnId}`}
+      numberOfMonths={numberOfMonths}
+      selected={selectedRange}
+      onSelect={(range) => onChange(toFilterValue(range))}
+      header={
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
@@ -191,14 +181,7 @@ export function DataTableFilterDate({ columnId, label, value, texts, onChange }:
             {texts.lastYear}
           </Button>
         </div>
-
-        <Calendar
-          mode="range"
-          numberOfMonths={numberOfMonths}
-          selected={selectedRange}
-          onSelect={(range) => onChange(toFilterValue(range))}
-        />
-      </PopoverContent>
-    </Popover>
+      }
+    />
   );
 }

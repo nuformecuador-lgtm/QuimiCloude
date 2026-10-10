@@ -27,6 +27,8 @@
  * **2026-10-08**: `conditioning_team_member_not_allowed`, `conditioning_team_empty`.
  * **2026-10-08**: `delivery_exceeds_remaining`, `delivery_batch_insufficient`.
  * **2026-10-09**: `integration_secret_unreadable`.
+ * **2026-10-09**: `batch_expiry_not_future`, `batch_production_date_future`,
+ * `conditioning_batch_data_missing`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -163,6 +165,14 @@ export const ERROR_CODES = [
   // Distinto de `invalid_input`: la entrada marca personas o grupos, pero ninguna persona elegible
   // queda en el equipo.
   'conditioning_team_empty',
+  // Distinto de `invalid_input`: la fecha tiene forma valida, lo que falla es que no es posterior
+  // a hoy.
+  'batch_expiry_not_future',
+  // Distinto de `invalid_input`: la fecha tiene forma valida, lo que falla es que es posterior a hoy.
+  'batch_production_date_future',
+  // Distinto de `order_not_conditionable`: el pedido si se puede terminar, lo que falta son los
+  // datos de lote de alguna linea.
+  'conditioning_batch_data_missing',
   // Distinto de `order_distribution_exceeds_quantity`: no pasa de lo pedido al repartir, pasa de
   // los envases que aun faltan por entregar.
   'delivery_exceeds_remaining',

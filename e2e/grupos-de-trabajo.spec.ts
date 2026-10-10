@@ -94,6 +94,7 @@ import { USERS_ROUTE } from '@/lib/shared/routes';
 
 // QC-93: la entrada y su aterrizaje, derivado de los permisos del usuario en la base.
 import { loginAndLand } from './helpers/landing';
+import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc85_e2e_';
@@ -129,6 +130,7 @@ const GROUP_LIST_TESTID = 'work-group-list';
 const GROUP_LIST_EMPTY_TESTID = 'work-group-list-empty';
 const GROUP_CREATE_OPEN_TESTID = 'work-group-create-open';
 const GROUP_NAME_CELL_TESTID = 'data-table-cell-name';
+const GROUP_ROW_ACTIONS_TESTID = 'work-group-row-actions';
 const GROUP_ACTION_EDIT_TESTID = 'work-group-action-edit';
 const GROUP_ACTION_DELETE_TESTID = 'work-group-action-delete';
 
@@ -442,7 +444,13 @@ test.describe('pestana de grupos de trabajo', () => {
 
     // --- 5. RENOMBRARLO. La misma fila, su accion de abrir, y el panel llega precargado con el
     // nombre que la lista muestra (R20, R23).
-    await row.getByTestId(GROUP_ACTION_EDIT_TESTID).click();
+    await (
+      await openRowActionsMenuItem(
+        page,
+        row.getByTestId(GROUP_ROW_ACTIONS_TESTID),
+        GROUP_ACTION_EDIT_TESTID,
+      )
+    ).click();
     await expect(sheet).toBeVisible({ timeout: 60_000 });
     await expect(sheet).toHaveAttribute('data-mode', 'edit');
     await expect(sheet).toHaveAttribute('data-work-group-id', created.id);
@@ -469,7 +477,13 @@ test.describe('pestana de grupos de trabajo', () => {
     // --- 6. METER A UNA PERSONA. Se abre el panel otra vez sobre el grupo ya creado: ahi es donde
     // se gestionan los miembros (decision cerrada 4). El grupo todavia no tiene ninguno, y el
     // renombrado no le ha tocado los miembros (R23).
-    await row.getByTestId(GROUP_ACTION_EDIT_TESTID).click();
+    await (
+      await openRowActionsMenuItem(
+        page,
+        row.getByTestId(GROUP_ROW_ACTIONS_TESTID),
+        GROUP_ACTION_EDIT_TESTID,
+      )
+    ).click();
     await expect(sheet).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(MEMBERS_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(MEMBERS_ERROR_TESTID)).toHaveCount(0);
@@ -525,7 +539,13 @@ test.describe('pestana de grupos de trabajo', () => {
     // --- 8. BORRAR EL GRUPO. Se pide confirmacion en un dialogo que NOMBRA a ese grupo (R33): el
     // sujeto se afirma por el campo oculto que viaja en el envio —identificador, no copy— y el
     // mensaje contiene el nombre del fixture. Mientras no se confirme, no se invoca el borrado.
-    await row.getByTestId(GROUP_ACTION_DELETE_TESTID).click();
+    await (
+      await openRowActionsMenuItem(
+        page,
+        row.getByTestId(GROUP_ROW_ACTIONS_TESTID),
+        GROUP_ACTION_DELETE_TESTID,
+      )
+    ).click();
     const dialog = page.getByTestId(DELETE_DIALOG_TESTID);
     await expect(dialog).toBeVisible({ timeout: 60_000 });
     await expect(dialog.getByTestId(DELETE_ID_TESTID)).toHaveValue(created.id);
