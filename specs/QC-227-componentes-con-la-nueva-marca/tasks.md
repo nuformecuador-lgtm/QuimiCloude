@@ -26,7 +26,7 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
 
 ## Tanda 1 — Primitivos y piezas compartidas (Dep.: T0)
 
-- [ ] **T1 [P]. Badges de estado** (R1, R3–R6, R8, R9)
+- [x] **T1 [P]. Badges de estado** (R1, R3–R6, R8, R9)
   - Variantes `success`, `warning`, `info` y `neutral`, y `destructive` con `subtle`/`text`, en
     `components/ui/badge.tsx`, con el foco de `design.md > 7` (`design.md > 3`).
   - Mapas de tono en `order-status-badge.tsx` y `user-columns.tsx`; «En revisión» con `info` en
@@ -34,7 +34,7 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
   - Test nuevo `tests/unit/marca/badges-estado.test.tsx`, con un caso por R en el nombre.
   - **Hecho cuando:** el test está verde y cada `Record` sigue siendo exhaustivo (sin `default`).
 
-- [ ] **T2 [P]. Cabecera de tabla y prop `tabular`** (R10, R11, R13)
+- [x] **T2 [P]. Cabecera de tabla y prop `tabular`** (R10, R11, R13)
   - `components/ui/table.tsx` (`bg-muted`, `text-muted-foreground`); columna fijada de la cabecera
     en `data-table-header-menu.tsx`; `tabular?: boolean` en `data-table-types.ts` y su clase en
     `data-table.tsx` y en `packing-orders-list-section.tsx` (`design.md > 4`).
@@ -43,7 +43,7 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
   - **Hecho cuando:** el test está verde y los tests existentes de `DataTable` siguen verdes sin
     editar aserciones.
 
-- [ ] **T3 [P]. Barra lateral y contorno global** (R14–R17, R22)
+- [x] **T3 [P]. Barra lateral y contorno global** (R14–R17, R22)
   - En `app/globals.css`, la regla del ítem inactivo de `design.md > 5`, después del bloque del
     activo, y `outline-ring/50` → `outline-ring` en `@layer base`. Sin tocar la regla del activo
     ni su `::before`.
@@ -52,7 +52,7 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
     `tests/unit/app-sidebar.test.tsx` y `tests/unit/theme/sidebar-panel.test.tsx` siguen verdes sin
     editar.
 
-- [ ] **T4 [P]. Botones, campos y foco en los primitivos** (R18–R25)
+- [x] **T4 [P]. Botones, campos y foco en los primitivos** (R18–R25)
   - `components/ui/button.tsx` (base y `destructive`, conservando `btn-shine`, `btn-veil` y las
     clases de movimiento de QC-228), `input.tsx`, `textarea.tsx`, `select.tsx`, `autocomplete.tsx`,
     `checkbox.tsx`, `tabs.tsx` y `calendar.tsx` (`design.md > 6, 7`).
@@ -61,7 +61,7 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
   - Test nuevo `tests/unit/marca/botones-y-campos.test.tsx`.
   - **Hecho cuando:** el test está verde y ninguno de esos ocho archivos contiene `ring-ring/`.
 
-- [ ] **T5 [P]. Contraste de los pares de componentes** (R2, R10, R15, R18–R21, R23)
+- [x] **T5 [P]. Contraste de los pares de componentes** (R2, R10, R15, R18–R21, R23)
   - Test nuevo `tests/unit/marca/contraste-componentes.test.ts`, que reutiliza la conversión de
     `tests/unit/theme/color-tokens.test.ts`. Si no está exportada, se mueve a
     `tests/unit/theme/contraste.ts` sin cambiar su lógica, y `color-tokens.test.ts` la importa de ahí.
@@ -69,7 +69,7 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
     editar sus tablas esperadas (R27). Si algún par no llega, se para y se reporta: no se toca
     ningún token (D10).
 
-- [ ] **T8 [P]. Logo del login con precarga** (R26) — solo si P1 queda en «entra»
+- [x] **T8 [P]. Logo del login con precarga** (R26) — solo si P1 queda en «entra»
   - Leer la referencia de `<Image>` en `node_modules/next/dist/docs/` para elegir `preload` o
     `priority` (`design.md > 8`).
   - `preload` en `components/shared/brand-logo.tsx` y su uso en `app/(public)/login/page.tsx`.
@@ -77,7 +77,7 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
   - **Hecho cuando:** el test está verde, `e2e/login-skin.spec.ts` sigue verde y el aviso de LCP de
     `next dev` ya no sale (se anota en `progress/impl_QC-227.md`).
 
-- [ ] **T12 (Dep.: T0, T3). Carril colapsado centrado y control de colapso** (R31–R39) — ENMIENDA 2026-10-09
+- [x] **T12 (Dep.: T0, T3). Carril colapsado centrado y control de colapso** (R31–R39) — ENMIENDA 2026-10-09
   - Depende de T3 porque las dos tocan `app/globals.css`. No es `[P]` con T3; con las demás de la
     tanda, sí.
   - **Primero medir, sin cambiar nada.** Escribir el bloque «carril colapsado» de
@@ -124,7 +124,7 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
 
 ## Tanda 2 — Pantallas (Dep.: T1, T2, T4)
 
-- [ ] **T6. Columnas de cifras y panel de lotes** (R7, R11, R12, R13)
+- [x] **T6. Columnas de cifras y panel de lotes** (R7, R11, R12, R13)
   - `tabular: true` en las columnas de la lista cerrada de `design.md > 4.2` (12 archivos
     `*-columns.tsx`) y `font-mono tabular-nums` en las cuatro celdas de cifra de
     `order-ingredients-table.tsx`.
@@ -135,7 +135,7 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
   - **Hecho cuando:** los tests están verdes y los tests existentes del panel y de esas pantallas
     siguen verdes sin editar aserciones.
 
-- [ ] **T7 (Dep.: T6). Foco en compuestos y rutas, y guardia** (R22–R24)
+- [x] **T7 (Dep.: T6). Foco en compuestos y rutas, y guardia** (R22–R24)
   - Foco opaco (campo o control, `design.md > 7`) en `shared-select.tsx`, `presentation-select.tsx`,
     `presentation-unit-select.tsx`, `date-picker.tsx`, `file-field.tsx`,
     `data-table/data-table-filters.tsx`, `responsible-avatars.tsx`, `product-field.tsx`,
