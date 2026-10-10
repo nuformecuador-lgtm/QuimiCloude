@@ -309,12 +309,12 @@ bloque del login; las clases de movimiento en uso son `duration-(--dur-*)`, `eas
 | R21 | `motion-tokens.test.ts > R21: *` (2 casos); `data-table-scroll.test.tsx > R21: *` (2 casos); los 4 casos `… con movimiento reducido` de `e2e/movimiento.spec.ts` |
 | R22 | `motion-tokens.test.ts > R22: la regla global no cambia el nombre de ninguna animacion…`; `tests/unit/theme/color-tokens.test.ts > R32 (ENMIENDA QC-228)`; `e2e/login-skin.spec.ts > R22 (ENMIENDA QC-226): con movimiento reducido…` |
 | R23 | `guard-movimiento.test.ts > R23: una curva… con rebote`, `R23: animate-bounce y animate-ping`, `R23: infinite fuera del login…`, `R23: animate-* y animaciones CSS en la tabla, el badge y el logo` y el barrido |
-| R24 | La suite existente, sin editar aserciones de comportamiento salvo las enmiendas de `design.md > 8`: `tests/unit/shared-ui/button-touch.test.tsx > R5 — sin touch, buttonVariants da las clases de siempre para el defecto` (solo la cadena de clases, `ENMIENDA QC-228`) y `tests/unit/theme/color-tokens.test.ts > R6` (localizador `--dur-instant:`) y `> R32 (ENMIENDA QC-228)`. Los snapshots de paridad, en T6 (Pendientes) |
+| R24 | La suite existente, sin editar aserciones de comportamiento salvo las enmiendas de `design.md > 8`: `tests/unit/shared-ui/button-touch.test.tsx > R5 — sin touch, buttonVariants da las clases de siempre para el defecto` (solo la cadena de clases, `ENMIENDA QC-228`) y `tests/unit/theme/color-tokens.test.ts > R6` (localizador `--dur-instant:`) y `> R32 (ENMIENDA QC-228)`. Los 21 archivos de `tests/unit/paridad/*` (376 tests), regenerados en T6 solo por clases de movimiento |
 | R25 | `tests/guards/guard-dependencias-aprobadas.test.ts` (existente; verde en `vitest run guard`) |
 
 ## Pendientes
 
-- **T6 (regeneración de los 13 snapshots de paridad):** pendiente de integrar `dev` con QC-232. Hoy
+- **T6:** HECHA el 2026-10-09 (sección T6 al final). Texto original: pendiente de integrar `dev` con QC-232. Hoy
   fallan 13 archivos de `tests/unit/paridad` (152 tests) solo por las clases de T2/T3 previstas en
   `design.md > 8` (más `hover:text-foreground` de `outline`). Se regeneran con `-u` en el commit
   `test(QC-228): paridad con las clases de movimiento` tras la integración.
@@ -323,3 +323,50 @@ bloque del login; las clases de movimiento en uso son `duration-(--dur-*)`, `eas
   QC-228 o ficha aparte.
 
 **Veredicto:** T9 y T10 hechas; los dos E2E verdes en Chromium y WebKit (22/22), guardias verdes y R1–R25 con test.
+
+## T6 — Paridad tras integrar dev con QC-232 (implementer, 2026-10-09)
+
+### Integración
+`git fetch origin dev && git merge origin/dev` (dev en 92d514c9, PR #195 de QC-232): merge
+`7c943774` **sin conflictos**. Ningún archivo de componentes tocado por las dos ramas a la vez.
+
+### Snapshots regenerados (commit `28046e6e`, `test(QC-228): paridad con las clases de movimiento`)
+`pnpm exec vitest run tests/unit/paridad` antes de `-u`: 17 archivos y 264 tests en rojo. Tras `-u`:
+21/21 archivos y 376/376 tests en verde. El commit solo contiene los `.snap`.
+
+Comprobación mecánica del diff (`git diff -U0`, cada línea `-` emparejada con su `+`, comparadas
+quitando los atributos `class`): **724 pares, 0 diferencias fuera de `class`, 0 líneas sin pareja**.
+El árbol accesible, los textos y los atributos no cambian. Tokens de clase del diff:
+
+| Sale | Entra | Origen (`design.md > 8`) |
+|---|---|---|
+| `active:not-aria-[haspopup]:translate-y-px` (404) | `active:not-aria-[haspopup]:scale-[0.98]` (404) | escala al pulsar de `default`/`outline` (R18) |
+| `hover:bg-primary/80` (161) | `btn-shine` (161) | brillo del primario (R16) |
+| `hover:bg-muted`, `hover:text-foreground`, `dark:hover:bg-input/50` (243) | `btn-veil` (243) | velo de `outline` (R17); `hover:text-foreground` ya anotado en Pendientes |
+| `duration-100` (177), `duration-150`/`duration-200`/`ease-in-out` (45) | `duration-(--dur-*)`, `ease-(--ease-*)`, `data-closed:`/`data-ending-style:` duración y curva de salida, `after:duration/ease` de tabs | duración y curva |
+| `data-open:zoom-in-95`, `data-closed:zoom-out-95` (65) | `zoom-in-96`, `zoom-out-96` (65) | escala de entrada de diálogos |
+
+Archivos regenerados (líneas cambiadas): `confirmaciones-paridad` 336, `formularios-paridad` 348,
+`inventario-paridad` 136, `recetas-paridad` 120, `catalogo-paridad` 96, `buscadores-paridad` 90,
+`grupos-paridad` 54, `usuarios-paridad` 54, `asignacion-paridad` 44, `presentaciones-paridad` 34,
+`clientes-paridad` 30, `pedidos-paridad` 30, `unidades-paridad` 26, `proveedores-paridad` 20,
+`campos-paridad` 18, `asignacion-listas-paridad` 8, `login-paridad` 4. Motivo, en todos: solo clases
+de movimiento de T2/T3 (tabla anterior).
+
+`tests/unit/shared-ui/button-touch.test.tsx`: 63/63 verde, no se toca.
+
+### `./init.sh` (rápido) — ROJO, bloqueante pendiente de decisión
+```
+ Test Files  1 failed | 103 passed (104)
+      Tests  1 failed | 1458 passed | 35 skipped (1494)
+[test:rapido] rojos NUEVOS (fuera del baseline): tests/unit/clientes/scope.test.ts
+ FAIL tests/unit/clientes/scope.test.ts > R28 — los UNICOS E2E que nombran clientes son
+      e2e/clientes.spec.ts y la excepcion de QC-156 > ningun otro archivo de e2e/ ... nombra clientes
+AssertionError: spec E2E ajeno con marca de clientes: movimiento.spec.ts
+```
+El proyecto `ui` del mismo gate: 282/282 archivos, 4304 tests verdes. El rojo no está en
+`tests/baseline-rojos.json` y lo causa el propio E2E de QC-228 (`e2e/movimiento.spec.ts`, T9), que
+navega a «Clientes» y da de alta un cliente. Dos salidas, con precedente la primera (QC-156, QC-223):
+1. añadir `movimiento.spec.ts` a `E2E_PERMITIDOS` con su nota de por qué;
+2. reescribir el E2E sobre otro módulo (p. ej. Proveedores), cambiando `design.md` de QC-228.
+No se aplica ninguna: decide el leader/humano.

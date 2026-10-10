@@ -51,7 +51,7 @@ la fase 3 entra. Las demás preguntas tienen propuesta por defecto y no bloquean
     que detecta cada patrón prohibido.
   - **Hecho cuando:** `pnpm exec vitest run guard` está verde.
 
-- [ ] **T6 (tras T2, T3). Paridad y tests de clases** (R24) — pendiente de integrar dev con QC-232
+- [x] **T6 (tras T2, T3). Paridad y tests de clases** (R24)
   - Revisar el diff de `pnpm exec vitest run tests/unit/paridad` y, si solo cambian las clases
     previstas en `design.md > 8`, regenerar con `-u` en el commit
     `test(QC-228): paridad con las clases de movimiento`.
