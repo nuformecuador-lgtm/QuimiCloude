@@ -278,24 +278,34 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   // Borra SIEMPRE, aunque el `beforeAll` fallara a medias o un test reventara. El orden lo imponen
-  // las FK restrictivas: usuarios -> empresa.
+  // las FK restrictivas: tokens de establecer contrasena -> usuarios -> empresa. Dar de alta un
+  // usuario le genera su token (QC-79), y `credential_setup_tokens.user_id` es `onDelete: Restrict`.
   //
   // **Por los nombres EXACTOS de ESTE worker, NUNCA por `FIXTURE_PREFIX`**: `fullyParallel` reparte
   // los dos tests de este archivo en workers DISTINTOS, cada uno con su propio `RUN_ID` y su propio
   // fixture. Borrar por prefijo aqui se llevaria lo que el OTRO worker acaba de crear.
-  try {
-    await prisma.user.deleteMany({
-      where: {
-        username: { in: [adminUser.username, operatorUser.username, nuevoUsuario.username] },
-      },
-    });
-  } finally {
+  //
+  // Cada paso corre aunque falle el anterior, y se relanza el PRIMER fallo: el de un paso posterior
+  // (la empresa que no se puede borrar porque quedaron usuarios) taparia la causa.
+  const usernames = [adminUser.username, operatorUser.username, nuevoUsuario.username];
+  const pasos: ReadonlyArray<() => Promise<unknown>> = [
+    () => prisma.credentialSetupToken.deleteMany({ where: { user: { username: { in: usernames } } } }),
+    () => prisma.user.deleteMany({ where: { username: { in: usernames } } }),
+    () => prisma.company.deleteMany({ where: { name: companyName } }),
+  ];
+
+  let primerFallo: unknown;
+  for (const paso of pasos) {
     try {
-      await prisma.company.deleteMany({ where: { name: companyName } });
-    } finally {
-      await prisma.$disconnect();
+      await paso();
+    } catch (error) {
+      primerFallo ??= error;
     }
   }
+
+  await prisma.$disconnect();
+
+  if (primerFallo !== undefined) throw primerFallo;
 });
 
 // Timeout amplio: el primer `goto` hace que `next dev` compile la ruta bajo demanda y bcrypt tarda
