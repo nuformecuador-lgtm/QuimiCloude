@@ -425,6 +425,13 @@ const NAME_COLUMN_ID = 'lastNames';
 const DATE_COLUMN_ID = 'createdAt';
 const INSET_BUTTON = '[data-slot="sidebar-inset"] [data-slot="button"]';
 
+/** Primer item con submenu de la navegacion, tomado de la constante y no escrito a mano. */
+const FIRST_GROUP = (() => {
+  const group = PRIVATE_NAV_ITEMS.find((item) => item.kind === 'group');
+  if (!group) throw new Error('PRIVATE_NAV_ITEMS no tiene ningun item con submenu');
+  return group;
+})();
+
 /** Color calculado de un token, leido de una sonda con `color: var(--token)` en el documento. */
 async function tokenColor(page: Page, token: string): Promise<string> {
   return page.evaluate((name) => {
@@ -1017,6 +1024,45 @@ for (const theme of THEMES) {
       expectColor(focused.color, accentForeground, 'R16 texto con foco');
       await context.close();
     });
+
+    for (const collapsed of [false, true]) {
+      const mode = collapsed ? 'modo icono' : 'expandida';
+
+      test(`R15 R16 un item con submenu pinta el tono apagado en reposo y el del hover con foco (${mode})`, async ({
+        browser,
+        baseURL,
+      }) => {
+        const { context, page } = await enter(browser, baseURL as string, { theme, collapsed });
+        await settleDesktop(page, collapsed);
+        const mutedForeground = await tokenColor(page, '--sidebar-muted-foreground');
+        const accentForeground = await tokenColor(page, '--sidebar-accent-foreground');
+        const sidebar = await tokenColor(page, '--sidebar');
+        const trigger = page.getByTestId(FIRST_GROUP.testId);
+
+        await page.mouse.move(DESKTOP_VIEWPORT.width - 1, DESKTOP_VIEWPORT.height - 1);
+        const rest = await trigger.evaluate(async (el) => {
+          await Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished));
+          const svg = el.querySelector('svg');
+          return {
+            slot: el.getAttribute('data-slot'),
+            text: getComputedStyle(el).color,
+            icon: svg ? getComputedStyle(svg).color : null,
+          };
+        });
+        const ratio = contrastRatio(parseCssColor(rest.text), parseCssColor(sidebar));
+        log(`${theme} ${mode} R15 ${FIRST_GROUP.testId} [${rest.slot}] reposo texto=${rest.text} icono=${rest.icon} contraste=${round(ratio)}`);
+        expectColor(rest.text, mutedForeground, `R15 texto del grupo (${mode})`);
+        if (rest.icon !== null) expectColor(rest.icon, mutedForeground, `R15 icono del grupo (${mode})`);
+        expect.soft(ratio, 'R15 contraste contra --sidebar').toBeGreaterThanOrEqual(MIN_CONTRAST);
+
+        await tabTo(page, `[data-testid="${FIRST_GROUP.testId}"]`, `R16 foco del grupo (${mode})`);
+        const focused = await focusedStyle(page);
+        log(`${theme} ${mode} R16 ${focused.id} foco texto=${focused.color} focus-visible=${focused.focusVisible}`);
+        expect.soft(focused.focusVisible, 'R16 el foco por teclado no es :focus-visible').toBe(true);
+        expectColor(focused.color, accentForeground, `R16 texto del grupo con foco (${mode})`);
+        await context.close();
+      });
+    }
 
     test('R21 R23 R24 con el teclado: el boton pinta un contorno opaco de --ring de 2 px a 2 px; el campo, borde y anillo de 1 px', async ({
       browser,

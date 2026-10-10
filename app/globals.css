@@ -403,17 +403,19 @@
 }
 
 /* Item de navegacion inactivo en el tono apagado del panel. Solo dentro de `sidebar-content`: la
-   marca y el pie tambien son `sidebar-menu-button` y no cambian. Sin capa, gana a las utilidades
-   del primitivo, asi que excluye hover y foco para no anular su color. */
+   marca y el pie tambien son botones de menu y no cambian. Se selecciona por `data-sidebar` y no
+   por `data-slot`: los items con submenu pasan por `CollapsibleTrigger` o `DropdownMenuTrigger`,
+   que pisan el `data-slot` del primitivo pero conservan su `data-sidebar`. Sin capa, gana a las
+   utilidades del primitivo, asi que excluye hover y foco para no anular su color. */
 [data-slot='sidebar-content']
-  :is([data-slot='sidebar-menu-button'], [data-slot='sidebar-menu-sub-button']):not([data-active]):not(:hover):not(:focus-visible) {
+  :is([data-sidebar='menu-button'], [data-sidebar='menu-sub-button']):not([data-active]):not(:hover):not(:focus-visible) {
   color: var(--sidebar-muted-foreground);
 }
 
-/* Con foco de teclado, el inactivo toma el color del hover (R16, decision humana 2026-10-10): el
-   primitivo solo pinta el anillo en `focus-visible` y el texto heredaba `--sidebar-foreground`. */
+/* Con foco de teclado, el inactivo toma el color del hover: el primitivo solo pinta el anillo en
+   `focus-visible` y el texto heredaba `--sidebar-foreground`. */
 [data-slot='sidebar-content']
-  :is([data-slot='sidebar-menu-button'], [data-slot='sidebar-menu-sub-button']):not([data-active]):focus-visible {
+  :is([data-sidebar='menu-button'], [data-sidebar='menu-sub-button']):not([data-active]):focus-visible {
   color: var(--sidebar-accent-foreground);
 }
 

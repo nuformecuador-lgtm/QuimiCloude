@@ -11,10 +11,10 @@ const css = readFileSync(join(RAIZ, 'app', 'globals.css'), 'utf8');
 const sidebarTsx = readFileSync(join(RAIZ, 'components', 'ui', 'sidebar.tsx'), 'utf8');
 
 const INACTIVE_SELECTOR =
-  "[data-slot='sidebar-content']\n  :is([data-slot='sidebar-menu-button'], [data-slot='sidebar-menu-sub-button']):not([data-active]):not(:hover):not(:focus-visible)";
+  "[data-slot='sidebar-content']\n  :is([data-sidebar='menu-button'], [data-sidebar='menu-sub-button']):not([data-active]):not(:hover):not(:focus-visible)";
 
 const FOCUS_SELECTOR =
-  "[data-slot='sidebar-content']\n  :is([data-slot='sidebar-menu-button'], [data-slot='sidebar-menu-sub-button']):not([data-active]):focus-visible";
+  "[data-slot='sidebar-content']\n  :is([data-sidebar='menu-button'], [data-sidebar='menu-sub-button']):not([data-active]):focus-visible";
 
 /** Bloques del item activo, copiados tal cual del `dev` de partida: no pueden cambiar. */
 const ACTIVE_RULE = `[data-slot='sidebar-menu-button'][data-active] {
