@@ -214,7 +214,11 @@ Se copia en `app/globals.css`, tal cual, la regla de `tokens.css` del kit
   `matchMedia('(prefers-reduced-motion: reduce)').matches`; si `matchMedia` no existe (jsdom),
   conserva `'smooth'`, y los tests actuales no cambian.
 
+> Nota 2026-10-09 (review): la primera colocación del indicador va sin fundido; compatible con R14.
+
 ## 8. Enmiendas a specs cerrados y tests que se tocan
+
+> Nota 2026-10-09 (review): por R17, la variante `outline` de `button.tsx` también pierde `hover:text-foreground` y `dark:hover:bg-input/50` (pasa a `btn-veil`).
 
 | Test | Por qué | Cómo |
 | --- | --- | --- |
