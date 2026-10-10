@@ -300,10 +300,10 @@ describe('acento del elemento activo', () => {
   });
 
   it('en modo icono el boton se fuerza a 44px con !important', () => {
-    // El primitivo aplica `size-8!` y `p-2!` cuando el panel esta colapsado, contando con su
-    // rail de 3rem. Aqui el rail mide 4.875rem, asi que hay que ganarle — y a un `!important`
-    // solo se le gana con otro: estar fuera de `@layer` NO basta. Si alguien quita el
-    // `!important` de estas reglas, el boton vuelve a 32px y el icono sale aplastado.
+    // ENMIENDA QC-227: las medidas del modo icono las fija el primitivo (`size-11!`, `p-3.5!`);
+    // esta regla sin capa no les gana -con `!important`, la declaracion en capa gana- y solo las
+    // repite como contrato. Por eso el relleno pasa de 10px a 14px, el del primitivo. El tamano
+    // calculado lo mide `e2e/marca-componentes.spec.ts`.
     const regla = css.match(
       /\[data-collapsible='icon'\] \[data-slot='sidebar-menu-button'\]\s*\{[^}]*\}/,
     );
@@ -316,7 +316,7 @@ describe('acento del elemento activo', () => {
     expect(regla?.[0], 'el width perdio el !important').toMatch(/width:\s*44px\s*!important/);
     expect(regla?.[0], 'el height perdio el !important').toMatch(/height:\s*44px\s*!important/);
     expect(regla?.[0], 'el padding perdio el !important').toMatch(
-      /padding:\s*10px\s*!important/,
+      /padding:\s*14px\s*!important/,
     );
   });
 

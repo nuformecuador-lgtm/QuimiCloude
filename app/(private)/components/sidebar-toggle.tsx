@@ -1,5 +1,7 @@
 'use client';
 
+import { PanelLeftCloseIcon, PanelLeftOpenIcon } from 'lucide-react';
+
 import { SIDEBAR_PANEL_ID } from '@/components/private/app-sidebar';
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 
@@ -41,6 +43,8 @@ export function SidebarToggle() {
       aria-controls={SIDEBAR_PANEL_ID}
       aria-label={SIDEBAR_TOGGLE_LABEL}
       data-testid="private-sidebar-toggle"
-    />
+    >
+      {isExpanded ? <PanelLeftCloseIcon /> : <PanelLeftOpenIcon />}
+    </SidebarTrigger>
   );
 }

@@ -347,6 +347,10 @@ export const E2E_ESPERADOS = [
   // y la entrada de pantalla, tambien con movimiento reducido. No lee ni afirma nada sobre el
   // identificador de peticion ni sobre `reference`.
   'movimiento.spec.ts',
+  // Alta el 2026-10-09 (QC-227, enmienda permitida: es el punto de extension de la lista). Mide en
+  // navegador real las cajas del carril colapsado y el icono de los controles de colapso. No lee
+  // ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'marca-componentes.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
