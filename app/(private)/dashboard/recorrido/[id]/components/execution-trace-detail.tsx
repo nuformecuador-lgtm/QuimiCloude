@@ -19,7 +19,7 @@ import { touchTarget } from '@/lib/shared/ui/touch-target';
 export const BACK_TO_LIST_TEXT = 'Volver a la lista';
 export { EMPTY_MARK as MISSING_PERSON_MARK } from '@/lib/shared/ui/empty-mark';
 
-const BACK_LINK_CLASS = `inline-flex ${touchTarget} items-center self-start rounded-md px-2 text-sm font-medium underline underline-offset-4 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`;
+const BACK_LINK_CLASS = `inline-flex ${touchTarget} items-center self-start rounded-md px-2 text-sm font-medium underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring`;
 
 function BackLink({ href }: { readonly href: string }) {
   return (

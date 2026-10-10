@@ -75,6 +75,7 @@ export function buildRecipeColumns({ rowActions }: RecipeColumnsDeps): readonly 
     {
       id: 'createdAt',
       label: 'Creado',
+      tabular: true,
       align: 'start',
       sortable: true,
       filter: { kind: 'dateRange' },
@@ -83,6 +84,7 @@ export function buildRecipeColumns({ rowActions }: RecipeColumnsDeps): readonly 
     {
       id: 'updatedAt',
       label: 'Actualizado',
+      tabular: true,
       align: 'start',
       sortable: true,
       cell: (recipe) => formatCivilDate(recipe.updatedAt),

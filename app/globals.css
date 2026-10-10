@@ -311,19 +311,19 @@
   min-height: 44px;
 }
 
-/* Modo icono: el boton tiene que ser cuadrado de 44px, no 32.
-   El primitivo fuerza `size-8!` y `p-2!` -32px con !important- cuando el panel esta
-   colapsado, contando con el rail de 3rem que trae de serie. Aqui el rail mide 4.875rem
-   (78px, `app/(private)/layout.tsx`), asi que quedaba un boton de 32px de ancho por 44 de
-   alto -el `min-height` de arriba si gana, porque `min-height` acota a `height`- y el
-   contenido salia aplastado contra el padding.
+/* Los items con submenu pasan por un disparador que pisa el `data-slot` pero conserva
+   `data-sidebar`: sin esta regla se quedaban en los 32px del primitivo. */
+[data-sidebar='menu-button']:not([data-slot='sidebar-menu-button']) {
+  min-height: 44px;
+}
 
-   Lleva `!important` a proposito y no por pereza: es la unica forma de ganarle a un
-   `!important` de una utilidad. Estar fuera de `@layer` no basta contra eso. */
+/* Modo icono: las medidas las fija el primitivo (`size-11!` y `p-3.5!` en
+   `components/ui/sidebar.tsx`); esta regla solo las repite como contrato. No puede ganarles:
+   con `!important`, una declaracion en capa gana a una sin capa. */
 [data-collapsible='icon'] [data-slot='sidebar-menu-button'] {
   width: 44px !important;
   height: 44px !important;
-  padding: 10px !important;
+  padding: 14px !important;
 }
 
 /* El isotipo es mas grande que un icono de menu: 32px dentro de 44 de boton dejan 6px de aire por lado. */
@@ -408,9 +408,26 @@
   box-shadow: none;
 }
 
+/* Item de navegacion inactivo en el tono apagado del panel. Solo dentro de `sidebar-content`: la
+   marca y el pie tambien son botones de menu y no cambian. Se selecciona por `data-sidebar` y no
+   por `data-slot`: los items con submenu pasan por `CollapsibleTrigger` o `DropdownMenuTrigger`,
+   que pisan el `data-slot` del primitivo pero conservan su `data-sidebar`. Sin capa, gana a las
+   utilidades del primitivo, asi que excluye hover y foco para no anular su color. */
+[data-slot='sidebar-content']
+  :is([data-sidebar='menu-button'], [data-sidebar='menu-sub-button']):not([data-active]):not(:hover):not(:focus-visible) {
+  color: var(--sidebar-muted-foreground);
+}
+
+/* Con foco de teclado, el inactivo toma el color del hover: el primitivo solo pinta el anillo en
+   `focus-visible` y el texto heredaba `--sidebar-foreground`. */
+[data-slot='sidebar-content']
+  :is([data-sidebar='menu-button'], [data-sidebar='menu-sub-button']):not([data-active]):focus-visible {
+  color: var(--sidebar-accent-foreground);
+}
+
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
   }
   body {
     @apply bg-background text-foreground;

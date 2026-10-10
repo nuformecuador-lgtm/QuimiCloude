@@ -95,6 +95,7 @@ export function buildCustomerColumns({ rowActions }: CustomerColumnsDeps): reado
     {
       id: CREATED_AT_COLUMN_ID,
       label: 'Fecha de alta',
+      tabular: true,
       align: 'start',
       sortable: isSortable(CREATED_AT_COLUMN_ID),
       filter:
@@ -106,6 +107,7 @@ export function buildCustomerColumns({ rowActions }: CustomerColumnsDeps): reado
     {
       id: UPDATED_AT_COLUMN_ID,
       label: 'Última modificación',
+      tabular: true,
       align: 'start',
       sortable: isSortable(UPDATED_AT_COLUMN_ID),
       cell: (customer) => formatCivilDate(customer.updatedAt),

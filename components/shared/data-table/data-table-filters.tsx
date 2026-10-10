@@ -230,7 +230,7 @@ export function DataTableFilters<TRow>({
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       className={cn(
-                        'inline-flex items-center gap-1.5 rounded-lg border border-input bg-background px-2.5 text-sm hover:bg-muted',
+                        'inline-flex items-center gap-1.5 rounded-lg border border-input bg-background px-2.5 text-sm hover:bg-muted outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring',
                         touchTarget,
                       )}
                       data-testid={`data-table-filter-${column.id}`}

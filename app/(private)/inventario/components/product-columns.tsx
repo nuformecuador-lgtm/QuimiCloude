@@ -222,6 +222,7 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
     {
       id: 'stock',
       label: 'Existencia',
+      tabular: true,
       align: 'center',
       sortable: true,
       filter: { kind: 'numberRange' },
@@ -230,6 +231,7 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
     {
       id: 'qtyAlert',
       label: 'Alerta de cantidad',
+      tabular: true,
       align: 'center',
       sortable: true,
       filter: { kind: 'numberRange' },
@@ -238,6 +240,7 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
     {
       id: 'reserved',
       label: 'Reservado',
+      tabular: true,
       align: 'center',
       // No ordena ni filtra: es un agregado de los lotes, no una columna de `products`.
       cell: (product) => aggregateQuantityCell(product.reserved, 'product-reserved', product, units),
@@ -245,6 +248,7 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
     {
       id: 'available',
       label: 'Disponible',
+      tabular: true,
       align: 'center',
       cell: (product) => aggregateQuantityCell(product.available, 'product-available', product, units),
     },

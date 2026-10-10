@@ -253,7 +253,7 @@ export function RecipeVersionForm(props: RecipeVersionFormProps) {
       }}
     >
       {props.mode === 'edit' && props.version.isUnderReview ? (
-        <Badge variant="outline" className="self-start" data-testid="recipe-version-form-under-review">
+        <Badge variant="info" className="self-start" data-testid="recipe-version-form-under-review">
           Por revisar
         </Badge>
       ) : null}

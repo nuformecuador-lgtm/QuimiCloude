@@ -209,6 +209,7 @@ export function buildCatalogColumns({
     {
       id: 'minPurchase',
       label: 'Mínimo de compra',
+      tabular: true,
       align: 'end',
       sortable: true,
       cell: (line) =>
@@ -245,6 +246,7 @@ export function buildCatalogColumns({
     {
       id: 'createdAt',
       label: 'Creado',
+      tabular: true,
       align: 'start',
       sortable: true,
       cell: (line) => formatCivilDate(line.createdAt),
@@ -252,6 +254,7 @@ export function buildCatalogColumns({
     {
       id: 'updatedAt',
       label: 'Actualizado',
+      tabular: true,
       align: 'start',
       // `updatedAt` NO esta en `SUPPLIER_CATALOG_LINE_QUERYABLE.sortable`: se muestra, no se
       // ordena. Declararlo ordenable seria pintar un control que el backend ignora.

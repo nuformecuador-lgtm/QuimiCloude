@@ -37,6 +37,8 @@ export type BrandLogoProps = (
 ) & {
   readonly height: number;
   readonly alt: string;
+  /** Pide la imagen desde el `<head>` y sin carga diferida: solo para el logo que es el LCP de su página. */
+  readonly preload?: boolean;
 };
 
 const ON_DARK_ASSETS = {
@@ -50,11 +52,13 @@ function BrandImage({
   height,
   alt,
   className,
+  preload,
 }: {
   readonly asset: BrandAsset;
   readonly height: number;
   readonly alt: string;
   readonly className?: string;
+  readonly preload?: boolean;
 }) {
   const width = Math.round((height * asset.viewBoxWidth) / asset.viewBoxHeight);
 
@@ -66,12 +70,13 @@ function BrandImage({
       alt={alt}
       unoptimized
       className={className}
+      preload={preload}
     />
   );
 }
 
 export function BrandLogo(props: BrandLogoProps) {
-  const { variant, tone, height, alt } = props;
+  const { variant, tone, height, alt, preload } = props;
 
   if (variant === 'isotipo' && tone === 'auto') {
     // Las dos imágenes van en el HTML y el tema decide cuál se ve: así el servidor y el
@@ -89,5 +94,7 @@ export function BrandLogo(props: BrandLogoProps) {
     );
   }
 
-  return <BrandImage asset={ON_DARK_ASSETS[variant]} height={height} alt={alt} />;
+  return (
+    <BrandImage asset={ON_DARK_ASSETS[variant]} height={height} alt={alt} preload={preload} />
+  );
 }

@@ -38,7 +38,7 @@ export function NavUser({ user }: NavUserProps) {
     <SidebarMenu data-testid="private-user">
       <SidebarMenuItem>
         <div
-          className="flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left"
+          className="flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left group-data-[collapsible=icon]:justify-center"
           title={user.displayName}
           data-testid="private-user-identity"
         >

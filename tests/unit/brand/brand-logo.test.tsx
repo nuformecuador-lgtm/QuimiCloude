@@ -6,8 +6,20 @@ import { extname, join } from 'node:path';
 
 import { cleanup, render } from '@testing-library/react';
 
+import LoginPage from '@/app/(public)/login/page';
 import { BrandLogo, type BrandLogoProps } from '@/components/shared/brand-logo';
+import type { LoginFormState } from '@/lib/modules/identity/adapters/driving/login-form-state';
 import * as privateNav from '@/lib/shared/navigation/private-nav';
+
+// El formulario del login importa su Server Action; aqui solo se pinta la pantalla.
+const { loginActionMock } = vi.hoisted(() => ({
+  loginActionMock:
+    vi.fn<(prevState: LoginFormState, formData: FormData) => Promise<LoginFormState>>(),
+}));
+
+vi.mock('@/lib/modules/identity/adapters/driving/login-action', () => ({
+  loginAction: loginActionMock,
+}));
 
 // `__dirname` y no `import.meta.url`: en el proyecto `ui` (jsdom) la URL del modulo no es `file:`.
 const RAIZ = join(__dirname, '..', '..', '..');
@@ -117,6 +129,44 @@ describe('BrandLogo', () => {
 
     expect(img.getAttribute('src')).not.toContain('/_next/image');
     expect(img.hasAttribute('srcset')).toBe(false);
+  });
+});
+
+describe('logo del login', () => {
+  const LOGO_LOGIN = '/brand/logo-vertical-dark.svg';
+
+  it('R26: el login pide el logo vertical por precarga y sin carga diferida', async () => {
+    const { container } = render(await LoginPage({ searchParams: Promise.resolve({}) }));
+
+    const logo = container.querySelector(`img[src="${LOGO_LOGIN}"]`);
+    expect(logo).not.toBeNull();
+    expect(logo).not.toHaveAttribute('loading', 'lazy');
+    expect(
+      document.head.querySelector(`link[rel="preload"][as="image"][href="${LOGO_LOGIN}"]`),
+    ).not.toBeNull();
+  });
+
+  it('R26: los usos de la barra lateral y del encabezado privado siguen en carga diferida y sin precarga', () => {
+    const otros: BrandLogoProps[] = [
+      { variant: 'horizontal', tone: 'on-dark', height: 28, alt: '' },
+      { variant: 'isotipo', tone: 'on-dark', height: 32, alt: '' },
+      { variant: 'isotipo', tone: 'auto', height: 28, alt: 'QuimiCloude' },
+    ];
+    for (const props of otros) {
+      for (const img of imagenes(props)) {
+        expect(img).toHaveAttribute('loading', 'lazy');
+      }
+      cleanup();
+    }
+
+    for (const ruta of ['components/private/app-sidebar.tsx', 'app/(private)/layout.tsx']) {
+      const fuente = readFileSync(join(RAIZ, ruta), 'utf8');
+      expect(fuente).toMatch(/<BrandLogo\b/);
+      expect({ ruta, precarga: /<BrandLogo\b[^>]*\bpreload\b/.test(fuente) }).toEqual({
+        ruta,
+        precarga: false,
+      });
+    }
   });
 });
 

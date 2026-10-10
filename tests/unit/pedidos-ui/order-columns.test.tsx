@@ -498,9 +498,10 @@ describe('estado y prioridad se leen como etiqueta, no como valor crudo del enum
   });
 
   it.each([
-    ['POR_ACONDICIONAR', 'Por acondicionar', 'secondary'],
-    ['EN_ACONDICIONAMIENTO', 'En acondicionamiento', 'default'],
-    ['TERMINADO', 'Terminado', 'secondary'],
+    // ENMIENDA QC-227: variantes secondary/default/secondary -> warning/info/success, los tonos de estado de la marca.
+    ['POR_ACONDICIONAR', 'Por acondicionar', 'warning'],
+    ['EN_ACONDICIONAMIENTO', 'En acondicionamiento', 'info'],
+    ['TERMINADO', 'Terminado', 'success'],
   ] as const)(
     'R29, R32: la celda pinta %s como «%s», con su valor en `data-status` y la variante %s',
     (status, etiqueta, variante) => {

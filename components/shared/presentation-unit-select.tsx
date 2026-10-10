@@ -143,7 +143,7 @@ export function PresentationUnitSelect({
                 <button
                   type="button"
                   aria-label={`${PRESENTATION_UNIT_HELPER_LABEL} ${PRESENTATION_UNIT_LABEL}`}
-                  className={`flex ${touchTarget} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
+                  className={`flex ${touchTarget} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring`}
                   data-testid={PRESENTATION_UNIT_HELPER_TESTID}
                 />
               }

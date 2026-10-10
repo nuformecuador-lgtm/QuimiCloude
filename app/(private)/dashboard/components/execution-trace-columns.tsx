@@ -99,12 +99,14 @@ export function buildExecutionTraceColumns({
     {
       id: TRACE_FIRST_AT_COLUMN_ID,
       label: 'Primera anotación',
+      tabular: true,
       align: 'start',
       cell: (row) => formatTraceInstant(row.firstAt),
     },
     {
       id: LAST_AT_COLUMN_ID,
       label: 'Última anotación',
+      tabular: true,
       align: 'start',
       filter: { kind: 'dateRange' },
       cell: (row) => formatTraceInstant(row.lastAt),
@@ -133,7 +135,7 @@ export function buildExecutionTraceColumns({
         <Link
           href={executionTraceDetailHref(row.orderId, params)}
           data-testid="execution-trace-link"
-          className={`inline-flex ${touchTarget} items-center rounded-md px-2 text-sm font-medium underline underline-offset-4 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
+          className={`inline-flex ${touchTarget} items-center rounded-md px-2 text-sm font-medium underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring`}
         >
           {TRACE_LINK_TEXT}
           <span className="sr-only"> del pedido {row.numberText}</span>

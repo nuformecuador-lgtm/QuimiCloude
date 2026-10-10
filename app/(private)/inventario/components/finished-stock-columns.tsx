@@ -193,6 +193,7 @@ export function buildFinishedStockColumns({
     {
       id: 'stock',
       label: 'Existencia',
+      tabular: true,
       align: 'center',
       cell: (item) =>
         item.kind === 'group' ? groupStockCell(item.row, units) : lineStockCell(item.line, units),
@@ -200,6 +201,7 @@ export function buildFinishedStockColumns({
     {
       id: 'qtyAlert',
       label: 'Alerta de cantidad',
+      tabular: true,
       align: 'center',
       cell: (item) => (item.kind === 'line' ? qtyAlertCell(item.line.product, units) : null),
     },

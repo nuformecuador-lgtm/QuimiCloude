@@ -54,25 +54,25 @@ export const ORDER_PRIORITY_LABELS: Readonly<Record<OrderPriority, string>> = {
  * Variante visual por estado y por prioridad. Tambien exhaustivas: el color acompana a la
  * etiqueta, **nunca la sustituye** —el estado se lee, no se adivina por el tono—.
  */
-const STATUS_VARIANTS: Readonly<Record<OrderStatus, 'default' | 'secondary' | 'outline' | 'destructive'>> = {
-  PENDIENTE: 'outline',
-  EN_CURSO: 'default',
-  POR_EMPACAR: 'secondary',
-  EN_EMPAQUE: 'default',
-  ENTREGADO: 'secondary',
+type StatusTone = 'success' | 'warning' | 'destructive' | 'info' | 'neutral';
+
+const STATUS_VARIANTS: Readonly<Record<OrderStatus, StatusTone>> = {
+  PENDIENTE: 'neutral',
+  EN_CURSO: 'info',
+  POR_EMPACAR: 'warning',
+  EN_EMPAQUE: 'info',
+  ENTREGADO: 'success',
   CANCELADO: 'destructive',
-  // El mismo tono que `CANCELADO`: los dos son los estados que impiden trabajar el pedido, y el
-  // color acompana a la etiqueta, nunca la sustituye.
   BLOQUEADO: 'destructive',
-  POR_ACONDICIONAR: 'secondary',
-  EN_ACONDICIONAMIENTO: 'default',
-  TERMINADO: 'secondary',
+  POR_ACONDICIONAR: 'warning',
+  EN_ACONDICIONAMIENTO: 'info',
+  TERMINADO: 'success',
 };
 
-const PRIORITY_VARIANTS: Readonly<Record<OrderPriority, 'default' | 'secondary' | 'outline' | 'destructive'>> = {
-  BAJA: 'outline',
-  MEDIA: 'secondary',
-  ALTA: 'default',
+const PRIORITY_VARIANTS: Readonly<Record<OrderPriority, StatusTone>> = {
+  BAJA: 'neutral',
+  MEDIA: 'info',
+  ALTA: 'warning',
   CRITICA: 'destructive',
 };
 
@@ -117,10 +117,10 @@ export const ORDER_COVERAGE_LABELS: Readonly<Record<OrderCoverage, string>> = {
   partial: 'Sin cobertura completa',
 };
 
-const COVERAGE_VARIANTS: Readonly<Record<OrderCoverage, 'default' | 'secondary' | 'outline' | 'destructive'>> = {
-  full: 'secondary',
-  none: 'outline',
-  partial: 'destructive',
+const COVERAGE_VARIANTS: Readonly<Record<OrderCoverage, StatusTone>> = {
+  full: 'success',
+  none: 'neutral',
+  partial: 'warning',
 };
 
 export function OrderCoverageBadge({ coverage }: { readonly coverage: OrderCoverage }) {

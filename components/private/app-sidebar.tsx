@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronRightIcon, PanelLeftIcon } from 'lucide-react';
+import { ChevronRightIcon, PanelLeftCloseIcon, PanelLeftOpenIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
@@ -119,7 +119,7 @@ export function AppSidebar({ user, navItems }: AppSidebarProps) {
                 aria-label={BRAND_LABEL}
                 onClick={closeMobilePanel}
                 data-testid="private-brand-link"
-                className="h-auto gap-3 py-2"
+                className="h-auto gap-3 py-2 group-data-[collapsible=icon]:p-1.5!"
               >
                 {/* `alt` vacio: el nombre ya lo da el enlace y repetirlo haria que se anunciara dos veces. */}
                 {isIconMode ? (
@@ -200,9 +200,13 @@ export function AppSidebar({ user, navItems }: AppSidebarProps) {
           aria-expanded={open}
           aria-controls={SIDEBAR_PANEL_ID}
           data-testid="private-sidebar-edge-toggle"
-          className="absolute top-6 -right-[26px] hidden rounded-[10px] bg-sidebar text-sidebar-foreground shadow-[0_0_0_1px_var(--sidebar-border),0_8px_18px_-8px_rgba(10,40,40,0.55)] md:inline-flex hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          className="absolute top-6 -right-[26px] hidden rounded-[10px] bg-sidebar! text-sidebar-foreground! shadow-[0_0_0_1px_var(--sidebar-border),0_8px_18px_-8px_rgba(10,40,40,0.55)] md:inline-flex hover:bg-sidebar-accent! hover:text-sidebar-accent-foreground! hover:border-sidebar-ring! aria-expanded:bg-sidebar! aria-expanded:text-sidebar-foreground! focus-visible:ring-2 focus-visible:ring-sidebar-ring"
         >
-          <PanelLeftIcon className="size-3.5" />
+          {open ? (
+            <PanelLeftCloseIcon className="size-3.5" />
+          ) : (
+            <PanelLeftOpenIcon className="size-3.5" />
+          )}
         </Button>
       </div>
     </Sidebar>
