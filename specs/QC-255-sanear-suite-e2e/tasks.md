@@ -9,7 +9,7 @@
 
 ## Tanda 1 — el helper
 
-- [ ] **T1 — `e2e/helpers/fixture-user.ts` y su test unitario** (R1, R2, R3, R4)
+- [x] **T1 — `e2e/helpers/fixture-user.ts` y su test unitario** (R1, R2, R3, R4)
   - `fixtureSessionsValidFrom(now)` y `createFixtureUser(args)` según `design.md > 2`.
   - `tests/unit/e2e-helpers/fixture-user.test.ts` con Prisma mockeado, como `landing.test.ts`:
     - el sello cae ≥ 1 s antes de `floor(now)`, probado con `now` en `.000`, `.500` y `.999` (R1);
@@ -19,14 +19,14 @@
   - **Hecho:** `pnpm exec vitest related --run e2e/helpers/fixture-user.ts` verde, typecheck y
     lint verdes.
 
-- [ ] **T2 — Guardia de fixtures de usuario** (R6; sujeta a P1) — depende de T1
+- [x] **T2 — Guardia de fixtures de usuario** (R6; sujeta a P1) — depende de T1
   - `tests/guards/guard-e2e-fixture-user.test.ts` según `design.md > 4.3`, con un caso rojo
     sintético que demuestra que muerde.
   - **Hecho:** la guardia está **roja** contra `dev` y nombra los 54 sitios. Se deja roja hasta T3.
 
 ## Tanda 2 — migrar y adaptar (paralelo)
 
-- [ ] **T3 [P] — Migrar los 52 specs al helper** (R5, R7, R8, R9) — depende de T1
+- [x] **T3 [P] — Migrar los 52 specs al helper** (R5, R7, R8, R9) — depende de T1
   - Reemplazo mecánico `prisma.user.create(` → `createFixtureUser(` en todos los specs de
     `## Archivos esperados` marcados «helper». En `errores.spec.ts` no se añade nada: el `active`
     lo pone el helper.
@@ -37,25 +37,25 @@
     (inventario, marca-componentes, recetas-pasos, unidades, pedidos-asignados) verde en chromium con
     `--retries=0`.
 
-- [ ] **T4 [P] — Casos de formularios: C** (R10, R11, R12, R13) — depende de T1
+- [x] **T4 [P] — Casos de formularios: C** (R10, R11, R12, R13) — depende de T1
   - `presentaciones.spec.ts` R36, `aislamiento-recetas.spec.ts` paso 4 y `pedidos-cotizacion.spec.ts`
     `:416` y `:503`, según `design.md > 3`.
   - **Hecho:** los tres specs verdes en local en los dos proyectos, sin cambiar ningún importe
     esperado. Si un importe no cuadra, se para (R13).
 
-- [ ] **T5 [P] — Casos de controles movidos: D** (R14, R15, R16) — depende de T1
+- [x] **T5 [P] — Casos de controles movidos: D** (R14, R15, R16) — depende de T1
   - `permisos.spec.ts`, `grupos-de-trabajo.spec.ts` R42 y `datos-de-lote-en-acondicionamiento.spec.ts`
     R22.
   - **Hecho:** los tres verdes en local en los dos proyectos. `grep -n "private-user-trigger\|work-group-member-search\|work-group-candidate'" e2e/` sin resultados.
 
-- [ ] **T6 [P] — Formato y limpieza: E, F** (R17, R18) — depende de T1
+- [x] **T6 [P] — Formato y limpieza: E, F** (R17, R18) — depende de T1
   - `proveedores.spec.ts` R51 y `usuarios.spec.ts` `afterAll`.
   - **Hecho:** los dos verdes en local en chromium y webkit. Tras correr `usuarios.spec.ts`, ningún
     usuario ni empresa con su prefijo de `RUN_ID` queda en la base.
 
 ## Tanda 3 — sin relajar y presupuesto
 
-- [ ] **T7 — Tabla de equivalencias y guardia de saltos** (R19, R20, R21) — depende de T3–T6
+- [x] **T7 — Tabla de equivalencias y guardia de saltos** (R19, R20, R21) — depende de T3–T6
   - `progress/impl_QC-255.md`: tabla «caso → afirmación antes / después → ficha o commit», con el
     spec dueño de cada requisito citado (R36, R42, R22, R51) y la ficha de `afa5a867` confirmada con
     `git log`.
@@ -63,7 +63,7 @@
   - **Hecho:** guardia verde. Cada fila de la tabla tiene su origen. Sin casos de R21, o la feature
     parada con la pregunta escrita.
 
-- [ ] **T8 — `actionTimeout` y matriz por navegador** (R23, R24, R25; R24/R25 sujetos a P2) —
+- [x] **T8 — `actionTimeout` y matriz por navegador** (R23, R24, R25; R24/R25 sujetos a P2) —
   depende de T3–T6
   - `playwright.config.ts > use.actionTimeout = 30_000`.
   - `.github/workflows/gate.yml`: job `e2e-navegador` con matriz y job agregador `e2e`, según
@@ -74,7 +74,7 @@
 
 ## Tanda 4 — la prueba
 
-- [ ] **T9 — Run E2E completo** (R26, R27) — depende de T7 y T8
+- [x] **T9 — Run E2E completo** (R26, R27) — depende de T7 y T8
   - Push de la rama y `workflow_dispatch` de `gate.yml` sobre ella.
   - En `progress/impl_QC-255.md`: id del run, duración por job, `passed / flaky / failed / skipped`
     por proyecto, recuento de `sesion=fin` atribuido a su test, y lista de flaky con su primer error

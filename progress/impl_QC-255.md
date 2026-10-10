@@ -17,7 +17,8 @@
 | 2 | T6 — proveedores, usuarios | `40a673ec` |
 | 3 | T7 — guardia de saltos | `f8dc4478` |
 | 3 | T8 — `actionTimeout`, matriz por navegador, guardia de presupuesto | `260c5513` |
-| 3 | T7 — esta bitacora y la tabla de equivalencias | (commit de cierre) |
+| 3 | T7 — esta bitacora y la tabla de equivalencias | `b136a060` |
+| 4 | T9 — resultado del run de CI en esta bitacora | (este commit) |
 
 T2 se commiteo roja (tal como pide `tasks.md`) y se empujo junto con T3, ya en verde: ningun
 push lleva la guardia en rojo.
@@ -66,7 +67,7 @@ Listas cerradas revisadas: no se anade ningun spec E2E nuevo; `tests/unit/client
 | R20, R21 | Tabla de abajo |
 | R22 | `git diff --name-only origin/dev...HEAD` (ver «Verificacion») |
 | R23, R24, R25 | `tests/guards/guard-e2e-presupuesto.test.ts` |
-| R26, R27 | Run de CI que lanza el leader (pendiente) |
+| R26, R27 | Run de CI `38075057426` (ver «T9») |
 
 ## Tabla de equivalencias (R20)
 
@@ -154,14 +155,47 @@ de #199.
 - R22: `git diff --name-only origin/dev...HEAD` no lista nada bajo `app/`, `lib/`,
   `components/`, `hooks/`, `middleware.ts` ni `db/` (0 de 64 archivos).
 
+## T9 — run de CI (R26, R27)
+
+`workflow_dispatch` de `gate.yml` sobre `feature/QC-255-sanear-suite-e2e`, lanzado por el leader:
+run **`38075057426`**, todo en `success`. Datos sacados de los logs de cada job
+(`gh api repos/singularis-co/QuimiCloude/actions/jobs/<id>/logs`).
+
+| Job | Inicio → fin (UTC) | Duracion | Playwright |
+|---|---|---|---|
+| `e2e (chromium)` (114280190827) | 18:15:40 → 18:23:36 | 7 min 56 s | **171 passed**, 0 flaky, 0 failed, 0 skipped, 0 did not run (suite 6.8 min) |
+| `e2e (webkit)` (114280190829) | 18:15:40 → 18:35:47 | 20 min 7 s | **171 passed**, 0 flaky, 0 failed, 0 skipped, 0 did not run (suite 18.7 min) |
+| `e2e` (agregador, 114284189117) | 18:35:49 → 18:35:52 | 3 s | `needs.e2e-navegador.result == success` |
+| `gate-completo` | 18:20:51 → 18:21:05 | — | success |
+
+Tiempo de pared del E2E: 20 min 12 s, frente a los 60 min agotados del run de #199. Ningun
+`Retry #` en los logs: con `retries: 2` disponibles, ningun test necesito reintento.
+
+**R26:** cumplido. Los dos proyectos ejecutaron sus 171 tests, todos verdes, dentro del timeout.
+
+**R27, `GET /login?sesion=fin`:** 3 por navegador (6 en total; 89 en #199). Cada uno se atribuye
+por su marca de tiempo al test que termina justo despues:
+
+| Navegador | `sesion=fin` | Test que termina despues | Provocado a proposito |
+|---|---|---|---|
+| chromium | 18:17:52.985 | `cierre-de-sesiones.spec.ts:267` (✓ 18:17:53.84; peticiones previas con `q=qc101_e2e_*`) | si |
+| chromium | 18:22:58.052 | `session.spec.ts:296`, cuenta que deja de estar activa (✓ 18:22:58.32) | si |
+| chromium | 18:23:00.239 | `session.spec.ts:359`, ficha dada de baja (✓ 18:23:00.49) | si |
+| webkit | 18:20:11.607 | `cierre-de-sesiones.spec.ts:267` (✓ 18:20:13.83; `q=qc101_e2e_*`) | si |
+| webkit | 18:33:48.490 | `session.spec.ts:296` (✓ 18:33:48.90) | si |
+| webkit | 18:33:53.062 | `session.spec.ts:359` (✓ 18:33:53.47) | si |
+
+Ninguno espurio. R27 cumplido.
+
+**Flaky:** ninguno en CI. `interrupted by another navigation`: 0 apariciones en los dos logs.
+El flaky local de `acondicionar-con-equipo.spec.ts:395` en webkit (ver arriba) no aparecio en
+CI; queda anotado como posible entrada para QC-208.
+
 ## Lo que falta
 
-- **T9 (R26, R27):** el `workflow_dispatch` de `gate.yml` sobre esta rama lo lanza el leader. Hay
-  que anotar aqui: id del run, duracion de `e2e (chromium)`, `e2e (webkit)` y `e2e`, recuento
-  `passed / flaky / failed / skipped` por proyecto, `sesion=fin` atribuidos (solo `session.spec.ts`
-  y `cierre-de-sesiones.spec.ts`) y la lista de flaky con su primer error.
+Nada de esta ficha. Queda pendiente la revision.
 
 ## Veredicto
 
-Suite E2E saneada en local (chromium 171/171; webkit 170/171 con un flaky de WebKit ajeno al
-sello), gate local en verde; falta el run de CI de T9.
+Suite E2E saneada: el run de CI `38075057426` da 171/171 en chromium y 171/171 en webkit, sin
+flaky, en 20 min, con cero `sesion=fin` espurios.
