@@ -3,10 +3,12 @@
  * La fila comun de «Por acondicionar» y del detalle del acondicionador: una sola composicion para
  * las dos, para que la lista y el detalle nunca muestren datos distintos de un mismo pedido.
  */
+import { batchesByPresentation, hasBatchData, missingBatchDataLines } from './conditioning-batch-data';
 import { composeOrderRows, type ComposeOrderRowsDeps } from './compose-order-rows';
 import type { OrderDistributionLineView } from './order-distribution-view';
 import type { ConditioningTeamMemberRow } from '../ports/conditioning-team-repository';
 
+import type { FinishedBatchOfOrderLine } from '@/lib/modules/inventario';
 import { formatOrderNumber, type AssignedOrderSummary, type OrderStatus } from '@/lib/modules/pedidos';
 
 export type ConditioningOrderRow = {
@@ -35,9 +37,31 @@ export type ConditioningTeamMemberView = {
     | { readonly kind: 'workGroup'; readonly workGroupId: string; readonly workGroupName: string };
 };
 
-/** La fila del detalle con su equipo; vacio en `POR_ACONDICIONAR`, que todavia no lo tiene. */
+/** Una linea del reparto con su lote. Sin datos, los tres campos van `null` y `provisionalLot` trae
+ *  el lote automatico; con datos, al reves. Fechas `AAAA-MM-DD`. */
+export type ConditioningBatchLineView = {
+  /** `null` = la linea no tiene lote de produccion. */
+  readonly batchId: string | null;
+  readonly presentationId: string;
+  readonly presentationName: string | null;
+  readonly packagingName: string | null;
+  readonly packages: number;
+  readonly provisionalLot: string | null;
+  readonly lot: string | null;
+  readonly expiryDate: string | null;
+  readonly productionDate: string | null;
+};
+
+export type ConditioningBatchData = {
+  readonly lines: readonly ConditioningBatchLineView[];
+  readonly missingCount: number;
+};
+
+/** La fila del detalle con su equipo; vacio en `POR_ACONDICIONAR`, que todavia no lo tiene.
+ *  `batchData` es `null` para quien no puede escribir los datos de lote. */
 export type ConditioningOrderDetail = ConditioningOrderRow & {
   readonly team: readonly ConditioningTeamMemberView[];
+  readonly batchData: ConditioningBatchData | null;
 };
 
 export async function composeConditioningOrderRows(
@@ -55,6 +79,7 @@ export async function composeConditioningOrderDetail(
   companyId: string,
   order: AssignedOrderSummary,
   team: readonly ConditioningTeamMemberRow[],
+  batches: readonly FinishedBatchOfOrderLine[] | null,
 ): Promise<ConditioningOrderDetail | undefined> {
   const { rows, names } = await composeConditioningOrderRowsWithNames(
     deps,
@@ -74,6 +99,32 @@ export async function composeConditioningOrderDetail(
           ? { kind: 'direct' }
           : { kind: 'workGroup', workGroupId: member.workGroupId, workGroupName: member.workGroupName },
     })),
+    batchData: batches === null ? null : composeBatchData(row.presentationLines, batches),
+  };
+}
+
+function composeBatchData(
+  lines: readonly OrderDistributionLineView[],
+  batches: readonly FinishedBatchOfOrderLine[],
+): ConditioningBatchData {
+  const byPresentation = batchesByPresentation(batches);
+  return {
+    lines: lines.map((line) => {
+      const batch = byPresentation.get(line.presentationId);
+      const withData = hasBatchData(batch);
+      return {
+        batchId: batch?.batchId ?? null,
+        presentationId: line.presentationId,
+        presentationName: line.presentationName,
+        packagingName: line.packagingName,
+        packages: line.packages,
+        provisionalLot: batch !== undefined && !withData ? batch.lot : null,
+        lot: withData ? (batch?.lot ?? null) : null,
+        expiryDate: withData ? (batch?.expiryDate ?? null) : null,
+        productionDate: withData ? (batch?.productionDate ?? null) : null,
+      };
+    }),
+    missingCount: missingBatchDataLines(lines, batches),
   };
 }
 

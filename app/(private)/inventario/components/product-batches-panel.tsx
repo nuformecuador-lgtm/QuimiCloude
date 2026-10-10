@@ -9,12 +9,12 @@ import {
 } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
-
-import { EMPTY_CELL } from './product-columns';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
 const LOT_LABEL = 'Lote';
 const QUANTITY_LABEL = 'Cantidad';
 const PURCHASE_DATE_LABEL = 'Fecha de compra';
+const EXPIRY_DATE_LABEL = 'Vencimiento';
 const RESERVED_LABEL = 'Apartado';
 const AVAILABLE_LABEL = 'Disponible';
 const OVER_RESERVED_LABEL = 'Sobre-reservado';
@@ -22,7 +22,8 @@ const PACKAGING_PRESENTATION_LABEL = 'Presentación del envase';
 const PACKAGING_LEGACY_LABEL = 'Envase sin presentación fija';
 
 /**
- * Panel de lotes de un producto: numero de lote, cantidad con su unidad y fecha de compra.
+ * Panel de lotes de un producto: numero de lote, cantidad con su unidad, fecha de compra y,
+ * si el lote lo tiene, vencimiento.
  *
  * Puramente presentacional: recibe los lotes y el catalogo de unidades por props y no pide nada
  * por su cuenta. El detalle del historial y las acciones de ajuste son dos ranuras -el mismo
@@ -53,7 +54,7 @@ type PackagingInfo =
 function packagingInfo(product: ProductBatchesPanelProps['product']): PackagingInfo {
   if (product === undefined || product.type !== PRODUCT_TYPES.PACKAGING) return null;
   if (product.presentationId == null) return { kind: 'legacy' };
-  return { kind: 'fixed', presentationName: product.presentationName ?? EMPTY_CELL };
+  return { kind: 'fixed', presentationName: product.presentationName ?? EMPTY_MARK };
 }
 
 /**
@@ -64,7 +65,7 @@ function packagingInfo(product: ProductBatchesPanelProps['product']): PackagingI
 function unitLabel(unitId: string | null, units: readonly UnitRef[] | undefined): string | null {
   if (unitId === null || units === undefined) return null;
   const unit = units.find((candidate) => candidate.id === unitId);
-  return unit?.symbol ?? unit?.name ?? EMPTY_CELL;
+  return unit?.symbol ?? unit?.name ?? EMPTY_MARK;
 }
 
 /**
@@ -215,6 +216,12 @@ export function ProductBatchesPanel({
                   <dt className="text-xs text-muted-foreground">{PURCHASE_DATE_LABEL}</dt>
                   <dd data-testid="product-batch-purchase-date">{batch.purchaseDate}</dd>
                 </div>
+                {batch.expiryDate === null ? null : (
+                  <div className="flex flex-col">
+                    <dt className="text-xs text-muted-foreground">{EXPIRY_DATE_LABEL}</dt>
+                    <dd data-testid="product-batch-expiry-date">{batch.expiryDate}</dd>
+                  </div>
+                )}
                 {batch.reserved === undefined ? null : (
                   <div className="flex flex-col">
                     <dt className="text-xs text-muted-foreground">{RESERVED_LABEL}</dt>

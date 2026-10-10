@@ -76,7 +76,8 @@
     "recetas/recipe-packing-steps-migration.int.test.ts",
     "recetas/recipe-versions-constraints.int.test.ts",
     "unidades/mass-volume-bridge.int.test.ts",
-    "unidades/unidades-constraints.int.test.ts"
+    "unidades/unidades-constraints.int.test.ts",
+    "inventario/product-batch-production-date-migration.int.test.ts"
   ],
   "commit": [
     {
@@ -578,6 +579,16 @@
       "archivo": "scripts/seed-demo.int.test.ts",
       "motivo": "Corre el seed de demostracion (scripts/seed-demo) dos veces con su gateway real, que escribe por los casos de uso de 'lib/composition'; esos casos de uso abren sus PROPIAS transacciones sobre el cliente Prisma GLOBAL, asi que una transaccion del test con ROLLBACK no los envolveria. Corre sobre una empresa efimera (randomUUID) con su Administrador, creada en 'beforeAll', y la borra entera en 'afterAll' por su company_id, en el orden que exigen las FK; no toca la empresa inicial de la plantilla. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-08"
+    },
+    {
+      "archivo": "inventario/finished-batch-labels.int.test.ts",
+      "motivo": "QC-219 T3 (R6, R10, R11, R12, R19): ejercita 'createFinishedBatchLabels' (finished-batch-labels-prisma.ts): 'listOfOrder' lee con el cliente Prisma GLOBAL y 'writeForOrder' abre SU PROPIA 'prisma.$transaction', asi que una transaccion del test con ROLLBACK no los envolveria; R11 necesita ademas DOS escrituras reales simultaneas compitiendo por el indice unico de lote, y un 'pg.Client' que retiene sin confirmar el mismo lote en otra fila mientras la escritura REAL espera. Siembra los lotes con 'receiveFinishedGoods' en una 'prisma.$transaction' que CONFIRMA, como 'order-batches.int.test.ts'. Cada caso fabrica su empresa efimera con randomUUID (usuario, rol, tipo de documento, unidad, receta, presentaciones, pedidos y lineas) y la limpia en un 'finally' en orden de FK (libros -> lotes -> productos -> lineas -> pedidos -> receta -> presentaciones -> unidad; empresa, usuario, rol y tipo de documento en 'afterAll'). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-09"
+    },
+    {
+      "archivo": "asignaciones/finish-conditioning-batch-data.int.test.ts",
+      "motivo": "QC-219 T8 (R15, R16, R17, R18): ejercita 'finishConditioning', 'saveConditioningBatchData' y 'getConditioningOrder' con la composicion real ('asignaciones' de '@/lib/composition'): guardar abre SU PROPIA 'prisma.$transaction' sobre el cliente GLOBAL y Terminar escribe con el, asi que una transaccion del test con ROLLBACK no los envolveria. Siembra los lotes con 'receiveFinishedGoods' en una 'prisma.$transaction' que CONFIRMA. Cada caso fabrica su empresa efimera con randomUUID y la borra en su 'finally' en orden de FK (equipo -> libros -> lotes -> productos -> lineas -> pedidos -> receta -> presentaciones -> unidad -> usuarios -> roles -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-09"
     },
     {
       "archivo": "pedidos/order-delivery.int.test.ts",

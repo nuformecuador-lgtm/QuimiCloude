@@ -13,14 +13,13 @@ import {
 import { buttonVariants } from '@/components/ui/button';
 import type { ErrorState as OperationError } from '@/lib/modules/errores';
 import type { RecipeSummary } from '@/lib/modules/recetas';
-import { NEW_RECIPE_ROUTE, recipeEditRoute } from '@/lib/shared/routes';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
+import { NEW_RECIPE_ROUTE } from '@/lib/shared/routes';
 import { cn } from '@/lib/utils';
 
-import { DeleteRecipeDialog } from './delete-recipe-dialog';
 import { buildRecipeColumns } from './recipe-columns';
 import { RECIPE_SKELETON_COLUMN_COUNT } from './recipe-columns-skeleton';
 import { recipeListHref } from './recipe-list-params';
+import { RecipeRowActions } from './recipe-row-actions';
 
 export const RECIPE_TABLE_ID = 'recetas';
 
@@ -156,22 +155,7 @@ export function RecipeTable({
   const columns = useMemo(
     () =>
       buildRecipeColumns({
-        rowActions: (recipe) => (
-          <>
-            <Link
-              href={recipeEditRoute(recipe.id)}
-              className={cn(
-                touchTarget,
-                'inline-flex items-center justify-center rounded-lg px-2 text-sm hover:bg-muted',
-              )}
-              aria-label={`Editar ${recipe.name}`}
-              data-testid="recipe-edit-open"
-            >
-              Editar
-            </Link>
-            <DeleteRecipeDialog recipe={recipe} />
-          </>
-        ),
+        rowActions: (recipe) => <RecipeRowActions recipe={recipe} />,
       }),
     [],
   );

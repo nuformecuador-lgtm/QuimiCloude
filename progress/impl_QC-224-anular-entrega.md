@@ -453,3 +453,31 @@ Veredicto: B5 lista para commit; el unico rojo es `order-delivery-append-only` (
   **1 fail** = `tests/unit/pedidos/order-delivery-append-only.test.ts > R32: ningun camino de lib/ ni
   app/ modifica o borra una entrega…` (rojo aceptado; lo enmienda TC).
 - `pnpm run typecheck`: 0 errores.
+
+## F2.3 — merge de origin/dev (implementer, 2026-10-09)
+
+Trae QC-219 (dia de produccion / etiqueta del lote) y QC-234 (secretos de integraciones). 7
+conflictos de contenido; ambos lados se conservan, dev primero y QC-224 encima:
+
+- `error-codes.ts` / `error-catalog.ts`: dev (`integration_secret_unreadable`, comentario de
+  QC-219) + QC-224 (`delivery_not_found`, `delivery_already_voided`) al final.
+- `catalogo.test.ts`: conteo **recalculado a 84** (78 + 1 QC-234 + 3 QC-219 + 2 QC-224).
+- `guard-identificador-de-request.test.ts`: las cuatro migraciones del 2026-10-09 en orden de
+  nombre de carpeta. Nota: `20261009120000_inventory_movement_kind_delivery_void` (QC-224) y
+  `20261009120000_product_batches_production_date` (QC-219) comparten timestamp; Prisma las ordena
+  por nombre y son independientes (enum vs columna). La guardia pasa.
+- `guard-libro-de-inventario.test.ts`: titulo del censo con los nueve nombres
+  (+ `writeFinishedBatchLabels` de QC-219, + `returnFinishedGoods` de QC-224).
+- `qc121-alcance.test.ts`: "ocho" -> **nueve** caminos, el fabricado de mas pasa a ser el decimo.
+- `qc91-alcance.test.ts` (no trivial): las dos enmiendas ampliaban la misma asercion R21 del
+  `update` permitido (dev: `UPDATES_PERMITIDOS = [adjustBatchStock, writeFinishedBatchLabels]`
+  con `llamaAUpdateFueraDeLas`; QC-224: `UPDATE_PERMITIDO = [adjustBatchStock, returnFinishedGoods]`
+  con `llamaAUpdateFueraDe`). Resolucion: la asercion sobre el `product-prisma.ts` real usa la
+  union `[...UPDATES_PERMITIDOS, ...UPDATE_PERMITIDO]`, y se mantienen las comprobaciones de QC-224
+  (adjustBatchStock solo ya no basta; exactamente un `update` en `returnFinishedGoods`). Las dos
+  constantes y los tests de mutacion de cada lado quedan sin tocar.
+
+Migracion nueva aplicada a `qc224_anular_entrega`: `20261009120000_product_batches_production_date`.
+
+Verificacion: `tsc --noEmit` 0 errores; `vitest run tests/guards` + catalogo + qc121 + qc91:
+60 archivos, 925 pass, 12 skip, 0 fail.

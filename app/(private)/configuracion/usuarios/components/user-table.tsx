@@ -257,6 +257,10 @@ export function UserTable({
    * quien, y llaman a `setPanel(null)` al cerrar.
    */
   const [panel, setPanel] = useState<UserPanel | null>(null);
+  // La ultima fila de cada dialogo: tras la primera apertura el dialogo sigue montado y su salida
+  // anima con el contenido de esa fila.
+  const [lastDeleteUser, setLastDeleteUser] = useState<UserRow | null>(null);
+  const [lastStatusUser, setLastStatusUser] = useState<UserRow | null>(null);
 
   /** Cerrar es siempre lo mismo: soltar el estado. Estable, para no rearmar los dialogos. */
   const closePanel = useCallback((next: boolean) => {
@@ -270,8 +274,14 @@ export function UserTable({
       createUserColumns({
         canModify,
         onEdit: (user) => setPanel({ mode: 'edit', user }),
-        onDelete: (user) => setPanel({ mode: 'delete', user }),
-        onStatusChange: (user) => setPanel({ mode: 'status', user }),
+        onDelete: (user) => {
+          setLastDeleteUser(user);
+          setPanel({ mode: 'delete', user });
+        },
+        onStatusChange: (user) => {
+          setLastStatusUser(user);
+          setPanel({ mode: 'status', user });
+        },
       }),
     [canModify],
   );
@@ -318,12 +328,20 @@ export function UserTable({
         />
       )}
 
-      {deleteUser === null ? null : (
-        <DeleteUserDialog user={deleteUser} open onOpenChange={closePanel} />
+      {lastDeleteUser === null ? null : (
+        <DeleteUserDialog
+          user={deleteUser ?? lastDeleteUser}
+          open={deleteUser !== null}
+          onOpenChange={closePanel}
+        />
       )}
 
-      {statusUser === null ? null : (
-        <UserStatusDialog user={statusUser} open onOpenChange={closePanel} />
+      {lastStatusUser === null ? null : (
+        <UserStatusDialog
+          user={statusUser ?? lastStatusUser}
+          open={statusUser !== null}
+          onOpenChange={closePanel}
+        />
       )}
     </div>
   );

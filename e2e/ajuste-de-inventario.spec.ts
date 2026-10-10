@@ -47,6 +47,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 
 import { loginAndLand, permissionsForUsername } from './helpers/landing';
+import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 const FIXTURE_PREFIX = 'qc92_e2e_';
 
@@ -202,7 +203,9 @@ async function openBatchesOf(page: Page, user: Credentials, seeded: SeededBatch)
 }
 
 async function openBatchesPanel(page: Page, seeded: SeededBatch): Promise<void> {
-  await page.getByTestId('product-batches-open').click();
+  await (
+    await openRowActionsMenuItem(page, page.getByTestId('product-row-actions'), 'product-batches-open')
+  ).click();
   await expect(page.getByTestId('product-batches-sheet')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId(`product-batch-${seeded.batchId}`)).toBeVisible({ timeout: 60_000 });
 }

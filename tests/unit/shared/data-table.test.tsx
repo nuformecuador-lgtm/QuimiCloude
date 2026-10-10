@@ -216,6 +216,7 @@ describe('Barrel de components/shared/data-table (R1)', () => {
     expect(exportado).toEqual(
       [
         'DataTable',
+        'actionsColumn',
         'DATA_TABLE_FEATURES',
         'DATA_TABLE_OPTED_FEATURES',
         'createDefaultParams',

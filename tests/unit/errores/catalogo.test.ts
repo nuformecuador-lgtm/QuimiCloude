@@ -49,7 +49,7 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 76 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 79 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
       // 65 y no 60: entran `order_without_distribution`, `order_presentation_line_not_editable`,
       // `order_distribution_exceeds_quantity` y `order_without_unit` (QC-170) y
@@ -63,8 +63,11 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // 76 y no 74: entran `conditioning_team_member_not_allowed` y `conditioning_team_empty`.
       // QC-223 2026-10-08: 78 y no 76: entran `delivery_exceeds_remaining` y
       // `delivery_batch_insufficient`.
-      // QC-224 2026-10-09: 80 y no 78: entran `delivery_not_found` y `delivery_already_voided`.
-      expect(ERROR_CODES).toHaveLength(80)
+      // QC-234 2026-10-09: 79 y no 78: entra `integration_secret_unreadable`.
+      // QC-219 2026-10-09: 82 y no 79: entran `batch_expiry_not_future`,
+      // `batch_production_date_future` y `conditioning_batch_data_missing`.
+      // QC-224 2026-10-09: 84 y no 82: entran `delivery_not_found` y `delivery_already_voided`.
+      expect(ERROR_CODES).toHaveLength(84)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 

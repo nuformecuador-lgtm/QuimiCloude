@@ -28,9 +28,9 @@ import {
   TAB_PARAM,
   USUARIOS_TABS_TESTID,
   USUARIOS_TAB_TESTIDS,
-  WORK_GROUP_ACTION_DELETE_TESTID,
   WORK_GROUP_ACTION_EDIT_TESTID,
   WORK_GROUP_CREATE_OPEN_TESTID,
+  WORK_GROUP_ROW_ACTIONS_TESTID,
   WORK_GROUP_SECTION_TESTID,
   WORK_GROUP_SHEET_TESTID,
   WORK_GROUP_TABLE_TESTID,
@@ -38,6 +38,7 @@ import {
 import UsuariosPage from '@/app/(private)/configuracion/usuarios/page';
 import type { WorkGroupRow } from '@/lib/modules/identity';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
+import { clickRowAction } from '../../../helpers/row-actions-menu';
 import { setupUser } from '../../../helpers/user-event';
 import {
   NARROW_VIEWPORT,
@@ -288,8 +289,8 @@ describe.each([
     const objetivos = [
       screen.getByTestId(WORK_GROUP_CREATE_OPEN_TESTID),
       screen.getByTestId(USUARIOS_TAB_TESTIDS[GROUPS_TAB]),
-      ...screen.getAllByTestId(WORK_GROUP_ACTION_EDIT_TESTID),
-      ...screen.getAllByTestId(WORK_GROUP_ACTION_DELETE_TESTID),
+      // Las acciones de fila viven en un menu: el control tactil de la fila es su disparador.
+      ...screen.getAllByTestId(WORK_GROUP_ROW_ACTIONS_TESTID),
     ];
 
     for (const objetivo of objetivos) {
@@ -307,15 +308,15 @@ describe.each([
     expect(screen.getByTestId('data-table-search').className).toContain(FUENTE_DE_CAMPO);
   });
 
-  it('las acciones de fila estan SIEMPRE en el DOM: nada depende de `:hover`', async () => {
+  it('el disparador de las acciones de fila esta SIEMPRE en el DOM: nada depende de `:hover`', async () => {
     await renderPestanaDeGrupos();
 
     for (const grupo of GRUPOS) {
       const fila = screen.getByTestId(`data-table-row-${grupo.id}`);
-      const editar = within(fila).getByTestId(WORK_GROUP_ACTION_EDIT_TESTID);
-      const borrar = within(fila).getByTestId(WORK_GROUP_ACTION_DELETE_TESTID);
+      // Las acciones viven en el menu de la fila; lo que esta siempre en el DOM es su disparador.
+      const disparador = within(fila).getByTestId(WORK_GROUP_ROW_ACTIONS_TESTID);
 
-      for (const control of [editar, borrar]) {
+      for (const control of [disparador]) {
         expect(control).toBeVisible();
         // Ni `opacity-0`, ni `invisible`, ni `hidden` que solo se levanten al pasar el raton.
         for (const clase of clases(control)) {
@@ -332,7 +333,11 @@ describe.each([
     await renderPestanaDeGrupos();
 
     const fila = screen.getByTestId(`data-table-row-${GRUPOS[0]!.id}`);
-    await user.click(within(fila).getByTestId(WORK_GROUP_ACTION_EDIT_TESTID));
+    await clickRowAction(
+      user,
+      within(fila).getByTestId(WORK_GROUP_ROW_ACTIONS_TESTID),
+      WORK_GROUP_ACTION_EDIT_TESTID,
+    );
 
     expect(await screen.findByTestId(WORK_GROUP_SHEET_TESTID)).toBeInTheDocument();
   });

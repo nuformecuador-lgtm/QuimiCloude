@@ -17,8 +17,8 @@ import { CatalogLineSheet } from './catalog-line-sheet';
 import { buildCatalogColumns } from './catalog-columns';
 import { CATALOG_SKELETON_COLUMN_COUNT } from './catalog-columns-skeleton';
 import { EMPTY_CATALOG_DIRECTORIES, type CatalogDirectories } from './catalog-directories';
+import { CatalogLineRowActions } from './catalog-line-row-actions';
 import { catalogListHref } from './catalog-list-params';
-import { DeleteCatalogLineDialog } from './delete-catalog-line-dialog';
 
 /**
  * Tabla del catalogo de un proveedor (R12, R13, R21, R22, R30, R41, R48; `design.md > 6`).
@@ -34,7 +34,7 @@ import { DeleteCatalogLineDialog } from './delete-catalog-line-dialog';
  * resueltas, los diccionarios, las unidades y los parametros con los que se pidieron.
  *
  * **Las acciones de fila NO son un slot** (correccion del 2026-09-07): esta tabla monta ella
- * misma `CatalogLineSheet` y `DeleteCatalogLineDialog`. El diseno original las recibia como
+ * misma `CatalogLineRowActions`, el menu de la fila con su panel y su dialogo. El diseno original las recibia como
  * `rowActions`, una funcion que `CatalogListSection` construia; pero esa seccion es un Server
  * Component y una funcion no cruza la frontera servidor->cliente, asi que la pantalla reventaba
  * con «Functions cannot be passed directly to Client Components». De la seccion bajan datos
@@ -188,19 +188,15 @@ export function CatalogTable({
     `CatalogListSection`: esa seccion es un Server Component, y una funcion no cruza la frontera
     servidor->cliente («Functions cannot be passed directly to Client Components»). Con el slot,
     la pantalla del proveedor reventaba al pintarse. Lo que baja de la seccion son datos
-    -`supplierId` y `units`-, y esta tabla los enchufa al panel y al dialogo, igual que hace
-    `product-table.tsx` en inventario. Las acciones siguen SIEMPRE visibles: nada tras `:hover`
-    (R48).
+    -`supplierId` y `units`-, y esta tabla los enchufa al menu de la fila. Su disparador sigue
+    SIEMPRE visible: nada tras `:hover`.
   */
   const columns = useMemo(
     () =>
       buildCatalogColumns({
         directories,
         rowActions: (line) => (
-          <>
-            <CatalogLineSheet supplierId={supplierId} units={units} line={line} />
-            <DeleteCatalogLineDialog line={line} />
-          </>
+          <CatalogLineRowActions supplierId={supplierId} units={units} line={line} />
         ),
       }),
     [directories, supplierId, units],

@@ -10,7 +10,12 @@ import type {
 } from '@/lib/modules/asignaciones/ports/conditioning-team-repository';
 import type { OrderAssignmentRowWithOrder } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
 import type { PersonRef } from '@/lib/modules/identity';
-import type { PresentationCatalog, PresentationRef } from '@/lib/modules/inventario';
+import type {
+  FinishedBatchLabels,
+  FinishedBatchOfOrderLine,
+  PresentationCatalog,
+  PresentationRef,
+} from '@/lib/modules/inventario';
 import type { AssignedOrderSummary, OrderCatalog, Page } from '@/lib/modules/pedidos';
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
@@ -76,6 +81,8 @@ type Opciones = {
   readonly presentations?: readonly PresentationRef[];
   readonly units?: readonly UnitRef[];
   readonly team?: readonly ConditioningTeamMemberRow[];
+  /** QC-219: los lotes de produccion del pedido que devuelve `listOfOrder`. */
+  readonly batches?: readonly FinishedBatchOfOrderLine[];
 };
 
 function pagina(
@@ -107,6 +114,7 @@ export function montar(options?: Opciones) {
   const findRefsPresentations = vi.fn(async () => options?.presentations ?? []);
   const findRefsUnits = vi.fn(async () => options?.units ?? []);
   const listTeamByOrderInCompany = vi.fn<ConditioningTeamRepository['listByOrderInCompany']>(async () => options?.team ?? []);
+  const listOfOrder = vi.fn<FinishedBatchLabels['listOfOrder']>(async () => options?.batches ?? []);
 
   const deps = {
     assignments: {
@@ -123,10 +131,12 @@ export function montar(options?: Opciones) {
     presentations: { findRefs: findRefsPresentations } as unknown as PresentationCatalog,
     units: { findRefs: findRefsUnits } as unknown as UnitCatalog,
     team: { insertAll: vi.fn(), listByOrderInCompany: listTeamByOrderInCompany },
+    batches: { listOfOrder },
     now: () => AHORA,
   } as unknown as ComposeOrderRowsDeps & {
     readonly orders: OrderCatalog;
     readonly team: ConditioningTeamRepository;
+    readonly batches: Pick<FinishedBatchLabels, 'listOfOrder'>;
   };
 
   return {
@@ -139,6 +149,7 @@ export function montar(options?: Opciones) {
     findRefsPresentations,
     findRefsUnits,
     listTeamByOrderInCompany,
+    listOfOrder,
     todos: [
       listAliveSummariesInCompany,
       listAliveSummariesByIds,
@@ -148,6 +159,7 @@ export function montar(options?: Opciones) {
       findRefsPresentations,
       findRefsUnits,
       listTeamByOrderInCompany,
+      listOfOrder,
     ],
   };
 }
@@ -164,4 +176,20 @@ export function actoresSinElPermiso(seedPermissions: Readonly<Record<string, rea
     sinPermiso.push([`rol ${rol}`, { id: ANA, companyId: EMPRESA, permissions: seedPermissions[rol] ?? [] }]);
   }
   return sinPermiso;
+}
+
+/** QC-219: el lote de produccion de una linea; sin `conDatos`, con el lote automatico y sin fechas. */
+export function loteDeLinea(
+  presentationId: string,
+  batchId: string,
+  conDatos?: { readonly lot: string; readonly expiryDate: string; readonly productionDate: string },
+): FinishedBatchOfOrderLine {
+  return {
+    batchId,
+    orderPresentationLineId: `linea-${presentationId}`,
+    presentationId,
+    lot: conDatos?.lot ?? `AUTO-${presentationId}`,
+    expiryDate: conDatos?.expiryDate ?? null,
+    productionDate: conDatos?.productionDate ?? null,
+  };
 }

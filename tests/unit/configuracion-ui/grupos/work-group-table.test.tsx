@@ -43,6 +43,7 @@ import {
 import { WORK_GROUP_QUERYABLE, type WorkGroupRow } from '@/lib/modules/identity';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { USERS_ROUTE } from '@/lib/shared/routes';
+import { clickRowAction } from '../../../helpers/row-actions-menu';
 import { esperarInteractiva, setupUser } from '../../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../../helpers/viewport';
 
@@ -414,7 +415,11 @@ describe('la tabla es la duena del estado de las escrituras (R9, `design.md > 5`
     const objetivo = GRUPOS[1]!;
 
     const fila = screen.getByTestId(`data-table-row-${objetivo.id}`);
-    await user.click(within(fila).getByTestId(WORK_GROUP_ACTION_EDIT_TESTID));
+    await clickRowAction(
+      user,
+      within(fila).getByTestId(WORK_GROUP_ROW_ACTIONS_TESTID),
+      WORK_GROUP_ACTION_EDIT_TESTID,
+    );
 
     const panel = await screen.findByTestId(WORK_GROUP_SHEET_TESTID);
     expect(panel).toHaveAttribute('data-mode', 'edit');
@@ -430,7 +435,11 @@ describe('la tabla es la duena del estado de las escrituras (R9, `design.md > 5`
     const objetivo = GRUPOS[2]!;
 
     const fila = screen.getByTestId(`data-table-row-${objetivo.id}`);
-    await user.click(within(fila).getByTestId(WORK_GROUP_ACTION_DELETE_TESTID));
+    await clickRowAction(
+      user,
+      within(fila).getByTestId(WORK_GROUP_ROW_ACTIONS_TESTID),
+      WORK_GROUP_ACTION_DELETE_TESTID,
+    );
 
     expect(await screen.findByTestId(DELETE_WORK_GROUP_DIALOG_TESTID)).toBeInTheDocument();
     // Sobre ESE grupo: el identificador que el dialogo enviaria es el de la fila que lo abrio.
@@ -445,7 +454,11 @@ describe('la tabla es la duena del estado de las escrituras (R9, `design.md > 5`
     // Se ejercita con la EDICION, que es la escritura que esta tabla sigue siendo duena de abrir:
     // el alta se mudo a `work-group-create-action.tsx` y cierra en su propio archivo.
     const fila = screen.getByTestId(`data-table-row-${GRUPOS[0]!.id}`);
-    await user.click(within(fila).getByTestId(WORK_GROUP_ACTION_EDIT_TESTID));
+    await clickRowAction(
+      user,
+      within(fila).getByTestId(WORK_GROUP_ROW_ACTIONS_TESTID),
+      WORK_GROUP_ACTION_EDIT_TESTID,
+    );
     await user.click(await screen.findByTestId(WORK_GROUP_FORM_CANCEL_TESTID));
 
     await waitFor(() => expect(screen.queryByTestId(WORK_GROUP_SHEET_TESTID)).toBeNull());
@@ -461,7 +474,11 @@ describe('la tabla es la duena del estado de las escrituras (R9, `design.md > 5`
     const objetivo = GRUPOS[0]!;
 
     const fila = screen.getByTestId(`data-table-row-${objetivo.id}`);
-    await user.click(within(fila).getByTestId(WORK_GROUP_ACTION_DELETE_TESTID));
+    await clickRowAction(
+      user,
+      within(fila).getByTestId(WORK_GROUP_ROW_ACTIONS_TESTID),
+      WORK_GROUP_ACTION_DELETE_TESTID,
+    );
     await user.click(await screen.findByTestId(DELETE_WORK_GROUP_DISMISS_TESTID));
 
     await waitFor(() => expect(screen.queryByTestId(DELETE_WORK_GROUP_DIALOG_TESTID)).toBeNull());

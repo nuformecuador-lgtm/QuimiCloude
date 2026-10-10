@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useActionState, useRef, useState } from 'react';
 
-import { ConfirmActionDialog } from '@/components/shared/confirm-action-dialog';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { StepReader } from '@/components/shared/step-reader';
 import { Button } from '@/components/ui/button';
@@ -76,6 +76,17 @@ export const PACKING_ORDER_FINISH_CONFIRM_TEXTS = {
   cancel: 'Cancelar',
   confirm: 'Terminar',
 } as const;
+
+function confirmTexts(
+  texts: typeof PACKING_ORDER_START_CONFIRM_TEXTS | typeof PACKING_ORDER_FINISH_CONFIRM_TEXTS,
+) {
+  return {
+    title: texts.title,
+    description: texts.description,
+    dismiss: texts.cancel,
+    confirm: texts.confirm,
+  };
+}
 
 const RECIPE_MISSING_TEXT = 'Esta receta esta dada de baja.';
 const QUANTITY_LABEL = 'Cantidad:';
@@ -226,13 +237,16 @@ export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) 
           >
             {startPending ? START_PENDING_LABEL : START_LABEL}
           </Button>
-          <ConfirmActionDialog
+          <ConfirmDialog
             open={startConfirmOpen}
             onOpenChange={setStartConfirmOpen}
             onConfirm={() => startFormRef.current?.requestSubmit()}
-            texts={PACKING_ORDER_START_CONFIRM_TEXTS}
-            testId={PACKING_ORDER_START_DIALOG_TESTID}
-            confirmTestId={PACKING_ORDER_START_CONFIRM_TESTID}
+            texts={confirmTexts(PACKING_ORDER_START_CONFIRM_TEXTS)}
+            testIds={{
+              dialog: PACKING_ORDER_START_DIALOG_TESTID,
+              dismiss: `${PACKING_ORDER_START_DIALOG_TESTID}-cancel`,
+              confirm: PACKING_ORDER_START_CONFIRM_TESTID,
+            }}
           />
         </form>
       ) : null}
@@ -271,13 +285,16 @@ export function PackingOrderScreen({ order, actorId }: PackingOrderScreenProps) 
               {finishPending ? FINISH_PENDING_LABEL : FINISH_LABEL}
             </Button>
           )}
-          <ConfirmActionDialog
+          <ConfirmDialog
             open={finishConfirmOpen}
             onOpenChange={setFinishConfirmOpen}
             onConfirm={() => finishFormRef.current?.requestSubmit()}
-            texts={PACKING_ORDER_FINISH_CONFIRM_TEXTS}
-            testId={PACKING_ORDER_FINISH_DIALOG_TESTID}
-            confirmTestId={PACKING_ORDER_FINISH_CONFIRM_TESTID}
+            texts={confirmTexts(PACKING_ORDER_FINISH_CONFIRM_TEXTS)}
+            testIds={{
+              dialog: PACKING_ORDER_FINISH_DIALOG_TESTID,
+              dismiss: `${PACKING_ORDER_FINISH_DIALOG_TESTID}-cancel`,
+              confirm: PACKING_ORDER_FINISH_CONFIRM_TESTID,
+            }}
           />
         </form>
       ) : null}

@@ -35,6 +35,7 @@ import {
 } from './list-query-sql';
 
 import type { FinishedGoodsOutcome } from '../../../domain/finished-goods';
+import type { FinishedBatchLabel, FinishedBatchLabelsOutcome } from '../../../domain/finished-batch-labels';
 import type { FinishedGoodsDispatchOutcome } from '../../../domain/finished-goods-dispatch';
 import type { FinishedGoodsReturnOutcome } from '../../../domain/finished-goods-return';
 import type { InventoryScope } from '../../../domain/inventory-scope';
@@ -1570,4 +1571,74 @@ export async function findFinishedGoodsReceipts(
         row.orderId !== null && row.batch.packageContent !== null,
     )
     .map((row) => ({ orderId: row.orderId, packages: packagesFromReceipt(row.quantity, row.batch.packageContent) }));
+}
+
+/**
+ * Lote, vencimiento y dia de produccion de los lotes que entraron por el asiento `production` del
+ * pedido. Cambia la etiqueta del lote, no su existencia: por eso no asienta movimiento, y la
+ * trazabilidad queda en `updated_by` y `updated_at`.
+ *
+ * Los lotes se bloquean antes de comprobar el choque, asi que dos guardados del mismo pedido se
+ * serializan. Contra otro pedido en carrera solo protege el indice unico: su `P2002` sale como
+ * excepcion para que se deshaga la transaccion entera, y lo traduce quien la abrio.
+ */
+export async function writeFinishedBatchLabels(
+  tx: Prisma.TransactionClient,
+  input: {
+    readonly orderId: string;
+    readonly labels: readonly FinishedBatchLabel[];
+    readonly actorId: string;
+    readonly now: Date;
+  },
+  scope: InventoryScope,
+): Promise<FinishedBatchLabelsOutcome> {
+  const { companyId } = companyScopeColumns(scope);
+  if (input.labels.length === 0) return { kind: 'written' };
+  const batchIds = input.labels.map((label) => label.batchId);
+
+  const ofOrder = await tx.$queryRaw<ReadonlyArray<{ readonly id: string }>>(Prisma.sql`
+    SELECT b."id"::text AS "id"
+      FROM "product_batches" b
+     WHERE b."company_id" = ${companyId}::uuid
+       AND b."id" = ANY(${batchIds}::uuid[])
+       AND EXISTS (
+             SELECT 1
+               FROM "inventory_movements" m
+              WHERE m."batch_id" = b."id"
+                AND m."company_id" = ${companyId}::uuid
+                AND m."kind" = 'production'
+                AND m."order_id" = ${input.orderId}::uuid
+           )
+     ORDER BY b."id"
+       FOR UPDATE
+  `);
+  const lockedIds = new Set(ofOrder.map((row) => row.id));
+  const notFound = input.labels.find((label) => !lockedIds.has(label.batchId));
+  if (notFound !== undefined) return { kind: 'batch_not_found', batchId: notFound.batchId };
+
+  // Exacta y sensible a mayusculas, como el indice unico. Un lote del mismo pedido tambien choca.
+  const holders = await tx.productBatch.findMany({
+    where: { AND: [batchCompanyScope(scope), { lot: { in: input.labels.map((label) => label.lot) } }] },
+    select: { id: true, lot: true },
+  });
+  const clash = input.labels.find((label) =>
+    holders.some((holder) => holder.lot === label.lot && holder.id !== label.batchId),
+  );
+  if (clash !== undefined) return { kind: 'duplicate_lot', batchId: clash.batchId };
+
+  for (const label of input.labels) {
+    await tx.productBatch.update({
+      where: { id: label.batchId, companyId },
+      data: {
+        lot: label.lot,
+        expiryDate: toBatchExpiryDate(label.expiryDate),
+        productionDate: toBatchExpiryDate(label.productionDate),
+        updatedBy: input.actorId,
+        updatedAt: input.now,
+      },
+      select: { id: true },
+    });
+  }
+
+  return { kind: 'written' };
 }

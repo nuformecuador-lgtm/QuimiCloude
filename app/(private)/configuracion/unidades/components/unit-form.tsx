@@ -1,33 +1,17 @@
 'use client';
 
 import { useActionState, useEffect, useId } from 'react';
-import { useFormStatus } from 'react-dom';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { FormSheet } from '@/components/shared/form-sheet';
+import { SelectField } from '@/components/shared/select-field';
+import { TextField } from '@/components/shared/text-field';
 import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import type { UnitView } from '@/lib/modules/unidades';
 import {
   createUnitAction,
   updateUnitAction,
 } from '@/lib/modules/unidades/adapters/driving/unit-actions';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { formatFactor, unitLabel } from './unit-equivalence';
 
@@ -113,9 +97,6 @@ export const UNIT_ERROR_SYMBOL_TESTID = 'unit-error-symbol';
 export const UNIT_ERROR_BASE_TESTID = 'unit-error-base';
 
 type UnitFieldName = (typeof UNIT_BUSINESS_FIELDS)[number];
-
-/** 16 px en TODOS los anchos: el primitivo baja a 14 px en `md` y R48 no distingue por ancho. */
-const FIELD_TEXT = 'text-base md:text-base';
 
 const FIELD_LABELS: Readonly<Record<UnitFieldName, string>> = {
   name: 'Nombre',
@@ -298,230 +279,94 @@ export function UnitForm({ unit, baseUnits, onSaved }: UnitFormProps) {
   const options = baseUnits.filter((candidate) => candidate.id !== unit?.id);
 
   return (
-    <SheetContent
-      side="right"
-      className="w-full pb-[env(safe-area-inset-bottom)] data-[side=right]:w-full sm:max-w-md"
-      data-testid={UNIT_SHEET_TESTID}
-      isForm
-      formProps={{ action: formAction, 'data-testid': UNIT_FORM_TESTID }}
-      footer={<FormActions />}
+    <FormSheet
+      title={isEdit ? 'Editar unidad' : 'Nueva unidad'}
+      description={
+        isEdit ? 'Cambia los datos de la unidad de medida.' : 'Describe la nueva unidad de medida.'
+      }
+      formAction={formAction}
+      testIds={{
+        sheet: UNIT_SHEET_TESTID,
+        form: UNIT_FORM_TESTID,
+        cancel: UNIT_FORM_CANCEL_TESTID,
+        submit: UNIT_FORM_SUBMIT_TESTID,
+      }}
     >
-      <SheetHeader>
-        <SheetTitle>{isEdit ? 'Editar unidad' : 'Nueva unidad'}</SheetTitle>
-        <SheetDescription>
-          {isEdit
-            ? 'Cambia los datos de la unidad de medida.'
-            : 'Describe la nueva unidad de medida.'}
-        </SheetDescription>
-      </SheetHeader>
-
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-        {formError === undefined ? null : (
-          // Aqui van los rechazos que no senalan ningun campo.
-          <ErrorAlert
-            error={formError}
-            id={formErrorId}
-            className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            testId={UNIT_FORM_ERROR_TESTID}
-            renderCatalogued={(catalogued) => (
-              <>
-                <p>{catalogued.message}</p>
-                <p className="text-xs" data-testid={UNIT_FORM_ERROR_CODE_TESTID}>
-                  {catalogued.code}
-                </p>
-              </>
-            )}
-          />
-        )}
-
-        <UnitTextField
-          id={`${fieldId}-${UNIT_NAME_FIELD}`}
-          name={UNIT_NAME_FIELD}
-          label={FIELD_LABELS.name}
-          defaultValue={initialName}
-          required
-          testId={UNIT_FIELD_NAME_TESTID}
-          errorTestId={UNIT_ERROR_NAME_TESTID}
-          error={fieldErrors.name}
-        />
-
-        <UnitTextField
-          id={`${fieldId}-${UNIT_SYMBOL_FIELD}`}
-          name={UNIT_SYMBOL_FIELD}
-          label={FIELD_LABELS.symbol}
-          defaultValue={initialSymbol}
-          testId={UNIT_FIELD_SYMBOL_TESTID}
-          errorTestId={UNIT_ERROR_SYMBOL_TESTID}
-          error={fieldErrors.symbol}
-        />
-
-        <div className="flex flex-col gap-2">
-          <span id={baseLabelId} className="text-sm font-medium">
-            {FIELD_LABELS.baseUnitId}
-          </span>
-          {/*
-            El primitivo monta un `input` oculto con este `name`, asi que el valor viaja en el
-            `FormData` y `buildUnitFormData` decide si la clave se envia o no (R34).
-          */}
-          <Select
-            key={initialBase}
-            name={UNIT_BASE_FIELD}
-            defaultValue={initialBase}
-            items={[
-              { label: NO_BASE_UNIT_LABEL, value: NO_BASE_UNIT_VALUE },
-              ...options.map((option) => ({ label: unitLabel(option), value: option.id })),
-            ]}
-          >
-            <SelectTrigger
-              aria-labelledby={baseLabelId}
-              aria-invalid={fieldErrors.baseUnitId === undefined ? undefined : true}
-              aria-describedby={fieldErrors.baseUnitId === undefined ? undefined : baseErrorId}
-              className={`w-full ${touchTarget} ${FIELD_TEXT}`}
-              data-testid={UNIT_FIELD_BASE_TESTID}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {/* «No deriva de ninguna» es una eleccion EXPLICITA (R36), no el hueco que queda. */}
-              <SelectItem value={NO_BASE_UNIT_VALUE} data-testid={UNIT_OPTION_NO_BASE_TESTID}>
-                {NO_BASE_UNIT_LABEL}
-              </SelectItem>
-              {options.map((option) => (
-                <SelectItem key={option.id} value={option.id} data-testid={UNIT_OPTION_BASE_TESTID}>
-                  {unitLabel(option)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {fieldErrors.baseUnitId === undefined ? null : (
-            <p
-              id={baseErrorId}
-              role="alert"
-              className="text-sm text-destructive"
-              data-testid={UNIT_ERROR_BASE_TESTID}
-            >
-              {fieldErrors.baseUnitId}
-            </p>
+      {formError === undefined ? null : (
+        <ErrorAlert
+          error={formError}
+          id={formErrorId}
+          className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
+          testId={UNIT_FORM_ERROR_TESTID}
+          renderCatalogued={(catalogued) => (
+            <>
+              <p>{catalogued.message}</p>
+              <p className="text-xs" data-testid={UNIT_FORM_ERROR_CODE_TESTID}>
+                {catalogued.code}
+              </p>
+            </>
           )}
-        </div>
-
-        {/*
-          `inputMode="decimal"` y NUNCA `type="number"` (`design.md > 8`): un `number` del
-          navegador reintroduce coma flotante y localizacion decimal en el unico modulo del ERP
-          que decidio no tenerlas. El factor es TEXTO de principio a fin.
-        */}
-        <UnitTextField
-          id={`${fieldId}-${UNIT_FACTOR_FIELD}`}
-          name={UNIT_FACTOR_FIELD}
-          label={FIELD_LABELS.factor}
-          defaultValue={initialFactor}
-          inputMode="decimal"
-          testId={UNIT_FIELD_FACTOR_TESTID}
         />
-      </div>
-    </SheetContent>
-  );
-}
-
-/** Campo de texto del formulario, con su etiqueta y su error en linea. */
-function UnitTextField({
-  id,
-  name,
-  label,
-  defaultValue,
-  required,
-  inputMode,
-  testId,
-  errorTestId,
-  error,
-}: {
-  readonly id: string;
-  readonly name: string;
-  readonly label: string;
-  readonly defaultValue: string;
-  readonly required?: boolean;
-  readonly inputMode?: 'decimal';
-  readonly testId: string;
-  readonly errorTestId?: string;
-  readonly error?: string;
-}) {
-  const errorId = `${id}-error`;
-
-  return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={id}>{label}</Label>
-      {/*
-        `key={defaultValue}`: Base UI avisa cuando el `defaultValue` de un campo no controlado
-        cambia despues de montarse, y la clave fuerza el remontaje justo en ese salto —el que
-        ocurre al volver de un intento fallido—. El campo sigue sin estar controlado.
-      */}
-      <Input
-        key={defaultValue}
-        id={id}
-        name={name}
-        type="text"
-        inputMode={inputMode}
-        autoComplete="off"
-        required={required}
-        defaultValue={defaultValue}
-        className={`min-h-11 ${FIELD_TEXT}`}
-        aria-invalid={error === undefined ? undefined : true}
-        aria-describedby={error === undefined ? undefined : errorId}
-        data-testid={testId}
-      />
-      {error === undefined || errorTestId === undefined ? null : (
-        <p id={errorId} role="alert" className="text-sm text-destructive" data-testid={errorTestId}>
-          {error}
-        </p>
       )}
-    </div>
-  );
-}
 
-/**
- * Acciones del pie: cancelar y guardar. **Cancelar es `type="button"`** —y no un submit— porque
- * el panel entero es un `<form>` y cualquier boton sin tipo dentro de el lo enviaria. Cierra por
- * el primitivo (`SheetClose`), y al no navegar la URL conserva pagina, tamano, orden y busqueda
- * (R32).
- */
-function FormActions() {
-  return (
-    <>
-      <SheetClose
-        render={
-          <Button
-            type="button"
-            variant="outline-dashed"
-            className={touchTarget}
-            data-testid={UNIT_FORM_CANCEL_TESTID}
-          />
-        }
-      >
-        Cancelar
-      </SheetClose>
-      <SaveButton />
-    </>
-  );
-}
+      <TextField
+        id={`${fieldId}-${UNIT_NAME_FIELD}`}
+        name={UNIT_NAME_FIELD}
+        label={FIELD_LABELS.name}
+        defaultValue={initialName}
+        remountOnDefault
+        required
+        autoComplete="off"
+        testId={UNIT_FIELD_NAME_TESTID}
+        errorTestId={UNIT_ERROR_NAME_TESTID}
+        error={fieldErrors.name}
+      />
 
-/**
- * Boton de envio. Componente aparte por una necesidad tecnica: `useFormStatus()` solo lee el
- * estado del `<form>` ANCESTRO, asi que dentro del componente que renderiza el `<form>` devolveria
- * siempre `pending: false` y el boton no se deshabilitaria nunca.
- */
-function SaveButton() {
-  const { pending } = useFormStatus();
+      <TextField
+        id={`${fieldId}-${UNIT_SYMBOL_FIELD}`}
+        name={UNIT_SYMBOL_FIELD}
+        label={FIELD_LABELS.symbol}
+        defaultValue={initialSymbol}
+        remountOnDefault
+        autoComplete="off"
+        testId={UNIT_FIELD_SYMBOL_TESTID}
+        errorTestId={UNIT_ERROR_SYMBOL_TESTID}
+        error={fieldErrors.symbol}
+      />
 
-  return (
-    <Button
-      type="submit"
-      touch
-      disabled={pending}
-      aria-busy={pending}
-      data-testid={UNIT_FORM_SUBMIT_TESTID}
-    >
-      {pending ? 'Guardando…' : 'Guardar'}
-    </Button>
+      <SelectField
+        name={UNIT_BASE_FIELD}
+        label={FIELD_LABELS.baseUnitId}
+        noneOption={{
+          label: NO_BASE_UNIT_LABEL,
+          value: NO_BASE_UNIT_VALUE,
+          testId: UNIT_OPTION_NO_BASE_TESTID,
+        }}
+        options={options.map((option) => ({ label: unitLabel(option), value: option.id }))}
+        defaultValue={initialBase}
+        remountOnDefault
+        labelId={baseLabelId}
+        errorId={baseErrorId}
+        triggerTestId={UNIT_FIELD_BASE_TESTID}
+        optionTestId={UNIT_OPTION_BASE_TESTID}
+        error={fieldErrors.baseUnitId}
+        errorTestId={UNIT_ERROR_BASE_TESTID}
+      />
+
+      {/*
+        `inputMode="decimal"` y nunca `type="number"`: el `number` del navegador reintroduce coma
+        flotante y separador decimal local en un factor que se maneja como texto exacto.
+      */}
+      <TextField
+        id={`${fieldId}-${UNIT_FACTOR_FIELD}`}
+        name={UNIT_FACTOR_FIELD}
+        label={FIELD_LABELS.factor}
+        defaultValue={initialFactor}
+        remountOnDefault
+        inputMode="decimal"
+        autoComplete="off"
+        testId={UNIT_FIELD_FACTOR_TESTID}
+      />
+    </FormSheet>
   );
 }

@@ -242,3 +242,12 @@ export type {
   ReservationAllocation,
   ReservationPlan,
 } from './domain/plan-reservation';
+// Los datos de lote del producto terminado que escribe el acondicionamiento: el contrato y la
+// regla del lote tecleado y de la fecha civil, para que quien los valida use la misma definicion.
+export { typedLotSchema, civilDateSchema } from './domain/product-batch-input';
+export type {
+  FinishedBatchLabel,
+  FinishedBatchLabels,
+  FinishedBatchLabelsOutcome,
+  FinishedBatchOfOrderLine,
+} from './domain/finished-batch-labels';

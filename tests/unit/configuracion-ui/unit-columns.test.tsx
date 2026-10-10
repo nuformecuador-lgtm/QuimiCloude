@@ -8,13 +8,13 @@
 //
 // **Los asserts van sobre ids de columna, rol ARIA, `data-testid` y constantes exportadas** (R49),
 // nunca sobre el copy de las etiquetas: `label` se reescribe sin avisar y un assert sobre el no
-// dice nada del comportamiento. Los nombres accesibles de los dos botones se comprueban con las
+// dice nada del comportamiento. Los nombres accesibles de los dos items se comprueban con las
 // funciones que los componen (`editUnitLabel`, `deleteUnitLabel`), unica fuente de ese texto.
 //
 // **`unit-actions.ts` esta mockeada con dobles que FALLAN si se les llama**: una declaracion de
 // columnas no puede pedir ni escribir datos por su cuenta (R44, R46).
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -35,6 +35,9 @@ import {
   formatUnitEquivalence,
 } from '@/app/(private)/configuracion/unidades/components';
 import { UNIT_QUERYABLE, type UnitView } from '@/lib/modules/unidades';
+
+import { openRowActionsMenu } from '../../helpers/row-actions-menu';
+import { setupUser } from '../../helpers/user-event';
 
 // El panel de edicion y el dialogo de borrado que la celda de acciones monta usan `useRouter` para
 // refrescar la lista tras una escritura (R38). En jsdom no hay App Router montado, asi que se
@@ -241,13 +244,15 @@ describe('la columna de acciones es una columna NORMAL que devuelve elementos (R
 });
 
 describe('la fila de una unidad DE EMPRESA ofrece editar y borrar (R28, R48)', () => {
-  it('los dos botones estan en el DOM desde el primer render y son botones de verdad', () => {
+  it('al abrir el menu de la fila, editar y borrar son items de menu de verdad y habilitados', async () => {
     const view = unidad();
+    const user = setupUser();
 
     pintarCelda(ACTIONS_COLUMN_ID, view);
+    const menu = await openRowActionsMenu(user, screen.getByTestId(UNIT_ROW_ACTIONS_TESTID));
 
-    const editar = screen.getByRole('button', { name: editUnitLabel(view.name) });
-    const borrar = screen.getByRole('button', { name: deleteUnitLabel(view.name) });
+    const editar = within(menu).getByRole('menuitem', { name: editUnitLabel() });
+    const borrar = within(menu).getByRole('menuitem', { name: deleteUnitLabel() });
 
     expect(editar).toBe(screen.getByTestId(UNIT_ACTION_EDIT_TESTID));
     expect(borrar).toBe(screen.getByTestId(UNIT_ACTION_DELETE_TESTID));
@@ -265,17 +270,20 @@ describe('la fila de una unidad DE EMPRESA ofrece editar y borrar (R28, R48)', (
     }
   });
 
-  it('los dos objetivos tactiles miden al menos 44x44 px (R48)', () => {
+  it('el disparador del menu mide al menos 44x44 px y sus items 44 px de alto (R48)', async () => {
+    const user = setupUser();
     pintarCelda(ACTIONS_COLUMN_ID, unidad());
+    const disparador = screen.getByTestId(UNIT_ROW_ACTIONS_TESTID);
+    expect(disparador).toHaveClass('min-h-11');
+    expect(disparador).toHaveClass('min-w-11');
 
+    const menu = await openRowActionsMenu(user, disparador);
     for (const testId of [UNIT_ACTION_EDIT_TESTID, UNIT_ACTION_DELETE_TESTID]) {
-      const boton = screen.getByTestId(testId);
-      expect(boton).toHaveClass('min-h-11');
-      expect(boton).toHaveClass('min-w-11');
+      expect(within(menu).getByTestId(testId)).toHaveClass('min-h-11');
     }
   });
 
-  it('nada se descubre con `:hover` ni vive dentro de un desplegable (R48)', () => {
+  it('nada se descubre con `:hover` y el menu de la fila arranca cerrado (R48)', () => {
     const { container } = pintarCelda(ACTIONS_COLUMN_ID, unidad());
 
     expect(screen.queryByRole('menu')).toBeNull();
@@ -298,10 +306,12 @@ describe('la fila de una unidad DE SISTEMA deja la celda VACIA (R29)', () => {
     expect(screen.queryByTestId(UNIT_ACTION_DELETE_TESTID)).toBeNull();
   });
 
-  it('el detector muerde: la MISMA unidad sin `isSystem` si pinta las dos acciones', () => {
+  it('el detector muerde: la MISMA unidad sin `isSystem` si pinta las dos acciones', async () => {
+    const user = setupUser();
     pintarCelda(ACTIONS_COLUMN_ID, unidad({ isSystem: false }));
 
-    expect(screen.getAllByRole('button')).toHaveLength(2);
+    const menu = await openRowActionsMenu(user, screen.getByTestId(UNIT_ROW_ACTIONS_TESTID));
+    expect(within(menu).getAllByRole('menuitem')).toHaveLength(2);
   });
 
   it('la columna de nombre no gana ningun distintivo por ser la unidad de sistema (R29)', () => {

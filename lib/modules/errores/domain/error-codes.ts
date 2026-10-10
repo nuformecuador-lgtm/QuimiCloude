@@ -26,6 +26,9 @@
  * **2026-10-07**: `order_conditioning_taken`, `order_not_conditionable`.
  * **2026-10-08**: `conditioning_team_member_not_allowed`, `conditioning_team_empty`.
  * **2026-10-08**: `delivery_exceeds_remaining`, `delivery_batch_insufficient`.
+ * **2026-10-09**: `integration_secret_unreadable`.
+ * **2026-10-09**: `batch_expiry_not_future`, `batch_production_date_future`,
+ * `conditioning_batch_data_missing`.
  * **2026-10-09**: `delivery_not_found`, `delivery_already_voided`.
  */
 export const ERROR_CODES = [
@@ -163,12 +166,21 @@ export const ERROR_CODES = [
   // Distinto de `invalid_input`: la entrada marca personas o grupos, pero ninguna persona elegible
   // queda en el equipo.
   'conditioning_team_empty',
+  // Distinto de `invalid_input`: la fecha tiene forma valida, lo que falla es que no es posterior
+  // a hoy.
+  'batch_expiry_not_future',
+  // Distinto de `invalid_input`: la fecha tiene forma valida, lo que falla es que es posterior a hoy.
+  'batch_production_date_future',
+  // Distinto de `order_not_conditionable`: el pedido si se puede terminar, lo que falta son los
+  // datos de lote de alguna linea.
+  'conditioning_batch_data_missing',
   // Distinto de `order_distribution_exceeds_quantity`: no pasa de lo pedido al repartir, pasa de
   // los envases que aun faltan por entregar.
   'delivery_exceeds_remaining',
   // Distinto de `batch_stock_negative` e `insufficient_material`: el lote existe, pero ya no tiene
   // los envases enteros que la entrega le pide.
   'delivery_batch_insufficient',
+  'integration_secret_unreadable',
   // Distinto de `order_not_found`: lo que falta es la entrega, no el pedido.
   'delivery_not_found',
   // Distinto de `action_not_allowed`: el pedido admite anular, pero alguna presentacion elegida ya

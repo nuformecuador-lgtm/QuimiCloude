@@ -15,7 +15,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   WORK_GROUP_ACTIONS_COLUMN_ID,
   WORK_GROUP_ACTIONS_COLUMN_LABEL,
+  WORK_GROUP_ACTION_DELETE_LABEL,
   WORK_GROUP_ACTION_DELETE_TESTID,
+  WORK_GROUP_ACTION_EDIT_LABEL,
   WORK_GROUP_ACTION_EDIT_TESTID,
   WORK_GROUP_COLUMNS,
   WORK_GROUP_COLUMN_COUNT,
@@ -27,8 +29,7 @@ import {
   WORK_GROUP_SKELETON_COLUMN_COUNT,
   WorkGroupRowActions,
   createWorkGroupColumns,
-  deleteWorkGroupLabel,
-  editWorkGroupLabel,
+  workGroupRowActionsLabel,
 } from '@/app/(private)/configuracion/usuarios/components';
 import {
   RESPONSIBLE_AVATARS_LIMIT,
@@ -37,6 +38,8 @@ import {
   RESPONSIBLE_OVERFLOW_TESTID,
 } from '@/components/shared/responsible-avatars';
 import { WORK_GROUP_QUERYABLE, type WorkGroupRow } from '@/lib/modules/identity';
+import { clickRowAction, openRowActionsMenu } from '../../../helpers/row-actions-menu';
+import { setupUser } from '../../../helpers/user-event';
 
 /**
  * La fila del listado, con **las tres claves que el contrato devuelve**. El tipo es el del modulo:
@@ -254,20 +257,20 @@ describe('lo que ordena lo dice la lista blanca, y solo si es columna visible (R
 });
 
 describe('las acciones de fila existen solo con permiso de escritura (R9)', () => {
-  it('con `canModify` las dos se emiten, cada una nombrando al grupo', () => {
+  it('con `canModify` las dos se emiten en el menu de la fila, cuyo disparador nombra al grupo', async () => {
+    const user = setupUser();
     render(<WorkGroupRowActions group={GRUPO} canModify />);
 
-    expect(screen.getByTestId(WORK_GROUP_ROW_ACTIONS_TESTID)).toHaveAttribute(
-      'data-work-group-id',
-      GRUPO.id,
+    const disparador = screen.getByTestId(WORK_GROUP_ROW_ACTIONS_TESTID);
+    expect(disparador).toHaveAttribute('data-work-group-id', GRUPO.id);
+    // El grupo lo nombra el disparador del menu; cada item dice solo el verbo.
+    expect(disparador).toHaveAccessibleName(workGroupRowActionsLabel(GRUPO.name));
+    await openRowActionsMenu(user, disparador);
+    expect(screen.getByTestId(WORK_GROUP_ACTION_EDIT_TESTID)).toHaveAccessibleName(
+      WORK_GROUP_ACTION_EDIT_LABEL,
     );
-    expect(screen.getByTestId(WORK_GROUP_ACTION_EDIT_TESTID)).toHaveAttribute(
-      'aria-label',
-      editWorkGroupLabel(GRUPO.name),
-    );
-    expect(screen.getByTestId(WORK_GROUP_ACTION_DELETE_TESTID)).toHaveAttribute(
-      'aria-label',
-      deleteWorkGroupLabel(GRUPO.name),
+    expect(screen.getByTestId(WORK_GROUP_ACTION_DELETE_TESTID)).toHaveAccessibleName(
+      WORK_GROUP_ACTION_DELETE_LABEL,
     );
   });
 
@@ -278,13 +281,15 @@ describe('las acciones de fila existen solo con permiso de escritura (R9)', () =
     expect(screen.queryByRole('button')).toBeNull();
   });
 
-  it('cada disparador avisa sobre QUE grupo se pidio actuar, y no escribe nada por su cuenta', () => {
+  it('cada item del menu avisa sobre QUE grupo se pidio actuar, y no escribe nada por su cuenta', async () => {
     const onEdit = vi.fn();
     const onDelete = vi.fn();
+    const user = setupUser();
     render(<WorkGroupRowActions group={GRUPO} canModify onEdit={onEdit} onDelete={onDelete} />);
 
-    screen.getByTestId(WORK_GROUP_ACTION_EDIT_TESTID).click();
-    screen.getByTestId(WORK_GROUP_ACTION_DELETE_TESTID).click();
+    const disparador = screen.getByTestId(WORK_GROUP_ROW_ACTIONS_TESTID);
+    await clickRowAction(user, disparador, WORK_GROUP_ACTION_EDIT_TESTID);
+    await clickRowAction(user, disparador, WORK_GROUP_ACTION_DELETE_TESTID);
 
     expect(onEdit).toHaveBeenCalledWith(GRUPO);
     expect(onDelete).toHaveBeenCalledWith(GRUPO);

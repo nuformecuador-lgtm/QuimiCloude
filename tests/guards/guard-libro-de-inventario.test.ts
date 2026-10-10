@@ -27,6 +27,11 @@ const CAMINOS_ESPERADOS = [
   // QC-224 2026-10-09: la vuelta al lote de una entrega anulada, octavo camino.
   'returnFinishedGoods',
 ] as const;
+// Nota (2026-10-09, QC-219 R27): excepcion nombrada a «todo camino asienta con writeMovement».
+// `writeFinishedBatchLabels` cambia la etiqueta del lote (lote, vencimiento, dia de produccion),
+// no su existencia, y el libro asienta movimientos de cantidad. A cambio, esta guardia exige que su
+// cuerpo NO escriba `stock` (ver el bloque del final).
+const CAMINOS_SIN_ASIENTO = ['writeFinishedBatchLabels'] as const;
 const CARPETAS_IGNORADAS = new Set(['node_modules', '.next', '.git', 'dist', 'coverage']);
 const SUFIJOS_FUENTE = ['.ts', '.tsx'];
 
@@ -235,7 +240,7 @@ function contieneAsientoEnCuerpo(fuente: string, nombreFuncion: string): boolean
   return cuerpo !== null && /writeMovement\s*\(/.test(cuerpo);
 }
 
-const CENSO_ESPERADO = CAMINOS_ESPERADOS.map((nombre) => `${PRODUCT_PRISMA}::${nombre}`).sort();
+const CENSO_ESPERADO = [...CAMINOS_ESPERADOS, ...CAMINOS_SIN_ASIENTO].map((nombre) => `${PRODUCT_PRISMA}::${nombre}`).sort();
 
 // -------------------------------------------------------------------------------------------
 // EL CENSO SOBRE EL ARBOL REAL
@@ -253,8 +258,9 @@ describe('guardia: censo de caminos de escritura de product_batches bajo lib/ (R
   });
 
   // QC-223 2026-10-08: + dispatchFinishedGoods en el titulo, igual que en CAMINOS_ESPERADOS.
+  // QC-219 2026-10-09: + writeFinishedBatchLabels, de CAMINOS_SIN_ASIENTO.
   // QC-224 2026-10-09: + returnFinishedGoods en el titulo, igual que en CAMINOS_ESPERADOS.
-  it('el censo de caminos de escritura es exactamente { createWithFirstBatch, addBatchToAlive, adjustBatchStock, consumeBatchStock, receiveFinishedGoods, addImportedFinishedGoodsBatch, dispatchFinishedGoods, returnFinishedGoods }', () => {
+  it('el censo de caminos de escritura es exactamente { createWithFirstBatch, addBatchToAlive, adjustBatchStock, consumeBatchStock, receiveFinishedGoods, addImportedFinishedGoodsBatch, dispatchFinishedGoods, returnFinishedGoods, writeFinishedBatchLabels }', () => {
     const real = censoReal();
     expect(
       real,
@@ -371,5 +377,84 @@ describe('guardia: los detectores muerden sobre fuentes fabricadas, no solo sobr
     const funciones = funcionesExportadas(codigo);
     expect(funciones.map((f) => f.nombre)).toEqual(['primera', 'segunda']);
     expect(codigo.slice(funciones[0].inicio, funciones[0].fin + 1)).not.toContain('segunda');
+  });
+});
+
+// -------------------------------------------------------------------------------------------
+// QC-219 R27 — EL CAMINO SIN ASIENTO NO ESCRIBE LA EXISTENCIA
+// -------------------------------------------------------------------------------------------
+
+/** `true` si el cuerpo escribe `stock`: un `stock:` en cualquier objeto, o un `increment` /
+ *  `decrement`. Mas estricto que mirar solo `data`, a proposito: el camino no tiene por que
+ *  nombrar la existencia en ningun sitio. */
+function escribeExistencia(cuerpo: string): boolean {
+  return /\bstock\s*:/.test(cuerpo) || /\b(?:increment|decrement)\b/.test(cuerpo);
+}
+
+/** `true` si la funcion existe con esa forma y su cuerpo no escribe `stock`. Si no existe, `false`:
+ *  la guardia se pone roja, no se queda vigilando el vacio. */
+function caminoSinExistencia(fuente: string, nombreFuncion: string): boolean {
+  const cuerpo = cuerpoDeFuncion(fuente, nombreFuncion);
+  return cuerpo !== null && !escribeExistencia(cuerpo);
+}
+
+describe('guardia: el camino de etiqueta de lote no toca la existencia (QC-219 R27)', () => {
+  for (const nombre of CAMINOS_SIN_ASIENTO) {
+    it(`R27: ${nombre} de product-prisma.ts existe y no escribe stock`, () => {
+      expect(
+        caminoSinExistencia(leer(PRODUCT_PRISMA), nombre),
+        `${PRODUCT_PRISMA} :: ${nombre} escribe stock -o ya no existe con esa forma-: es un camino ` +
+          'sin asiento, y solo puede serlo si no cambia la existencia.',
+      ).toBe(true);
+    });
+  }
+
+  it('R27: el mismo update de etiqueta en OTRA funcion sale en el censo con su nombre (rojo)', () => {
+    const fuente = [
+      'export async function writeFinishedBatchLabels(tx) {',
+      '  await tx.productBatch.update({ where: {}, data: { lot } });',
+      '}',
+      'export async function relabelElsewhere(tx) {',
+      '  await tx.productBatch.update({ where: {}, data: { lot } });',
+      '}',
+    ].join('\n');
+    const etiquetas = etiquetasDeArchivo(PRODUCT_PRISMA, fuente);
+    expect(etiquetas).toContain(`${PRODUCT_PRISMA}::relabelElsewhere`);
+    expect([...new Set(etiquetas)].sort()).not.toEqual(
+      CAMINOS_SIN_ASIENTO.map((nombre) => `${PRODUCT_PRISMA}::${nombre}`),
+    );
+  });
+
+  it('R27: un stock: dentro de writeFinishedBatchLabels da rojo', () => {
+    const fuente = [
+      'export async function writeFinishedBatchLabels(tx) {',
+      '  await tx.productBatch.update({ where: {}, data: { lot, stock: 0 } });',
+      '}',
+    ].join('\n');
+    expect(caminoSinExistencia(fuente, 'writeFinishedBatchLabels')).toBe(false);
+  });
+
+  it('R27: un increment o decrement dentro de writeFinishedBatchLabels da rojo', () => {
+    for (const operacion of ['increment', 'decrement']) {
+      const fuente = [
+        'export async function writeFinishedBatchLabels(tx) {',
+        `  await tx.productBatch.update({ where: {}, data: { lot, existencia: { ${operacion}: 1 } } });`,
+        '}',
+      ].join('\n');
+      expect(caminoSinExistencia(fuente, 'writeFinishedBatchLabels')).toBe(false);
+    }
+  });
+
+  it('R27: un stock: en OTRA funcion no ensucia el camino de etiqueta, y su ausencia da rojo', () => {
+    const fuente = [
+      'export async function writeFinishedBatchLabels(tx) {',
+      '  await tx.productBatch.update({ where: {}, data: { lot } });',
+      '}',
+      'export async function adjustBatchStock(tx) {',
+      '  await tx.productBatch.update({ where: {}, data: { stock: { increment: 1 } } });',
+      '}',
+    ].join('\n');
+    expect(caminoSinExistencia(fuente, 'writeFinishedBatchLabels')).toBe(true);
+    expect(caminoSinExistencia('export function otra() { return 1; }', 'writeFinishedBatchLabels')).toBe(false);
   });
 });

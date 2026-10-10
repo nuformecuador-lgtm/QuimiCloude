@@ -47,6 +47,14 @@ export {
   type CatalogPageSize,
 } from './catalog-list-params';
 export { CatalogListSection } from './catalog-list-section';
+export {
+  CATALOG_LINE_ACTION_DELETE_TESTID,
+  CATALOG_LINE_ACTION_EDIT_TESTID,
+  CATALOG_LINE_ROW_ACTIONS_TESTID,
+  CatalogLineRowActions,
+  catalogLineRowActionsLabel,
+  type CatalogLineRowActionsProps,
+} from './catalog-line-row-actions';
 export { CatalogPdfUpload, type CatalogPdfUploadProps } from './catalog-pdf-upload';
 export {
   CATALOG_LIST_EMPTY_TESTID,

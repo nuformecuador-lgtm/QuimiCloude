@@ -4,23 +4,12 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
-import { ErrorAlert } from '@/components/shared/error-alert';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import type { UserRow } from '@/lib/modules/identity';
 import {
   endAllSessionsAction,
   type EndSessionsFormState,
 } from '@/lib/modules/identity/adapters/driving/session-actions';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { endUserSessionsMessage, endUserSessionsSuccess, endUserSessionsTitle } from './user-labels';
 
@@ -92,56 +81,37 @@ export function EndUserSessionsDialog({ user, open, onOpenChange }: EndUserSessi
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent data-testid={END_USER_SESSIONS_DIALOG_TESTID}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{endUserSessionsTitle(displayName)}</AlertDialogTitle>
-          <AlertDialogDescription data-testid={END_USER_SESSIONS_MESSAGE_TESTID}>
-            {endUserSessionsMessage(displayName)}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        {error === undefined ? null : (
-          <ErrorAlert
-            error={error}
-            id={errorId}
-            className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            testId={END_USER_SESSIONS_ERROR_TESTID}
-            withDataCode
-            renderCatalogued={(catalogued) => (
-              <p data-testid={END_USER_SESSIONS_ERROR_MESSAGE_TESTID}>{catalogued.message}</p>
-            )}
-          />
-        )}
-
-        <form action={formAction} data-testid={END_USER_SESSIONS_FORM_TESTID}>
-          <input
-            type="hidden"
-            name={END_USER_SESSIONS_ID_FIELD}
-            defaultValue={user.id}
-            data-testid={END_USER_SESSIONS_ID_TESTID}
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              className={touchTarget}
-              data-testid={END_USER_SESSIONS_DISMISS_TESTID}
-            >
-              {DISMISS_LABEL}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              type="submit"
-              variant="destructive"
-              className={touchTarget}
-              disabled={isPending}
-              aria-busy={isPending}
-              aria-describedby={error === undefined ? undefined : errorId}
-              data-testid={END_USER_SESSIONS_CONFIRM_TESTID}
-            >
-              {isPending ? CONFIRM_PENDING_LABEL : CONFIRM_LABEL}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </form>
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      variant="destructive"
+      texts={{
+        title: endUserSessionsTitle(displayName),
+        description: endUserSessionsMessage(displayName),
+        dismiss: DISMISS_LABEL,
+        confirm: CONFIRM_LABEL,
+        pending: CONFIRM_PENDING_LABEL,
+      }}
+      testIds={{
+        dialog: END_USER_SESSIONS_DIALOG_TESTID,
+        message: END_USER_SESSIONS_MESSAGE_TESTID,
+        dismiss: END_USER_SESSIONS_DISMISS_TESTID,
+        confirm: END_USER_SESSIONS_CONFIRM_TESTID,
+        form: END_USER_SESSIONS_FORM_TESTID,
+        error: END_USER_SESSIONS_ERROR_TESTID,
+        errorMessage: END_USER_SESSIONS_ERROR_MESSAGE_TESTID,
+      }}
+      submit={{
+        kind: 'action',
+        action: formAction,
+        hidden: [
+          { name: END_USER_SESSIONS_ID_FIELD, value: user.id, testId: END_USER_SESSIONS_ID_TESTID },
+        ],
+      }}
+      isPending={isPending}
+      confirmDescribedBy={error === undefined ? undefined : errorId}
+      error={error}
+      errorId={errorId}
+    />
   );
 }

@@ -3,9 +3,10 @@
  * Idempotente: una segunda corrida no duplica nada. Que crea: `docs/verification.md >
  * Datos de demostracion`.
  *
- * Cascara fina, como `scripts/seed.ts`: carga el entorno, aplica las guardas (nunca con un
- * `VERCEL_ENV` distinto de `development`, preview incluido, ni en CI; contra una base que no sea local, solo con `--forzar`), lee las contrasenas
- * de demo del entorno y delega en `seed-demo/run.ts`. Prisma y la composicion se cargan
+ * Cascara fina, como `scripts/seed.ts`: carga el entorno, aplica las guardas de
+ * `seed-demo/guard.ts` (nunca en production; en preview solo dentro de Vercel y contra la base de
+ * preview; fuera de eso, nunca en CI y contra una base que no sea local solo con `--forzar`), lee
+ * las contrasenas de demo del entorno y delega en `seed-demo/run.ts`. Prisma y la composicion se cargan
  * con `import()` DESPUES de `loadDotEnv()`.
  */
 import { existsSync } from 'node:fs'

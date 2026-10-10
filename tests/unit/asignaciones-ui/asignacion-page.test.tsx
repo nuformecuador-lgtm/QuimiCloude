@@ -47,6 +47,7 @@ import {
   ConditionedOrdersListSection,
   ConditioningOrdersListSection,
   ConditioningOrdersSkeleton,
+  DeliveredConditionedOrdersListSection,
   FinishedOrdersListSection,
   PackingOrdersListSection,
 } from '@/app/(private)/asignacion/components';
@@ -406,7 +407,7 @@ describe('las dos vistas del acondicionador', () => {
     const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
     expect(pestanas.props).toMatchObject({
       current: 'por_acondicionar',
-      views: ['por_acondicionar', 'acondicionados'],
+      views: ['por_acondicionar', 'acondicionados', 'acondicionados_entregados'],
     });
     expect(encontrarPorTipo(arbol, ConditioningOrdersListSection)).toHaveLength(1);
     expect(encontrarPorTipo(arbol, ConditionedOrdersListSection)).toHaveLength(0);
@@ -482,5 +483,92 @@ describe('las dos vistas del acondicionador', () => {
       expect(tab.className).toContain('min-h-11');
       expect(tab.className).toContain('min-w-11');
     }
+  });
+});
+
+describe('la tercera vista del acondicionador: «Entregados»', () => {
+  const ACONDICIONADOR = SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO] ?? [];
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('R20: el rol sembrado ve tres pestañas y «Entregados» va detrás de «Terminados»', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(ACONDICIONADOR));
+
+    const arbol = await invocar();
+
+    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
+    expect((pestanas.props as { views: readonly string[] }).views).toEqual([
+      'por_acondicionar',
+      'acondicionados',
+      'acondicionados_entregados',
+    ]);
+    expect(encontrarPorTipo(arbol, DeliveredConditionedOrdersListSection)).toHaveLength(0);
+  });
+
+  it('R20: `?vista=acondicionados_entregados` marca «Entregados» y monta su sección dentro de Suspense', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(ACONDICIONADOR));
+
+    const arbol = await invocar('acondicionados_entregados');
+
+    const [pestanas] = encontrarPorTipo(arbol, AssignmentViewTabs);
+    expect(pestanas.props).toMatchObject({ current: 'acondicionados_entregados' });
+    const [seccion] = encontrarPorTipo(arbol, DeliveredConditionedOrdersListSection);
+    expect(seccion.props).toMatchObject({ params: { page: 1, pageSize: 10 } });
+    expect(encontrarPorTipo(arbol, ConditionedOrdersListSection)).toHaveLength(0);
+    expect(encontrarPorTipo(arbol, ConditioningOrdersListSection)).toHaveLength(0);
+    const [limite] = encontrarPorTipo(arbol, Suspense);
+    const fallback = (limite.props as { fallback: ReactElement }).fallback;
+    expect(fallback.type).toBe(ConditioningOrdersSkeleton);
+  });
+
+  it('R20: el esqueleto de «Entregados» anuncia «Cargando pedidos entregados…»', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(ACONDICIONADOR));
+
+    const arbol = await invocar('acondicionados_entregados');
+
+    const [limite] = encontrarPorTipo(arbol, Suspense);
+    const fallback = (limite.props as { fallback: ReactElement }).fallback;
+    expect(fallback.props).toMatchObject({ list: 'acondicionados_entregados' });
+    render(fallback);
+    const esqueleto = screen.getByRole('status');
+    expect(esqueleto).toHaveAttribute('data-list', 'acondicionados_entregados');
+    expect(esqueleto).toHaveTextContent('Cargando pedidos entregados…');
+    expect(esqueleto).not.toHaveTextContent('Cargando pedidos terminados…');
+  });
+
+  it.each([ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR])(
+    'R20: %s pidiendo `?vista=acondicionados_entregados` cae a su vista por defecto, sin pestaña ni sección',
+    async (rol) => {
+      getSessionUserMock.mockResolvedValue(sesionCon(SEED_ROLE_PERMISSIONS[rol] ?? []));
+      const porDefecto = await invocar();
+
+      const arbol = await invocar('acondicionados_entregados');
+
+      expect(encontrarPorTipo(arbol, DeliveredConditionedOrdersListSection)).toHaveLength(0);
+      for (const pestanas of encontrarPorTipo(arbol, AssignmentViewTabs)) {
+        expect((pestanas.props as { views: readonly string[] }).views).not.toContain('acondicionados_entregados');
+      }
+      expect(JSON.stringify(arbol)).toBe(JSON.stringify(porDefecto));
+    },
+  );
+
+  it('R20: las tres pestañas se rotulan en orden, «Entregados» enlaza a su vista y mide 44x44', () => {
+    render(
+      <AssignmentViewTabs
+        current="acondicionados_entregados"
+        views={['por_acondicionar', 'acondicionados', 'acondicionados_entregados']}
+      />,
+    );
+
+    const disparadores = screen.getAllByRole('tab');
+    expect(disparadores.map((tab) => tab.textContent)).toEqual(['Por acondicionar', 'Terminados', 'Entregados']);
+    const entregados = screen.getByTestId('assignment-view-tab-acondicionados_entregados');
+    expect(entregados).toHaveAttribute('href', '/asignacion?vista=acondicionados_entregados');
+    expect(entregados).toHaveAttribute('aria-selected', 'true');
+    expect(entregados.tagName).toBe('A');
+    expect(entregados.className).toContain('min-h-11');
+    expect(entregados.className).toContain('min-w-11');
   });
 });

@@ -1,0 +1,105 @@
+# Preview: cada PR a `dev` con rama de este repo se despliega en Vercel como preview.
+#
+#   pull_request a `dev` (opened, synchronize, reopened) -> despliegue de preview
+#
+# Por CLI y token, como `desplegar.yml`, y con la misma version de la CLI: Vercel no puede
+# conectarse al repo por Git. El build es remoto (`pnpm run build` en Vercel, scope Preview, contra
+# la base de preview); el runner no instala dependencias ni construye nada.
+#
+# `pull_request` y nunca `pull_request_target`: el codigo del PR no corre con permisos de la rama
+# base. Los PRs desde forks quedan saltados: GitHub no les da los secrets.
+#
+# Secrets: los mismos tres que `desplegar.yml` (VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID).
+name: preview
+
+on:
+  pull_request:
+    branches: [dev]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+# Una preview a la vez por PR, sin cortar la que esta en curso: el build remoto migra la base de
+# preview, y uno cortado a medias deja sin saber en que estado quedo. PRs distintos si corren a la vez.
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    name: preview
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # El entorno de GitHub deja el enlace en la conversacion del PR y lo actualiza en cada push,
+    # sin permisos de escritura ni comentarios que se acumulen.
+    environment:
+      name: preview
+      url: ${{ steps.desplegar.outputs.url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Solo Node, sin pnpm ni `pnpm install`: la CLI va por `npx` y el build es remoto.
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Secrets de Vercel presentes
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          faltan=()
+          [ -n "$VERCEL_TOKEN" ] || faltan+=(VERCEL_TOKEN)
+          [ -n "$VERCEL_ORG_ID" ] || faltan+=(VERCEL_ORG_ID)
+          [ -n "$VERCEL_PROJECT_ID" ] || faltan+=(VERCEL_PROJECT_ID)
+          if [ "${#faltan[@]}" -gt 0 ]; then
+            echo "::error::Faltan secrets: ${faltan[*]}. Se crean en Settings > Secrets and variables > Actions del repo; el token sale de vercel.com/account/tokens y ORG/PROJECT de .vercel/project.json."
+            exit 1
+          fi
+
+      # Version fija y la misma que `desplegar.yml`. Sin `--prod`: esto es una preview.
+      - name: vercel deploy
+        id: desplegar
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          # La CLI imprime la URL en stdout y el progreso en stderr. El token lo lee de VERCEL_TOKEN;
+          # por `--token` quedaria en la lista de procesos.
+          url=$(npx --yes vercel@63.1.0 deploy --yes)
+          echo "Desplegado: $url"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Resumen
+        shell: bash
+        env:
+          URL: ${{ steps.desplegar.outputs.url }}
+        run: |
+          {
+            echo "## Preview"
+            echo
+            echo "$URL"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # La preview solo la abren cuentas de Vercel del equipo. En vez de confiar en la
+      # configuracion de Deployment Protection, se comprueba en cada despliegue.
+      - name: La preview no es publica
+        shell: bash
+        env:
+          URL: ${{ steps.desplegar.outputs.url }}
+        run: |
+          codigo=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$URL")
+          echo "Sin credenciales, la preview responde $codigo"
+          case "$codigo" in
+            2??) echo "::error::La preview responde $codigo sin credenciales: es publica. Revisa Deployment Protection en Vercel."; exit 1 ;;
+          esac

@@ -81,8 +81,12 @@ export const ERROR_MESSAGE_KEY = {
   adjustment_reason_not_allowed: 'errors.adjustment_reason_not_allowed',
   conditioning_team_member_not_allowed: 'errors.conditioning_team_member_not_allowed',
   conditioning_team_empty: 'errors.conditioning_team_empty',
+  batch_expiry_not_future: 'errors.batch_expiry_not_future',
+  batch_production_date_future: 'errors.batch_production_date_future',
+  conditioning_batch_data_missing: 'errors.conditioning_batch_data_missing',
   delivery_exceeds_remaining: 'errors.delivery_exceeds_remaining',
   delivery_batch_insufficient: 'errors.delivery_batch_insufficient',
+  integration_secret_unreadable: 'errors.integration_secret_unreadable',
   delivery_not_found: 'errors.delivery_not_found',
   delivery_already_voided: 'errors.delivery_already_voided',
 } as const satisfies Record<ErrorCode, string>;
@@ -210,10 +214,15 @@ export const ERROR_MESSAGES_ES = {
   'errors.conditioning_team_member_not_allowed':
     'Esta persona no puede formar parte del equipo de acondicionamiento.',
   'errors.conditioning_team_empty': 'El equipo de acondicionamiento necesita al menos una persona.',
+  'errors.batch_expiry_not_future': 'La fecha de vencimiento debe ser posterior a hoy.',
+  'errors.batch_production_date_future': 'El dia de produccion no puede ser posterior a hoy.',
+  'errors.conditioning_batch_data_missing': 'Faltan datos de lote en alguna linea del pedido.',
   'errors.delivery_exceeds_remaining':
     'La entrega supera los envases que faltan por entregar en alguna presentacion.',
   'errors.delivery_batch_insufficient':
     'Algun lote ya no tiene los envases elegidos: revisa los lotes y confirma de nuevo.',
+  'errors.integration_secret_unreadable':
+    'No se pudo leer una credencial guardada de la integración. Vuelve a escribirla.',
   'errors.delivery_not_found': 'La entrega no existe.',
   'errors.delivery_already_voided':
     'Alguna presentacion elegida ya estaba anulada: revisa la lista y vuelve a intentarlo.',

@@ -1,12 +1,11 @@
 import Link from 'next/link';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
-import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import type { PackingOrderRow } from '@/lib/modules/asignaciones';
 import { packingOrderRoute } from '@/lib/shared/routes';
-import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
+import { MissingValue, presentationColumn, recipeColumn } from './assignment-list-parts';
 import { COMPANY_ORDER_STATUS_LABELS } from './company-orders-columns';
 
 /**
@@ -16,13 +15,7 @@ import { COMPANY_ORDER_STATUS_LABELS } from './company-orders-columns';
  * desde un componente de servidor.
  */
 
-function MissingValue({ field }: { readonly field: string }) {
-  return (
-    <span aria-label="Sin dato" data-testid={`packing-order-missing-${field}`}>
-      {EMPTY_MARK}
-    </span>
-  );
-}
+const MISSING_TEST_ID_PREFIX = 'packing-order';
 
 export const PACKING_ORDER_NUMBER_COLUMN_ID = 'orderNumber';
 export const PACKING_ORDER_RECIPE_NAME_COLUMN_ID = 'recipeName';
@@ -50,25 +43,16 @@ export function buildPackingOrdersColumns(): readonly DataTableColumn<PackingOrd
         </Link>
       ),
     },
-    {
-      id: PACKING_ORDER_RECIPE_NAME_COLUMN_ID,
-      label: 'Receta',
-      align: 'start',
-      cell: (order) =>
-        order.recipeName ?? <MissingValue field={PACKING_ORDER_RECIPE_NAME_COLUMN_ID} />,
-    },
-    {
-      id: PACKING_ORDER_PRESENTATION_COLUMN_ID,
-      label: 'Presentación',
-      align: 'start',
-      cell: (order) => <OrderDistributionLabel lines={order.presentationLines} />,
-    },
+    recipeColumn(PACKING_ORDER_RECIPE_NAME_COLUMN_ID, MISSING_TEST_ID_PREFIX),
+    presentationColumn(PACKING_ORDER_PRESENTATION_COLUMN_ID),
     {
       id: PACKING_ORDER_PACKAGES_COLUMN_ID,
       label: 'Envases',
       align: 'end',
       cell: (order) =>
-        order.packages ?? <MissingValue field={PACKING_ORDER_PACKAGES_COLUMN_ID} />,
+        order.packages ?? (
+          <MissingValue testIdPrefix={MISSING_TEST_ID_PREFIX} field={PACKING_ORDER_PACKAGES_COLUMN_ID} />
+        ),
     },
     {
       id: PACKING_ORDER_STATUS_COLUMN_ID,
@@ -85,7 +69,9 @@ export function buildPackingOrdersColumns(): readonly DataTableColumn<PackingOrd
       label: 'Quién empaca',
       align: 'start',
       cell: (order) =>
-        order.packedByName ?? <MissingValue field={PACKING_ORDER_PACKER_COLUMN_ID} />,
+        order.packedByName ?? (
+          <MissingValue testIdPrefix={MISSING_TEST_ID_PREFIX} field={PACKING_ORDER_PACKER_COLUMN_ID} />
+        ),
     },
   ];
 }
