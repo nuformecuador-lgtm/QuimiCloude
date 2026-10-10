@@ -247,24 +247,24 @@ test.describe('la zona privada segun los permisos de quien entra', () => {
     }
 
     // El control de cerrar sesion sigue ahi (R8, R14): sin el, quien no tenga ningun permiso
-    // quedaria encerrado con la unica salida de borrar la cookie a mano. Vive dentro del menu de
-    // usuario, asi que hay que abrirlo primero.
+    // quedaria encerrado con la unica salida de borrar la cookie a mano. Desde el 2026-09-07
+    // (decision humana, `components/private/nav-user.tsx`) es un boton del encabezado, junto al de
+    // tema, sin menu de usuario que abrir antes: mismo control que pulsa `e2e/session.spec.ts`.
     //
-    // POR QUE POR TECLADO Y NO CON EL RATON: el menu se abre con foco + `Enter`, no con `click()`.
+    // POR QUE POR TECLADO Y NO CON EL RATON: se afirma que el control recibe el foco, no se pulsa.
     // El motivo es un artefacto del ENTORNO, no del codigo de la feature: el `webServer` del E2E
     // levanta `next dev`, y su overlay de desarrollo (`<nextjs-portal>`) se interpone sobre la
     // vista EN LA PANTALLA DE 404 y solo en WebKit, asi que la comprobacion de interceptacion de
     // puntero de Playwright nunca deja llegar el clic y el paso muere por timeout. Que es del
-    // overlay y no del componente lo demuestra `e2e/session.spec.ts`, que hace este mismo
-    // `getByTestId('private-user-trigger').click()` con raton en `/inventario` y pasa en WebKit;
-    // la diferencia es la pantalla, no el control. Contra un build de produccion —sin overlay— el
-    // raton volveria a funcionar. No se usa `{ force: true }` a proposito: eso taparia la
-    // comprobacion en vez de rodearla. Y el teclado no rebaja lo que se demuestra, lo mejora: es
-    // exactamente lo que R8 y R14 piden —que la salida sea ALCANZABLE— incluso sin puntero.
-    const userTrigger = page.getByTestId('private-user-trigger');
-    await expect(userTrigger).toBeVisible();
-    await userTrigger.focus();
-    await page.keyboard.press('Enter');
-    await expect(page.getByTestId('private-logout')).toBeVisible();
+    // overlay y no del componente lo demuestra `e2e/session.spec.ts`, que pulsa este mismo control
+    // con raton en `/inventario` y pasa en WebKit; la diferencia es la pantalla, no el control.
+    // Contra un build de produccion —sin overlay— el raton volveria a funcionar. No se usa
+    // `{ force: true }` a proposito: eso taparia la comprobacion en vez de rodearla. Y el teclado
+    // no rebaja lo que se demuestra, lo mejora: es exactamente lo que R8 y R14 piden —que la salida
+    // sea ALCANZABLE— incluso sin puntero.
+    const logout = page.getByTestId('private-logout');
+    await expect(logout).toBeVisible();
+    await logout.focus();
+    await expect(logout).toBeFocused();
   });
 });

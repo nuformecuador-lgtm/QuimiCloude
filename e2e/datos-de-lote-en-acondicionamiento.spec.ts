@@ -85,6 +85,7 @@ import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { seedPackaging } from './helpers/packaging';
 import { exactProductNameCellText } from './helpers/product-name-cell';
+import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de él se toca. */
 const FIXTURE_PREFIX = 'qc219_e2e_';
@@ -165,6 +166,7 @@ const NAME_CELL_TESTID = 'data-table-cell-name';
 const ORDER_GROUP_NAME_TESTID = 'finished-stock-name';
 const ORDER_GROUP_TOGGLE_TESTID = 'finished-stock-toggle';
 const BATCHES_OPEN_TESTID = 'product-batches-open';
+const PRODUCT_ROW_ACTIONS_TESTID = 'product-row-actions';
 const BATCHES_SHEET_TESTID = 'product-batches-sheet';
 const BATCH_LOT_TESTID = 'product-batch-lot';
 const BATCH_EXPIRY_TESTID = 'product-batch-expiry-date';
@@ -404,11 +406,18 @@ async function expectAdminSeesBatchData(
         .getByTestId(NAME_CELL_TESTID)
         .filter({ hasText: exactProductNameCellText(line.productName) });
       await expect(nameCell).toHaveCount(1, { timeout: 60_000 });
-      await page
+      // «Lotes» vive en el menu de acciones de la fila desde QC-232 (c2d4d46f), igual que en los
+      // otros specs que abren el panel de lotes.
+      const productRow = page
         .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
-        .filter({ has: nameCell })
-        .getByTestId(BATCHES_OPEN_TESTID)
-        .click();
+        .filter({ has: nameCell });
+      await (
+        await openRowActionsMenuItem(
+          page,
+          productRow.getByTestId(PRODUCT_ROW_ACTIONS_TESTID),
+          BATCHES_OPEN_TESTID,
+        )
+      ).click();
 
       const sheet = page.getByTestId(BATCHES_SHEET_TESTID);
       await expect(sheet).toBeVisible({ timeout: 60_000 });
