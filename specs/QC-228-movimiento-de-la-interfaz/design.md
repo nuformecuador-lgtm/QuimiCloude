@@ -106,6 +106,21 @@ lienzo (`linear-gradient(135deg, #0A4A47 0%, #02605A 45%, #0B7A72 100%)` y
 `@media (hover: hover)`, como hace la variante `hover:` de Tailwind v4: en táctil no se queda
 pegado, y el hover no es la única forma de descubrir nada (es decoración; regla multiplataforma).
 
+**Enmienda 2026-10-09 (D11, «todas menos link»).**
+
+- `outline-dashed`, `secondary` y `ghost`: `active:not-aria-[haspopup]:translate-y-px` pasa a
+  `active:not-aria-[haspopup]:scale-[0.98]`, y su hover (`hover:bg-muted`, `hover:text-foreground`,
+  `dark:hover:bg-input/50`, `dark:hover:bg-muted/50` o el `color-mix` de `secondary`) pasa a
+  `btn-veil`. Se conservan los `aria-expanded:*`.
+- `destructive`: solo cambia la pulsación a `scale-[0.98]`; conserva `hover:bg-destructive/*`.
+- `link`: sin cambio (`translate-y-px`).
+- `btn-veil` pinta el velo con `background-image` sobre el `background-color` de la variante, así
+  que sobre `secondary` mezcla el petróleo al 10 % con su fondo azulado; el texto petróleo queda a
+  5.4:1 en claro y 5.6:1 en oscuro. En `secondary` y `ghost`, cuyo borde es transparente en
+  reposo, el hover pinta el borde de petróleo como en `outline`.
+- La escala usa la propiedad CSS `scale`, independiente de `translate`: ya no pisa el
+  `-translate-y-1/2` de los botones centrados, que era el motivo de neutralizar `translate-y-px`.
+
 `data-table-scroll-nav.tsx` ya neutraliza la pulsación con el mismo stack
 (`active:not-aria-[haspopup]:-translate-y-1/2`); se le añade `active:not-aria-[haspopup]:scale-100`
 para que la flecha `outline` siga sin moverse (R18). Su `transition-colors` impide además animar

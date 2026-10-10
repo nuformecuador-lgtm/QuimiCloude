@@ -355,16 +355,29 @@ describe('clases de movimiento de los botones', () => {
     expect(buttonVariants({ variant: 'outline' }).split(' ')).toContain('btn-veil');
   });
 
-  it('R18: primario y secundario escalan al 98 % al pulsar, salvo si abren un menú; las demás variantes conservan su pulsación', () => {
-    for (const variant of ['default', 'outline'] as const) {
+  it('R17: outline-dashed, secondary y ghost usan el velo en lugar de su hover anterior', () => {
+    for (const variant of ['outline-dashed', 'secondary', 'ghost'] as const) {
+      const lista = buttonVariants({ variant }).split(' ');
+      expect(lista, variant).toContain('btn-veil');
+      expect(lista.filter((c) => /^(dark:)?hover:(bg|text)-/.test(c)), variant).toEqual([]);
+    }
+  });
+
+  it('R17: destructive y link no llevan velo; destructive conserva su hover rojo', () => {
+    for (const variant of ['destructive', 'link'] as const) {
+      expect(buttonVariants({ variant }).split(' '), variant).not.toContain('btn-veil');
+    }
+    expect(buttonVariants({ variant: 'destructive' }).split(' ')).toContain('hover:bg-destructive/20');
+  });
+
+  it('R18: todas las variantes salvo link escalan al 98 % al pulsar, salvo si abren un menú; link conserva su pulsación', () => {
+    for (const variant of ['default', 'outline', 'outline-dashed', 'secondary', 'ghost', 'destructive'] as const) {
       const lista = buttonVariants({ variant }).split(' ');
       expect(lista, variant).toContain(PULSACION);
       expect(lista, variant).not.toContain(DESPLAZAMIENTO);
     }
-    for (const variant of ['outline-dashed', 'secondary', 'ghost', 'destructive', 'link'] as const) {
-      const lista = buttonVariants({ variant }).split(' ');
-      expect(lista, variant).toContain(DESPLAZAMIENTO);
-      expect(lista, variant).not.toContain(PULSACION);
-    }
+    const link = buttonVariants({ variant: 'link' }).split(' ');
+    expect(link).toContain(DESPLAZAMIENTO);
+    expect(link).not.toContain(PULSACION);
   });
 });

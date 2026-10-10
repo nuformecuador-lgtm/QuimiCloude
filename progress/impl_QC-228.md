@@ -391,3 +391,39 @@ precedentes (QC-156, QC-219, QC-223): entra `movimiento.spec.ts`, nota fechada s
 centinela pasa de treinta y cuatro a treinta y cinco. Añadido a `tasks.md > Archivos esperados`.
 - `vitest run tests/unit/shared tests/unit/paridad tests/unit/clientes/scope.test.ts`: 66/66 archivos, 924 tests verdes.
 - `./init.sh --completo`: 1102/1102 archivos, 16586 tests verdes, 139 omitidos; sin rojos nuevos; `init OK`.
+
+## Enmienda D11 — botones (frontend_dev)
+
+**Archivos modificados**
+- `components/ui/button.tsx`: `outline-dashed`, `secondary`, `ghost` llevan `btn-veil` y `active:not-aria-[haspopup]:scale-[0.98]`; se retiran sus `hover:bg-*`, `hover:text-*` y `dark:hover:bg-*` (se conservan `aria-expanded:*` y el resto). `destructive`: `translate-y-px` → `scale-[0.98]`, conserva su hover rojo. `link`: sin cambio.
+- `tests/unit/shared-ui/motion-classes.test.tsx`: dos casos R17 nuevos y el caso R18 reescrito («todas salvo link»).
+- `tests/unit/theme/motion-tokens.test.ts`: los ayudantes de contraste del caso R16 suben al `describe` (sin cambiar el caso R16) y entra el caso R17 de contraste del velo.
+
+**Sin cambios (revisado)**
+- `components/shared/data-table/data-table-scroll-nav.tsx`: las flechas usan `variant="outline"`, que ya escalaba; `scale-100` y `-translate-y-1/2` siguen neutralizando la pulsación y el comentario sigue siendo cierto.
+- `tests/guards/guard-movimiento.test.ts`: no vigila variantes de botón ni `translate-y-px`; no hace falta ajustarlo.
+- `tests/unit/shared-ui/button-touch.test.tsx`: pasa sin tocarlo (la cadena fija es solo la de `default`).
+- Ningún otro consumidor de `app/` ni `components/` depende de `active:not-aria-[haspopup]:translate-y-px`.
+
+**Mapa R → test**
+- R17 → `motion-classes.test.tsx > R17: outline-dashed, secondary y ghost usan el velo en lugar de su hover anterior`; `> R17: destructive y link no llevan velo; destructive conserva su hover rojo`; `motion-tokens.test.ts > R17: el texto petróleo del velo cumple 4.5:1 sobre secondary y sobre background, en claro y en oscuro` (ratios: claro 5.41 secondary / 6.13 background; oscuro 5.64 / 8.60).
+- R18 → `motion-classes.test.tsx > R18: todas las variantes salvo link escalan al 98 % al pulsar, salvo si abren un menú; link conserva su pulsación`.
+
+**Nota visual:** `btn-veil` pinta el borde a `--primary` al hover; en `secondary` y `ghost` (borde transparente) aparece un borde petróleo al hover. Es lo que dice la utilidad; si no se quiere, es otra enmienda.
+
+**Salida de los comandos**
+```
+$ pnpm typecheck
+> tsc --noEmit
+(sin errores)
+
+$ pnpm exec eslint components/ui/button.tsx tests/unit/shared-ui/motion-classes.test.tsx tests/unit/theme/motion-tokens.test.ts
+ESLint: No issues found
+
+$ pnpm exec vitest run tests/unit/shared-ui tests/unit/theme tests/guards/guard-movimiento.test.ts tests/unit/shared/data-table-scroll.test.tsx
+ Test Files  33 passed (33)
+      Tests  386 passed (386)
+```
+Paridad no corrida (la regenera el leader).
+
+**Veredicto:** enmienda D11 aplicada a los botones; typecheck, lint y tests tocados en verde.

@@ -287,48 +287,48 @@ describe('motion-tokens', () => {
       ]);
     });
 
-    it('R16: el texto del primario cumple 4.5:1 sobre las tres paradas del degradado, en claro y en oscuro', () => {
-      type Rgb = readonly [number, number, number];
-      const lineal = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-      const deHex = (hex: string): Rgb => {
-        const n = hex.replace('#', '');
-        return [0, 2, 4].map((i) => lineal(parseInt(n.slice(i, i + 2), 16) / 255)) as unknown as Rgb;
-      };
-      const deOklch = (l: number, c: number, h: number): Rgb => {
-        const a = c * Math.cos((h * Math.PI) / 180);
-        const b = c * Math.sin((h * Math.PI) / 180);
-        const l_ = (l + 0.3963377774 * a + 0.2158037573 * b) ** 3;
-        const m_ = (l - 0.1055613458 * a - 0.0638541728 * b) ** 3;
-        const s_ = (l - 0.0894841775 * a - 1.291485548 * b) ** 3;
-        const rgb = [
-          4.0767416621 * l_ - 3.3077115913 * m_ + 0.2309699292 * s_,
-          -1.2684380046 * l_ + 2.6097574011 * m_ - 0.3413193965 * s_,
-          -0.0041960863 * l_ - 0.7034186147 * m_ + 1.707614701 * s_,
-        ];
-        return rgb.map((v) => Math.min(1, Math.max(0, v))) as unknown as Rgb;
-      };
-      const oklch = (valor: string): [number, number, number] => {
-        const m = valor.match(/^oklch\(([\d.]+) ([\d.]+) ([\d.]+)\)$/);
-        if (!m) throw new Error(`oklch no reconocido: ${valor}`);
-        return [Number(m[1]), Number(m[2]), Number(m[3])];
-      };
-      /** Una parada: hex, `var(--primary)` o su mezcla en oklch con negro o blanco (sin tono, toma el de --primary). */
-      const parada = (texto: string, primario: string): Rgb => {
-        const color = texto.replace(/\s+\d+%$/, '');
-        if (color.startsWith('#')) return deHex(color);
-        const [l, c, h] = oklch(primario);
-        if (color === 'var(--primary)') return deOklch(l, c, h);
-        const m = color.match(/^color-mix\(in oklch, var\(--primary\) (\d+)%, (black|white)\)$/);
-        if (!m) throw new Error(`parada no reconocida: ${texto}`);
-        const p = Number(m[1]) / 100;
-        return deOklch(p * l + (1 - p) * (m[2] === 'white' ? 1 : 0), p * c, h);
-      };
-      const luminancia = ([r, g, b]: Rgb) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
-      const contraste = (x: Rgb, y: Rgb) => {
-        const [a, b] = [luminancia(x), luminancia(y)].sort((p, q) => q - p);
-        return (a + 0.05) / (b + 0.05);
-      };
+    type Rgb = readonly [number, number, number];
+    const lineal = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    const deHex = (hex: string): Rgb => {
+      const n = hex.replace('#', '');
+      return [0, 2, 4].map((i) => lineal(parseInt(n.slice(i, i + 2), 16) / 255)) as unknown as Rgb;
+    };
+    const deOklch = (l: number, c: number, h: number): Rgb => {
+      const a = c * Math.cos((h * Math.PI) / 180);
+      const b = c * Math.sin((h * Math.PI) / 180);
+      const l_ = (l + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+      const m_ = (l - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+      const s_ = (l - 0.0894841775 * a - 1.291485548 * b) ** 3;
+      const rgb = [
+        4.0767416621 * l_ - 3.3077115913 * m_ + 0.2309699292 * s_,
+        -1.2684380046 * l_ + 2.6097574011 * m_ - 0.3413193965 * s_,
+        -0.0041960863 * l_ - 0.7034186147 * m_ + 1.707614701 * s_,
+      ];
+      return rgb.map((v) => Math.min(1, Math.max(0, v))) as unknown as Rgb;
+    };
+    const oklch = (valor: string): [number, number, number] => {
+      const m = valor.match(/^oklch\(([\d.]+) ([\d.]+) ([\d.]+)\)$/);
+      if (!m) throw new Error(`oklch no reconocido: ${valor}`);
+      return [Number(m[1]), Number(m[2]), Number(m[3])];
+    };
+    /** Una parada: hex, `var(--primary)` o su mezcla en oklch con negro o blanco (sin tono, toma el de --primary). */
+    const parada = (texto: string, primario: string): Rgb => {
+      const color = texto.replace(/\s+\d+%$/, '');
+      if (color.startsWith('#')) return deHex(color);
+      const [l, c, h] = oklch(primario);
+      if (color === 'var(--primary)') return deOklch(l, c, h);
+      const m = color.match(/^color-mix\(in oklch, var\(--primary\) (\d+)%, (black|white)\)$/);
+      if (!m) throw new Error(`parada no reconocida: ${texto}`);
+      const p = Number(m[1]) / 100;
+      return deOklch(p * l + (1 - p) * (m[2] === 'white' ? 1 : 0), p * c, h);
+    };
+    const luminancia = ([r, g, b]: Rgb) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const contraste = (x: Rgb, y: Rgb) => {
+      const [a, b] = [luminancia(x), luminancia(y)].sort((p, q) => q - p);
+      return (a + 0.05) / (b + 0.05);
+    };
 
+    it('R16: el texto del primario cumple 4.5:1 sobre las tres paradas del degradado, en claro y en oscuro', () => {
       for (const tema of [':root', '.dark'] as const) {
         const primario = variableDe(tema, 'primary');
         const [lt, ct, ht] = oklch(variableDe(tema, 'primary-foreground'));
@@ -364,6 +364,24 @@ describe('motion-tokens', () => {
     it('R17: el velo es petróleo al 10 % en claro y --primary al 10 % en oscuro', () => {
       expect(variableDe(':root', 'button-veil-color')).toBe('rgb(2 96 90 / 0.1)');
       expect(variableDe('.dark', 'button-veil-color')).toBe('color-mix(in oklch, var(--primary) 10%, transparent)');
+    });
+
+    it('R17: el texto petróleo del velo cumple 4.5:1 sobre secondary y sobre background, en claro y en oscuro', () => {
+      const codificar = (c: number) => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
+      /** Compone el color con alfa 0.1 sobre el fondo en sRGB, como lo pinta el navegador. */
+      const sobre = (velo: Rgb, fondo: Rgb): Rgb =>
+        velo.map((v, i) => lineal(0.1 * codificar(v) + 0.9 * codificar(fondo[i]))) as unknown as Rgb;
+      const deVar = (tema: ':root' | '.dark', nombre: string): Rgb => deOklch(...oklch(variableDe(tema, nombre)));
+
+      expect(variableDe(':root', 'button-veil-color')).toBe('rgb(2 96 90 / 0.1)');
+      expect(variableDe('.dark', 'button-veil-color')).toBe('color-mix(in oklch, var(--primary) 10%, transparent)');
+      for (const tema of [':root', '.dark'] as const) {
+        const texto = deVar(tema, 'primary');
+        const velo = tema === ':root' ? deHex('#02605A') : texto;
+        for (const fondo of ['secondary', 'background']) {
+          expect(contraste(texto, sobre(velo, deVar(tema, fondo))), `${tema} ${fondo}`).toBeGreaterThanOrEqual(4.5);
+        }
+      }
     });
 
     it('R18: la escala al pulsar se transiciona en --dur-instant en los dos botones', () => {

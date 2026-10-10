@@ -54,6 +54,7 @@ hacer, lo que ve al final de cada transición y los datos no cambian; solo cambi
 | D8 | Tablero 3 del lienzo aprobado entero como alcance de QC-228: entrada de pantalla escalonada, ítem activo que se desliza, botón primario con brillo, botón secundario animado (velo petróleo de 200 ms; borde y texto a petróleo en 100 ms), tarjetas que suben al hover, toast y diálogo | humano, 2026-10-08 | — | R4–R6, R10, R13–R20 (tarjetas: «Lo que NO entra», P3) |
 | D9 | Sin dependencias nuevas | humano (ficha) | — | R25 |
 | D10 | Sin cambio de comportamiento: el estado final de cada pantalla, control y dato es el mismo con y sin animación | leader, 2026-10-09 (consigna del humano: cerrar el rediseño hoy) | — | R15, R24 |
+| D11 | Enmienda a D8 tras probar la preview («Cancelar», `outline-dashed`, no se animaba): «todas menos link». La pulsación al 98 % pasa a `outline-dashed`, `secondary`, `ghost` y `destructive`; el velo, a `outline-dashed`, `secondary` y `ghost`, en lugar de su hover; `destructive` conserva su hover rojo; `link` no cambia | humano, 2026-10-09 | R17, R18 (D8) | R17, R18 |
 
 ## Requisitos (EARS)
 
@@ -141,10 +142,21 @@ habilitado, el sistema DEBE hacer entrar desde la derecha un velo petróleo al 1
 y DEBE pasar el borde y el texto a petróleo (`--primary`) en `--dur-instant`, los dos con
 `--ease-standard`.
 
+> **Enmienda 2026-10-09 (D11).** El velo se aplica también a las variantes `outline-dashed`,
+> `secondary` y `ghost`, en lugar de su hover anterior (`hover:bg-*`, `hover:text-*`). El texto
+> petróleo sobre el velo cumple 4.5:1 sobre el fondo de `secondary` y sobre `--background`, en claro
+> y en oscuro. `destructive` y `link` no llevan velo. Test: `motion-classes.test.tsx > R17` y
+> `motion-tokens.test.ts > R17: el texto petróleo del velo cumple 4.5:1…`.
+
 **R18.** MIENTRAS un botón primario o secundario está pulsado, el sistema DEBE escalarlo al 98 %
 en `--dur-instant` con `--ease-standard`. Las demás variantes conservan su pulsación actual, y
 los botones que abren un menú (`aria-haspopup`) y las flechas de desplazamiento de las tablas
 siguen sin moverse al pulsarse.
+
+> **Enmienda 2026-10-09 (D11).** La escala al 98 % al pulsar se aplica a todas las variantes salvo
+> `link`: `default`, `outline`, `outline-dashed`, `secondary`, `ghost` y `destructive`. Ninguna de
+> ellas conserva `translate-y-px`; `link` conserva su pulsación actual. Las excepciones de
+> `aria-haspopup` y de las flechas de las tablas siguen. Test: `motion-classes.test.tsx > R18`.
 
 ### Entrada de pantalla
 
@@ -192,7 +204,7 @@ casos que fijan una clase o una regla de CSS de movimiento, con nota de enmienda
 ### Cobertura de las decisiones cerradas
 
 D1→R1–R25 · D2→R1, R3–R12, R19 · D3→R2–R13, R16–R19 · D4→R3–R12 · D5→R21, R22 · D6→R23 ·
-D7→R1, R2, R23 · D8→R4–R6, R10, R13–R20 (las tarjetas quedan fuera por P3) · D9→R25 · D10→R15, R24.
+D7→R1, R2, R23 · D8→R4–R6, R10, R13–R20 (las tarjetas quedan fuera por P3) · D9→R25 · D10→R15, R24 · D11→R17, R18.
 
 ## Preguntas abiertas
 
