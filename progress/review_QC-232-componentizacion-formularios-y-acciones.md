@@ -192,3 +192,64 @@ El resto está verificado y en verde:
 - `archivos-en-vuelo`.
 
 La vuelta 2 puede acotarse al diff de H2 y a la tabla de parejas de H1.
+
+## Vuelta 2 (acotada a 975b4bdd..d2afb23f)
+
+Revisé solo H1, H2 y las menores m1, m2, m4 y m5, más sus posibles regresiones. Commits:
+`acc0205f`, `0a758eea`, `e9c834f3` y `d2afb23f`.
+
+### H2: RESUELTO
+- **`acc0205f` solo cambia comentarios** en `unit-row-actions`, `catalog-columns`, `user-form`,
+  `work-group-form`, `order-form` y `order-sheet`. Ninguna línea de código cambia.
+- **Citas:** en todo el diff de producción desde el merge-base, ninguna línea añadida cita `QC-<n>`,
+  `R<n>`, `design.md` ni «decisión cerrada» (0 coincidencias). Con esto quedan resueltas H2 y m5.
+- **Verificación:** `eslint` pasa limpio en los 6 archivos, `typecheck` da exit 0, y
+  `vitest run guard` más los tests editados en la vuelta dan 71 archivos con 1039 tests que pasan
+  y 15 que se saltan.
+
+### Menores de la vuelta 1
+- **m1: resuelto.** Los títulos de test están al día (`0a758eea`). R4 sigue sin enmienda escrita, y
+  la acepto con la decisión 1.
+- **m2: resuelto.** En inventario y catálogo el caso ya no se salta: ahora afirma que el error
+  heredado reaparece.
+- **m4: resuelto.** El dueño de D39 está corregido en `progress/deudas.md` (`e9c834f3`).
+
+### H1: RESUELTO
+- **Lo que hay en disco:**
+  - 117 capturas «antes» (`dev` `9c28ab11`) y 141 «después»: 117 parejas más 24 de menú abierto, en
+    las 8 tablas que estrenan menú y en claro, oscuro y móvil;
+  - el índice en `progress/capturas_QC-232.md` y la sección en `progress/features/QC-232.md`;
+  - T0c y T5e marcadas.
+- **Cómo las comparé:** un diff de píxeles de las 117 parejas con PIL.
+- **Parejas idénticas píxel a píxel (63):** todas las de usuarios (salvo una), pedidos (incluido su
+  menú), asignación, ejecución, empaque, el borrado de proveedor y las altas de clientes,
+  inventario, proveedores y proveedor-detalle, más los móviles de presentaciones, unidades y grupos.
+- **Parejas con diferencias que miré** (Read sobre crops lado a lado):
+  - **Las tablas** (clientes, fórmulas, grupos, inventario, producto terminado, presentaciones,
+    unidades y catálogo) solo cambian en la celda de acciones: los iconos pasan a ser los tres
+    puntos. Las columnas se reajustan un poco por el ancho de esa celda.
+  - **Los diálogos de borrado** son idénticos: mismo título, texto y botones. La diferencia está en
+    la tabla difuminada del fondo, y en `inventario-borrar` también en el scroll de la página.
+  - **Las altas de presentaciones y unidades (claro y oscuro)** solo difieren en la tabla
+    difuminada detrás del panel. El panel no cambia, y la versión móvil es idéntica.
+  - **`grupos-alta-oscuro`** difiere solo porque en la «antes» la lista de miembros aún estaba
+    cargando, que es un artefacto de tiempo. La de claro y la de móvil son idénticas.
+  - **`usuarios-menu-claro`** difiere en 4 píxeles, que es ruido de render.
+  - **`formulas-menu-movil`:** el menú está abierto con «Editar» y «Borrar», y el disparador es de
+    tres puntos.
+- **Los dos diálogos que faltan (terminar en ejecución y en empaque): ACEPTABLE.**
+  - R3 pide formularios, borrados y tablas, y estos no son borrados.
+  - Usan la misma pieza `ConfirmDialog` sin form que «iniciar», cuyas parejas son idénticas píxel a
+    píxel.
+  - Su árbol lo congela `confirmaciones-paridad` (los describe de finalizar la ejecución y de
+    empaque), sin regenerar.
+  - Capturarlos obligaría a escribir en la base.
+- **Menor nuevo (n1):** las «antes» se hicieron después de tocar código, sobre `dev`. La producción
+  de `dev` está sin tocar por esta rama, así que es equivalente. Lo dejo anotado.
+
+### Nota
+Al mergear `dev` en la rama antes del PR entra la migración `20261009120000_product_batches_production_date`.
+Cualquier conflicto que traiga ese merge queda fuera de esta revisión. `gate-completo` en CI sigue
+siendo condición de merge.
+
+### Veredicto vuelta 2: **OK**
