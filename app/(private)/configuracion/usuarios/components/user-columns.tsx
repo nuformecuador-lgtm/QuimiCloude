@@ -61,11 +61,11 @@ export const USER_STATUS_BADGE_TESTID = 'user-status';
  * **acompana** a la etiqueta, nunca la sustituye —el estado se lee, no se adivina por el tono—.
  */
 const STATUS_VARIANTS: Readonly<
-  Record<UserAccountStatus, 'default' | 'secondary' | 'outline' | 'destructive'>
+  Record<UserAccountStatus, 'success' | 'warning' | 'destructive' | 'info' | 'neutral'>
 > = {
-  active: 'default',
-  pending: 'outline',
-  inactive: 'secondary',
+  active: 'success',
+  pending: 'warning',
+  inactive: 'neutral',
   blocked: 'destructive',
 };
 

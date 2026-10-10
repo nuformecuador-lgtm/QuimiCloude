@@ -62,7 +62,7 @@ export function RecipeVersionList({ originalId, versions }: RecipeVersionListPro
                 {version.name}
               </Link>
               {version.isUnderReview ? (
-                <Badge variant="outline" data-testid="recipe-version-under-review">
+                <Badge variant="info" data-testid="recipe-version-under-review">
                   Por revisar
                 </Badge>
               ) : null}
