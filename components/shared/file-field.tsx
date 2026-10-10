@@ -99,8 +99,9 @@ export type FileFieldProps = {
 
 /** Estado visual de la zona: reposo, arrastre encima, trabajando y error. */
 const DROPZONE_BASE =
-  'relative flex min-h-36 cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors focus-within:ring-3 focus-within:ring-ring/50';
-const DROPZONE_IDLE = 'border-input bg-transparent hover:border-ring hover:bg-accent/40';
+  'relative flex min-h-36 cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors focus-within:ring-1 focus-within:ring-ring';
+const DROPZONE_IDLE =
+  'border-input bg-transparent hover:border-ring hover:bg-accent/40 focus-within:border-ring';
 const DROPZONE_DRAGGING = 'border-primary bg-primary/5';
 const DROPZONE_INVALID = 'border-destructive bg-destructive/5';
 

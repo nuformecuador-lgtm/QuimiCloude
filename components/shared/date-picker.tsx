@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 import { FieldError } from './field-error';
 
 const TRIGGER_CLASS =
-  'inline-flex items-center gap-1.5 rounded-lg border border-input bg-background px-2.5 text-sm hover:bg-muted';
+  'inline-flex items-center gap-1.5 rounded-lg border border-input bg-background px-2.5 text-sm hover:bg-muted outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring';
 
 type DatePickerSingleProps = {
   readonly mode: 'single';

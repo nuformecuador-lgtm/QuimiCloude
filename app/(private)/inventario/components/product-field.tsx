@@ -81,7 +81,7 @@ export function ProductField({
                   aria-label={`Qué es ${label}`}
                   // 44x44 de toque, como el gemelo de `PresentationSelect` en el mismo panel; el
                   // icono sigue en `size-4`. `shrink-0` impide que el flex le recorte el ancho.
-                  className={`flex ${touchTarget} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
+                  className={`flex ${touchTarget} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring`}
                   data-testid={`product-helper-${name}`}
                 />
               }

@@ -345,7 +345,7 @@ export function PresentationSelect({
                   aria-label="Qué es Presentación"
                   // Crece el blanco de toque, no el icono, que sigue en `size-4`. `shrink-0` impide
                   // que el flex del padre le recorte los 44 px en pantallas estrechas.
-                  className={`flex ${touchTarget} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
+                  className={`flex ${touchTarget} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring`}
                   data-testid="presentation-helper"
                 />
               }

@@ -154,7 +154,7 @@ export function ResponsibleAvatars({
                   aria-label={overflowLabel(rest.length)}
                   aria-describedby={namesId}
                   onClick={onShowAll}
-                  className={`flex ${touchTarget} shrink-0 items-center justify-center rounded-full text-sm text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
+                  className={`flex ${touchTarget} shrink-0 items-center justify-center rounded-full text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring`}
                   data-testid={RESPONSIBLE_OVERFLOW_TESTID}
                 />
               }
