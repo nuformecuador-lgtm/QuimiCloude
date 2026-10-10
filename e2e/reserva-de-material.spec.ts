@@ -58,6 +58,7 @@ import {
   assignedOrderRoute,
 } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import {
   clickAndConfirm,
@@ -291,7 +292,7 @@ async function inventoryRow(page: Page): Promise<Locator> {
 async function createUser(user: Credentials, roleId: string): Promise<string> {
   if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
 
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames: `Qc141${RUN_ID.slice(0, 8)}`,
       lastNames: 'Reserva',

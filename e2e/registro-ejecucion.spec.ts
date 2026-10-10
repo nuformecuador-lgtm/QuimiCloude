@@ -25,6 +25,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { ASSIGNED_ORDERS_ROUTE, CANCELLED_ORDER_PARAM, assignedOrderRoute } from '@/lib/shared/routes';
 
 import { ASSIGNED_ORDER_START_CONFIRM_TESTID, clickAndConfirm } from './helpers/confirm-dialog';
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
 const FIXTURE_PREFIX = 'qc82_e2e_';
@@ -208,7 +209,7 @@ test.beforeAll(async () => {
   ).id;
 
   operatorUserId = (
-    await prisma.user.create({
+    await createFixtureUser({
       data: {
         firstNames: `Qc82${RUN_ID.slice(0, 8)}`,
         lastNames: 'Operador',

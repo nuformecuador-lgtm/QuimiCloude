@@ -332,3 +332,7 @@ Rescatados de *Evaluaciones* y *Features en curso* del archivo: no estaban en *D
 - **Qué falta:** en el runner de 2 vCPU las dos emisiones concurrentes a veces no llegan a encolarse tras el bloqueo (`waitForLockWaiters`). Alargar la espera no lo arregla (con 20 s choca con el `testTimeout`): hay que entender por qué no se encolan (pool de conexiones, orden de arranque, `pg_stat_activity`) y hacer el test determinista. Mientras tanto está en `tests/baseline-rojos.json`; al arreglarlo, se borra la entrada.
 - **Estado:** resuelta el 2026-10-07 en `chore/ci-velocidad-y-d34`. Causa: orden de arranque —las emisiones se lanzaban sin esperar a que el `FOR UPDATE` del bloqueo estuviera tomado; si una llegaba antes, ganaba sin esperar y no quedaba nada encolado—. Ahora se lanzan solo con el bloqueo tomado (y se afirma que atrapó 1 fila). Entrada borrada del baseline. Detalle: `progress/fix-d34-credential-setup.md`.
 - **Dueño:** sin asignar.
+
+## QC-255 — menores del review (2026-10-10)
+
+Ver progress/review_QC-255-sanear-suite-e2e.md: m1 citas de ficha/requisito en comentarios y describe de tests nuevos; m2 cabeceras largas; m3 guardia de usuarios no ve create<Tipo> ni creaciones anidadas; m4 guardia de saltos solo mira *.spec.ts y no ve .skip( partido; m5 guardia de presupuesto no fija nombre `e2e` ni condición de disparo; m6 R14 por focus() programático.

@@ -22,6 +22,7 @@ import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { DASHBOARD_ROUTE, ORDERS_ROUTE } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
 
@@ -150,7 +151,7 @@ test.beforeAll(async () => {
   ).id;
 
   adminUserId = (
-    await prisma.user.create({
+    await createFixtureUser({
       data: {
         firstNames: `Qc122${RUN_ID.slice(0, 8)}`,
         lastNames: 'Busqueda',

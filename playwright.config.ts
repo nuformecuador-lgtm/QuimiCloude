@@ -32,6 +32,11 @@ export default defineConfig({
   use: {
     baseURL: E2E_BASE_URL,
     trace: 'on-first-retry',
+    // Tope de cada click, fill o press sin plazo propio. Sin el, una accion sobre un selector que
+    // ya no existe esperaba hasta agotar el timeout del caso (180-300 s) en cada reintento, y un
+    // par de selectores muertos se comian el presupuesto del job E2E entero. 30 s cubre de sobra
+    // a WebKit sobre `next dev`; la primera compilacion de una ruta va en el `goto`, que no lo usa.
+    actionTimeout: 30_000,
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },

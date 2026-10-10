@@ -41,6 +41,7 @@ import {
   WHATSAPP_INTEGRATION_ROUTE,
 } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO usuario que crea. Nada fuera de el se toca. */
@@ -120,7 +121,7 @@ async function createUserWithRole(
   const password = `Qc222-E2E-${RUN_ID.slice(0, 12)}`;
 
   // Hash REAL: lo que se prueba es que bcrypt, el adaptador Prisma y la Server Action se entienden.
-  await prisma.user.create({
+  await createFixtureUser({
     data: {
       firstNames: `Qc222${RUN_ID.slice(0, 8)}${suffix}`,
       lastNames: 'Integraciones',

@@ -49,6 +49,7 @@ import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { DASHBOARD_ROUTE, executionTraceRoute } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
@@ -183,7 +184,7 @@ function displayNameOf(user: SeedUser): string {
 }
 
 async function createUser(user: SeedUser, roleId: string, ownerCompanyId: string): Promise<string> {
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames: user.firstNames,
       lastNames: user.lastNames,

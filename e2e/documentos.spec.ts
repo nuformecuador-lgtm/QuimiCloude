@@ -37,6 +37,7 @@ import { normalizeSupplierName } from '@/lib/modules/proveedores';
 import { prisma } from '@/lib/shared/db/prisma';
 import { FORMULAS_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
@@ -195,7 +196,7 @@ test.beforeAll(async () => {
 
   // Hash REAL: el objetivo es que bcrypt, el adaptador Prisma y la Server Action de login se
   // entiendan de verdad.
-  await prisma.user.create({
+  await createFixtureUser({
     data: {
       firstNames: `Qc107${RUN_ID.slice(0, 8)}`,
       lastNames: 'Documentos',
@@ -248,7 +249,7 @@ test.beforeAll(async () => {
   });
   noUploadRoleId = noUploadRole.id;
 
-  await prisma.user.create({
+  await createFixtureUser({
     data: {
       firstNames: `Qc142${RUN_ID.slice(0, 8)}`,
       lastNames: 'Documentos',

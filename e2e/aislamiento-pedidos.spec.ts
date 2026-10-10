@@ -30,6 +30,7 @@ import { normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { addPackagingLine, openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
@@ -260,7 +261,7 @@ test.beforeAll(async () => {
   companyBId = await createCompany(COMPANY_B_NAME);
 
   // Hash real: el login tiene que pasar por bcrypt, el adaptador Prisma y la Server Action de verdad.
-  const admin = await prisma.user.create({
+  const admin = await createFixtureUser({
     data: {
       firstNames: `Qc60${RUN_ID.slice(0, 8)}`,
       lastNames: 'Aislamiento',

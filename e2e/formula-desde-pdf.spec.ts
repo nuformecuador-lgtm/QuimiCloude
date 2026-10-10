@@ -38,6 +38,7 @@ import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { formulaImportRoute, FORMULAS_ROUTE, recipeEditRoute } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
@@ -131,7 +132,7 @@ test.beforeAll(async () => {
     );
   }
 
-  await prisma.user.create({
+  await createFixtureUser({
     data: {
       firstNames: `Qc159${RUN_ID.slice(0, 8)}`,
       lastNames: 'Formulas',

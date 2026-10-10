@@ -61,6 +61,7 @@ import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import {
   addPackagingLine,
@@ -163,7 +164,7 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
     );
   }
 
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames: `Qc151${RUN_ID.slice(0, 8)}`,
       lastNames: 'Cotizacion',
@@ -412,6 +413,12 @@ test.afterAll(async () => {
 // El primer `goto` hace que `next dev` compile la ruta bajo demanda y bcrypt tarda a proposito.
 test.setTimeout(180_000);
 
+/** Elige en el formulario del pedido la unidad del fixture (litro). */
+async function chooseOrderUnit(page: Page): Promise<void> {
+  await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
+  await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
+}
+
 test.describe('cotizacion del coste en el pedido (QC-151)', () => {
   test('el bloque de coste cotiza con cada cantidad, guarda el mismo importe y lo reabre sin teclear nada', async ({
     page,
@@ -436,6 +443,11 @@ test.describe('cotizacion del coste en el pedido (QC-151)', () => {
     const quantity = page.getByTestId('order-field-quantity');
     const quoteValue = page.getByTestId('order-cost-quote-value');
 
+    // La unidad del pedido ANTES de cotizar: `quoteOrderCostSchema` la exige (`unitId`
+    // obligatorio desde QC-204) y sin ella el bloque se queda en el guion. Es la del ingrediente
+    // (litro), asi que no hay conversion y los importes de (a)-(d) no cambian.
+    await chooseOrderUnit(page);
+
     // (a) 5000 -> 500 L requeridos x 25,5000 = 12.750,00.
     await quantity.fill(QUANTITY_A);
     await expect(quoteValue).toHaveText(AMOUNT_A, { timeout: 60_000 });
@@ -448,13 +460,10 @@ test.describe('cotizacion del coste en el pedido (QC-151)', () => {
     await quantity.fill(QUANTITY_C);
     await expect(quoteValue).toHaveText(MISSING_VALUE_MARK, { timeout: 60_000 });
 
-    // (d) vuelta a 5001, se elige la unidad, una linea de reparto con el envase y se guarda: la
-    // Server Action REAL de `pedidos` contra Postgres.
+    // (d) vuelta a 5001, una linea de reparto con el envase y se guarda: la Server Action REAL de
+    // `pedidos` contra Postgres. La unidad ya esta elegida desde el principio.
     await quantity.fill(QUANTITY_B);
     await expect(quoteValue).toHaveText(AMOUNT_B, { timeout: 60_000 });
-
-    await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
-    await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
 
     const distribution = page.getByTestId('order-distribution-field');
     await addPackagingLine(
@@ -518,6 +527,9 @@ test.describe('cotizacion del coste en el pedido (QC-151)', () => {
     await expect(recipeOption).toHaveCount(1, { timeout: 60_000 });
     await recipeOption.click();
     await expect(page.getByTestId('recipe-picker-value')).toHaveValue(costRecipeId);
+
+    // La unidad del pedido ANTES de cotizar, igual que en el caso anterior: litro, la de los lotes.
+    await chooseOrderUnit(page);
 
     // Receta al 100 %: la cantidad tecleada ES la cantidad necesaria. Los tres lotes A (20 a 10),
     // B (20 a 12) y C (50 a 15) entran ENTEROS en el promedio, se necesiten o no para cubrir los

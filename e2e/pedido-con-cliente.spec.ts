@@ -20,6 +20,7 @@ import { normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand, type Credentials } from './helpers/landing';
 import { addPackagingLine, openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
@@ -143,7 +144,7 @@ function orderRow(page: Page, orderId: string) {
 }
 
 async function createUser(user: Credentials, roleId: string, company: string): Promise<string> {
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames: `Qc156${RUN_ID.slice(0, 8)}`,
       lastNames: 'Cliente',
