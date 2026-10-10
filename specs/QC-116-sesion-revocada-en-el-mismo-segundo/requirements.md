@@ -169,3 +169,7 @@ restricciones que trae la ficha se cubren así:
 | Fecha | Pregunta | Decisión |
 | --- | --- | --- |
 | — | — | Ninguna todavía: se llenará con la respuesta del humano a las preguntas abiertas |
+
+## Aprobación
+
+2026-10-10, humano: spec aprobado con la opción B (el login emite en el segundo siguiente al sello, tope 2 s) y los defaults del resto (sin truncar el sello, sin migración de datos, reloj inyectado en las pruebas, sin E2E propio).
