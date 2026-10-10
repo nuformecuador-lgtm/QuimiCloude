@@ -194,3 +194,7 @@ ninguno cae en R21.
   Esta ficha toca 52 specs. **Recomendada:** que el leader lo mida con `archivos-en-vuelo` en F2.0.
   Si chocan, QC-255 se integra primero: solo cambia cómo se crea el usuario, y QC-116 resuelve
   después.
+
+## Aprobación
+
+2026-10-10, humano: spec aprobado con las recomendaciones de P1–P7 (dos guardias; matriz por navegador con job final `e2e`; QC-208 fuera; sin build/retries/maxFailures; MAIL_TRANSPORT fuera; verde admite flaky con cero `sesion=fin` espurios y lista de flaky; si choca con QC-116, QC-255 entra primero).
