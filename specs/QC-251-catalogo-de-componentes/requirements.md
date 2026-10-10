@@ -4,7 +4,9 @@
 > Abre el rediseño (`progress/rediseno.md > Orden de trabajo`, paso 1). QC-256 (piezas compartidas
 > del rediseño) y QC-257 (shell) dependen de ella y registrarán sus piezas en este catálogo.
 > El archivo NO viene sembrado por `/afinar-feature`: el alcance y las decisiones de abajo los
-> propone este spec y se aprueban con él.
+> propuso este spec. **El humano lo aprobó con cambios el 2026-10-10** (`## Decisiones cerradas`):
+> se añaden la regla dura de reutilización, el pase de diseño obligatorio por componente nuevo, la
+> columna `Diseño` y la fuente de diseño versionada en `docs/diseno/` (R23–R36).
 
 ## Alcance
 
@@ -20,6 +22,12 @@ Entra:
    duplicado sin justificar.
 4. **Guardia:** todo componente exportado por `components/shared` tiene fila y toda fila apunta a
    algo que existe.
+5. **Regla dura de reutilización y pase de diseño** (humano, 2026-10-10): antes de crear un
+   componente SIEMPRE se reutiliza lo que existe; todo componente nuevo, y todo cambio visual de uno
+   existente, pasa por la guía de marca y por su pase `/design` aprobado antes del spec que lo
+   implementa. Deberes de agentes, columna `Diseño`, guardia y casilla que lo sostienen.
+6. **Fuente de diseño versionada** en `docs/diseno/`: `README.md`, `guia-de-marca.html`,
+   `sistema.css` y `canvas/` (copias de `_trabajo/`), y `progress/rediseno.md` apuntando ahí.
 
 Fuera de alcance:
 
@@ -27,7 +35,10 @@ Fuera de alcance:
 - Crear piezas nuevas del rediseño (PriorityMark, StatusBadge, Notice, PageShell, UrlTabs,
   PasswordField…): son **QC-256** y **QC-257**. Este spec solo garantiza que el formato las admite.
 - Arreglar los imports por ruta profunda que hoy existen hacia `components/shared/step-reader/`
-  (ver `## Preguntas abiertas`, 2).
+  (`StepDocumentView` desde `formulas`, `clampStepPosition` desde `asignacion`): es **QC-268**.
+  Mientras tanto el catálogo trata `StepDocumentView` como público de hecho (caso (c)).
+- Hacer los pases `/design` de piezas futuras, o copiar a `docs/diseno/` el resto de `_trabajo/`
+  (brief, capturas, SVG/PNG de marca).
 - `components/private/` (ver `design.md > 10`, alternativa D).
 
 ## Glosario
@@ -49,8 +60,40 @@ Fuera de alcance:
   de `components/shared/` (sin contar `CATALOGO.md`) y cada `index.ts` de un módulo con barrel.
 - **Archivo catalogable de Primitivos/Apoyos.** Cada `.tsx` de `components/ui/`; cada `.ts`/`.tsx`
   de `lib/shared/ui/` y de `hooks/`. Se excluyen tests (`*.test.*`, `*.spec.*`) y `*.d.ts`.
+- **Tablero de diseño.** Una pantalla del canvas de Claude Design con la pieza o la pantalla, sus
+  estados, sus animaciones y el componente o librería que usa, en escritorio, tablet y teléfono.
+  Su copia versionada vive en `docs/diseno/canvas/<Nombre>.dc.html`.
+- **Referencia de diseño.** La ruta entre backticks de un tablero versionado que existe
+  (`docs/diseno/canvas/<Nombre>.dc.html`), opcionalmente con el nombre del tablero en el canvas.
+- **Pieza previa al rediseño.** Un `Archivo` que ya estaba catalogado al cerrar QC-251. Su lista
+  es cerrada y vive en la guardia.
+- **Cambio visual.** Un cambio de un componente que altera lo que se ve o cómo se mueve (tallas,
+  colores, tipografía, espaciado, estados, animaciones), a diferencia de un cambio solo de lógica
+  o de props sin efecto visual.
 
-## Decisiones del spec (se aprueban con el spec)
+## Decisiones cerradas (no reabrir)
+
+Del humano, al aprobar el spec con cambios (2026-10-10):
+
+| # | Decisión | Requisitos |
+|---|---|---|
+| H1 | La subida a `components/shared` es con la **segunda ruta**; `docs/architecture.md` se alinea (cierra la antigua pregunta 1 y confirma D4). | R16, R20 |
+| H2 | Los imports profundos hacia `step-reader` van en ficha aparte, **QC-268** (cierra la antigua pregunta 2). | — (fuera de alcance) |
+| H3 | **Regla dura:** antes de crear cualquier componente SIEMPRE se reutiliza lo que existe; solo se crea uno nuevo si no existe, en el orden reutilizar → extender → componer → crear. No es una recomendación. | R16, R23 |
+| H4 | Todo componente **nuevo** y todo **cambio visual** de uno existente pasa por la guía de marca y lleva su pase `/design` (tablero en el canvas con animaciones, componente o librería y estados en escritorio, tablet y teléfono), aprobado por el humano **antes** del spec de implementación. El spec de esa ficha cita el tablero; sin esa referencia no se implementa. | R24, R25, R26, R27 |
+| H5 | Mecanismos: deberes de `spec_author`, `frontend_dev` y `reviewer`; columna `Diseño` en el catálogo (tablero o «previo al rediseño»); guardia que exige `Diseño` en cada fila nueva de Compuestos; casilla en `docs/checkpoints-proyecto.md`. | R25–R32 |
+| H6 | La fuente de diseño se **versiona** en `docs/diseno/` (README, guía de marca, sistema visual, canvas) para que la regla sea verificable por el equipo, y `progress/rediseno.md` apunta ahí. | R33, R34, R35, R36 |
+
+Del leader, al cerrar las preguntas abiertas (2026-10-10):
+
+| # | Decisión | Requisitos |
+|---|---|---|
+| H7 | QC-257 (shell) solo modifica piezas privadas existentes (`app-sidebar`, controles de la cabecera) y no crea piezas compartidas: **sin cuarta sección**; `components/private` sigue fuera del catálogo. | R1 |
+| H8 | `support.js` **no se versiona**: la copia de `docs/diseno/canvas/` es fuente legible y la vista viva es el canvas. El `README.md` lo dice. | R33 |
+| H9 | El pase `/design` lo hace **cualquier persona del equipo** desde Claude Code pidiendo a Claude un diseño (Claude Design: un tablero nuevo en el canvas del proyecto o en uno propio compartido con el humano). El humano lo aprueba y el tablero aprobado se copia a `docs/diseno/canvas/` en la rama de la ficha. El `README.md` lo escribe como flujo paso a paso. | R24, R33 |
+| H10 | `Diseño` se exige **también a Primitivos** (confirma D7): R29 se mantiene. | R29 |
+
+## Decisiones del spec (aprobadas con el spec)
 
 | # | Decisión | Requisitos |
 |---|---|---|
@@ -60,6 +103,10 @@ Fuera de alcance:
 | D4 | La subida a `components/shared` se dispara con la **segunda ruta**; `docs/architecture.md` (que hoy dice «dos features») se alinea a esa redacción. Se admite subir antes con excepción declarada en el `design.md` y consumidores identificados (como hizo QC-55). | R16, R20 |
 | D5 | El catálogo no cita fichas ni requisitos: la historia vive en `specs/` y en git, igual que en los comentarios de producción. | R11 |
 | D6 | La celda `Alcance` lleva siempre «Cubre:» y «No cubre:», para que la mitad «qué no cubre» no se pierda. | R3 |
+| D7 | La columna `Diseño` va en las **tres** secciones (formato único). La guardia exige referencia de diseño a toda fila nueva de **Compuestos y Primitivos** (un primitivo también es visual: el rediseño cambia `Button` y `Badge`); en Apoyos y en módulos `.ts` sin componentes vale «sin UI». | R28, R29 |
+| D8 | «Fila nueva» se define mecánicamente: lo que no está en la lista cerrada de piezas previas al rediseño (instantánea al cerrar QC-251). Esa lista solo puede encoger. | R29, R31 |
+| D9 | La referencia de diseño de una fila es una ruta versionada `docs/diseno/canvas/*.dc.html`, no solo el enlace al canvas privado: la guardia y cualquier persona del equipo pueden comprobarla. | R28, R30 |
+| D10 | `docs/diseno/sistema.css` y `docs/diseno/canvas/qc.css` son el mismo archivo: los tableros cargan `./qc.css` y no se tocan; la guardia exige que sean idénticos. | R34 |
 
 ## Requisitos (EARS)
 
@@ -70,7 +117,8 @@ Fuera de alcance:
   `## Compuestos — components/shared` y `## Apoyos — lib/shared/ui y hooks`, cada una con una
   única tabla.
 - **R2.** La tabla de cada sección DEBE tener exactamente estas columnas, en este orden:
-  `Pieza | Archivo | Para qué | Alcance | Puntos de extensión | Base de`.
+  `Pieza | Archivo | Para qué | Alcance | Puntos de extensión | Base de | Diseño`
+  (la columna `Diseño` se añadió al aprobar, H5; su contenido lo fija R28).
 - **R3.** Cada fila DEBE cumplir: `Pieza` con al menos un nombre entre backticks; `Archivo` con
   exactamente una ruta entre backticks, relativa a la raíz del repo; `Para qué` no vacía;
   `Alcance` con el texto `Cubre:` y el texto `No cubre:`; `Puntos de extensión` y `Base de` no
@@ -136,20 +184,63 @@ Fuera de alcance:
   `components/shared/CATALOGO.md` junto a `tests/baseline-rojos.json` y `progress/deudas.md`
   (la lista sustituye a la de por defecto: perder estas dos sería una regresión).
 
+### Regla dura de reutilización y pase de diseño (H3, H4)
+
+- **R23.** `docs/perfil-agentes.md > Regla de decisión para componentes` DEBE redactar la regla como
+  **obligatoria** —«antes de crear cualquier componente SIEMPRE se reutiliza lo que existe; solo se
+  crea uno nuevo si no existe»—, con su fecha (2026-10-10) y su origen (decisión del humano), y
+  DEBE aplicar a todos los agentes que escriben specs o UI, no solo a `frontend_dev`.
+- **R24.** `docs/perfil-agentes.md` DEBE contener la regla del pase de diseño: todo componente
+  nuevo y todo cambio visual de uno existente pasa por la guía de marca
+  (`docs/diseno/guia-de-marca.html`) y lleva un pase `/design` con un tablero que muestra sus
+  animaciones, el componente o librería que usa y sus estados en escritorio, tablet y teléfono,
+  aprobado por el humano ANTES del spec que lo implementa; sin referencia de diseño en ese spec no
+  se implementa. `docs/architecture.md > Componentes` DEBE remitir a esa regla.
+- **R25.** `docs/perfil-agentes.md > spec_author` DEBE exigir que, CUANDO el spec propone un
+  componente nuevo o un cambio visual, `design.md` cite su referencia de diseño aprobada; y SI no la
+  hay, ENTONCES el `spec_author` DEBE parar y devolver `BLOQUEADO: falta el pase /design de <pieza>`
+  en vez de escribir el spec.
+- **R26.** `docs/perfil-agentes.md > frontend_dev` DEBE prohibir crear un componente que no tenga
+  fila en el catálogo y referencia de diseño en el `design.md` de su feature.
+- **R27.** `docs/perfil-agentes.md > reviewer` DEBE incluir como BLOQUEANTE un componente nuevo (o un
+  cambio visual) del diff sin justificación de por qué no se reutilizó lo existente, o sin
+  referencia de diseño en el `design.md` de la feature.
+
+### La columna `Diseño` y su guardia (H5)
+
+- **R28.** La celda `Diseño` de cada fila DEBE contener exactamente uno de: el texto
+  `previo al rediseño`; una o más referencias de diseño (`docs/diseno/canvas/<Nombre>.dc.html` entre
+  backticks); o, solo en Apoyos y en filas de Compuestos cuyo `Archivo` es un `.ts` que no es
+  `index.ts`, el texto `sin UI`.
+- **R29.** SI una fila de Compuestos o de Primitivos lleva `previo al rediseño` y su `Archivo` no
+  está en la lista cerrada de piezas previas al rediseño, ENTONCES la guardia DEBE fallar pidiendo
+  su referencia de diseño.
+- **R30.** SI la celda `Diseño` cita una ruta `docs/diseno/canvas/...` que no existe, o lleva un
+  valor fuera de R28, ENTONCES la guardia DEBE fallar.
+- **R31.** La lista cerrada de piezas previas al rediseño DEBE vivir en la guardia con la fecha de su
+  instantánea; SI una de sus entradas apunta a un archivo que ya no existe, ENTONCES la guardia DEBE
+  fallar pidiendo quitarla (la lista solo encoge).
+- **R32.** `docs/checkpoints-proyecto.md > Calidad de codigo` DEBE tener una casilla: «Todo componente
+  nuevo o con cambio visual tiene su pase `/design` aprobado, citado en el `design.md` de la feature
+  y en la celda `Diseño` de su fila del catálogo».
+
+### Fuente de diseño versionada (H6)
+
+- **R33.** El repo DEBE tener `docs/diseno/` con: `README.md`, `guia-de-marca.html` (copia de
+  `_trabajo/marca/guia-de-marca.html`), `sistema.css` (copia de `_trabajo/rediseno/canvas/qc.css`) y
+  `canvas/` (copia de todo `_trabajo/rediseno/canvas/`). El `README.md` DEBE explicar qué es la guía
+  de marca y el sistema visual, enlazar el canvas `https://claude.ai/artifact/Voiri77bod5p5EuzCUkPaq`
+  diciendo que es privado y que el acceso se pide al humano, decir que `support.js` no se versiona
+  (la copia es fuente legible; la vista viva es el canvas) y describir paso a paso el flujo
+  `/design` de H9 (cualquier persona pide el diseño a Claude desde Claude Code → tablero en el
+  canvas del proyecto o en uno propio compartido con el humano → aprobación del humano → copia a
+  `docs/diseno/canvas/` en la rama de la ficha → spec que lo cita → fila del catálogo).
+- **R34.** `docs/diseno/sistema.css` DEBE ser idéntico, byte a byte, a `docs/diseno/canvas/qc.css`.
+- **R35.** `progress/rediseno.md` DEBE apuntar a `docs/diseno/` (canvas, sistema y guía) como fuente
+  del diseño, en vez de a `_trabajo/rediseno/canvas/`.
+- **R36.** CUANDO `docs/diseno/` está en el árbol, todas las guardias del repo DEBEN seguir en verde
+  sin excepciones nuevas (`design.md > 12` recoge cuáles lo leen).
+
 ## Preguntas abiertas
 
-1. **D4: «segunda ruta» frente a «dos features».** La ficha pide «segunda ruta» y
-   `docs/architecture.md` dice hoy «al menos DOS features con la misma API». Como el doc del perfil
-   manda sobre `perfil-agentes.md`, el spec propone alinear `architecture.md` (R20). Confirmarlo al
-   aprobar; si el humano prefiere «dos features», cambian R16 y R20 y nada más.
-2. **Imports profundos hacia `components/shared/step-reader/`.** Hoy
-   `app/(private)/produccion/formulas/components/recipe-version-form.tsx` importa `StepDocumentView`
-   y `app/(private)/asignacion/[id]/components/order-execution-screen.tsx` importa
-   `clampStepPosition` saltándose el barrel. El catálogo los trata como públicos de hecho (caso (c)
-   del glosario) y `StepDocumentView` lleva fila. ¿Se abre ficha para reexportarlos por el barrel o
-   se deja como deuda en `progress/deudas.md`? No bloquea este spec.
-3. **QC-256 y QC-257 no están en `feature_list.json`** (el último importado es QC-255). El formato
-   se ha diseñado genérico (R13) sin poder leer su alcance; si alguna de las dos pone piezas fuera
-   de `components/ui`, `components/shared`, `lib/shared/ui` o `hooks` (p. ej. el shell en
-   `components/private/` o en `app/(private)/components/`), esas piezas no entrarían en el catálogo.
-   ¿Debe el shell registrarse? Si sí, se añade una cuarta sección, y eso es un cambio a este spec.
+Ninguna. Las cuatro que quedaban las cerró el leader el 2026-10-10 (H7–H10).
