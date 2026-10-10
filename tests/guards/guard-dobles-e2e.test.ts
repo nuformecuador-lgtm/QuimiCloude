@@ -15,8 +15,9 @@
 // `guard-envio-de-correo.test.ts`: censo en memoria, funciones puras sobre el censo y un caso de
 // SENSIBILIDAD por motivo que demuestra que la guardia muerde.
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -46,18 +47,6 @@ const DOBLES = [
 
 /** La consulta que tiene que acompanar a toda eleccion de un doble. */
 const CONSULTA = 'documentsE2EDoublesEnabled(';
-
-/** Carpetas que nunca se recorren: no son fuente versionada del repo. */
-const CARPETAS_IGNORADAS = new Set([
-  'node_modules',
-  '.next',
-  '.git',
-  '.worktrees',
-  'dist',
-  'coverage',
-  'test-results',
-  'playwright-report',
-]);
 
 /**
  * `tests/` y `e2e/` quedan FUERA del censo de activacion a proposito, mismo criterio que
@@ -98,27 +87,31 @@ function esCensable(nombre: string): boolean {
   return EXTENSIONES.some((extension) => nombre.endsWith(extension)) || nombre === '.env.example';
 }
 
-/** Todo el fuente versionado del repo, en rutas relativas a la raiz y con `/` siempre. */
+/**
+ * Todo el fuente VERSIONABLE del repo, en rutas relativas a la raiz y con `/` siempre: lo que git
+ * ya sigue mas lo nuevo que aun no se ha anadido, y nunca lo que `.gitignore` deja fuera. La lista
+ * sale de `git ls-files`, no del disco: un archivo local ignorado —`feature_list.json`, la copia
+ * del board que puede NOMBRAR la variable en la descripcion de una ficha— no se versiona, no llega
+ * a ningun proceso de CI ni de despliegue y no puede encender nada. `-z` separa con NUL: ninguna
+ * ruta se entrecomilla ni se parte, tampoco en Windows.
+ */
 function fuentesDelRepo(): string[] {
-  const encontradas: string[] = [];
+  const argumentos = ['ls-files', '-z', '--cached', '--others', '--exclude-standard'];
+  const salida = execFileSync('git', argumentos, {
+    cwd: RAIZ,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
 
-  const recorrer = (directorio: string, raiz: boolean) => {
-    for (const entrada of readdirSync(directorio, { withFileTypes: true })) {
-      const completa = join(directorio, entrada.name);
-      if (entrada.isDirectory()) {
-        if (CARPETAS_IGNORADAS.has(entrada.name)) continue;
-        if (raiz && CARPETAS_FUERA_DEL_CENSO.has(entrada.name)) continue;
-        recorrer(completa, false);
-        continue;
-      }
-      if (esCensable(entrada.name)) {
-        encontradas.push(relative(RAIZ, completa).split('\\').join('/'));
-      }
-    }
-  };
+  const rutas = new Set(salida.split('\0').filter((ruta) => ruta.length > 0));
 
-  recorrer(RAIZ, true);
-  return encontradas;
+  return [...rutas].filter(
+    (ruta) =>
+      !CARPETAS_FUERA_DEL_CENSO.has(ruta.split('/')[0]) &&
+      esCensable(ruta.split('/').at(-1) ?? '') &&
+      // Un archivo seguido pero borrado en el arbol de trabajo sigue en el indice: no hay que leer.
+      existsSync(join(RAIZ, ruta)),
+  );
 }
 
 /**
