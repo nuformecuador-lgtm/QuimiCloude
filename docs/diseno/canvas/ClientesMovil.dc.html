@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Clientes en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="Clientes" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Clientes · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">customer-list-section · customer-table · customer-columns · customer-row-actions · customer-sheet · customer-form · delete-customer-dialog · shared/data-table · shared/delete-confirm-dialog · form-sheet · ui/sonner</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">@tanstack/react-table · @base-ui/react</span> (Menu, AlertDialog, Sheet) · <span class="mono">sonner · lucide-react</span></dd>
+      <dt>Escritorio</dt><dd>«Buscar clientes» · tabla Apellidos · Nombres · Ciudad · Teléfono · Correo · Dirección · Fecha de alta · Última modificación, orden por Apellidos · acciones de fila en ⋯ (Editar / Eliminar) · Sheet «Nuevo cliente» / «Editar cliente» con los mismos campos</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono · tabla con scroll horizontal dentro de su caja</dd>
+      <dt>Teléfono</dt><dd>La tabla pasa a tarjetas (nombre completo y ciudad, teléfono y correo, dirección) · «Acciones» abre el menú centrado con objetivos de 48 px · Sheet a pantalla completa con Nombres y Apellidos apilados</dd>
+      <dt>Animación</dt><dd>Menú ⋯ 200/150 ms · Sheet 300/150 ms · «Eliminar el cliente» con zoom 300 ms · la fila editada parpadea suave · toasts «Cliente creado.», «Cliente actualizado.», «Cliente eliminado.»</dd>
+      <dt>Por confirmar</dt><dd>Qué campos son obligatorios en el formulario (se marcan Nombres y Apellidos) · vacío «Todavía no hay clientes registrados.» con la prop <span class="mono">vacio</span></dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

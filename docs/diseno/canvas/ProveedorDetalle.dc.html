@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Ficha del proveedor</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="proveedores" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <sc-if value="{{ noExiste }}" hint-placeholder-val="{{ false }}">
+          <div class="box" role="alert"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7M7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"></path></svg></span><span class="h3">Este proveedor no existe o fue dado de baja.</span><a class="b b-out b-back b-touch-m" href="Proveedores.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver a la lista de proveedores</a></div>
+        </sc-if>
+        <sc-if value="{{ existe }}" hint-placeholder-val="{{ true }}">
+        <div><a class="b b-out b-back b-touch-m" href="Proveedores.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver a proveedores</a></div>
+
+        <div class="ph">
+          <div class="ph-t" style="gap: 10px">
+            <h1 class="h1">Envases Andinos</h1>
+            <dl class="cq-stack" style="display: flex; flex-wrap: wrap; gap: 6px 28px; margin: 0; font-size: 14px">
+              <div style="display: flex; gap: 8px; align-items: center"><dt class="dim" style="display: flex; gap: 6px; align-items: center"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"></path></svg>Teléfono</dt><dd class="mono" style="margin: 0">604 322 8150</dd></div>
+              <div style="display: flex; gap: 8px; align-items: center"><dt class="dim" style="display: flex; gap: 6px; align-items: center"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3zM3 7l9 6 9-6"></path></svg>Correo electrónico</dt><dd style="margin: 0">ventas@envasesandinos.co</dd></div>
+            </dl>
+          </div>
+          <div class="ph-act" style="display: flex; gap: 8px; flex-wrap: wrap">
+            <button class="b b-out b-touch-m" type="button" onClick="{{ openSupEdit }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</button>
+            <button class="b b-out b-touch-m" type="button" aria-label="Dar de baja Envases Andinos" onClick="{{ openSupDel }}" style="color: var(--d-fg)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg>Dar de baja</button>
+            <button class="b b-out b-touch-m" type="button" onClick="{{ openUpload }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"></path></svg>Subir PDFs</button>
+            <button class="b b-pri b-touch-m" type="button" onClick="{{ openLineNew }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nueva línea</button>
+          </div>
+        </div>
+
+        <div class="toolbar" role="toolbar" aria-label="Buscar en el catálogo">
+          <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Buscar en el catálogo" aria-label="Buscar en el catálogo"></label>
+        </div>
+
+        <div class="tw">
+          <div class="scroll">
+            <table class="collapse">
+              <thead><tr><th scope="col">Imagen</th><th scope="col">Nombre</th><th scope="col">Presentación</th><th scope="col">Unidad</th><th scope="col" class="num">Costo</th><th scope="col" class="num">Mínimo de compra</th><th scope="col" class="num">Tiempo de entrega</th><th scope="col">Material</th><th scope="col">Medidas</th><th scope="col" class="num">Creado</th><th scope="col" class="num">Actualizado</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead>
+              <tbody>
+                <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+                  <tr class="{{ r.trCls }}">
+                    <td><span class="thumb photo" role="img" aria-label="{{ r.alt }}"></span></td>
+                    <td class="strong">{{ r.name }}</td>
+                    <td>{{ r.pres }}</td>
+                    <td><span class="{{ r.unitCls }}">{{ r.unit }}</span></td>
+                    <td class="num mono">{{ r.cost }}</td>
+                    <td class="num mono">{{ r.min }}</td>
+                    <td class="num mono">{{ r.lead }}</td>
+                    <td>{{ r.mat }}</td>
+                    <td class="mono" style="font-size: 13px">{{ r.med }}</td>
+                    <td class="num mono">{{ r.created }}</td>
+                    <td class="num mono">{{ r.updated }}</td>
+                    <td class="rowact anchor">
+                      <button class="b b-gho b-ico" type="button" aria-label="{{ r.menuLabel }}" aria-haspopup="menu" aria-expanded="{{ r.open }}" onClick="{{ r.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button>
+                      <div class="{{ r.menuCls }}" role="menu">
+                        <button class="mi" type="button" role="menuitem" onClick="{{ openLineEdit }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</button>
+                        <div class="sep"></div>
+                        <button class="mi danger" type="button" role="menuitem" onClick="{{ r.del }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg>Dar de baja</button>
+                      </div>
+                    </td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+            <div class="rows-m">
+              <sc-for list="{{ rows }}" as="r" hint-placeholder-count="5">
+                <div class="rm">
+                  <div class="rm-top" style="justify-content: flex-start"><span class="thumb photo" role="img" aria-label="{{ r.alt }}"></span><div style="display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1"><span class="strong">{{ r.name }}</span><span class="cap">{{ r.pres }} · {{ r.unit }}</span></div><span class="mono strong">{{ r.cost }}</span></div>
+                  <div class="rm-meta"><span>Mín. <span class="mono">{{ r.min }}</span></span><span><span class="mono">{{ r.lead }}</span></span><span>{{ r.mat }}</span></div>
+                  <div class="rm-meta"><span class="mono">{{ r.med }}</span></div>
+                  <div class="rm-top"><span class="cap">Actualizado <span class="mono">{{ r.updated }}</span></span><button class="b b-out b-sm b-touch-m" type="button" onClick="{{ r.mobileActs }}" aria-label="{{ r.menuLabel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg>Acciones</button></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div class="pg"><span style="display: flex; align-items: center; gap: 8px">Líneas por página <button class="in trig" type="button" style="width: 76px; height: 32px"><span class="mono">10</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></span><span class="pgb"><button class="b b-out b-ico b-sm" type="button" aria-label="Página anterior" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><button class="b b-out b-ico b-sm" type="button" aria-label="Página siguiente" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></span></div>
+        </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="proveedores" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <aside class="{{ supSheetCls }}" role="dialog" aria-modal="true" aria-labelledby="pd-ss">
+    <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="pd-ss" class="h2">Editar proveedor</h2><p class="sub">Completa los datos del proveedor. Hace falta al menos un teléfono o un correo.</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="sheet-bd">
+      <div class="f"><label for="pd-sn">Nombre <span class="req">*</span></label><input id="pd-sn" class="in" type="text" value="Envases Andinos"></div>
+      <div class="f"><label for="pd-st">Teléfono</label><input id="pd-st" class="in mono" type="tel" value="604 322 8150"></div>
+      <div class="f"><label for="pd-sc">Correo electrónico</label><input id="pd-sc" class="in" type="email" value="ventas@envasesandinos.co"></div>
+    </div>
+    <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ saveSup }}">Guardar</button></div>
+  </aside>
+
+  <aside class="{{ lineSheetCls }}" role="dialog" aria-modal="true" aria-labelledby="pd-ls">
+    <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="pd-ls" class="h2">{{ lineTitle }}</h2><p class="sub">{{ lineDesc }}</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="sheet-bd">
+      <div class="f"><label for="pd-ln">Nombre <span class="req">*</span></label><input id="pd-ln" class="in" type="text" value="{{ lf.name }}"></div>
+      <div class="g2 cq-1">
+        <div class="f anchor"><label for="pd-lp">Presentación <span class="req">*</span></label><button id="pd-lp" class="in trig" type="button" aria-haspopup="listbox" aria-expanded="{{ presOpenStr }}" onClick="{{ togglePres }}"><span>{{ lf.pres }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <div class="{{ presPopCls }}" role="listbox">
+            <sc-for list="{{ presOpts }}" as="o" hint-placeholder-count="4"><button class="{{ o.cls }}" type="button" role="option" aria-selected="{{ o.sel }}" onClick="{{ o.pick }}">{{ o.label }}<sc-if value="{{ o.on }}" hint-placeholder-val="{{ false }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-left: auto"><path d="m5 12 5 5 9-10"></path></svg></sc-if></button></sc-for>
+          </div>
+        </div>
+        <div class="f"><label for="pd-lu">Unidad</label><button id="pd-lu" class="in trig" type="button"><span>{{ lf.unit }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+      </div>
+      <div class="g3 cq-1">
+        <div class="f"><label for="pd-lc">Costo <span class="req">*</span></label><input id="pd-lc" class="in mono" type="text" inputmode="decimal" value="{{ lf.cost }}"></div>
+        <div class="f"><label for="pd-lm">Mínimo de compra</label><input id="pd-lm" class="in mono" type="text" inputmode="decimal" value="{{ lf.min }}"></div>
+        <div class="f"><label for="pd-lt">Tiempo de entrega (días)</label><input id="pd-lt" class="in mono" type="text" inputmode="numeric" value="{{ lf.lead }}"></div>
+      </div>
+      <div class="f"><label for="pd-lmat">Material</label><input id="pd-lmat" class="in" type="text" value="{{ lf.mat }}"></div>
+      <div class="g2 cq-1">
+        <div class="f"><label for="pd-ld">Diámetro</label><div style="display: grid; grid-template-columns: minmax(0, 1fr) 84px; gap: 8px"><input id="pd-ld" class="in mono" type="text" inputmode="decimal" value="{{ lf.dia }}"><button class="in trig" type="button" aria-label="Unidad de diámetro"><span>cm</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div></div>
+        <div class="f"><label for="pd-la">Alto</label><div style="display: grid; grid-template-columns: minmax(0, 1fr) 84px; gap: 8px"><input id="pd-la" class="in mono" type="text" inputmode="decimal" value="{{ lf.alt }}"><button class="in trig" type="button" aria-label="Unidad de alto"><span>cm</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div></div>
+      </div>
+      <div class="f"><label for="pd-lb">Boca</label><input id="pd-lb" class="in mono" type="text" value="{{ lf.boca }}"><span class="help">Escribe hasta 40 caracteres, o déjalo vacío.</span></div>
+    </div>
+    <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ saveLine }}">Guardar</button></div>
+  </aside>
+
+  <div class="{{ supDelCls }}" role="alertdialog" aria-modal="true" aria-labelledby="pd-sd">
+    <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg></div>
+    <h2 id="pd-sd" class="h2">Dar de baja el proveedor</h2>
+    <p class="sub">Se va a dar de baja «Envases Andinos». Esta acción no se puede deshacer.</p>
+    <div class="nt n-w"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2zM12 10v4M12 17h.01"></path></svg><span>Sus líneas de catálogo se dan de baja con él.</span></div>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-des" type="button" onClick="{{ confirmSupDel }}">Dar de baja</button></div>
+  </div>
+
+  <div class="{{ lineDelCls }}" role="alertdialog" aria-modal="true" aria-labelledby="pd-ld2">
+    <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg></div>
+    <h2 id="pd-ld2" class="h2">Dar de baja la línea</h2>
+    <p class="sub">Se va a dar de baja «{{ delName }}». Esta acción no se puede deshacer.</p>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-des" type="button" onClick="{{ confirmLineDel }}">Dar de baja</button></div>
+  </div>
+
+  <div class="{{ uploadCls }}" role="dialog" aria-modal="true" aria-labelledby="pd-up">
+    <div class="dlg-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="pd-up" class="h2">Subir PDFs</h2><p class="sub">Solo PDF, hasta <span class="mono">10</span> archivos por tanda.</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="drop"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--muted-fg)"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"></path></svg><button class="b b-out" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6v18h12V7zM14 3v4h4"></path></svg>Elegir PDFs</button></div>
+    <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column">
+      <sc-for list="{{ files }}" as="fi" hint-placeholder-count="2">
+        <li style="display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--border)">
+          <div style="display: flex; align-items: center; gap: 10px"><span class="thumb"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6v18h12V7zM14 3v4h4"></path></svg></span><div style="display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1"><span class="mono" style="font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ fi.name }}</span><span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="{{ fi.upCls }}"><i></i>{{ fi.up }}</span><sc-if value="{{ fi.hasProc }}" hint-placeholder-val="{{ false }}"><span class="{{ fi.procCls }}"><i></i>{{ fi.proc }}</span></sc-if></span></div>
+            <sc-if value="{{ fi.canReview }}" hint-placeholder-val="{{ false }}"><a class="b b-out b-sm b-go" href="ProveedorImportar.dc.html">Revisar<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a></sc-if>
+            <sc-if value="{{ fi.canResume }}" hint-placeholder-val="{{ false }}"><button class="b b-out b-sm" type="button" onClick="{{ resume }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"></path></svg>Reanudar</button></sc-if>
+          </div>
+          <sc-if value="{{ fi.busy }}" hint-placeholder-val="{{ false }}"><div class="progress bar-ind"><i></i></div></sc-if>
+        </li>
+      </sc-for>
+    </ul>
+    <div class="actions"><sc-if value="{{ upIdle }}" hint-placeholder-val="{{ true }}"><button class="b b-gho" type="button" style="margin-right: auto" onClick="{{ closeAll }}">Quitar la selección</button><button class="b b-out" type="button" onClick="{{ closeAll }}">Cerrar</button><button class="b b-pri" type="button" onClick="{{ startUpload }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"></path></svg>Subir</button></sc-if><sc-if value="{{ upNotIdle }}" hint-placeholder-val="{{ false }}"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cerrar</button></sc-if></div>
+  </div>
+
+  <div class="{{ actsCls }}" role="menu" aria-label="Acciones de la línea">
+    <div class="dlg-hd" style="padding: 0 4px 8px"><span class="h3">{{ actsName }}</span><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <button class="mi" type="button" role="menuitem" onClick="{{ openLineEdit }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</button>
+    <div class="sep"></div>
+    <button class="mi danger" type="button" role="menuitem" onClick="{{ actsDel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg>Dar de baja</button>
+  </div>
+
+  <div class="toastwrap" aria-live="polite"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastMsg }}</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"noExiste":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); clearTimeout(this.u1); clearTimeout(this.u2); clearTimeout(this.u3); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const data = [
+['l1','Galón 3,78 L','Galón 3,78 L','L','2.350,00','100','5 días','PEAD','Ø 15,5 cm · alto 28 cm · boca 38/400','12/08/2026','02/10/2026','15,5','28','38/400'],
+['l2','Garrafa 20 L','Garrafa 20 L','L','9.800,00','50','7 días','PEAD','Ø 28 cm · alto 42 cm · boca 63 mm','12/08/2026','02/10/2026','28','42','63 mm'],
+['l3','Tambor 200 L','Tambor 200 L','L','85.000,00','10','15 días','Acero','Ø 58 cm · alto 88 cm','14/08/2026','14/08/2026','58','88',''],
+['l4','Frasco 1 L','Frasco 1 L','Sin unidad','980,00','200','5 días','PET','Ø 7,5 cm · alto 12 cm · boca 28/410','20/08/2026','01/10/2026','7,5','12','28/410'],
+['l5','Tapa 38 mm','Tapa','Sin unidad','120,00','1.000','3 días','PP','Ø 3,8 cm · boca 38/400','03/09/2026','03/09/2026','3,8','','38/400'],
+['l6','Galón 3,78 L ámbar','Galón 3,78 L','L','2.690,00','100','10 días','PEAD','Ø 15,5 cm · alto 28 cm · boca 38/400','08/10/2026','08/10/2026','15,5','28','38/400']
+];
+const removed = s.removed || {};
+const list = data.filter((d) => !removed[d[0]]);
+const open = s.open;
+const toast = (msg) => { this.setState({ toast: true, toastMsg: msg, sheet: null, dlg: null }); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: false }), 3200); };
+const rowById = (id) => data.filter((d) => d[0] === id)[0] || data[0];
+const editRow = rowById(s.editId || 'l1');
+const isNew = s.sheet === 'line-new';
+const lf = isNew ? { name: '', pres: s.pres || 'Elige una presentación', unit: 'Sin unidad', cost: '', min: '', lead: '', mat: '', dia: '', alt: '', boca: '' } : { name: editRow[1], pres: s.pres || editRow[2], unit: editRow[3], cost: editRow[4], min: editRow[5], lead: editRow[6].replace(' días', ''), mat: editRow[7], dia: editRow[11], alt: editRow[12], boca: editRow[13] };
+const presList = ['Galón 3,78 L','Garrafa 20 L','Tambor 200 L','Frasco 1 L','Tapa'];
+const up = s.up || 0;
+const filesData = [
+['catalogo-envases-andinos-2026.pdf', ['Sin subir','neutral'], ['Subiendo','progress'], ['Subido','success'], ['Subido','success']],
+['lista-precios-octubre.pdf', ['Sin subir','neutral'], ['Subiendo','progress'], ['No se pudo subir','danger'], ['No se pudo subir','danger']]
+];
+const procData = [null, null, ['Procesando','info'], ['Listo','success']];
+const stepUp = (n) => { this.setState({ up: n }); };
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+noExiste: !!this.props.noExiste, existe: !this.props.noExiste,
+rows: list.map((d) => ({ name: d[1], alt: 'Imagen de ' + d[1], pres: d[2], unit: d[3], unitCls: d[3] === 'Sin unidad' ? 'dim' : '', cost: d[4], min: d[5], lead: d[6], mat: d[7], med: d[8], created: d[9], updated: d[10], trCls: s.fresh === d[0] ? 'fade' : '', open: open === d[0] ? 'true' : 'false', menuCls: open === d[0] ? 'pop right at-row open' : 'pop right at-row', menuLabel: 'Acciones de ' + d[1], toggle: () => this.setState({ open: open === d[0] ? null : d[0], editId: d[0] }), del: () => this.setState({ dlg: 'line-del', delId: d[0], open: null }), mobileActs: () => this.setState({ acts: d[0], editId: d[0] }) })),
+actsCls: s.acts ? 'dlg menu open' : 'dlg menu', actsName: s.acts ? rowById(s.acts)[1] : '',
+actsDel: () => this.setState({ dlg: 'line-del', delId: s.acts, acts: null }),
+openSupEdit: () => this.setState({ sheet: 'sup' }),
+openSupDel: () => this.setState({ dlg: 'sup-del' }),
+openUpload: () => this.setState({ dlg: 'upload', up: 0 }),
+openLineNew: () => this.setState({ sheet: 'line-new', pres: null, presOpen: false }),
+openLineEdit: () => this.setState({ sheet: 'line-edit', open: null, acts: null, pres: null, presOpen: false }),
+supSheetCls: s.sheet === 'sup' ? 'sheet open' : 'sheet',
+lineSheetCls: (s.sheet === 'line-new' || s.sheet === 'line-edit') ? 'sheet wide open' : 'sheet wide',
+lineTitle: isNew ? 'Nueva línea de catálogo' : 'Editar línea de catálogo',
+lineDesc: isNew ? 'Completa los datos de la línea. La presentación es obligatoria y la unidad es opcional.' : 'Cambia los datos de la línea. Se guardan todos los campos.',
+lf: lf,
+presOpenStr: s.presOpen ? 'true' : 'false',
+togglePres: () => this.setState({ presOpen: !s.presOpen }),
+presPopCls: s.presOpen ? 'pop full open' : 'pop full',
+presOpts: presList.map((p) => ({ label: p, on: lf.pres === p, sel: lf.pres === p ? 'true' : 'false', cls: lf.pres === p ? 'opt hl' : 'opt', pick: () => this.setState({ pres: p, presOpen: false }) })),
+supDelCls: s.dlg === 'sup-del' ? 'dlg open' : 'dlg',
+lineDelCls: s.dlg === 'line-del' ? 'dlg open' : 'dlg',
+delName: s.delId ? rowById(s.delId)[1] : '',
+uploadCls: s.dlg === 'upload' ? 'dlg wide open' : 'dlg wide',
+files: filesData.map((f) => ({ name: f[0], up: f[up + 1][0], upCls: 'sb t-' + f[up + 1][1], hasProc: f[up + 1][0] === 'Subido' && !!procData[up], proc: procData[up] ? procData[up][0] : '', procCls: procData[up] ? 'sb t-' + procData[up][1] : 'sb', busy: f[up + 1][0] === 'Subiendo' || (f[up + 1][0] === 'Subido' && up === 2), canReview: f[up + 1][0] === 'Subido' && up === 3, canResume: f[up + 1][0] === 'No se pudo subir' })),
+upIdle: up === 0, upNotIdle: up > 0,
+startUpload: () => { stepUp(1); clearTimeout(this.u1); clearTimeout(this.u2); this.u1 = setTimeout(() => stepUp(2), 1200); this.u2 = setTimeout(() => stepUp(3), 2600); },
+resume: () => { stepUp(1); clearTimeout(this.u3); this.u3 = setTimeout(() => stepUp(3), 1200); },
+confirmSupDel: () => toast('Proveedor dado de baja.'),
+confirmLineDel: () => { this.setState({ removed: Object.assign({}, removed, { [s.delId]: true }) }); toast('Línea de catálogo dada de baja.'); },
+saveSup: () => toast('[Proveedor actualizado.]'),
+saveLine: () => { this.setState({ fresh: isNew ? null : s.editId }); toast(isNew ? 'Línea de catálogo creada.' : 'Línea de catálogo actualizada.'); },
+ovCls: (s.sheet || s.dlg || s.menu || s.acts) ? 'ov open' : 'ov',
+closeAll: () => this.setState({ sheet: null, dlg: null, menu: false, acts: null, open: null, presOpen: false }),
+toastCls: s.toast ? 'toast show' : 'toast',
+toastMsg: s.toastMsg || ''
+};
+}
+}
+</script>
+</body>
+</html>

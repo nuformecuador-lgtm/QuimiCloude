@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Ejecución en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="Ejecucion" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Ejecución · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">shared/step-reader</span> (Paso X de Y, barra, casillas, Anterior / Siguiente / Finalizar, espera) · <span class="mono">countdown-timer · confirm-dialog · ui/checkbox · ui/card · ui/collapsible · row-actions-menu</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (Menu, AlertDialog, Collapsible, Checkbox) · <span class="mono">lucide-react</span></dd>
+      <dt>Escritorio</dt><dd>Sin barra lateral: columna de lectura de 720 px con el panel «Herramientas» y los materiales al lado · cabecera fija con nº, receta, «Pedido N», «Presentación: …» y el progreso · menú ⋯ con «Cancelar pedido»</dd>
+      <dt>Tablet</dt><dd>Una columna: «Herramientas» arriba (plegable) y el paso debajo · pie fijo a todo el ancho</dd>
+      <dt>Teléfono</dt><dd><span class="mono">min-h-dvh</span> · pie fijo con <span class="mono">safe-area-inset-bottom</span> · botones de 52 px y casillas de 52 px · «Siguiente» deshabilitado hasta marcar todo («Marca los N elementos pendientes para continuar.») y hasta que acaba la espera · diálogos centrados</dd>
+      <dt>Animación</dt><dd>El paso entra deslizándose 28 px desde el lado al que avanzas (300 ms) · la barra crece 300 ms · casilla dibuja el check y tacha el texto en 200 ms · anillo de la espera avanza cada segundo · panel plegable 200 ms</dd>
+      <dt>Por confirmar</dt><dd>Botones de «¿Terminar el pedido?» (aquí Cancelar / Terminar) y adónde lleva (aquí a Asignación) · título «[Materiales]» del panel · los pasos, herramientas y materiales son de ejemplo (vienen de la receta) · la espera dura 8 s solo en la demo</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

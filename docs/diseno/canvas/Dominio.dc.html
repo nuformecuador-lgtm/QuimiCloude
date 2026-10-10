@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Piezas compartidas de dominio</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 1440px; height: 1120px; padding: 40px 48px; display: flex; flex-direction: column; gap: 22px; position: relative; overflow: hidden">
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <h1 class="h1">Piezas compartidas que ya existen</h1>
+    <p class="sub" style="max-width: 920px">Todas viven hoy en <span class="mono">components/shared/</span>: aquí solo reciben la marca y el movimiento. Las pantallas las reutilizan; no se crea ninguna nueva para lo que ya cubren. El avatar tiene una sola forma en todo el canvas (<span class="mono">.av</span>, tallas <span class="mono">sm · base · lg</span>, cinco colores).</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px">
+    <section class="card" aria-labelledby="dm-av">
+      <span id="dm-av" class="lab">ResponsibleAvatars + Tooltip</span>
+      <div style="padding-top: 30px"><span class="avs">
+        <span class="av" tabindex="0" aria-label="Laura Gómez">LG<span class="tip">Laura Gómez</span></span>
+        <span class="av c2" tabindex="0" aria-label="Mateo Sánchez">MS<span class="tip">Mateo Sánchez</span></span>
+        <span class="av c3" tabindex="0" aria-label="Valentina Herrera">VH<span class="tip">Valentina Herrera</span></span>
+        <span class="av more" tabindex="0" aria-label="Santiago Vargas, [OTRO]">+2<span class="tip">Santiago Vargas, [OTRO]</span></span>
+      </span></div>
+      <div style="display: flex; align-items: center; gap: 10px"><span class="av sm c4">SV</span><span class="av c4">SV</span><span class="av lg c5">CR</span><span class="cap">sm 24 · base 32 · lg 40</span></div>
+      <div class="person"><span class="av sm">LG</span>Laura Gómez</div>
+      <span class="cap">Pasa el ratón o tabula: el avatar sube 3 px y el tooltip entra en 150 ms.</span>
+      <span class="cap mono">responsible-avatars.tsx · ui/avatar · ui/tooltip</span>
+    </section>
+
+    <section class="card" aria-labelledby="dm-cd">
+      <span id="dm-cd" class="lab">CountdownTimer + botón con espera</span>
+      <div style="display: flex; align-items: center; gap: 14px; color: var(--primary)">
+        <svg class="ring" viewBox="0 0 44 44" aria-hidden="true"><circle class="bgc" cx="22" cy="22" r="18"></circle><circle class="fgc" cx="22" cy="22" r="18" stroke-dasharray="113.1" stroke-dashoffset="{{ dash }}" transform="rotate(-90 22 22)"></circle></svg>
+        <span class="mono" style="font-size: 28px; font-weight: 500; color: var(--fg)" role="timer" aria-live="off">{{ mmss }}</span>
+      </div>
+      <button class="b b-pri b-touch b-block" type="button" disabled="{{ locked }}" onClick="{{ restart }}">Terminar</button>
+      <span class="cap" aria-live="polite">{{ waitText }}</span>
+      <span class="cap mono">countdown-timer.tsx · CountdownGatedButton (hoy en la ruta; sube a shared)</span>
+    </section>
+
+    <section class="card" aria-labelledby="dm-od">
+      <span id="dm-od" class="lab">OrderDistributionLabel · marcas de unidad</span>
+      <div style="display: flex; flex-direction: column; gap: 10px; font-size: 14px">
+        <span title="2 × Galón 3,78 L, 1 × Garrafa 20 L, 4 × Tambor 200 L, 6 × Galón 3,78 L"><span class="mono">2</span> × Galón 3,78 L <span class="count">+3</span></span>
+        <span class="dim">Sin presentación</span>
+        <span><span class="mono">1.200 ml</span> <span class="dim" title="Conversión aproximada: 1 ml ≈ 1 g">aprox.</span></span>
+        <span style="color: var(--d-fg); font-size: 13px">La unidad del pedido no es convertible a la del insumo.</span>
+      </div>
+      <span class="cap">Texto visible, no tooltip: en táctil un tooltip no se ve.</span>
+      <span class="cap mono">order-distribution-label.tsx · unit-conversion-marks.tsx</span>
+    </section>
+
+    <section class="card" aria-labelledby="dm-ei">
+      <span id="dm-ei" class="lab">EntityImage</span>
+      <div style="display: flex; gap: 12px; align-items: flex-end">
+        <span class="thumb lg photo" role="img" aria-label="[FOTO DEL PRODUCTO]"></span>
+        <span class="thumb lg" role="img" aria-label="Sin imagen"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg></span>
+        <span class="thumb photo" role="img" aria-label="[FOTO DEL PRODUCTO]"></span>
+        <span class="thumb" role="img" aria-label="Sin imagen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg></span>
+      </div>
+      <span class="cap">Dos tallas: 64 px en fichas y formularios, 40 px en tablas. Absorbe <span class="mono">OrderRecipeImage</span>.</span>
+      <span class="cap mono">entity-image.tsx · compress-image.ts</span>
+    </section>
+  </div>
+
+  <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr) minmax(0, 1fr); gap: 16px">
+    <section class="card" aria-labelledby="dm-ff">
+      <span id="dm-ff" class="lab">FileField</span>
+      <div class="{{ dropCls }}">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 28px; height: 28px; color: {{ dropIc }}; transition: color 200ms, translate 200ms; translate: 0 {{ dropY }}"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"></path></svg>
+        <span style="font-size: 14px; font-weight: 500">Arrastra la imagen aquí o haz clic para elegirla</span>
+      </div>
+      <div class="drop row"><span class="thumb lg"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg></span><span class="sub">Sin receta elegida</span></div>
+      <button class="b b-out b-sm" type="button" onClick="{{ toggleDrop }}" style="align-self: flex-start">{{ dropBtn }}</button>
+      <span class="cap mono">file-field.tsx · file-types.ts · compress-image.ts</span>
+    </section>
+
+    <section class="card" aria-labelledby="dm-du">
+      <div style="display: flex; flex-direction: column; gap: 4px"><span id="dm-du" class="lab">DocumentUpload · tanda de PDFs</span><span class="h3">Subir PDFs</span><span class="cap">Solo PDF, hasta [N] archivos por tanda.</span></div>
+      <div style="display: flex; flex-direction: column">
+        <sc-for list="{{ docs }}" as="d" hint-placeholder-count="4">
+          <div style="display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px">
+            <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--muted-fg)"><path d="M14 3H6v18h12V7zM14 3v4h4"></path></svg>
+            <span class="mono" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ d.name }}</span>
+            <span style="display: inline-flex; gap: 10px; align-items: center"><span class="{{ d.cls }}"><i></i>{{ d.st }}</span><sc-if value="{{ d.hasAct }}" hint-placeholder-val="{{ false }}"><button class="b b-out b-sm" type="button" onClick="{{ d.act }}">{{ d.actLabel }}</button></sc-if></span>
+            <sc-if value="{{ d.det }}" hint-placeholder-val="{{ false }}"><div class="progress" style="grid-column: 2 / 4; height: 4px"><i style="width: {{ d.pct }}%"></i></div></sc-if>
+            <sc-if value="{{ d.ind }}" hint-placeholder-val="{{ false }}"><div class="progress bar-ind" style="grid-column: 2 / 4; height: 4px; position: relative"><i></i></div></sc-if>
+          </div>
+        </sc-for>
+      </div>
+      <div class="actions"><button class="b b-gho" type="button">Quitar la selección</button><button class="b b-out" type="button">Elegir PDFs</button><button class="b b-pri" type="button" onClick="{{ upload }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"></path></svg>Subir</button></div>
+      <span class="cap mono">document-upload/ (dialog, row, labels, use-batch-status) · etiquetas reales de labels.ts</span>
+    </section>
+
+    <section class="card" aria-labelledby="dm-co" style="background: var(--side); color: var(--sb-fg); border-color: transparent">
+      <span id="dm-co" class="lab" style="color: var(--sb-muted)">Collapsible · grupo del menú</span>
+      <div class="nav">
+        <button class="it" type="button" aria-expanded="{{ pOpenStr }}" onClick="{{ togP }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V10l6 4v-4l6 4V5h6v16zM7 17h2M12 17h2M17 17h2"></path></svg><span class="lbl">Producción</span><svg class="{{ pChev }}" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button>
+        <div class="{{ pColl }}"><div style="display: flex; flex-direction: column; gap: 4px"><a class="it sub-it" href="Formula.dc.html"><span class="lbl">Fórmulas</span></a></div></div>
+        <button class="it" type="button" aria-expanded="{{ iOpenStr }}" onClick="{{ togI }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v3a2 2 0 1 0 4 0V3h3v7h-3a2 2 0 1 0 0 4h3v7h-7v-3a2 2 0 1 0-4 0v3H3v-7h3a2 2 0 1 0 0-4H3V3z"></path></svg><span class="lbl">Integraciones</span><svg class="{{ iChev }}" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button>
+        <div class="{{ iColl }}"><div style="display: flex; flex-direction: column; gap: 4px"><a class="it sub-it" href="#">Proveedor IA</a><a class="it sub-it" href="#">Inventarios</a><a class="it sub-it" href="#">WhatsApp</a></div></div>
+      </div>
+      <span class="cap" style="color: var(--sb-muted)">Abre en 200 ms animando la altura (<span class="mono">grid-template-rows</span>); el chevron gira 90°.</span>
+      <span class="cap mono" style="color: var(--sb-muted)">ui/collapsible · ui/sidebar · app-sidebar.tsx</span>
+    </section>
+  </div>
+
+  <dl class="spec" style="margin-top: auto">
+    <dt>Componente</dt><dd><span class="mono">components/shared/responsible-avatars · countdown-timer · order-distribution-label · unit-conversion-marks · entity-image · file-field · document-upload/</span> · <span class="mono">components/ui/avatar · tooltip · collapsible · sidebar</span></dd>
+    <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (Avatar, Tooltip, Collapsible, Dialog de la tanda) · <span class="mono">@supabase/storage-js</span> (subida) · <span class="mono">@upstash/qstash</span> (procesado en cola) · <span class="mono">lucide-react</span></dd>
+    <dt>Animación</dt><dd>Tooltip 150 ms <span class="mono">--ease-enter</span> · avatar sube 3 px en 100 ms · anillo del cronómetro avanza cada segundo, lineal · zona de arrastre: borde, fondo y escala 1.01 en 200 ms · barra de subida determinada 300 ms; «Procesando» indeterminada 1.3 s · collapsible 200 ms <span class="mono">--ease-standard</span></dd>
+    <dt>Fuera de este tablero</dt><dd><span class="mono">step-reader/</span> va en la ejecución (F) · <span class="mono">supplier/</span> en proveedores (H) · <span class="mono">presentation-select</span> y los pickers en los formularios (D) · <span class="mono">credential-field</span> y <span class="mono">credential-requirements</span> se funden en <span class="mono">PasswordField</span> (tablero Campos)</dd>
+  </dl>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1120}}'>
+class Component extends DCLogic {
+componentDidMount() { this.start(); }
+componentWillUnmount() { clearInterval(this.iv); clearInterval(this.up); }
+start() {
+clearInterval(this.iv);
+this.end = Date.now() + 10000;
+this.setState({ left: 10 });
+this.iv = setInterval(() => {
+const left = Math.max(0, Math.ceil((this.end - Date.now()) / 1000));
+this.setState({ left: left });
+if (left === 0) clearInterval(this.iv);
+}, 250);
+}
+tick() {
+clearInterval(this.up);
+this.up = setInterval(() => {
+const s = this.state || {};
+const p1 = s.p1 === undefined ? 62 : s.p1;
+const p4 = s.p4;
+const n1 = s.go1 ? Math.min(100, p1 + 8) : p1;
+const n4 = p4 === undefined || p4 === null ? p4 : Math.min(100, p4 + 8);
+this.setState({ p1: n1, p4: n4 });
+if ((!s.go1 || n1 >= 100) && (n4 === undefined || n4 === null || n4 >= 100)) clearInterval(this.up);
+}, 250);
+}
+renderVals() {
+const s = this.state || {};
+const left = s.left === undefined ? 10 : s.left;
+const pOpen = s.pOpen !== false;
+const iOpen = !!s.iOpen;
+const p1 = s.p1 === undefined ? 62 : s.p1;
+const p4 = s.p4;
+const doc = (name, st, tone, extra) => Object.assign({ name: name, st: st, cls: 'sb t-' + tone, hasAct: false, actLabel: '', act: () => {}, det: false, ind: false, pct: 0 }, extra || {});
+const docs = [
+p1 >= 100 ? doc('formula-desengrasante.pdf', 'Subido', 'success') : doc('formula-desengrasante.pdf', 'Subiendo', 'progress', { det: true, pct: p1 }),
+doc('formula-limpiador-citrico.pdf', 'Procesando', 'info', { ind: true }),
+doc('formula-blanqueador.pdf', 'Listo', 'success', { hasAct: true, actLabel: 'Revisar' }),
+p4 === undefined || p4 === null
+? doc('catalogo-proveedor.pdf', 'No se pudo subir', 'danger', { hasAct: true, actLabel: 'Reanudar', act: () => { this.setState({ p4: 0 }); this.tick(); } })
+: (p4 >= 100 ? doc('catalogo-proveedor.pdf', 'Subido', 'success') : doc('catalogo-proveedor.pdf', 'Subiendo', 'progress', { det: true, pct: p4 }))
+];
+return {
+mmss: '00:' + String(left).padStart(2, '0'),
+dash: (113.1 * (1 - left / 10)).toFixed(1),
+locked: left > 0,
+waitText: left > 0 ? 'Espera 00:' + String(left).padStart(2, '0') + ' para continuar.' : 'Listo para terminar. (Pulsa para reiniciar la demostración.)',
+restart: () => this.start(),
+dropCls: s.over ? 'drop over' : 'drop',
+dropIc: s.over ? 'var(--primary)' : 'var(--muted-fg)',
+dropY: s.over ? '-3px' : '0',
+dropBtn: s.over ? 'Soltar' : 'Simular arrastre',
+toggleDrop: () => this.setState({ over: !s.over }),
+docs: docs,
+upload: () => { this.setState({ go1: true }); this.tick(); },
+pOpenStr: pOpen ? 'true' : 'false', pColl: pOpen ? 'coll open' : 'coll', pChev: pOpen ? 'ic chev-s open' : 'ic chev-s', togP: () => this.setState({ pOpen: !pOpen }),
+iOpenStr: iOpen ? 'true' : 'false', iColl: iOpen ? 'coll open' : 'coll', iChev: iOpen ? 'ic chev-s open' : 'ic chev-s', togI: () => this.setState({ iOpen: !iOpen })
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Modales de configuración</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}" style="width: 1440px; min-height: 5000px; padding: 40px; display: flex; flex-direction: column; gap: 24px">
+  <div style="display: flex; flex-direction: column; gap: 6px">
+    <span class="lab">Configuración · Usuarios, grupos, presentaciones y unidades</span>
+    <h1 class="h1">Modales de configuración</h1>
+    <p class="sub">Todos abiertos a la vez, sin animar. Textos literales del código; lo que no existe va entre corchetes.</p>
+  </div>
+
+  <div class="modal-grid">
+
+    <div class="stage for-sheet">
+      <span class="stage-cap">Sheet · Nuevo usuario</span>
+      <aside class="sheet wide static" role="dialog" aria-labelledby="m-un">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="m-un" class="h2">Nuevo usuario</h2><p class="sub">Describe los datos de la persona que va a usar el sistema.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div class="g2"><div class="f"><label>Nombres</label><input class="in" type="text"></div><div class="f"><label>Apellidos</label><input class="in" type="text"></div></div>
+          <div class="f"><label>Fecha de nacimiento</label><button class="in trig" type="button"><span class="mono dim">dd/mm/aaaa</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg></button></div>
+          <div class="g2"><div class="f"><label>Correo</label><input class="in" type="email"></div><div class="f"><label>Teléfono</label><input class="in mono" type="tel"></div></div>
+          <div style="display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 12px"><div class="f"><label>Tipo de documento</label><button class="in trig" type="button"><span>CC</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div><div class="f"><label>Número de documento</label><input class="in mono" type="text"></div></div>
+          <div class="f"><label>Nombre de usuario</label><input class="in mono focus" type="text" value="jperez"><span class="cap" style="display: flex; align-items: center; gap: 6px; color: var(--s-fg)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>Este nombre de usuario está libre: <span class="mono strong">jperez</span></span></div>
+          <div class="f"><label>Rol</label><button class="in trig" type="button"><span class="dim">[Elige un rol]</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
+      </aside>
+    </div>
+
+    <div class="stage for-sheet">
+      <span class="stage-cap">Sheet · Editar usuario</span>
+      <aside class="sheet wide static" role="dialog" aria-labelledby="m-ue">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="m-ue" class="h2">Editar usuario</h2><p class="sub">Cambia los datos de la persona.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div class="g2"><div class="f"><label>Nombres</label><input class="in" type="text" value="Laura"></div><div class="f"><label>Apellidos</label><input class="in" type="text" value="Gómez"></div></div>
+          <div class="f"><label>Fecha de nacimiento</label><button class="in trig" type="button"><span class="mono">03/09/1992</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg></button></div>
+          <div class="g2"><div class="f"><label>Correo</label><input class="in" type="email" value="lgomez@empresa.co"></div><div class="f"><label>Teléfono</label><input class="in mono" type="tel" value="310 220 4518"></div></div>
+          <div style="display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 12px"><div class="f"><label>Tipo de documento</label><button class="in trig" type="button"><span>CC</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div><div class="f"><label>Número de documento</label><input class="in mono" type="text" value="1020456789"></div></div>
+          <div class="f"><label>Nombre de usuario</label><input class="in mono" type="text" value="lgomez"><span class="cap" style="display: flex; align-items: center; gap: 6px; color: var(--s-fg)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>Este nombre de usuario está libre: <span class="mono strong">lgomez</span></span></div>
+          <div class="f"><label>Rol</label><button class="in trig" type="button"><span>[Operario]</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+          <div class="panel" style="display: flex; flex-direction: column; gap: 10px"><span class="h3">Cerrar sesiones</span><span class="cap">Se cerrarán todas las sesiones de Laura Gómez. Tendrá que volver a entrar.</span><button class="b b-out" type="button" style="align-self: flex-start"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg>Cerrar todas las sesiones de Laura Gómez</button></div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
+      </aside>
+    </div>
+
+    <div class="stage for-sheet">
+      <span class="stage-cap">Sheet · Nuevo grupo</span>
+      <aside class="sheet wide static" role="dialog" aria-labelledby="m-gn">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="m-gn" class="h2">Nuevo grupo</h2><p class="sub">Ponle nombre al grupo de trabajo.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div class="f"><label>Nombre del grupo</label><input class="in" type="text" value="Turno tarde"></div>
+          <div class="f"><span class="fl">Miembros iniciales</span>
+            <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Buscar personas para añadir"></label>
+            <div class="tw">
+              <div style="display: grid; grid-template-columns: minmax(0, 1fr) 120px 110px; gap: 10px; padding: 0 14px; height: 36px; align-items: center; background: var(--muted); border-bottom: 1px solid var(--border)"><span class="lab">Nombre</span><span class="lab">Rol</span><span class="lab" style="text-align: right">Acciones</span></div>
+              <div style="display: grid; grid-template-columns: minmax(0, 1fr) 120px 110px; gap: 10px; padding: 0 14px; min-height: 52px; align-items: center; border-bottom: 1px solid var(--border)"><span class="person" style="min-height: 0"><span class="av sm">LG</span>Laura Gómez</span><span class="cap">[Operario]</span><button class="b b-sec b-sm" type="button" style="justify-self: end" aria-pressed="true"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>Agregado</button></div>
+              <div style="display: grid; grid-template-columns: minmax(0, 1fr) 120px 110px; gap: 10px; padding: 0 14px; min-height: 52px; align-items: center; border-bottom: 1px solid var(--border)"><span class="person" style="min-height: 0"><span class="av sm c2">MS</span>Mateo Sánchez</span><span class="cap">[Operario]</span><button class="b b-out b-sm" type="button" style="justify-self: end" aria-pressed="false">Agregar</button></div>
+              <div style="display: grid; grid-template-columns: minmax(0, 1fr) 120px 110px; gap: 10px; padding: 0 14px; min-height: 52px; align-items: center; border-bottom: 1px solid var(--border)"><span class="person" style="min-height: 0"><span class="av sm c3">VH</span>Valentina Herrera</span><span class="cap">[Supervisor]</span><button class="b b-sec b-sm" type="button" style="justify-self: end" aria-pressed="true"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>Agregado</button></div>
+              <div style="display: grid; grid-template-columns: minmax(0, 1fr) 120px 110px; gap: 10px; padding: 0 14px; min-height: 52px; align-items: center"><span class="person" style="min-height: 0"><span class="av sm c4">SV</span>Santiago Vargas</span><span class="cap">[Operario]</span><button class="b b-out b-sm" type="button" style="justify-self: end" aria-pressed="false">Agregar</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
+      </aside>
+    </div>
+
+    <div class="stage for-sheet">
+      <span class="stage-cap">Sheet · Editar grupo</span>
+      <aside class="sheet wide static" role="dialog" aria-labelledby="m-ge">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="m-ge" class="h2">Editar grupo</h2><p class="sub">Cambia el nombre del grupo y gestiona sus miembros.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div class="f"><label>Nombre del grupo</label><input class="in" type="text" value="Turno mañana"></div>
+          <div class="f"><span class="fl">Buscar personas para añadir</span>
+            <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Buscar personas para añadir" value="Santi"></label>
+            <div class="tw">
+              <div style="display: grid; grid-template-columns: minmax(0, 1fr) 120px 110px; gap: 10px; padding: 0 14px; height: 36px; align-items: center; background: var(--muted); border-bottom: 1px solid var(--border)"><span class="lab">Nombre</span><span class="lab">Rol</span><span class="lab" style="text-align: right">Acciones</span></div>
+              <div style="display: grid; grid-template-columns: minmax(0, 1fr) 120px 110px; gap: 10px; padding: 0 14px; min-height: 52px; align-items: center"><span class="person" style="min-height: 0"><span class="av sm c4">SV</span>Santiago Vargas</span><span class="cap">[Operario]</span><button class="b b-sec b-sm" type="button" style="justify-self: end" aria-pressed="true"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>Agregado</button></div>
+            </div>
+          </div>
+          <div class="f"><span class="fl">Miembros del grupo</span>
+            <div style="display: flex; flex-direction: column">
+              <div class="person" style="border-bottom: 1px solid var(--border)"><span class="av sm">LG</span><span style="display: flex; flex-direction: column"><span>Laura Gómez</span><span class="cap">[Operario]</span></span><button class="b b-gho b-sm" type="button" style="margin-left: auto">Quitar del grupo</button></div>
+              <div class="person" style="border-bottom: 1px solid var(--border)"><span class="av sm c2">MS</span><span style="display: flex; flex-direction: column"><span>Mateo Sánchez</span><span class="cap">[Operario]</span></span><button class="b b-gho b-sm" type="button" style="margin-left: auto">Quitar del grupo</button></div>
+              <div class="person" style="border-bottom: 1px solid var(--border)"><span class="av sm c3">VH</span><span style="display: flex; flex-direction: column"><span>Valentina Herrera</span><span class="cap">[Supervisor]</span></span><button class="b b-gho b-sm" type="button" style="margin-left: auto">Quitar del grupo</button></div>
+              <div class="person" style="border-bottom: 1px solid var(--border)"><span class="av sm c4">SV</span><span style="display: flex; flex-direction: column"><span>Santiago Vargas</span><span class="cap">[Operario]</span></span><button class="b b-gho b-sm" type="button" style="margin-left: auto">Quitar del grupo</button></div>
+              <div class="person" style="border-bottom: 1px solid var(--border)"><span class="av sm c6">CO</span><span style="display: flex; flex-direction: column"><span>Camila Ortiz</span><span class="cap">[Operario]</span></span><button class="b b-gho b-sm" type="button" style="margin-left: auto">Quitar del grupo</button></div>
+            </div>
+            <div class="pg" style="border-top: 0; padding: 6px 0 0"><span>Página <span class="mono">1</span> de <span class="mono">2</span> · <span class="mono">7</span> en total</span><span class="pgb"><button class="b b-out b-ico b-sm" type="button" aria-label="Miembros anteriores" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><button class="b b-out b-ico b-sm" type="button" aria-label="Miembros siguientes"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></span></div>
+          </div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
+      </aside>
+    </div>
+
+    <div class="stage for-sheet">
+      <span class="stage-cap">Sheet · Editar usuario, cargando</span>
+      <aside class="sheet wide static" role="dialog" aria-labelledby="m-ul" aria-busy="true">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="m-ul" class="h2">Editar usuario</h2><p class="sub">Cambia los datos de la persona.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <span class="cap" style="display: flex; align-items: center; gap: 8px"><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg>Cargando los datos de la persona…</span>
+          <span class="sk" style="width: 30%"></span><span class="sk" style="height: 40px"></span>
+          <span class="sk" style="width: 30%"></span><span class="sk" style="height: 40px"></span>
+          <span class="sk" style="width: 40%"></span><span class="sk" style="height: 40px"></span>
+          <span class="sk" style="width: 25%"></span><span class="sk" style="height: 40px"></span>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button" disabled>Guardar</button></div>
+      </aside>
+    </div>
+
+    <div class="stage for-sheet">
+      <span class="stage-cap">Sheet · Nueva presentación</span>
+      <aside class="sheet static" role="dialog" aria-labelledby="m-pn">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="m-pn" class="h2">Nueva presentación</h2><p class="sub">Escribe el nombre de la nueva presentación.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div class="f"><label>Nombre <span class="req">*</span></label><input class="in" type="text" value="Garrafa 20 L"></div>
+          <div class="f"><label>Contenido</label><div style="position: relative"><input class="in mono has-suf" type="text" value="20"><span class="suf" aria-hidden="true">L</span></div></div>
+          <div class="f anchor"><div style="display: flex; align-items: center; justify-content: space-between; gap: 8px"><span class="fl">Unidad</span><button class="b b-lnk" type="button" style="font-size: 12px">Qué es</button></div><button class="in trig" type="button" aria-expanded="true"><span>Litro (L)</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+            <div class="pop full open" role="listbox"><button class="opt hl" type="button" role="option" aria-selected="true">Litro (L)<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-left: auto"><path d="m5 12 5 5 9-10"></path></svg></button><button class="opt" type="button" role="option">Mililitro (mL)</button><button class="opt" type="button" role="option">Kilogramo (kg)</button><button class="opt" type="button" role="option">Galón (gal)</button></div>
+          </div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
+      </aside>
+    </div>
+
+    <div class="stage for-sheet">
+      <span class="stage-cap">Sheet · Nueva unidad</span>
+      <aside class="sheet static" role="dialog" aria-labelledby="m-nu">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="m-nu" class="h2">Nueva unidad</h2><p class="sub">Describe la nueva unidad de medida.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div class="f"><label>Nombre</label><input class="in" type="text"></div>
+          <div class="f"><label>Símbolo</label><input class="in mono" type="text"></div>
+          <div class="f"><span class="fl">Deriva de</span><button class="in trig" type="button"><span>No deriva de ninguna</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+          <div class="f"><label>Factor</label><input class="in mono" type="text" disabled></div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
+      </aside>
+    </div>
+
+    <div class="stage for-sheet">
+      <span class="stage-cap">Sheet · Editar unidad (deriva de otra)</span>
+      <aside class="sheet static" role="dialog" aria-labelledby="m-eu">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="m-eu" class="h2">Editar unidad</h2><p class="sub">Cambia los datos de la unidad de medida.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div class="f"><label>Nombre</label><input class="in" type="text" value="Gramo"></div>
+          <div class="f"><label>Símbolo</label><input class="in mono" type="text" value="g"></div>
+          <div class="f anchor"><span class="fl">Deriva de</span><button class="in trig" type="button" aria-expanded="true"><span class="mono">kg</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+            <div class="pop full open" role="listbox"><button class="opt" type="button" role="option"><span class="dim">No deriva de ninguna</span></button><button class="opt hl" type="button" role="option" aria-selected="true"><span class="mono">kg</span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-left: auto"><path d="m5 12 5 5 9-10"></path></svg></button><button class="opt" type="button" role="option"><span class="mono">L</span></button></div>
+          </div>
+          <div class="f" style="margin-top: 120px"><label>Factor</label><input class="in mono" type="text" value="0,001"></div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
+      </aside>
+    </div>
+
+    <div class="stage" style="min-height: 520px; align-items: flex-start">
+      <span class="stage-cap">Dialog · Cambiar el estado de la cuenta</span>
+      <div class="dlg static" role="dialog" aria-labelledby="m-st">
+        <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 11h14v10H5zM8 11V7a4 4 0 1 1 8 0v4"></path></svg></div>
+        <h2 id="m-st" class="h2">Cambiar el estado de la cuenta</h2>
+        <p class="sub">Elige el estado de la cuenta de Mateo Sánchez.</p>
+        <div class="f anchor"><span class="fl">Estado de la cuenta</span><button class="in trig" type="button" aria-expanded="true"><span class="sb t-danger"><i></i>Bloqueado</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <div class="pop full open" role="listbox"><button class="opt hl" type="button" role="option"><span class="sb t-success"><i></i>Activo</span></button><button class="opt" type="button" role="option"><span class="sb t-neutral"><i></i>Pendiente</span></button><button class="opt" type="button" role="option"><span class="sb t-muted"><i></i>Inactivo</span></button><button class="opt" type="button" role="option" aria-selected="true"><span class="sb t-danger"><i></i>Bloqueado</span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-left: auto"><path d="m5 12 5 5 9-10"></path></svg></button></div>
+        </div>
+        <div class="actions" style="margin-top: 150px"><button class="b b-out" type="button">Volver</button><button class="b b-pri" type="button">Cambiar estado</button></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">AlertDialog · Cerrar todas las sesiones</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="m-se">
+        <div class="dlg-ic warn"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg></div>
+        <h2 id="m-se" class="h2">¿Cerrar todas las sesiones de Laura Gómez?</h2>
+        <p class="sub">Se cerrarán todas las sesiones de Laura Gómez. Tendrá que volver a entrar.</p>
+        <div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-des" type="button">Cerrar sesiones</button></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">AlertDialog · Eliminar al usuario</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="m-du">
+        <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+        <h2 id="m-du" class="h2">Eliminar al usuario</h2>
+        <p class="sub">Se va a eliminar a <span class="strong">Santiago Vargas</span>. Esta acción no se puede deshacer.</p>
+        <div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-des" type="button">Eliminar</button></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">AlertDialog · Eliminar el grupo</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="m-dg">
+        <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+        <h2 id="m-dg" class="h2">Eliminar el grupo</h2>
+        <p class="sub">Se va a eliminar el grupo <span class="strong">Empaque</span>. Esta acción no se puede deshacer.</p>
+        <div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-des" type="button">Eliminar</button></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">AlertDialog · Eliminar la presentación</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="m-dp">
+        <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+        <h2 id="m-dp" class="h2">Eliminar la presentación</h2>
+        <p class="sub">Se va a eliminar la presentación <span class="strong">Botella 1 L</span>. Esta acción no se puede deshacer.</p>
+        <div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-des" type="button">Eliminar</button></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">AlertDialog · Eliminar la unidad</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="m-dn">
+        <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+        <h2 id="m-dn" class="h2">Eliminar la unidad</h2>
+        <p class="sub">Se va a eliminar la unidad <span class="strong">Galón</span>. Esta acción no se puede deshacer.</p>
+        <div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-des" type="button">Eliminar</button></div>
+      </div>
+    </div>
+
+    <div class="stage" style="min-height: 420px">
+      <span class="stage-cap">Teléfono · Acciones de la persona</span>
+      <div class="dlg menu static" role="menu" aria-label="Acciones de Laura Gómez">
+        <div class="dlg-hd" style="padding: 0 4px 8px"><span class="h3">Laura Gómez</span><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <button class="mi" type="button" role="menuitem">Editar</button>
+        <button class="mi" type="button" role="menuitem">Cambiar estado</button>
+        <button class="mi" type="button" role="menuitem">Cerrar todas las sesiones de Laura Gómez</button>
+        <div class="sep"></div>
+        <button class="mi danger" type="button" role="menuitem">Eliminar</button>
+      </div>
+    </div>
+
+    <div class="stage" style="min-height: 420px">
+      <span class="stage-cap">Teléfono · Acciones del grupo</span>
+      <div class="dlg menu static" role="menu" aria-label="Acciones del grupo Turno mañana">
+        <div class="dlg-hd" style="padding: 0 4px 8px"><span class="h3">Turno mañana</span><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <button class="mi" type="button" role="menuitem">Abrir</button>
+        <div class="sep"></div>
+        <button class="mi danger" type="button" role="menuitem">Eliminar</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <span class="lab">Toasts del módulo</span>
+    <div class="g3">
+      <div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Usuario creado.</span></div>
+      <div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Estado de la cuenta actualizado.</span></div>
+      <div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Se cerraron las sesiones de Laura Gómez.</span></div>
+      <div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Persona añadida al grupo.</span></div>
+      <div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--w-fg)"><path d="M12 3 22 20H2zM12 10v4M12 17h.01"></path></svg><span>Grupo creado, pero no se pudo añadir a <span class="mono">2</span> persona(s).</span></div>
+      <div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Unidad creada.</span></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":5000}}'>
+class Component extends DCLogic {
+renderVals() { return { rootCls: this.props.oscuro ? 'qc dk' : 'qc' }; }
+}
+</script>
+</body>
+</html>

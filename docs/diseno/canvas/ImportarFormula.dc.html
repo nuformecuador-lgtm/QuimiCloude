@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Revisar fórmula</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="formulas" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter" style="max-width: 1040px">
+        <div class="ph">
+          <div class="ph-t" style="gap: 12px"><a class="b b-out b-back b-touch-m" href="Formulas.dc.html" style="align-self: flex-start"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver al listado</a><h1 class="h1">Revisar fórmula</h1><p class="sub" style="display: inline-flex; align-items: center; gap: 6px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6v18h12V7zM14 3v4h4"></path></svg><span class="mono">desengrasante-alcalino.pdf</span></p></div>
+        </div>
+
+        <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+          <div class="box error"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg></span><p class="sub">No se pudo abrir esta revisión.</p><a class="b b-out b-back" href="Formulas.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver al listado</a></div>
+        </sc-if>
+
+        <sc-if value="{{ isReview }}" hint-placeholder-val="{{ true }}">
+          <section class="card" aria-labelledby="if-g">
+            <h2 id="if-g" class="sr">Datos de la fórmula</h2>
+            <div class="f"><label for="if-n">Nombre</label><input id="if-n" class="{{ nameCls }}" type="text" value="{{ nameVal }}"></div>
+            <div class="f"><label for="if-d">Descripción</label><textarea id="if-d" class="in" rows="2">Para superficies de cocina industrial.</textarea></div>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{ isReview }}" hint-placeholder-val="{{ true }}">
+          <section class="card" aria-labelledby="if-i">
+            <div class="card-hd"><h2 id="if-i" class="h2">Ingredientes</h2><span class="cap"><span class="mono">{{ ingN }}</span> · <span class="mono">{{ sumPct }}</span></span></div>
+            <ol class="{{ listCls }}" style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px">
+              <sc-for list="{{ ings }}" as="g" hint-placeholder-count="4">
+                <li style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--card)">
+                  <div style="display: flex; align-items: center; gap: 10px">
+                    <span class="num-dot mono">{{ g.n }}</span>
+                    <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1"><span class="lab" style="font-size: 10.5px">Referencia del PDF</span><span style="font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ g.ref }}</span></span>
+                    <button class="b b-gho b-sm" type="button" onClick="{{ g.remove }}" aria-label="{{ g.rmLabel }}" style="height: 44px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg><span class="hide-m">Quitar</span></button>
+                  </div>
+                  <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap">
+                    <div class="f" style="flex: 0 0 120px"><label>Porcentaje</label><input class="in mono num" type="text" value="{{ g.pct }}"></div>
+                    <sc-if value="{{ g.isPick }}" hint-placeholder-val="{{ true }}">
+                      <div class="f" style="flex: 1 1 260px"><label>Producto</label><button class="in trig" type="button" aria-haspopup="listbox" aria-expanded="false"><span style="{{ g.prodStyle }}">{{ g.prodText }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+                      <button class="b b-lnk" type="button" onClick="{{ g.toCreate }}" style="min-height: 40px">Crear materia prima</button>
+                    </sc-if>
+                    <sc-if value="{{ g.isCreate }}" hint-placeholder-val="{{ false }}">
+                      <div class="f fade" style="flex: 1 1 260px"><label>Nombre de la materia prima</label><input class="in" type="text" value="{{ g.newName }}"></div>
+                      <span class="sb t-success" style="margin-bottom: 9px"><i></i>[Se crea]</span>
+                      <button class="b b-lnk" type="button" onClick="{{ g.toPick }}" style="min-height: 40px">Elegir producto existente</button>
+                    </sc-if>
+                  </div>
+                </li>
+              </sc-for>
+            </ol>
+            <button class="b b-dash" type="button" onClick="{{ addIng }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Añadir ingrediente</button>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+          <section class="card" aria-labelledby="if-r">
+            <div style="display: flex; gap: 14px; align-items: center"><span class="dlg-ic success"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg></span><div style="display: flex; flex-direction: column; gap: 2px"><h2 id="if-r" class="h2">[Fórmula importada]</h2><p class="sub">{{ nameVal }}</p></div></div>
+            <div class="g2 cq-1">
+              <dl class="stat" style="margin: 0"><dt>Materias primas creadas</dt><dd class="mono">{{ nCreated }}</dd><dd style="font-size: 13px; font-weight: 400; color: var(--muted-fg)">{{ createdList }}</dd></dl>
+              <dl class="stat" style="margin: 0"><dt>Materias primas reutilizadas</dt><dd class="mono">{{ nReused }}</dd><dd style="font-size: 13px; font-weight: 400; color: var(--muted-fg)">{{ reusedList }}</dd></dl>
+            </div>
+            <div class="actions"><a class="b b-out b-touch-m" href="Formulas.dc.html">Volver al listado</a><a class="b b-pri b-go b-touch-m" href="Formula.dc.html">Ver la fórmula<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a></div>
+          </section>
+        </sc-if>
+      </div>
+
+      <sc-if value="{{ isReview }}" hint-placeholder-val="{{ true }}">
+        <footer class="form-ft" style="flex-wrap: wrap; align-items: center; margin-top: auto">
+          <button class="b b-pri b-touch-m" type="button" onClick="{{ confirm }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>Confirmar</button>
+        </footer>
+      </sc-if>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="formulas" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <div class="{{ clashCls }}" role="alertdialog" aria-modal="true" aria-labelledby="if-c" aria-describedby="if-cd">
+    <div class="dlg-ic warn"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2zM12 10v4M12 17h.01"></path></svg></div>
+    <h2 id="if-c" class="h2">[La fórmula ya existe]</h2>
+    <p id="if-cd" class="sub">Ya existe la fórmula «Desengrasante alcalino»[…]</p>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ rename }}">Cambiar el nombre</button><button class="b b-des" type="button" onClick="{{ replace }}">Reemplazar</button></div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"estado":{"editor":"enum","options":["revision","resumen","error"],"default":"revision"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const est = s.est || this.props.estado || 'revision';
+const k = s.k || 0;
+const I0 = [
+{ pct: '81,50', ref: 'AQUA (agua desmineralizada)', mode: 'pick', prod: 'Agua desmineralizada', newName: '' },
+{ pct: '5,00', ref: 'Sodium hydroxide', mode: 'pick', prod: 'Hidróxido de sodio', newName: '' },
+{ pct: '13,00', ref: 'Sodium laureth sulfate 70 %', mode: 'create', prod: '', newName: 'Tensoactivo LESS 70 %' },
+{ pct: '0,50', ref: 'Parfum (lemon)', mode: 'pick', prod: '', newName: '' }
+];
+const ings = s.ings || I0;
+const set = (arr) => this.setState({ ings: arr, k: k + 1 });
+const upd = (i, patch) => this.setState({ ings: ings.map((x, j) => (j === i ? Object.assign({}, x, patch) : x)) });
+const sum = ings.reduce((a, x) => a + (parseFloat(x.pct.replace(',', '.')) || 0), 0);
+const created = ings.filter((x) => x.mode === 'create').map((x) => x.newName || '[Sin nombre]');
+const reused = ings.filter((x) => x.mode === 'pick' && x.prod).map((x) => x.prod);
+const renamed = !!s.renamed;
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+isError: est === 'error', isReview: est === 'revision', isDone: est === 'resumen',
+nameVal: renamed ? 'Desengrasante alcalino (PDF)' : 'Desengrasante alcalino',
+nameCls: renamed ? 'in focus' : 'in',
+ingN: ings.length, sumPct: sum.toFixed(2).replace('.', ',') + ' %',
+listCls: k % 2 ? 'fade' : '',
+ings: ings.map((x, i) => ({
+n: i + 1, ref: x.ref || '[Sin referencia]', pct: x.pct + ' %',
+isPick: x.mode === 'pick', isCreate: x.mode === 'create',
+prodText: x.prod || 'Elegir producto', prodStyle: x.prod ? '' : 'color: var(--muted-fg)',
+newName: x.newName,
+rmLabel: 'Quitar el ingrediente ' + (i + 1),
+remove: () => set(ings.filter((_, j) => j !== i)),
+toCreate: () => upd(i, { mode: 'create', newName: x.newName || x.ref }),
+toPick: () => upd(i, { mode: 'pick' })
+})),
+addIng: () => set(ings.concat([{ pct: '0,00', ref: '', mode: 'pick', prod: '', newName: '' }])),
+confirm: () => (renamed ? this.setState({ est: 'resumen' }) : this.setState({ clash: true })),
+clashCls: s.clash ? 'dlg open' : 'dlg',
+rename: () => this.setState({ clash: false, renamed: true }),
+replace: () => this.setState({ clash: false, est: 'resumen' }),
+nCreated: created.length, createdList: created.join(' · ') || '—',
+nReused: reused.length, reusedList: reused.join(' · ') || '—',
+ovCls: (s.menu || s.clash) ? 'ov open' : 'ov',
+closeAll: () => this.setState({ menu: false, clash: false })
+};
+}
+}
+</script>
+</body>
+</html>

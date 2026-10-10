@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Página no encontrada</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="asignacion" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter" style="flex: 1">
+        <div class="box" style="flex: 1; min-height: 460px; gap: 14px; padding: 48px 20px">
+          <span class="bi" style="width: 64px; height: 64px; border-radius: 16px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 28px; height: 28px"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg></span>
+          <span class="lab mono">404</span>
+          <h1 class="h1" style="font-size: 26px">No encontramos esta página</h1>
+          <p class="sub" style="max-width: 420px">Revisa la dirección e inténtalo de nuevo, o continúa desde el menú lateral.</p>
+          <a class="b b-pri b-touch-m" href="Asignacion.dc.html" style="margin-top: 6px">[Ir a Asignación]</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="asignacion" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":800}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+ovCls: s.menu ? 'ov open' : 'ov',
+closeAll: () => this.setState({ menu: false })
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Modales del operario</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}" style="width: 1440px; min-height: 1900px; padding: 40px 48px; display: flex; flex-direction: column; gap: 24px">
+  <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 16px">
+    <div class="ph-t"><h1 class="h1">Modales del operario</h1><p class="sub">Asignación · Ejecución · Empaque · Acondicionamiento. Todos centrados en la pantalla visible, también en el teléfono.</p></div>
+    <button class="b b-out" type="button" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span>Cambiar tema</button>
+  </div>
+
+  <div class="modal-grid">
+    <div class="stage">
+      <span class="stage-cap">Asignación · ¿Comenzar el pedido?</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="mo-1">
+        <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg></div>
+        <h2 id="mo-1" class="h2">¿Comenzar el pedido?</h2>
+        <p class="cap" style="margin: 0"><span class="mono">2026-0000011</span> · Limpiador cítrico</p>
+        <p class="sub">Una vez comenzado, el pedido no se puede devolver: tendrás que continuarlo hasta terminarlo.</p>
+        <div class="actions"><button class="b b-out" type="button">Cancelar</button><a class="b b-pri" href="Ejecucion.dc.html">Comenzar</a></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">Asignación · Acciones del pedido (teléfono)</span>
+      <div class="dlg menu static" role="menu" aria-label="Acciones del pedido">
+        <div class="dlg-hd" style="padding: 0 4px 8px"><span class="h3">Pedido <span class="mono">2026-0000004</span></span><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <a class="mi" role="menuitem" href="Empaque.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>Entrar</a>
+        <a class="mi" role="menuitem" href="Recorrido.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM18 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM6 15V9a4 4 0 0 1 4-4h6M18 9v6a4 4 0 0 1-4 4H8"></path></svg>Ver recorrido</a>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">Ejecución · ¿Terminar el pedido?</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="mo-3">
+        <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg></div>
+        <h2 id="mo-3" class="h2">¿Terminar el pedido?</h2>
+        <p class="sub">Terminar el pedido no se puede deshacer.</p>
+        <div class="actions"><button class="b b-out b-touch" type="button">Cancelar</button><button class="b b-pri b-touch" type="button">Terminar</button></div>
+      </div>
+    </div>
+
+    <div class="stage" style="min-height: 440px">
+      <span class="stage-cap">Ejecución · ¿Cancelar el pedido?</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="mo-4">
+        <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg></div>
+        <h2 id="mo-4" class="h2">¿Cancelar el pedido?</h2>
+        <p class="sub">El pedido queda cancelado y el material apartado se libera. No se puede deshacer.</p>
+        <div class="f"><label for="mo-m">Motivo de la cancelación</label><textarea id="mo-m" class="in in-touch" rows="3"></textarea></div>
+        <div class="actions"><button class="b b-out b-touch" type="button">Volver</button><button class="b b-des b-touch" type="button">Cancelar pedido</button></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">Empaque · ¿Comenzar el empaque?</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="mo-5">
+        <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg></div>
+        <h2 id="mo-5" class="h2">¿Comenzar el empaque?</h2>
+        <p class="sub"><span class="mono">2026-0000004</span> · Limpiador multiusos limón · [DESCRIPCIÓN DEL DIÁLOGO]</p>
+        <div class="actions"><button class="b b-out b-touch" type="button">Cancelar</button><button class="b b-pri b-touch" type="button">Comenzar</button></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">Empaque · ¿Terminar el empaque?</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="mo-6">
+        <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg></div>
+        <h2 id="mo-6" class="h2">¿Terminar el empaque?</h2>
+        <p class="sub"><span class="mono">2026-0000004</span> · Limpiador multiusos limón · [DESCRIPCIÓN DEL DIÁLOGO]</p>
+        <div class="actions"><button class="b b-out b-touch" type="button">Cancelar</button><button class="b b-pri b-touch" type="button">Terminar</button></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">Acondicionamiento · Acondicionar el pedido</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="mo-7">
+        <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg></div>
+        <h2 id="mo-7" class="h2">Acondicionar el pedido <span class="mono">2026-0000006</span></h2>
+        <p class="sub">[DESCRIPCIÓN DEL DIÁLOGO]</p>
+        <div class="actions"><button class="b b-out b-touch" type="button">Cancelar</button><button class="b b-pri b-touch" type="button">Comenzar</button></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">Acondicionamiento · Terminar el acondicionamiento</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="mo-8">
+        <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg></div>
+        <h2 id="mo-8" class="h2">Terminar el acondicionamiento</h2>
+        <p class="sub">El pedido <span class="mono">2026-0000006</span> pasará a Terminado.</p>
+        <div class="actions"><button class="b b-out b-touch" type="button">Cancelar</button><button class="b b-pri b-touch" type="button">Terminar</button></div>
+      </div>
+    </div>
+  </div>
+
+  <dl class="spec">
+    <dt>Reutiliza</dt><dd><span class="mono">confirm-dialog · ui/alert-dialog · ui/dialog · text-field</span> (textarea del motivo)</dd>
+    <dt>Animación</dt><dd>Velo 200/150 ms · diálogo con zoom desde 96 % en 300 ms al abrir y 150 ms al cerrar</dd>
+    <dt>Por confirmar</dt><dd>Botones de «¿Terminar el pedido?» (aquí Cancelar / Terminar) · descripciones de los diálogos de empaque y de «Acondicionar el pedido N»</dd>
+  </dl>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1900}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+return { rootCls: dark ? 'qc dk' : 'qc', toggleDark: () => this.setState({ dark: !dark }) };
+}
+}
+</script>
+</body>
+</html>

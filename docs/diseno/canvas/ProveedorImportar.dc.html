@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Revisar importación de catálogo</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="proveedores" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div><a class="b b-out b-back b-touch-m" href="ProveedorDetalle.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver al detalle del proveedor</a></div>
+
+        <div class="ph">
+          <div class="ph-t"><span class="crumb">Envases Andinos</span><h1 class="h1">Revisar importación de catálogo</h1><p class="sub"><span class="mono">catalogo-envases-andinos-2026.pdf</span> · <span class="mono">5</span> filas leídas</p></div>
+        </div>
+
+        <sc-if value="{{ reviewing }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 14px">
+            <sc-for list="{{ rows }}" as="r" hint-placeholder-count="5">
+              <section class="card" aria-labelledby="{{ r.hid }}" style="gap: 14px; opacity: {{ r.op }}; transition: opacity 200ms">
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+                  <button class="cb" type="button" role="checkbox" aria-checked="{{ r.checked }}" aria-label="{{ r.incLabel }}" onClick="{{ r.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></button>
+                  <h2 id="{{ r.hid }}" class="h3">Fila <span class="mono">{{ r.n }}</span></h2>
+                  <span class="{{ r.bCls }}"><i></i>{{ r.badge }}</span>
+                  <span style="flex: 1"></span>
+                  <span class="{{ r.thumbCls }}" role="img" aria-label="{{ r.imgAlt }}"><sc-if value="{{ r.noImg }}" hint-placeholder-val="{{ true }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg></sc-if></span>
+                  <button class="b b-out b-sm b-touch-m" type="button" onClick="{{ r.pickImg }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg>Elige una imagen del archivo</button>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px">
+                  <div class="f"><label>Nombre</label><input class="in" type="text" value="{{ r.name }}"></div>
+                  <div class="f"><label>Presentación</label><input class="in" type="text" value="{{ r.pres }}"></div>
+                  <div class="f"><label>Costo</label><input class="in mono" type="text" inputmode="decimal" value="{{ r.cost }}" aria-invalid="{{ r.costInvalid }}"><sc-if value="{{ r.hasPrev }}" hint-placeholder-val="{{ false }}"><span class="help">[Costo actual] <span class="mono" style="text-decoration: line-through">{{ r.prev }}</span></span></sc-if><sc-if value="{{ r.costErr }}" hint-placeholder-val="{{ false }}"><span class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Escribe un costo mayor que cero, con hasta 4 decimales.</span></sc-if></div>
+                  <div class="f"><label>Mínimo de compra</label><input class="in mono" type="text" inputmode="decimal" value="{{ r.min }}"></div>
+                  <div class="f"><label>Tiempo de entrega (días)</label><input class="in mono" type="text" inputmode="numeric" value="{{ r.lead }}"></div>
+                  <div class="f"><label>Material</label><input class="in" type="text" value="{{ r.mat }}"></div>
+                  <div class="f"><label>Diámetro</label><div style="display: grid; grid-template-columns: minmax(0, 1fr) 76px; gap: 6px"><input class="in mono" type="text" inputmode="decimal" value="{{ r.dia }}"><button class="in trig" type="button" aria-label="Unidad de diámetro"><span>cm</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div></div>
+                  <div class="f"><label>Alto</label><div style="display: grid; grid-template-columns: minmax(0, 1fr) 76px; gap: 6px"><input class="in mono" type="text" inputmode="decimal" value="{{ r.alt }}"><button class="in trig" type="button" aria-label="Unidad de alto"><span>cm</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div></div>
+                  <div class="f"><label>Boca</label><input class="in mono" type="text" value="{{ r.boca }}"></div>
+                </div>
+              </section>
+            </sc-for>
+
+            <section class="card" aria-labelledby="pi-units" style="gap: 14px">
+              <h2 id="pi-units" class="h2">Unidades de presentaciones nuevas</h2>
+              <div class="g2 cq-1">
+                <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+                  <div class="f anchor"><label>{{ g.label }}</label><button class="in trig in-touch" type="button" aria-haspopup="listbox" aria-expanded="{{ g.openStr }}" onClick="{{ g.toggle }}"><span class="{{ g.valCls }}">{{ g.value }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                    <div class="{{ g.popCls }}" role="listbox">
+                      <sc-for list="{{ g.opts }}" as="o" hint-placeholder-count="4"><button class="{{ o.cls }}" type="button" role="option" aria-selected="{{ o.sel }}" onClick="{{ o.pick }}">{{ o.label }}</button></sc-for>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </section>
+
+            <div class="card cq-stack" style="flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; position: sticky; bottom: 0">
+              <span class="sub">[Filas incluidas] <span class="mono strong">{{ included }}</span></span>
+              <button class="b b-pri b-touch" type="button" onClick="{{ confirm }}" aria-busy="{{ busyStr }}"><sc-if value="{{ busy }}" hint-placeholder-val="{{ false }}"><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg></sc-if>{{ confirmLabel }}</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ done }}" hint-placeholder-val="{{ false }}">
+          <div class="card" role="status" style="align-items: flex-start; gap: 18px">
+            <div style="display: flex; align-items: center; gap: 12px"><span class="dlg-ic success"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg></span><p class="h3">La importación se guardó correctamente.</p></div>
+            <dl class="cq-2" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; width: 100%">
+              <div class="stat"><dt>Creadas</dt><dd class="mono">1</dd></div>
+              <div class="stat"><dt>Actualizadas</dt><dd class="mono">1</dd></div>
+              <div class="stat"><dt>Sin cambios</dt><dd class="mono">1</dd></div>
+              <div class="stat"><dt>Presentaciones creadas</dt><dd class="mono">1</dd></div>
+            </dl>
+            <a class="b b-out b-touch b-back" href="ProveedorDetalle.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver al detalle del proveedor</a>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="proveedores" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <div class="{{ cropCls }}" role="dialog" aria-modal="true" aria-labelledby="pi-crop">
+    <div class="dlg-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="pi-crop" class="h2">Elige una imagen del archivo</h2><p class="sub">Fila <span class="mono">{{ cropRow }}</span> · <span class="mono">catalogo-envases-andinos-2026.pdf</span></p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px">
+      <sc-for list="{{ crops }}" as="c" hint-placeholder-count="6">
+        <button class="ev-body" type="button" aria-label="{{ c.label }}" onClick="{{ c.pick }}" style="padding: 6px; cursor: pointer; font: inherit; color: inherit; text-align: left"><span class="thumb photo" style="width: 100%; height: 96px; border-radius: 8px; filter: hue-rotate({{ c.hue }}deg)"></span><span class="cap">Recorte del archivo <span class="mono">{{ c.n }}</span></span></button>
+      </sc-for>
+    </div>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button></div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"resumen":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1600}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); clearTimeout(this.t2); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const data = [
+[1,'Nueva','success','Bidón 5 L','Bidón 5 L','3.100,00','','100','6','PEAD','18','30','38/400',true],
+[2,'Cambia de costo','waiting','Galón 3,78 L','Galón 3,78 L','2.480,00','2.350,00','100','5','PEAD','15,5','28','38/400',true],
+[3,'Sin cambios','neutral','Garrafa 20 L','Garrafa 20 L','9.800,00','','50','7','PEAD','28','42','63 mm',true],
+[4,'Incompleta','danger','Frasco 500 mL','Frasco 500 mL','','','200','5','PET','6,5','17','24/410',false],
+[5,'Duplicada','waiting','Galón 3,78 L','Galón 3,78 L','2.480,00','','100','5','PEAD','15,5','28','38/400',false]
+];
+const inc = s.inc || {};
+const img = s.img || {};
+const isInc = (d) => inc[d[0]] !== undefined ? inc[d[0]] : d[13];
+const included = data.filter(isInc).length;
+const units = ['Litro (L)','Mililitro (mL)','Kilogramo (kg)','Unidad (u)'];
+const gsel = s.gsel || {};
+const gData = [['g1','Bidón 5 L (fila 1)'],['g2','Frasco 500 mL (fila 4)']];
+const done = s.done !== undefined ? s.done : !!this.props.resumen;
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+reviewing: !done, done: done,
+rows: data.map((d) => {
+  const on = isInc(d);
+  return { n: d[0], hid: 'pi-r' + d[0], badge: d[1], bCls: 'sb t-' + d[2], name: d[3], pres: d[4], cost: d[5], prev: d[6], hasPrev: !!d[6], costErr: d[1] === 'Incompleta', costInvalid: d[1] === 'Incompleta' ? 'true' : 'false', min: d[7], lead: d[8], mat: d[9], dia: d[10], alt: d[11], boca: d[12],
+    checked: on ? 'true' : 'false', incLabel: 'Incluir fila ' + d[0], op: on ? '1' : '0.6',
+    toggle: () => this.setState({ inc: Object.assign({}, inc, { [d[0]]: !on }) }),
+    noImg: !img[d[0]], thumbCls: img[d[0]] ? 'thumb photo' : 'thumb', imgAlt: img[d[0]] ? 'Recorte del archivo ' + img[d[0]] : 'Sin imagen',
+    pickImg: () => this.setState({ crop: d[0] }) };
+}),
+groups: gData.map((g) => ({ label: g[1], value: gsel[g[0]] || 'Elige una unidad', valCls: gsel[g[0]] ? '' : 'dim', openStr: s.gOpen === g[0] ? 'true' : 'false', popCls: s.gOpen === g[0] ? 'pop full open' : 'pop full', toggle: () => this.setState({ gOpen: s.gOpen === g[0] ? null : g[0] }), opts: units.map((u) => ({ label: u, sel: gsel[g[0]] === u ? 'true' : 'false', cls: gsel[g[0]] === u ? 'opt hl' : 'opt', pick: () => this.setState({ gsel: Object.assign({}, gsel, { [g[0]]: u }), gOpen: null }) })) })),
+included: included + ' / ' + data.length,
+busy: !!s.busy, busyStr: s.busy ? 'true' : 'false',
+confirmLabel: s.busy ? 'Confirmando…' : 'Confirmar',
+confirm: () => { if (s.busy) return; this.setState({ busy: true }); clearTimeout(this.t2); this.t2 = setTimeout(() => this.setState({ busy: false, done: true }), 1200); },
+cropCls: s.crop ? 'dlg wide open' : 'dlg wide',
+cropRow: s.crop || '',
+crops: [1, 2, 3, 4, 5, 6].map((n) => ({ n: n, hue: (n - 1) * 25, label: 'Recorte del archivo ' + n, pick: () => this.setState({ img: Object.assign({}, img, { [s.crop]: n }), crop: null }) })),
+ovCls: (s.crop || s.menu) ? 'ov open' : 'ov',
+closeAll: () => this.setState({ crop: null, menu: false })
+};
+}
+}
+</script>
+</body>
+</html>

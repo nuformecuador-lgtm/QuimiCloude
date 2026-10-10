@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Establecer contraseña en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="EstablecerContrasena" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Establecer contraseña · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">ui/card · shared/password-field · shared/credential-rule-labels · shared/field-error · shared/notice · shared/submit-button</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">@base-ui/react · lucide-react</span> · ninguna nueva</dd>
+      <dt>Escritorio</dt><dd>Tarjeta de 440 px sobre el fondo de marca · dos PasswordField con ojo («Mostrar la contraseña» / «Ocultar la contraseña», aria-pressed) · los 7 requisitos visibles mientras se escribe, en un panel bajo el campo · «Las dos contraseñas no coinciden.» bajo el segundo campo · aviso «La contraseña todavía no cumple estos requisitos:» con la lista de lo que falta · éxito en la misma tarjeta con «Ir a iniciar sesión»</dd>
+      <dt>Tablet</dt><dd>Igual que escritorio</dd>
+      <dt>Teléfono</dt><dd>Tarjeta a ancho completo con scroll de la página · campos de 48 px, ojo de 44 px · «Guardar contraseña» táctil a todo el ancho</dd>
+      <dt>Animación</dt><dd>Cada requisito cambia de color y de círculo a check en 200 ms al escribir · error de campo baja 4 px en 150 ms · aviso entra subiendo · «Guardando…» con spinner · la tarjeta de éxito entra escalonada</dd>
+      <dt>Por confirmar</dt><dd>«No debe figurar en una lista de credenciales filtradas» solo se comprueba en el servidor: aquí queda pendiente hasta guardar · en el código los textos van sin tildes (el diseño las pone) · el token caducado no tiene pantalla propia</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

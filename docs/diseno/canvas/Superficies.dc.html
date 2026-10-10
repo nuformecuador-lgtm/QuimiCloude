@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Cabecera y superficies</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 1440px; height: 980px; padding: 40px 48px; display: flex; flex-direction: column; gap: 20px; position: relative; overflow: hidden">
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <h1 class="h1">Cabecera, pestañas, FormSheet y borrado</h1>
+    <p class="sub" style="max-width: 980px">La cabecera privada real (la misma de Pedidos), la cabecera de página con miga, las pestañas que viven en la URL, el formulario en Sheet y la confirmación de borrado. Todo es interactivo: cambia de tema, de pestaña, abre «Nuevo usuario», o elimina desde el ⋯.</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 32px; align-items: start">
+    <section style="display: flex; flex-direction: column; gap: 12px" aria-label="Escritorio">
+      <span class="lab">Escritorio · cabecera, PageHeader, UrlTabs, FormSheet, DeleteConfirmDialog</span>
+      <div class="{{ deskCls }}" style="position: relative; height: 600px; border-radius: 16px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); overflow: hidden; display: flex; flex-direction: column; transition: background-color 300ms, color 300ms">
+        <header class="topbar">
+          <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+          <div class="tb-right">
+            <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDesk }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+            <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+          </div>
+        </header>
+
+        <div class="main-bd page enter" style="flex: 1; overflow: auto">
+          <div class="ph">
+            <div class="ph-t"><nav class="crumb" aria-label="[Ruta]"><span>Configuración</span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="m9 6 6 6-6 6"></path></svg><span aria-current="page">Usuarios</span></nav><h1 class="h1">Usuarios</h1></div>
+            <div class="ph-act" style="display: flex; gap: 8px"><button class="b b-pri b-touch-m" type="button" onClick="{{ openNew }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>{{ newLabel }}</button></div>
+          </div>
+
+          <nav class="tabs" aria-label="[Secciones de usuarios]">
+            <a class="tab" href="#personas" aria-current="{{ curP }}" onClick="{{ goP }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg>Personas</a>
+            <a class="tab" href="#grupos" aria-current="{{ curG }}" onClick="{{ goG }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"></path></svg>Grupos</a>
+          </nav>
+
+          <div class="{{ panelCls }}">
+            <div class="tw" style="overflow: visible">
+              <table>
+                <thead><tr><th scope="col" style="border-radius: 11px 0 0 0">Nombre</th><th scope="col">{{ col2 }}</th><th scope="col">{{ col3 }}</th><th scope="col" style="border-radius: 0 11px 0 0"><span class="sr">Acciones</span></th></tr></thead>
+                <tbody>
+                  <sc-for list="{{ rows }}" as="r" hint-placeholder-count="3">
+                    <tr>
+                      <td><span class="person" style="min-height: 0"><span class="{{ r.avCls }}">{{ r.ini }}</span><span class="strong">{{ r.name }}</span></span></td>
+                      <td><sc-if value="{{ r.isP }}" hint-placeholder-val="{{ true }}"><span class="mono">{{ r.user }}</span></sc-if><sc-if value="{{ r.isG }}" hint-placeholder-val="{{ false }}"><span class="avs"><span class="av sm">LG</span><span class="av sm c2">MS</span><span class="av sm c3">VH</span></span></sc-if></td>
+                      <td><sc-if value="{{ r.isP }}" hint-placeholder-val="{{ true }}"><span class="{{ r.stCls }}"><i></i>{{ r.st }}</span></sc-if></td>
+                      <td class="rowact anchor">
+                        <button class="b b-gho b-ico" type="button" aria-label="{{ r.menuLabel }}" aria-haspopup="menu" aria-expanded="{{ r.open }}" onClick="{{ r.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button>
+                        <div class="{{ r.menuCls }}" role="menu" aria-label="{{ r.menuLabel }}">
+                          <button class="mi" type="button" role="menuitem" onClick="{{ openEdit }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>{{ editLabel }}</button>
+                          <sc-if value="{{ r.isP }}" hint-placeholder-val="{{ true }}"><button class="mi" type="button" role="menuitem" onClick="{{ closeMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg>Cambiar estado</button></sc-if>
+                          <div class="sep"></div>
+                          <button class="mi danger" type="button" role="menuitem" onClick="{{ r.del }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Eliminar</button>
+                        </div>
+                      </td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+        <aside class="{{ sheetCls }}" role="dialog" aria-modal="true" aria-labelledby="sf-sh">
+          <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="sf-sh" class="h2">{{ sheetTitle }}</h2><p class="sub">{{ sheetDesc }}</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+          <div class="sheet-bd">
+            <sc-if value="{{ isPeople }}" hint-placeholder-val="{{ true }}">
+              <div class="g2"><div class="f"><label for="sf-n">Nombres</label><input id="sf-n" class="in" type="text" value="{{ fNames }}"></div><div class="f"><label for="sf-a">Apellidos</label><input id="sf-a" class="in" type="text" value="{{ fLast }}"></div></div>
+              <div class="f"><label for="sf-c">Correo</label><input id="sf-c" class="in" type="email" value="{{ fMail }}"></div>
+              <div class="f"><label for="sf-u">Nombre de usuario</label><input id="sf-u" class="in mono" type="text" value="{{ fUser }}"><span class="help">Este nombre de usuario está libre: <span class="mono">{{ fUser }}</span></span></div>
+              <div class="f"><span class="fl">Rol</span><button class="in trig" type="button" aria-haspopup="listbox" aria-expanded="false"><span>[Rol]</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+            </sc-if>
+            <sc-if value="{{ isGroups }}" hint-placeholder-val="{{ false }}">
+              <div class="f"><label for="sf-g">Nombre del grupo</label><input id="sf-g" class="in" type="text" value="{{ fGroup }}"></div>
+              <div class="f"><span class="fl">Miembros iniciales</span><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="text" placeholder="Buscar personas para añadir"></label><div class="person"><span class="av sm">LG</span>Laura Gómez<button class="b b-gho b-sm" type="button" style="margin-left: auto">Quitar del grupo</button></div></div>
+            </sc-if>
+          </div>
+          <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ save }}">Guardar</button></div>
+        </aside>
+
+        <div class="{{ delCls }}" role="alertdialog" aria-modal="true" aria-labelledby="sf-de" aria-describedby="sf-dd">
+          <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+          <h2 id="sf-de" class="h2">{{ delTitle }}</h2>
+          <p id="sf-dd" class="sub">{{ delPre }} <span class="strong" style="color: var(--fg)">{{ delName }}</span>. Esta acción no se puede deshacer.</p>
+          <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des" type="button" onClick="{{ confirmDel }}">Eliminar</button></div>
+        </div>
+
+        <div class="toastwrap" aria-live="polite"><div class="{{ toastCls }}" role="status"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastText }}</span></div></div>
+      </div>
+
+      <dl class="spec" style="margin-top: 8px">
+        <dt>Componente</dt><dd><span class="mono">app/(private)/layout.tsx</span> (cabecera) · <span class="mono">app/(private)/components/theme-toggle.tsx</span> · <span class="mono">components/ui/tooltip · tabs · sheet · alert-dialog</span> · <span class="mono">components/shared/form-sheet · delete-confirm-dialog · confirm-dialog</span> · PageHeader y UrlTabs: [POR CONFIRMAR si ya existen o son nuevos]</dd>
+        <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (Tooltip, Tabs, Dialog, AlertDialog) · <span class="mono">lucide-react</span> (Sun, Moon, LogOut, PanelLeftOpen/Close)</dd>
+        <dt>Animación</dt><dd>sol y luna se cruzan girando 90° con escala en 200 ms (hoy cambian sin transición) · tooltip 150 ms · tema: fondo y texto 300 ms · pestaña activa 200 ms · Sheet entra desde la derecha en 300 ms y sale en 150 ms · AlertDialog zoom .96 → 1 en 300 ms sobre velo 200 ms · toast 300 ms</dd>
+        <dt>Notas</dt><dd>La cabecera no lleva título ni miga: la miga vive en el PageHeader. Pie del Sheet y del diálogo: secundario a la izquierda, principal a la derecha. Hoy los botones de la cabecera no tienen tooltip: el rediseño lo agrega.</dd>
+      </dl>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 12px" aria-label="Teléfono">
+      <span class="lab">Teléfono · contenedor de 390 px</span>
+      <div class="{{ phoneCls }}" style="position: relative; width: 390px; height: 700px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); overflow: hidden; container-type: inline-size; transition: background-color 300ms, color 300ms">
+        <div style="height: 100%; overflow: auto">
+          <header class="topbar">
+            <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ mMenuStr }}" onClick="{{ openMMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="{{ isoSrc }}" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+            <div class="tb-right">
+              <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ togglePhone }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+              <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip" style="left: auto; right: 0; translate: none">Cerrar sesión</span></button>
+            </div>
+          </header>
+          <div class="main-bd page enter">
+            <div class="ph">
+              <div class="ph-t"><nav class="crumb" aria-label="[Ruta]"><span>Configuración</span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="m9 6 6 6-6 6"></path></svg><span aria-current="page">Usuarios</span></nav><h1 class="h1">Usuarios</h1></div>
+              <div class="ph-act" style="display: flex; gap: 8px"><button class="b b-pri b-touch-m" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>{{ newLabel }}</button></div>
+            </div>
+            <nav class="tabs" aria-label="[Secciones de usuarios]">
+              <a class="tab" href="#personas" aria-current="{{ curP }}" onClick="{{ goP }}">Personas</a>
+              <a class="tab" href="#grupos" aria-current="{{ curG }}" onClick="{{ goG }}">Grupos</a>
+            </nav>
+            <div class="nt n-i"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg><div>Cabecera móvil: «Alternar barra lateral» + isotipo a la izquierda; tema y cerrar sesión a la derecha, a 40 px con objetivo de 44 px.</div></div>
+          </div>
+        </div>
+        <div class="{{ mOvCls }}" onClick="{{ closeMMenu }}"></div>
+        <aside class="{{ mMenuCls }}" aria-label="Menú">
+          <dc-import name="Sidebar" active="usuarios" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+        </aside>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":980}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); }
+renderVals() {
+const s = this.state || {};
+const tab = s.tab || 'p';
+const isP = tab === 'p';
+const people = [
+['Laura Gómez', 'LG', 'av', 'lgomez', 'Activo', 'success', 'Laura', 'Gómez', 'laura.gomez@[dominio]'],
+['Mateo Sánchez', 'MS', 'av c2', 'msanchez', 'Pendiente', 'neutral', 'Mateo', 'Sánchez', 'mateo.sanchez@[dominio]'],
+['Valentina Herrera', 'VH', 'av c3', 'vherrera', 'Inactivo', 'muted', 'Valentina', 'Herrera', 'valentina.herrera@[dominio]']
+];
+const groups = [['[GRUPO A]', 'GA', 'av c4'], ['[GRUPO B]', 'GB', 'av c5']];
+const open = s.open;
+const k = s.k || 0;
+const go = (t) => (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ tab: t, open: null, k: k + 1 }); };
+const rows = isP
+? people.map((p) => ({ isP: true, isG: false, name: p[0], ini: p[1], avCls: p[2], user: p[3], st: p[4], stCls: 'sb t-' + p[5], menuLabel: 'Acciones de ' + p[0], open: open === p[0] ? 'true' : 'false', menuCls: open === p[0] ? 'pop right at-row open' : 'pop right at-row', toggle: () => this.setState({ open: open === p[0] ? null : p[0] }), del: () => this.setState({ dlg: p[0], open: null }) }))
+: groups.map((g) => ({ isP: false, isG: true, name: g[0], ini: g[1], avCls: g[2], count: g[3], menuLabel: 'Acciones de ' + g[0], open: open === g[0] ? 'true' : 'false', menuCls: open === g[0] ? 'pop right at-row open' : 'pop right at-row', toggle: () => this.setState({ open: open === g[0] ? null : g[0] }), del: () => this.setState({ dlg: g[0], open: null }) }));
+const sheet = s.sheet;
+const edit = sheet === 'edit';
+const who = people.find((p) => p[0] === s.editing) || people[0];
+const grp = groups.find((g) => g[0] === s.editing) || groups[0];
+const deskDark = !!s.deskDark;
+const phoneDark = !!s.phoneDark;
+const toast = (text) => { this.setState({ toast: true, toastText: text }); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: false }), 3200); };
+return {
+deskCls: deskDark ? 'dk' : '', toggleDesk: () => this.setState({ deskDark: !deskDark }),
+phoneCls: phoneDark ? 'dk' : '', togglePhone: () => this.setState({ phoneDark: !phoneDark }),
+isoSrc: phoneDark ? '/_blob/2791676cae5d6a8f7ecfe05f1c63f16d' : '/_blob/f9f03873139f42e5e761f3e112cb67d9',
+newLabel: isP ? 'Nuevo usuario' : 'Nuevo grupo',
+curP: isP ? 'page' : 'false', curG: isP ? 'false' : 'page', goP: go('p'), goG: go('g'),
+panelCls: k % 2 ? 'fade' : '',
+col2: isP ? 'Usuario' : 'Miembros', col3: isP ? 'Estado' : '',
+rows: rows,
+editLabel: isP ? 'Editar' : 'Abrir',
+closeMenu: () => this.setState({ open: null }),
+openNew: () => this.setState({ sheet: 'new', open: null }),
+openEdit: () => this.setState({ sheet: 'edit', editing: open, open: null }),
+isPeople: isP, isGroups: !isP,
+sheetCls: sheet ? 'sheet open' : 'sheet',
+sheetTitle: isP ? (edit ? 'Editar usuario' : 'Nuevo usuario') : (edit ? 'Editar grupo' : 'Nuevo grupo'),
+sheetDesc: isP ? (edit ? 'Cambia los datos de la persona.' : 'Describe los datos de la persona que va a usar el sistema.') : (edit ? 'Cambia el nombre del grupo y gestiona sus miembros.' : 'Ponle nombre al grupo de trabajo.'),
+fNames: edit ? who[6] : '', fLast: edit ? who[7] : '', fMail: edit ? who[8] : '', fUser: edit ? who[3] : 'svargas', fGroup: edit ? grp[0] : '',
+save: () => { this.setState({ sheet: null }); toast(isP ? (edit ? '[Usuario actualizado.]' : 'Usuario creado.') : (edit ? '[Grupo actualizado.]' : '[Grupo creado.]')); },
+delCls: s.dlg ? 'dlg open' : 'dlg',
+delTitle: isP ? 'Eliminar al usuario' : 'Eliminar el grupo',
+delPre: isP ? 'Se va a eliminar a' : 'Se va a eliminar el grupo',
+delName: s.dlg || '',
+confirmDel: () => { this.setState({ dlg: null }); toast(isP ? '[Usuario eliminado.]' : 'Grupo eliminado.'); },
+ovCls: (sheet || s.dlg) ? 'ov open' : 'ov',
+closeAll: () => this.setState({ sheet: null, dlg: null }),
+toastCls: s.toast ? 'toast show' : 'toast', toastText: s.toastText || 'Usuario creado.',
+mMenuStr: s.mMenu ? 'true' : 'false', openMMenu: () => this.setState({ mMenu: true }), closeMMenu: () => this.setState({ mMenu: false }),
+mOvCls: s.mMenu ? 'ov open' : 'ov', mMenuCls: s.mMenu ? 'sheet nav-l open' : 'sheet nav-l'
+};
+}
+}
+</script>
+</body>
+</html>

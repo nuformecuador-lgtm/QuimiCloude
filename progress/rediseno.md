@@ -4,13 +4,17 @@ Fuente del diseño:
 - Canvas de Claude Design (privado del humano; pedir acceso para verlo):
   https://claude.ai/artifact/Voiri77bod5p5EuzCUkPaq — 8 páginas por módulo, 87 tableros, cada
   pantalla en escritorio (1440), tablet (820) y teléfono (390) más un tablero de modales por módulo.
-- Copia local del código fuente del canvas (sin versionar): `_trabajo/rediseno/canvas/`.
-  - `qc.css` es el sistema visual completo del canvas (tokens de `app/globals.css` + piezas).
-    Es la referencia para portar a componentes; no se copia tal cual a la app.
+- Copia versionada de la fuente de diseño en `docs/diseno/` (qué hay y flujo `/design`:
+  `docs/diseno/README.md`):
+  - `docs/diseno/canvas/`: el código fuente de todos los tableros del canvas.
+  - `docs/diseno/sistema.css` (idéntico a `docs/diseno/canvas/qc.css`) es el sistema visual
+    completo del canvas (tokens de `app/globals.css` + piezas). Es la referencia para portar a
+    componentes; no se copia tal cual a la app.
+  - `docs/diseno/guia-de-marca.html`: la guía de marca.
   - `<Pantalla>.dc.html` = pantalla; `<Pantalla>Movil.dc.html` lleva su ficha
     (Reutiliza / Librerías / Escritorio / Tablet / Teléfono / Animación / Por confirmar).
   - `Modales<Modulo>.dc.html` = todos los modales del módulo abiertos.
-- Brief: `_trabajo/rediseno/brief/inventario.md` (textos literales de la app),
+- Brief (sin versionar): `_trabajo/rediseno/brief/inventario.md` (textos literales de la app),
   `convenciones.md` (reglas), `correcciones.md` (revisión).
 
 ## Decisiones del humano (2026-10-10)

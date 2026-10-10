@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Fundamentos de marca</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.qc{--bg:oklch(0.985 0.004 215);--fg:oklch(0.15 0.01 215);--card:oklch(1 0 0);--muted:oklch(0.965 0.006 215);--muted-fg:oklch(0.45 0.013 215);--border:oklch(0.925 0.009 215);font-family:'IBM Plex Sans',system-ui,sans-serif;background:var(--bg);color:var(--fg)}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+a{color:oklch(0.44 0.076 188)}a:hover{color:oklch(0.35 0.07 188)}
+</style>
+</helmet>
+<div class="qc" style="width: 1440px; min-height: 1560px; box-sizing: border-box; padding: 72px 80px; display: flex; flex-direction: column; gap: 56px">
+
+  <header style="display: flex; justify-content: space-between; align-items: flex-end; gap: 40px; padding-bottom: 32px; border-bottom: 1px solid var(--border)">
+    <div style="display: flex; flex-direction: column; gap: 16px">
+      <div style="display: flex; align-items: center; gap: 14px">
+        <img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="" style="width: 56px; height: 56px">
+        <span style="font-size: 30px; font-weight: 500; letter-spacing: -0.01em">Quimi<span style="color: #02605A; font-weight: 600">Cloude</span></span>
+      </div>
+      <h1 style="margin: 0; font-size: 56px; line-height: 1.05; font-weight: 600; letter-spacing: -0.025em; max-width: 900px">Fundamentos del rediseño</h1>
+      <p style="margin: 0; font-size: 18px; line-height: 1.5; color: var(--muted-fg); max-width: 760px">Los tokens que ya viven en <span class="mono" style="font-size: 16px">app/globals.css</span> (QC-226 cerró la paleta). El rediseño no cambia valores: decide cómo se usan.</p>
+    </div>
+    <div class="mono" style="font-size: 13px; color: var(--muted-fg); text-align: right; line-height: 1.7">IBM Plex Sans · IBM Plex Mono<br>radio base 0.5rem · oklch<br>claro y oscuro</div>
+  </header>
+
+  <section style="display: flex; flex-direction: column; gap: 20px">
+    <h2 style="margin: 0; font-size: 22px; font-weight: 600">Marca</h2>
+    <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 10px"><div style="height: 96px; border-radius: 12px; background: #02605A"></div><div style="font-weight: 600; font-size: 14px">Verde químico</div><div class="mono" style="font-size: 12px; color: var(--muted-fg)">#02605A</div></div>
+      <div style="display: flex; flex-direction: column; gap: 10px"><div style="height: 96px; border-radius: 12px; background: #3F9C94"></div><div style="font-weight: 600; font-size: 14px">Enlace</div><div class="mono" style="font-size: 12px; color: var(--muted-fg)">#3F9C94</div></div>
+      <div style="display: flex; flex-direction: column; gap: 10px"><div style="height: 96px; border-radius: 12px; background: #48CCBF"></div><div style="font-weight: 600; font-size: 14px">Turquesa (sobre oscuro)</div><div class="mono" style="font-size: 12px; color: var(--muted-fg)">#48CCBF</div></div>
+      <div style="display: flex; flex-direction: column; gap: 10px"><div style="height: 96px; border-radius: 12px; background: #1A79C2"></div><div style="font-weight: 600; font-size: 14px">Átomo azul</div><div class="mono" style="font-size: 12px; color: var(--muted-fg)">#1A79C2</div></div>
+      <div style="display: flex; flex-direction: column; gap: 10px"><div style="height: 96px; border-radius: 12px; background: linear-gradient(166deg, #0A4A47 0%, #003634 38%, #002828 70%, #021E1E 100%)"></div><div style="font-weight: 600; font-size: 14px">Panel lateral</div><div class="mono" style="font-size: 12px; color: var(--muted-fg)">#0A4A47 → #021E1E</div></div>
+      <div style="display: flex; flex-direction: column; gap: 10px"><div style="height: 96px; border-radius: 12px; background: linear-gradient(135deg, #0A4A47 0%, #02605A 45%, #0B7A72 100%)"></div><div style="font-weight: 600; font-size: 14px">Botón primario</div><div class="mono" style="font-size: 12px; color: var(--muted-fg)">#0A4A47 → #0B7A72</div></div>
+    </div>
+  </section>
+
+  <section style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px">
+    <div style="display: flex; flex-direction: column; gap: 16px; padding: 28px; border-radius: 16px; background: oklch(0.985 0.004 215); border: 1px solid var(--border)">
+      <h2 style="margin: 0; font-size: 18px; font-weight: 600">Superficies y texto · claro</h2>
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="height: 56px; border-radius: 8px; background: oklch(0.985 0.004 215); border: 1px solid var(--border)"></div><span style="font-size: 12px; font-weight: 600">background</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="height: 56px; border-radius: 8px; background: oklch(1 0 0); border: 1px solid var(--border)"></div><span style="font-size: 12px; font-weight: 600">card</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="height: 56px; border-radius: 8px; background: oklch(0.965 0.006 215)"></div><span style="font-size: 12px; font-weight: 600">muted</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="height: 56px; border-radius: 8px; background: oklch(0.925 0.009 215)"></div><span style="font-size: 12px; font-weight: 600">border</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="height: 56px; border-radius: 8px; background: oklch(0.15 0.01 215)"></div><span style="font-size: 12px; font-weight: 600">foreground</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="height: 56px; border-radius: 8px; background: oklch(0.45 0.013 215)"></div><span style="font-size: 12px; font-weight: 600">muted-foreground</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="height: 56px; border-radius: 8px; background: oklch(0.44 0.076 188)"></div><span style="font-size: 12px; font-weight: 600">primary</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="height: 56px; border-radius: 8px; background: oklch(0.95 0.025 248)"></div><span style="font-size: 12px; font-weight: 600">accent</span></div>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 16px; padding: 28px; border-radius: 16px; background: oklch(0.15 0.01 215); color: oklch(0.985 0.004 215)">
+      <h2 style="margin: 0; font-size: 18px; font-weight: 600">Superficies y texto · oscuro</h2>
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="height: 56px; border-radius: 8px; background: oklch(0.15 0.01 215); border: 1px solid oklch(0.27 0.013 215)"></div><span style="font-size: 12px; font-weight: 600">background</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="height: 56px; border-radius: 8px; background: oklch(0.21 0.012 215)"></div><span style="font-size: 12px; font-weight: 600">card</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="height: 56px; border-radius: 8px; background: oklch(0.27 0.013 215)"></div><span style="font-size: 12px; font-weight: 600">muted</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="height: 56px; border-radius: 8px; background: oklch(0.27 0.013 215); outline: 1px solid oklch(0.4 0.013 215)"></div><span style="font-size: 12px; font-weight: 600">border</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="height: 56px; border-radius: 8px; background: oklch(0.985 0.004 215)"></div><span style="font-size: 12px; font-weight: 600">foreground</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="height: 56px; border-radius: 8px; background: oklch(0.65 0.013 215)"></div><span style="font-size: 12px; font-weight: 600">muted-foreground</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="height: 56px; border-radius: 8px; background: oklch(0.77 0.115 186)"></div><span style="font-size: 12px; font-weight: 600">primary</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="height: 56px; border-radius: 8px; background: oklch(0.31 0.055 248)"></div><span style="font-size: 12px; font-weight: 600">accent</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 20px">
+    <h2 style="margin: 0; font-size: 22px; font-weight: 600">Tonos semánticos <span style="font-weight: 400; color: var(--muted-fg); font-size: 16px">· existen desde QC-226; hoy ningún .tsx los usa</span></h2>
+    <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 12px; background: oklch(0.95 0.04 145)"><div style="width: 32px; height: 32px; border-radius: 999px; background: oklch(0.52 0.14 145)"></div><span style="font-weight: 600; color: oklch(0.42 0.11 145)">success</span><span class="mono" style="font-size: 12px; color: oklch(0.42 0.11 145)">-subtle · -text</span></div>
+      <div style="display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 12px; background: oklch(0.95 0.031 60)"><div style="width: 32px; height: 32px; border-radius: 999px; background: oklch(0.64 0.15 60)"></div><span style="font-weight: 600; color: oklch(0.42 0.099 60)">warning</span><span class="mono" style="font-size: 12px; color: oklch(0.42 0.099 60)">-subtle · -text</span></div>
+      <div style="display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 12px; background: oklch(0.95 0.024 27)"><div style="width: 32px; height: 32px; border-radius: 999px; background: oklch(0.55 0.21 27)"></div><span style="font-weight: 600; color: oklch(0.42 0.11 27)">destructive</span><span class="mono" style="font-size: 12px; color: oklch(0.42 0.11 27)">-subtle · -text</span></div>
+      <div style="display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 12px; background: oklch(0.95 0.024 285)"><div style="width: 32px; height: 32px; border-radius: 999px; background: oklch(0.53 0.13 285)"></div><span style="font-weight: 600; color: oklch(0.42 0.11 285)">info</span><span class="mono" style="font-size: 12px; color: oklch(0.42 0.11 285)">-subtle · -text</span></div>
+      <div style="display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 12px; background: oklch(0.95 0.025 248)"><div style="width: 32px; height: 32px; border-radius: 999px; background: oklch(0.32 0.075 248)"></div><span style="font-weight: 600; color: oklch(0.32 0.075 248)">accent</span><span class="mono" style="font-size: 12px; color: oklch(0.32 0.075 248)">en proceso</span></div>
+    </div>
+  </section>
+
+  <section style="display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 32px">
+    <div style="grid-column: span 7; display: flex; flex-direction: column; gap: 18px">
+      <h2 style="margin: 0; font-size: 22px; font-weight: 600">Tipografía</h2>
+      <div style="display: flex; align-items: baseline; gap: 24px; border-bottom: 1px solid var(--border); padding-bottom: 12px"><span class="mono" style="width: 120px; font-size: 12px; color: var(--muted-fg)">Título 30/600</span><span style="font-size: 30px; font-weight: 600; letter-spacing: -0.015em">Pedidos</span></div>
+      <div style="display: flex; align-items: baseline; gap: 24px; border-bottom: 1px solid var(--border); padding-bottom: 12px"><span class="mono" style="width: 120px; font-size: 12px; color: var(--muted-fg)">Sección 20/600</span><span style="font-size: 20px; font-weight: 600">Datos del lote</span></div>
+      <div style="display: flex; align-items: baseline; gap: 24px; border-bottom: 1px solid var(--border); padding-bottom: 12px"><span class="mono" style="width: 120px; font-size: 12px; color: var(--muted-fg)">Cuerpo 14/400</span><span style="font-size: 14px">Limpiador multiusos limón · Concentrado</span></div>
+      <div style="display: flex; align-items: baseline; gap: 24px; border-bottom: 1px solid var(--border); padding-bottom: 12px"><span class="mono" style="width: 120px; font-size: 12px; color: var(--muted-fg)">Etiqueta 13/500</span><span style="font-size: 13px; font-weight: 500">Fecha de vencimiento</span></div>
+      <div style="display: flex; align-items: baseline; gap: 24px; border-bottom: 1px solid var(--border); padding-bottom: 12px"><span class="mono" style="width: 120px; font-size: 12px; color: var(--muted-fg)">Grupo 11/600</span><span style="font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-fg)">Operación</span></div>
+      <div style="display: flex; align-items: baseline; gap: 24px"><span class="mono" style="width: 120px; font-size: 12px; color: var(--muted-fg)">Cifras Mono 14</span><span class="mono" style="font-size: 14px">2026-0000004 · 1.250,50 kg · 12/10/2026</span></div>
+    </div>
+    <div style="grid-column: span 5; display: flex; flex-direction: column; gap: 28px">
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <h2 style="margin: 0; font-size: 22px; font-weight: 600">Radios</h2>
+        <div style="display: flex; gap: 16px; align-items: flex-end">
+          <div style="display: flex; flex-direction: column; gap: 6px; align-items: center"><div style="width: 64px; height: 64px; border-radius: 4.8px; background: var(--muted); border: 1px solid var(--border)"></div><span class="mono" style="font-size: 12px">sm</span></div>
+          <div style="display: flex; flex-direction: column; gap: 6px; align-items: center"><div style="width: 64px; height: 64px; border-radius: 6.4px; background: var(--muted); border: 1px solid var(--border)"></div><span class="mono" style="font-size: 12px">md</span></div>
+          <div style="display: flex; flex-direction: column; gap: 6px; align-items: center"><div style="width: 64px; height: 64px; border-radius: 8px; background: var(--muted); border: 1px solid var(--border)"></div><span class="mono" style="font-size: 12px">lg</span></div>
+          <div style="display: flex; flex-direction: column; gap: 6px; align-items: center"><div style="width: 64px; height: 64px; border-radius: 11.2px; background: var(--muted); border: 1px solid var(--border)"></div><span class="mono" style="font-size: 12px">xl</span></div>
+          <div style="display: flex; flex-direction: column; gap: 6px; align-items: center"><div style="width: 64px; height: 64px; border-radius: 999px; background: var(--muted); border: 1px solid var(--border)"></div><span class="mono" style="font-size: 12px">pill</span></div>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 22px; font-weight: 600">Movimiento</h2>
+        <div class="mono" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 24px; font-size: 13px">
+          <span>instant 100ms</span><span style="color: var(--muted-fg)">hover, foco</span>
+          <span>fast 150ms</span><span style="color: var(--muted-fg)">salida</span>
+          <span>base 200ms</span><span style="color: var(--muted-fg)">menús, popovers</span>
+          <span>slow 300ms</span><span style="color: var(--muted-fg)">Sheet, toast</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; padding-top: 32px; border-top: 1px solid var(--border)">
+    <div style="display: flex; flex-direction: column; gap: 8px"><h3 style="margin: 0; font-size: 16px; font-weight: 600">El color dice estado, no decora</h3><p style="margin: 0; font-size: 14px; line-height: 1.55; color: var(--muted-fg)">Un tono por significado. Una tabla no debería tener tres columnas de pastillas compitiendo: solo el estado lleva color; la prioridad usa un indicador neutro y solo «Crítica» se marca.</p></div>
+    <div style="display: flex; flex-direction: column; gap: 8px"><h3 style="margin: 0; font-size: 16px; font-weight: 600">Cifras en Plex Mono tabular</h3><p style="margin: 0; font-size: 14px; line-height: 1.55; color: var(--muted-fg)">Números de pedido, cantidades, fechas y lotes alinean en columna. Hoy ninguna celda usa tabular-nums.</p></div>
+    <div style="display: flex; flex-direction: column; gap: 8px"><h3 style="margin: 0; font-size: 16px; font-weight: 600">Una pieza por patrón</h3><p style="margin: 0; font-size: 14px; line-height: 1.55; color: var(--muted-fg)">Cada componente de la página siguiente es la versión única que reemplaza las copias que encontró la auditoría.</p></div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1560}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

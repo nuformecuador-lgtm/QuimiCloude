@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Acondicionamiento en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="Acondicionamiento" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Acondicionamiento · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">conditioning-order-screen · countdown-timer</span> (CountdownGatedButton sube a shared) · <span class="mono">responsible-avatars · async-autocomplete</span> («Buscar personas») · <span class="mono">text-field · date-picker · status-badge · confirm-dialog · ui/sonner</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (Tabs, Autocomplete, AlertDialog) · <span class="mono">sonner · lucide-react</span></dd>
+      <dt>Escritorio</dt><dd>«Equipo» y «Datos de lote» lado a lado · pestañas Personas / Grupos de trabajo · «Personas sueltas» con avatares <span class="mono">.av</span> y «Quitar» · grupos con «Asignar» / «Quitar» · Acondicionar / Terminar en el pie; Terminar espera con cuenta atrás en anillo</dd>
+      <dt>Tablet</dt><dd>Una columna: «Equipo» arriba y «Datos de lote» debajo · pie fijo</dd>
+      <dt>Teléfono</dt><dd>Campos de 48 px y letra de 16 px · Vencimiento y Día de producción apilados · resultados de «Buscar personas» con filas de 48 px · botones de 52 px · diálogos centrados</dd>
+      <dt>Animación</dt><dd>Entrada escalonada · pestañas con fundido · anillo de la cuenta atrás avanza cada segundo · diálogo con zoom 300 ms · toast al guardar y al terminar</dd>
+      <dt>Por confirmar</dt><dd>«[Volver a «Por acondicionar»]» · descripción de «Acondicionar el pedido N» · toasts «[Datos de lote guardados.]» y «[Acondicionamiento terminado.]» · etiqueta del botón con espera (aquí «Terminar 00:10») · si estas pantallas van sin barra lateral como la de ejecución</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

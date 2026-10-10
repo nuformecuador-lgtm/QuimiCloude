@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>DataTable</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 1440px; height: 980px; padding: 40px 48px; display: flex; flex-direction: column; gap: 20px; position: relative; overflow: hidden">
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <h1 class="h1">DataTable</h1>
+    <p class="sub" style="max-width: 960px">Un solo componente para todas las listas: barra de filtros, orden por columna, acciones de fila en el menú ⋯ (ninguna celda lleva enlaces ni botones sueltos) y paginación. En un contenedor estrecho la misma tabla se vuelve tarjetas y «Acciones» abre el menú centrado. A la derecha, la misma tabla y el mismo estado a 390 px.</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 32px; align-items: start">
+    <section style="display: flex; flex-direction: column; gap: 14px" aria-label="Escritorio">
+      <span class="lab">Escritorio</span>
+      <div class="toolbar" role="toolbar" aria-label="Filtros de pedidos">
+        <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Buscar por receta" aria-label="Buscar por receta"></label>
+        <button class="{{ chipCls }}" type="button" aria-pressed="{{ filtStr }}" onClick="{{ toggleFilter }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Estado<sc-if value="{{ filtered }}" hint-placeholder-val="{{ false }}"><span class="v">En curso</span></sc-if></button>
+        <button class="chip" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Prioridad</button>
+        <button class="chip" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg>Fecha de solicitud</button>
+        <sc-if value="{{ filtered }}" hint-placeholder-val="{{ false }}"><button class="b b-gho b-sm" type="button" onClick="{{ toggleFilter }}">Limpiar filtros</button></sc-if>
+      </div>
+
+      <div class="tw" style="overflow: visible">
+        <div class="scroll" style="overflow: visible">
+          <table class="collapse">
+            <thead><tr>
+              <th scope="col" aria-sort="{{ noSort }}" style="border-radius: 11px 0 0 0"><button class="{{ noBtnCls }}" type="button" onClick="{{ sortNo }}">Nº de pedido<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="opacity: {{ noOp }}"><path d="m6 9 6 6 6-6"></path></svg></button></th>
+              <th scope="col">Estado</th>
+              <th scope="col">Prioridad</th>
+              <th scope="col">Receta</th>
+              <th scope="col" class="num">Cantidad</th>
+              <th scope="col" class="num" aria-sort="{{ dateSort }}"><button class="{{ dateBtnCls }}" type="button" onClick="{{ sortDate }}">Fecha de solicitud<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="opacity: {{ dateOp }}"><path d="m6 9 6 6 6-6"></path></svg></button></th>
+              <th scope="col" style="border-radius: 0 11px 0 0"><span class="sr">Acciones</span></th>
+            </tr></thead>
+            <tbody class="{{ bodyCls }}">
+              <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+                <tr>
+                  <td class="mono">{{ r.no }}</td>
+                  <td><span class="{{ r.stCls }}"><i></i>{{ r.st }}</span></td>
+                  <td><span class="{{ r.pmCls }}"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="10" width="3" height="5" rx="1" fill="currentColor"></rect><rect x="6" y="6" width="3" height="9" rx="1" fill="currentColor" opacity="{{ r.o2 }}"></rect><rect x="11" y="2" width="3" height="13" rx="1" fill="currentColor" opacity="{{ r.o3 }}"></rect></svg>{{ r.pr }}</span></td>
+                  <td class="strong">{{ r.rec }}</td>
+                  <td class="num mono">{{ r.qty }}</td>
+                  <td class="num mono">{{ r.date }}</td>
+                  <td class="rowact anchor">
+                    <button class="b b-gho b-ico" type="button" aria-label="{{ r.menuLabel }}" aria-haspopup="menu" aria-expanded="{{ r.open }}" onClick="{{ r.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button>
+                    <div class="{{ r.menuCls }}" role="menu" aria-label="{{ r.menuLabel }}">
+                      <button class="mi" type="button" role="menuitem" onClick="{{ closeMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</button>
+                      <button class="mi" type="button" role="menuitem" onClick="{{ closeMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg>Responsables</button>
+                      <button class="mi" type="button" role="menuitem" onClick="{{ closeMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7"></path></svg>Entregar</button>
+                      <div class="sep"></div>
+                      <button class="mi danger" type="button" role="menuitem" onClick="{{ closeMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg>Cancelar</button>
+                      <button class="mi danger" type="button" role="menuitem" onClick="{{ closeMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Eliminar</button>
+                    </div>
+                  </td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <div class="pg"><span>{{ pageText }}</span><span class="pgb"><button class="b b-out b-ico b-sm" type="button" aria-label="Página anterior" disabled="{{ noPrev }}" onClick="{{ prev }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><button class="b b-out b-ico b-sm" type="button" aria-label="Página siguiente" disabled="{{ noNext }}" onClick="{{ next }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></span></div>
+      </div>
+      <span class="cap">Pulsa «Nº de pedido» o «Fecha de solicitud» para ordenar; «Estado» filtra; ⋯ abre el menú de la fila. El menú de las últimas filas se abre hacia arriba para no salirse de la vista.</span>
+      <dl class="spec" style="margin-top: 8px">
+        <dt>Componente</dt><dd><span class="mono">components/shared/data-table/</span> · <span class="mono">row-actions-menu.tsx</span> · <span class="mono">table-skeleton.tsx</span> · <span class="mono">components/ui/table · dropdown-menu · dialog</span></dd>
+        <dt>Librerías</dt><dd><span class="mono">@tanstack/react-table</span> (orden, filtro, paginación) · <span class="mono">@base-ui/react</span> (Menu; Dialog para el menú centrado) · <span class="mono">lucide-react</span></dd>
+        <dt>Animación</dt><dd>hover de fila 100 ms · chevron de orden gira 180° en 200 ms · menú ⋯ zoom .96 → 1 desde su esquina en 200 ms (150 ms al cerrar) · filas con fundido al filtrar o paginar · menú centrado con zoom 300 ms sobre velo</dd>
+        <dt>Notas</dt><dd>Las acciones antes sueltas en celda («Ver recorrido» del Dashboard, «Ver ficha del proveedor», «Lotes / Editar / Borrar» de Inventario) pasan al ⋯. Excepción: «Entrar» del operario. Las tarjetas usan <span class="mono">container-type</span>, no el ancho de la ventana.</dd>
+      </dl>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 14px" aria-label="Contenedor de teléfono">
+      <span class="lab">Contenedor de 390 px</span>
+      <div style="position: relative; width: 390px; height: 760px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg); overflow: hidden; container-type: inline-size">
+        <div style="height: 100%; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+          <div class="toolbar" role="toolbar" aria-label="Filtros de pedidos">
+            <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Buscar por receta" aria-label="Buscar por receta"></label>
+            <button class="{{ chipCls }}" type="button" aria-pressed="{{ filtStr }}" onClick="{{ toggleFilter }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Estado<sc-if value="{{ filtered }}" hint-placeholder-val="{{ false }}"><span class="v">En curso</span></sc-if></button>
+            <button class="chip" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Prioridad</button>
+          </div>
+          <div class="tw">
+            <div class="{{ rowsMCls }}">
+              <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+                <div class="rm">
+                  <div class="rm-top"><span class="mono strong">{{ r.no }}</span><span class="{{ r.stCls }}"><i></i>{{ r.st }}</span></div>
+                  <span class="strong">{{ r.rec }}</span>
+                  <div class="rm-meta"><span class="mono">{{ r.qty }}</span><span class="mono">{{ r.date }}</span></div>
+                  <div class="rm-top"><span class="{{ r.pmCls }}"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="10" width="3" height="5" rx="1" fill="currentColor"></rect><rect x="6" y="6" width="3" height="9" rx="1" fill="currentColor" opacity="{{ r.o2 }}"></rect><rect x="11" y="2" width="3" height="13" rx="1" fill="currentColor" opacity="{{ r.o3 }}"></rect></svg>{{ r.pr }}</span><button class="b b-out b-sm" type="button" style="height: 44px" aria-label="{{ r.menuLabel }}" onClick="{{ r.mobileActs }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg>Acciones</button></div>
+                </div>
+              </sc-for>
+            </div>
+            <div class="pg"><span>{{ pageText }}</span><span class="pgb"><button class="b b-out b-ico b-touch" type="button" aria-label="Página anterior" disabled="{{ noPrev }}" onClick="{{ prev }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><button class="b b-out b-ico b-touch" type="button" aria-label="Página siguiente" disabled="{{ noNext }}" onClick="{{ next }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></span></div>
+          </div>
+        </div>
+
+        <div class="{{ ovCls }}" onClick="{{ closeActs }}"></div>
+        <div class="{{ actsCls }}" role="menu" aria-label="Acciones del pedido">
+          <div class="dlg-hd" style="padding: 0 4px 8px"><span class="h3">Pedido <span class="mono">{{ actsNo }}</span></span><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeActs }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+          <button class="mi" type="button" role="menuitem" onClick="{{ closeActs }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</button>
+          <button class="mi" type="button" role="menuitem" onClick="{{ closeActs }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg>Responsables</button>
+          <button class="mi" type="button" role="menuitem" onClick="{{ closeActs }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7"></path></svg>Entregar</button>
+          <div class="sep"></div>
+          <button class="mi danger" type="button" role="menuitem" onClick="{{ closeActs }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg>Cancelar</button>
+          <button class="mi danger" type="button" role="menuitem" onClick="{{ closeActs }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Eliminar</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":980}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+const data = [
+['2026-0000003','En curso','progress','Alta',3,'Desengrasante alcalino','120,00 kg','02/10/2026'],
+['2026-0000004','Por empacar','waiting','Crítica',4,'Limpiador multiusos limón','80,50 kg','03/10/2026'],
+['2026-0000005','En empaque','progress','Media',2,'Blanqueador hipoclorito 5 %','200,00 L','04/10/2026'],
+['2026-0000006','Por acondicionar','waiting','Alta',3,'Limpiador multiusos limón','45,00 kg','05/10/2026'],
+['2026-0000007','En curso','progress','Media',2,'Limpiador cítrico','30,00 kg','06/10/2026'],
+['2026-0000008','Terminado','success','Baja',1,'Desengrasante alcalino','90,00 kg','07/10/2026'],
+['2026-0000009','Cancelado','muted','Media',2,'Blanqueador hipoclorito 5 %','150,00 L','08/10/2026'],
+['2026-0000010','Bloqueado','danger','Alta',3,'Limpiador cítrico','25,00 kg','09/10/2026'],
+['2026-0000011','Pendiente','neutral','Baja',1,'Desengrasante alcalino','60,00 kg','10/10/2026'],
+['2026-0000012','En curso','progress','Crítica',4,'Limpiador multiusos limón','18,00 kg','10/10/2026']
+];
+const filtered = !!s.filtered;
+const key = s.key || 'date';
+const asc = !!s.asc;
+const iso = (d) => d.slice(6) + d.slice(3, 5) + d.slice(0, 2);
+const val = (d) => key === 'no' ? d[0] : iso(d[7]) + d[0];
+let list = (filtered ? data.filter((d) => d[1] === 'En curso') : data).slice();
+list.sort((a, b) => (val(a) < val(b) ? -1 : val(a) > val(b) ? 1 : 0) * (asc ? 1 : -1));
+const per = 6;
+const pages = Math.max(1, Math.ceil(list.length / per));
+const page = Math.min(s.page || 1, pages);
+const shown = list.slice((page - 1) * per, page * per);
+const open = s.open;
+const k = s.k || 0;
+const sortBy = (kk) => () => this.setState({ key: kk, asc: key === kk ? !asc : false, open: null, k: k + 1 });
+return {
+filtered: filtered, filtStr: filtered ? 'true' : 'false', chipCls: filtered ? 'chip on' : 'chip',
+toggleFilter: () => this.setState({ filtered: !filtered, page: 1, open: null, k: k + 1 }),
+noSort: key === 'no' ? (asc ? 'ascending' : 'descending') : 'none',
+dateSort: key === 'date' ? (asc ? 'ascending' : 'descending') : 'none',
+noBtnCls: key === 'no' && asc ? 'sortb asc' : 'sortb', dateBtnCls: key === 'date' && asc ? 'sortb asc' : 'sortb',
+noOp: key === 'no' ? '1' : '0.35', dateOp: key === 'date' ? '1' : '0.35',
+sortNo: sortBy('no'), sortDate: sortBy('date'),
+bodyCls: k % 2 ? 'fade' : '', rowsMCls: k % 2 ? 'rows-m fade' : 'rows-m',
+rows: shown.map((d, i) => ({ no: d[0], st: d[1], stCls: 'sb t-' + d[2], pr: d[3], pmCls: d[4] === 4 ? 'pm crit' : 'pm', o2: d[4] >= 2 ? '1' : '0.2', o3: d[4] >= 3 ? '1' : '0.2', rec: d[5], qty: d[6], date: d[7],
+open: open === d[0] ? 'true' : 'false', menuCls: 'pop right at-row' + (i >= 3 ? ' up' : '') + (open === d[0] ? ' open' : ''), menuLabel: 'Acciones del pedido ' + d[0],
+toggle: () => this.setState({ open: open === d[0] ? null : d[0] }), mobileActs: () => this.setState({ acts: d[0] }) })),
+closeMenu: () => this.setState({ open: null }),
+pageText: 'Página ' + page + ' de ' + pages + ' · ' + list.length + ' en total',
+noPrev: page <= 1, noNext: page >= pages,
+prev: () => this.setState({ page: page - 1, open: null, k: k + 1 }),
+next: () => this.setState({ page: page + 1, open: null, k: k + 1 }),
+ovCls: s.acts ? 'ov open' : 'ov', actsCls: s.acts ? 'dlg menu open' : 'dlg menu', actsNo: s.acts || '',
+closeActs: () => this.setState({ acts: null })
+};
+}
+}
+</script>
+</body>
+</html>

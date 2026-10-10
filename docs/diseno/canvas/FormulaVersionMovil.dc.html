@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Versión de fórmula en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="FormulaVersion" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Versión de fórmula · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">recipe-version-form · async-autocomplete · text-field · status-badge · ui/sonner</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">@base-ui/react · zod · sonner · lucide-react</span></dd>
+      <dt>Escritorio</dt><dd>h1 «Nueva versión de {original}» (al editar, el nombre de la versión) · Nombre · «De la receta original» con cada línea marcada Igual / Cambiado / Añadido y el valor original tachado si cambió · «Quitados de la original» aparte · pie fijo Cancelar / Guardar</dd>
+      <dt>Tablet</dt><dd>Barra lateral en icono · las líneas caben en una fila</dd>
+      <dt>Teléfono</dt><dd>Cada línea se parte en dos (producto arriba; original, porcentaje, estado y Quitar abajo) · resumen de estados envuelve · botones del pie de 44 px</dd>
+      <dt>Animación</dt><dd>Entrada escalonada · al quitar o añadir la lista hace fade 200 ms · los badges cambian de tono 200 ms · toast «Versión creada.»</dd>
+      <dt>Por confirmar</dt><dd>«Volver a la receta» · cabeceras «Original» y «Estado» · acción para devolver un quitado · texto cuando no se quitó nada</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

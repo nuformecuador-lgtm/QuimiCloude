@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Importar inventario en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="InventarioImportar" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Importar inventario · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">shared/file-field · shared/data-table · status-badge · text-field · shared-select · form-dialog (Nueva unidad / Nueva presentación, los mismos formularios de configuración) · ui/sonner</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">@tanstack/react-table · @base-ui/react</span> (Dialog, Select) · lectura de .xlsx/.csv: la que ya use el importador · <span class="mono">sonner · lucide-react</span></dd>
+      <dt>Escritorio</dt><dd>«Volver a inventario» como botón con flecha · «Descargar plantilla» arriba a la derecha · paso 1: FileField «Elegir archivo» + «Revisar archivo» (deshabilitado sin archivo) · paso 2: «Vista previa» con Filas / Se crean / Suman lote / Duplicadas / Con error, «Faltan en el catálogo» (Unidades / Presentaciones con «Crear»), filtros Todas, Crear, Sumar lote, Duplicado, Error y tabla Fila · Estado · Producto · Detalle; «Descargar filas con error» e «Importar N filas válidas» · paso 3: «Importación terminada» + «Importar otro archivo»</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono · las cifras se reacomodan solas (rejilla auto-fit) · Unidades y Presentaciones en una sola columna</dd>
+      <dt>Teléfono</dt><dd>Cabecera con «Alternar barra lateral» + isotipo · acciones a lo ancho y apiladas (44 px) · pasos con scroll horizontal · tabla de vista previa en tarjetas (fila, estado, producto, detalle) · Dialogs a casi todo el ancho</dd>
+      <dt>Animación</dt><dd>Entrada escalonada · cada paso entra deslizándose · «Revisar archivo» e «Importar N filas válidas» muestran spinner y aria-busy · fundido de filas al filtrar · Dialog con zoom 300 ms · toasts «Unidad creada.» y [Presentación creada.]</dd>
+      <dt>Por confirmar</dt><dd>La barra de pasos (Elegir archivo · Vista previa · Importación terminada) es del diseño, no existe hoy · textos de «Detalle» de cada error · toast al crear una presentación · si el resultado repite las cifras o solo el título</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

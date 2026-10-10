@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Modales de proveedores</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 1440px; min-height: 3150px; padding: 40px 48px; display: flex; flex-direction: column; gap: 24px">
+  <div style="display: flex; flex-direction: column; gap: 6px"><h1 class="h1">Modales · Proveedores y clientes</h1><p class="sub">Todos abiertos a la vez, sin animar. Textos literales del código; lo que falta va entre corchetes.</p></div>
+
+  <div class="modal-grid">
+    <div class="stage for-sheet"><span class="stage-cap">SupplierSheet · Nuevo / Editar proveedor</span>
+      <aside class="sheet static" role="dialog" aria-labelledby="mp-1">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mp-1" class="h2">Nuevo proveedor</h2><p class="sub">Completa los datos del proveedor. Hace falta al menos un teléfono o un correo.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div class="f"><label for="mp-1n">Nombre <span class="req">*</span></label><input id="mp-1n" class="in" type="text" value="Distribuidora Norte"></div>
+          <div class="f"><label for="mp-1t">Teléfono</label><input id="mp-1t" class="in mono" type="tel" value=""></div>
+          <div class="f"><label for="mp-1c">Correo electrónico</label><input id="mp-1c" class="in" type="email" value="" aria-invalid="true"><span class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>[Escribe un teléfono o un correo.]</span></div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
+      </aside>
+    </div>
+
+    <div class="stage"><span class="stage-cap">Dar de baja el proveedor</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="mp-2">
+        <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg></div>
+        <h2 id="mp-2" class="h2">Dar de baja el proveedor</h2>
+        <p class="sub">Se va a dar de baja «Envases Andinos». Esta acción no se puede deshacer.</p>
+        <div class="nt n-w"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2zM12 10v4M12 17h.01"></path></svg><span>Sus líneas de catálogo se dan de baja con él.</span></div>
+        <div class="actions"><button class="b b-out" type="button">Cancelar</button><button class="b b-des" type="button">Dar de baja</button></div>
+      </div>
+    </div>
+
+    <div class="stage for-sheet"><span class="stage-cap">Nueva / Editar línea de catálogo</span>
+      <aside class="sheet wide static" role="dialog" aria-labelledby="mp-3">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mp-3" class="h2">Nueva línea de catálogo</h2><p class="sub">Completa los datos de la línea. La presentación es obligatoria y la unidad es opcional.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div class="f"><label for="mp-3n">Nombre <span class="req">*</span></label><input id="mp-3n" class="in" type="text" value="Frasco 1 L"></div>
+          <div class="g2">
+            <div class="f"><label for="mp-3p">Presentación <span class="req">*</span></label><button id="mp-3p" class="in trig" type="button" aria-invalid="true"><span class="dim">[Elige una presentación]</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button><span class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Elige una presentación.</span></div>
+            <div class="f"><label for="mp-3u">Unidad</label><button id="mp-3u" class="in trig" type="button"><span>Sin unidad</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+          </div>
+          <div class="g3">
+            <div class="f"><label for="mp-3c">Costo <span class="req">*</span></label><input id="mp-3c" class="in mono" type="text" value="980,00"></div>
+            <div class="f"><label for="mp-3m">Mínimo de compra</label><input id="mp-3m" class="in mono" type="text" value="200"></div>
+            <div class="f"><label for="mp-3t">Tiempo de entrega (días)</label><input id="mp-3t" class="in mono" type="text" value="5"></div>
+          </div>
+          <div class="f"><label for="mp-3mat">Material</label><input id="mp-3mat" class="in" type="text" value="PET"></div>
+          <div class="g2">
+            <div class="f"><label for="mp-3d">Diámetro</label><div style="display: grid; grid-template-columns: minmax(0, 1fr) 84px; gap: 8px"><input id="mp-3d" class="in mono" type="text" value="7,5"><button class="in trig" type="button" aria-label="Unidad de diámetro"><span>cm</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div></div>
+            <div class="f"><label for="mp-3a">Alto</label><div style="display: grid; grid-template-columns: minmax(0, 1fr) 84px; gap: 8px"><input id="mp-3a" class="in mono" type="text" value="12"><button class="in trig" type="button" aria-label="Unidad de alto"><span>cm</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div></div>
+          </div>
+          <div class="f"><label for="mp-3b">Boca</label><input id="mp-3b" class="in mono" type="text" value="28/410"><span class="help">Escribe hasta 40 caracteres, o déjalo vacío.</span></div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
+      </aside>
+    </div>
+
+    <div class="stage"><span class="stage-cap">Dar de baja la línea</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="mp-4">
+        <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg></div>
+        <h2 id="mp-4" class="h2">Dar de baja la línea</h2>
+        <p class="sub">Se va a dar de baja «Frasco 1 L». Esta acción no se puede deshacer.</p>
+        <div class="actions"><button class="b b-out" type="button">Cancelar</button><button class="b b-des" type="button">Dar de baja</button></div>
+      </div>
+    </div>
+
+    <div class="stage"><span class="stage-cap">Subir PDFs (shared/document-upload)</span>
+      <div class="dlg wide static" role="dialog" aria-labelledby="mp-5">
+        <div class="dlg-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mp-5" class="h2">Subir PDFs</h2><p class="sub">Solo PDF, hasta <span class="mono">10</span> archivos por tanda.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="drop"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--muted-fg)"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"></path></svg><button class="b b-out" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6v18h12V7zM14 3v4h4"></path></svg>Elegir PDFs</button></div>
+        <ul style="list-style: none; margin: 0; padding: 0">
+          <li style="display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border)"><span class="thumb"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6v18h12V7zM14 3v4h4"></path></svg></span><div style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0"><span class="mono" style="font-size: 13px">catalogo-envases-andinos-2026.pdf</span><span style="display: flex; gap: 6px"><span class="sb t-success"><i></i>Subido</span><span class="sb t-success"><i></i>Listo</span></span></div><button class="b b-out b-sm b-go" type="button">Revisar<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></li>
+          <li style="display: flex; flex-direction: column; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border)"><div style="display: flex; align-items: center; gap: 10px"><span class="thumb"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6v18h12V7zM14 3v4h4"></path></svg></span><div style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0"><span class="mono" style="font-size: 13px">catalogo-tapas-2026.pdf</span><span style="display: flex; gap: 6px"><span class="sb t-success"><i></i>Subido</span><span class="sb t-info"><i></i>Procesando</span></span></div></div><div class="progress bar-ind"><i></i></div></li>
+          <li style="display: flex; align-items: center; gap: 10px; padding: 10px 0"><span class="thumb"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6v18h12V7zM14 3v4h4"></path></svg></span><div style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0"><span class="mono" style="font-size: 13px">lista-precios-octubre.pdf</span><span style="display: flex; gap: 6px"><span class="sb t-danger"><i></i>No se pudo subir</span></span></div><button class="b b-out b-sm" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"></path></svg>Reanudar</button></li>
+        </ul>
+        <div class="actions"><button class="b b-gho" type="button" style="margin-right: auto">Quitar la selección</button><button class="b b-out" type="button">Cerrar</button><button class="b b-pri" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"></path></svg>Subir</button></div>
+      </div>
+    </div>
+
+    <div class="stage"><span class="stage-cap">Elige una imagen del archivo (crop-picker)</span>
+      <div class="dlg wide static" role="dialog" aria-labelledby="mp-6">
+        <div class="dlg-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mp-6" class="h2">Elige una imagen del archivo</h2><p class="sub">Fila <span class="mono">1</span> · <span class="mono">catalogo-envases-andinos-2026.pdf</span></p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="g3" style="gap: 10px">
+          <button class="ev-body" type="button" aria-label="Recorte del archivo 1" style="padding: 6px; font: inherit; color: inherit; text-align: left; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary)"><span class="thumb photo" style="width: 100%; height: 96px; border-radius: 8px"></span><span class="cap">Recorte del archivo <span class="mono">1</span></span></button>
+          <button class="ev-body" type="button" aria-label="Recorte del archivo 2" style="padding: 6px; font: inherit; color: inherit; text-align: left"><span class="thumb photo" style="width: 100%; height: 96px; border-radius: 8px; filter: hue-rotate(25deg)"></span><span class="cap">Recorte del archivo <span class="mono">2</span></span></button>
+          <button class="ev-body" type="button" aria-label="Recorte del archivo 3" style="padding: 6px; font: inherit; color: inherit; text-align: left"><span class="thumb photo" style="width: 100%; height: 96px; border-radius: 8px; filter: hue-rotate(50deg)"></span><span class="cap">Recorte del archivo <span class="mono">3</span></span></button>
+        </div>
+        <div class="actions"><button class="b b-out" type="button">Cancelar</button></div>
+      </div>
+    </div>
+
+    <div class="stage for-sheet"><span class="stage-cap">Nuevo / Editar cliente</span>
+      <aside class="sheet static" role="dialog" aria-labelledby="mp-7">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mp-7" class="h2">Editar cliente</h2><p class="sub">Cambia los datos del cliente.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div class="g2">
+            <div class="f"><label for="mp-7n">Nombres <span class="req">*</span></label><input id="mp-7n" class="in" type="text" value="Mateo"></div>
+            <div class="f"><label for="mp-7a">Apellidos <span class="req">*</span></label><input id="mp-7a" class="in" type="text" value="Sánchez"></div>
+          </div>
+          <div class="f"><label for="mp-7c">Ciudad</label><input id="mp-7c" class="in" type="text" value="Cali"></div>
+          <div class="f"><label for="mp-7t">Teléfono</label><input id="mp-7t" class="in mono" type="tel" value="318 990 2276"></div>
+          <div class="f"><label for="mp-7m">Correo</label><input id="mp-7m" class="in" type="email" value="mateo.sanchez@correo.co"></div>
+          <div class="f"><label for="mp-7d">Dirección</label><input id="mp-7d" class="in" type="text" value="Av. 6N # 23-50"></div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
+      </aside>
+    </div>
+
+    <div class="stage"><span class="stage-cap">Eliminar el cliente</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="mp-8">
+        <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+        <h2 id="mp-8" class="h2">Eliminar el cliente</h2>
+        <p class="sub">Se va a eliminar el cliente Mateo Sánchez. Esta acción no se puede deshacer.</p>
+        <div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-des" type="button">Eliminar</button></div>
+      </div>
+    </div>
+  </div>
+
+  <dl class="spec">
+    <dt>Reutiliza</dt><dd><span class="mono">shared/supplier</span> (SupplierSheet) · <span class="mono">catalog-line-sheet · unit-select · delete-supplier-dialog · delete-catalog-line-dialog · shared/document-upload · crop-picker · customer-sheet · shared/delete-confirm-dialog · ui/sonner</span></dd>
+    <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (Dialog, AlertDialog, Sheet, Select) · <span class="mono">sonner · lucide-react</span></dd>
+    <dt>Toasts</dt><dd>«Proveedor dado de baja.» · «Línea de catálogo creada.» · «Línea de catálogo actualizada.» · «Línea de catálogo dada de baja.» · «Cliente creado.» · «Cliente actualizado.» · «Cliente eliminado.»</dd>
+    <dt>Animación</dt><dd>Velo 200 ms · Dialog con zoom 300 ms entrada / 150 ms salida · Sheet desde la derecha 300/150 ms · errores de campo bajan 4 px en 150 ms</dd>
+  </dl>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":3150}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

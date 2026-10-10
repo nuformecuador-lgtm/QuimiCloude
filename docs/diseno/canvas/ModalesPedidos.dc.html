@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Modales de Pedidos</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}" style="width: 1440px; padding: 40px; display: flex; flex-direction: column; gap: 24px">
+  <div class="ph"><div class="ph-t"><span class="lab">Tablero de modales</span><h1 class="h1">Pedidos · modales</h1><p class="sub">Todos los Dialog, AlertDialog y Sheet del módulo, abiertos a la vez sobre su velo.</p></div></div>
+
+  <div class="modal-grid">
+
+    <!-- 1. Sheet Nuevo pedido (vacío) -->
+    <div class="stage for-sheet">
+      <span class="stage-cap">Sheet · Nuevo pedido</span>
+      <aside class="sheet wide static" role="dialog" aria-modal="true" aria-labelledby="mp-n">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mp-n" class="h2">Nuevo pedido</h2><p class="sub">Completa los datos del pedido. La fecha y el número los pone el sistema.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div class="drop row"><span class="thumb lg"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg></span><div style="display: flex; flex-direction: column; gap: 2px"><span class="fl">Imagen de la receta</span><span class="sub">Sin receta elegida</span></div></div>
+          <div class="f"><label for="mn-r">Receta <span class="req">*</span></label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="mn-r" class="in focus" type="text" placeholder="Busca una receta por su nombre"></label></div>
+          <div class="f"><label for="mn-v">Versión</label><button id="mn-v" class="in trig" type="button" disabled><span>Original</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+          <div class="f"><label for="mn-c">Cliente</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="mn-c" class="in" type="text" placeholder="Busca un cliente por su nombre"></label></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 140px; gap: 10px"><div class="f"><label for="mn-q">Cantidad <span class="req">*</span></label><input id="mn-q" class="in mono num" type="text"></div><div class="f"><label for="mn-u">Unidad</label><button id="mn-u" class="in trig" type="button"><span>kg</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div></div>
+          <div class="f"><label for="mn-p">Prioridad</label><button id="mn-p" class="in trig" type="button"><span>Media</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+          <div class="card" style="padding: 16px; gap: 10px"><span class="h3">Reparto en envases</span><div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 8px; align-items: end"><div class="f"><label>Envase</label><button class="in trig" type="button"><span class="dim">[Elige un envase]</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div><div class="f"><label>Cantidad</label><input class="in mono num" type="text"></div><button class="b b-out" type="button" style="height: 40px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Añadir</button></div></div>
+          <div class="f"><span class="fl">Responsables</span><div style="display: flex; gap: 8px"><label class="wrap-ic" style="flex: 1"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="text" placeholder="Buscar personas para asignar"></label><button class="b b-out" type="button" style="height: 40px" disabled>Asignar</button></div></div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
+      </aside>
+    </div>
+
+    <!-- 2. Sheet Editar pedido (todos los campos con datos) -->
+    <div class="stage for-sheet">
+      <span class="stage-cap">Sheet · Editar pedido (completo)</span>
+      <aside class="sheet wide static" role="dialog" aria-modal="true" aria-labelledby="mp-e">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mp-e" class="h2">Editar pedido</h2><p class="sub">Cambia los datos del pedido. Se guardan todos los campos.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div class="drop row"><span class="thumb lg photo"></span><div style="display: flex; flex-direction: column; gap: 2px"><span class="fl">Imagen de la receta</span><span class="strong">Desengrasante alcalino</span></div></div>
+          <div class="f"><label for="me-r">Receta <span class="req">*</span></label><div style="display: flex; gap: 8px"><label class="wrap-ic" style="flex: 1"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="me-r" class="in" type="text" value="Desengrasante alcalino"></label><button class="b b-out b-ico" type="button" aria-label="Borrar receta" style="height: 40px; width: 40px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div></div>
+          <div class="f anchor"><label for="me-v">Versión</label><button id="me-v" class="in trig" type="button" aria-expanded="true"><span>Original</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+            <div role="listbox" aria-label="Versión" style="display: flex; flex-direction: column; padding: 4px; border-radius: 10px; border: 1px solid var(--border); background: var(--popover); box-shadow: var(--shadow-pop)">
+              <span class="opt hl" role="option" aria-selected="true">Original<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-left: auto"><path d="m5 12 5 5 9-10"></path></svg></span>
+              <span class="opt" role="option" aria-selected="false">[Concentrado] <span class="sb t-waiting"><i></i>por revisar</span></span>
+              <span class="opt" role="option" aria-selected="false">[Sin fragancia] <span class="sb t-muted"><i></i>dada de baja</span></span>
+            </div>
+          </div>
+          <div class="f"><label for="me-c">Cliente</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="me-c" class="in" type="text" value="Mateo Sánchez"></label></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 140px; gap: 10px"><div class="f"><label for="me-q">Cantidad <span class="req">*</span></label><input id="me-q" class="in mono num" type="text" value="120,00"></div><div class="f"><label for="me-u">Unidad</label><button id="me-u" class="in trig" type="button"><span>kg</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div></div>
+          <div class="f"><label for="me-p">Prioridad</label><button id="me-p" class="in trig" type="button"><span class="pm"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="10" width="3" height="5" rx="1" fill="currentColor"></rect><rect x="6" y="6" width="3" height="9" rx="1" fill="currentColor"></rect><rect x="11" y="2" width="3" height="13" rx="1" fill="currentColor"></rect></svg>Alta</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+
+          <div class="card" style="padding: 16px; gap: 10px"><span class="h3">Reparto en envases</span>
+            <div class="lbox">
+              <div class="lrow"><span>Garrafa 20 L</span><span style="display: inline-flex; align-items: center; gap: 12px"><span class="mono">× 4</span><button class="b b-gho b-sm" type="button">Quitar</button></span></div>
+              <div class="lrow"><span>Galón 3,78 L</span><span style="display: inline-flex; align-items: center; gap: 12px"><span class="mono">× 10</span><button class="b b-gho b-sm" type="button">Quitar</button></span></div>
+            </div>
+            <div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 8px; align-items: end"><div class="f"><label>Envase</label><button class="in trig" type="button"><span>Garrafa 20 L</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div><div class="f"><label>Cantidad</label><input class="in mono num" type="text" value="1"></div><button class="b b-out" type="button" style="height: 40px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Añadir</button></div>
+            <span class="cap">Disponible <span class="mono">18</span> · Cubre <span class="mono">117,80 kg</span></span>
+          </div>
+
+          <div class="panel" style="display: flex; justify-content: space-between; align-items: center; gap: 12px"><span class="fl">Coste estimado de producción</span><span class="mono strong" style="font-size: 18px">$ 482.300</span></div>
+
+          <div class="tw"><div class="scroll"><table class="collapse">
+            <thead><tr><th scope="col">[Ingrediente]</th><th scope="col" class="num">Porcentaje</th><th scope="col" class="num">Cantidad</th><th scope="col" class="num">[Costo]</th></tr></thead>
+            <tbody>
+              <tr><td>Agua desionizada</td><td class="num mono">72,00 %</td><td class="num mono">86,40 kg</td><td class="num mono">$ 8.640</td></tr>
+              <tr><td>Hidróxido de sodio</td><td class="num mono">10,00 %</td><td class="num mono">12,00 kg</td><td class="num mono">$ 96.000</td></tr>
+              <tr><td>Tensoactivo no iónico</td><td class="num mono">15,00 %</td><td class="num mono">18,00 kg</td><td class="num mono">$ 324.000</td></tr>
+              <tr><td>Secuestrante EDTA</td><td class="num mono">3,00 %</td><td class="num mono">3,60 kg</td><td class="num mono">$ 53.660</td></tr>
+            </tbody>
+          </table>
+          <div class="rows-m">
+            <div class="rm"><div class="rm-top"><span class="strong">Agua desionizada</span><span class="mono">$ 8.640</span></div><div class="rm-meta"><span class="mono">72,00 %</span><span class="mono">86,40 kg</span></div></div>
+            <div class="rm"><div class="rm-top"><span class="strong">Hidróxido de sodio</span><span class="mono">$ 96.000</span></div><div class="rm-meta"><span class="mono">10,00 %</span><span class="mono">12,00 kg</span></div></div>
+            <div class="rm"><div class="rm-top"><span class="strong">Tensoactivo no iónico</span><span class="mono">$ 324.000</span></div><div class="rm-meta"><span class="mono">15,00 %</span><span class="mono">18,00 kg</span></div></div>
+            <div class="rm"><div class="rm-top"><span class="strong">Secuestrante EDTA</span><span class="mono">$ 53.660</span></div><div class="rm-meta"><span class="mono">3,00 %</span><span class="mono">3,60 kg</span></div></div>
+          </div></div></div>
+
+          <div class="f"><span class="fl">Responsables</span>
+            <div style="display: flex; gap: 8px"><label class="wrap-ic" style="flex: 1"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="text" placeholder="Buscar personas para asignar"></label><button class="b b-out" type="button" style="height: 40px">Asignar</button></div>
+            <span class="cap" style="margin-top: 6px">Asignados directamente</span>
+            <div class="person"><span class="av sm">LG</span>Laura Gómez<button class="b b-gho b-sm" type="button" style="margin-left: auto">Quitar del pedido</button></div>
+            <div class="person"><span class="av sm c2">MS</span>Mateo Sánchez<button class="b b-gho b-sm" type="button" style="margin-left: auto">Quitar del pedido</button></div>
+            <span class="cap" style="margin-top: 6px">Grupos de trabajo</span>
+            <div class="person"><span class="avs"><span class="av sm c3">VH</span><span class="av sm c4">SV</span></span>[Envasado turno A]<span class="count">2</span><button class="b b-gho b-sm" type="button" style="margin-left: auto">Quitar el grupo entero</button></div>
+          </div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
+      </aside>
+    </div>
+
+    <!-- 3. Sheet Entregar pedido N -->
+    <div class="stage for-sheet">
+      <span class="stage-cap">Sheet · Entregar pedido</span>
+      <aside class="sheet wide static" role="dialog" aria-modal="true" aria-labelledby="mp-en">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mp-en" class="h2">Entregar pedido <span class="mono">2026-0000006</span></h2><p class="sub">Elige el cliente y, por presentación, de qué lotes salen los envases.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div class="f"><label for="men-c">Cliente</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="men-c" class="in" type="text" value="Laura Gómez"></label></div>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div class="rm-top"><span class="h3">Galón 3,78 L</span><span class="cap mono">12</span></div>
+            <div class="tw"><div class="scroll"><table class="collapse">
+              <thead><tr><th scope="col">Lote</th><th scope="col" class="num">Disponibles</th><th scope="col">Entrada</th><th scope="col" class="num">Vence</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">L-2610-05</td><td class="num mono">8</td><td><input class="in mono num" type="text" value="8" aria-label="Entrada del lote L-2610-05" style="width: 88px; height: 36px"></td><td class="num mono">05/04/2027</td></tr>
+                <tr><td class="mono">L-2610-06</td><td class="num mono">6</td><td><input class="in mono num" type="text" value="4" aria-label="Entrada del lote L-2610-06" style="width: 88px; height: 36px"></td><td class="num mono">12/04/2027</td></tr>
+              </tbody>
+            </table>
+            <div class="rows-m">
+              <div class="rm"><div class="rm-top"><span class="mono strong">L-2610-05</span><span class="mono">05/04/2027</span></div><div class="rm-meta"><span>Disponibles <span class="mono">8</span></span></div><div class="f"><label for="men-e1">Entrada</label><input id="men-e1" class="in mono num" type="text" value="8"></div></div>
+              <div class="rm"><div class="rm-top"><span class="mono strong">L-2610-06</span><span class="mono">12/04/2027</span></div><div class="rm-meta"><span>Disponibles <span class="mono">6</span></span></div><div class="f"><label for="men-e2">Entrada</label><input id="men-e2" class="in mono num" type="text" value="4"></div></div>
+            </div></div></div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div class="rm-top"><span class="h3">Garrafa 20 L</span><span class="cap mono">2</span></div>
+            <div class="tw"><div class="scroll"><table class="collapse">
+              <thead><tr><th scope="col">Lote</th><th scope="col" class="num">Disponibles</th><th scope="col">Entrada</th><th scope="col" class="num">Vence</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">L-2610-02</td><td class="num mono">3</td><td><input class="in mono num" type="text" value="2" aria-label="Entrada del lote L-2610-02" style="width: 88px; height: 36px"></td><td class="num mono">28/03/2027</td></tr>
+              </tbody>
+            </table>
+            <div class="rows-m">
+              <div class="rm"><div class="rm-top"><span class="mono strong">L-2610-02</span><span class="mono">28/03/2027</span></div><div class="rm-meta"><span>Disponibles <span class="mono">3</span></span></div><div class="f"><label for="men-e3">Entrada</label><input id="men-e3" class="in mono num" type="text" value="2"></div></div>
+            </div></div></div>
+          </div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7M7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"></path></svg>Entregar</button></div>
+      </aside>
+    </div>
+
+    <!-- 4. Responsables -->
+    <div class="stage">
+      <span class="stage-cap">Dialog · Responsables</span>
+      <div class="dlg wide static" role="dialog" aria-modal="true" aria-labelledby="mp-rs">
+        <div class="dlg-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mp-rs" class="h2">Responsables</h2><p class="sub">[Pedido <span class="mono">2026-0000003</span>. Asigna personas o grupos de trabajo.]</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="tabs" role="tablist" aria-label="Tipo de responsable"><button class="tab" type="button" role="tab" aria-selected="true"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg>Personas</button><button class="tab" type="button" role="tab" aria-selected="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"></path></svg>Grupos de trabajo</button></div>
+        <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in focus" type="text" placeholder="Buscar personas para asignar" value="Va"></label>
+        <div class="lbox">
+          <div class="lrow"><span class="person"><button class="cb" type="button" role="checkbox" aria-checked="true" aria-label="Valentina Herrera"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></button><span class="av sm c3">VH</span>Valentina Herrera</span></div>
+          <div class="lrow"><span class="person"><button class="cb" type="button" role="checkbox" aria-checked="false" aria-label="Santiago Vargas"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></button><span class="av sm c4">SV</span>Santiago Vargas</span></div>
+        </div>
+        <div class="g2 cq-1">
+          <div style="display: flex; flex-direction: column"><span class="cap">Asignados directamente</span>
+            <div class="person"><span class="av sm">LG</span>Laura Gómez<button class="b b-gho b-sm" type="button" style="margin-left: auto">Quitar del pedido</button></div>
+            <div class="person"><span class="av sm c2">MS</span>Mateo Sánchez<button class="b b-gho b-sm" type="button" style="margin-left: auto">Quitar del pedido</button></div>
+          </div>
+          <div style="display: flex; flex-direction: column"><span class="cap">Grupos de trabajo</span>
+            <div class="person"><span class="avs"><span class="av sm c3">VH</span><span class="av sm c4">SV</span></span>[Envasado turno A]<button class="b b-gho b-sm" type="button" style="margin-left: auto">Quitar el grupo entero</button></div>
+          </div>
+        </div>
+        <div class="actions"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Asignar</button></div>
+      </div>
+    </div>
+
+    <!-- 5. Cancelar el pedido -->
+    <div class="stage">
+      <span class="stage-cap">AlertDialog · Cancelar el pedido</span>
+      <div class="dlg static" role="alertdialog" aria-modal="true" aria-labelledby="mp-ca">
+        <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg></div>
+        <h2 id="mp-ca" class="h2">Cancelar el pedido</h2>
+        <p class="sub">Se va a cancelar el pedido <span class="mono">2026-0000003</span>. Un pedido cancelado ya no se puede editar.</p>
+        <div class="f"><label for="mp-m">Motivo de la cancelación</label><textarea id="mp-m" class="in" rows="3"></textarea></div>
+        <div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-des" type="button">Cancelar el pedido</button></div>
+      </div>
+    </div>
+
+    <!-- 6. Eliminar el pedido -->
+    <div class="stage">
+      <span class="stage-cap">AlertDialog · Eliminar el pedido</span>
+      <div class="dlg static" role="alertdialog" aria-modal="true" aria-labelledby="mp-de">
+        <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+        <h2 id="mp-de" class="h2">Eliminar el pedido</h2>
+        <p class="sub">Se va a eliminar el pedido <span class="mono">2026-0000003</span>. Esta acción no se puede deshacer.</p>
+        <div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-des" type="button">Eliminar</button></div>
+      </div>
+    </div>
+
+    <!-- 7. Material insuficiente -->
+    <div class="stage">
+      <span class="stage-cap">AlertDialog · Material insuficiente</span>
+      <div class="dlg static" role="alertdialog" aria-modal="true" aria-labelledby="mp-mi">
+        <div class="dlg-ic warn"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2zM12 10v4M12 17h.01"></path></svg></div>
+        <h2 id="mp-mi" class="h2">Material insuficiente</h2>
+        <p class="sub">[No alcanza el material para apartar el pedido <span class="mono">2026-0000010</span>. Si lo guardas, queda Bloqueado hasta que haya existencias.]</p>
+        <div class="nt n-w"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"></path></svg><div style="display: flex; flex-direction: column; gap: 4px; flex: 1"><div class="rm-top"><span>Hidróxido de sodio</span><span class="mono">[faltan] 4,20 kg</span></div><div class="rm-top"><span>Tensoactivo no iónico</span><span class="mono">[faltan] 1,50 kg</span></div></div></div>
+        <div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-pri" type="button">Guardar bloqueado</button></div>
+      </div>
+    </div>
+
+    <!-- 8. Cliente -->
+    <div class="stage">
+      <span class="stage-cap">Dialog · Cliente</span>
+      <div class="dlg static" role="dialog" aria-modal="true" aria-labelledby="mp-cl">
+        <div class="dlg-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mp-cl" class="h2">Cliente</h2><p class="sub">Pedido <span class="mono">2026-0000003</span>. Solo se cambia el cliente.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="f"><label for="mp-cli">Cliente</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="mp-cli" class="in" type="text" value="Mateo Sánchez" placeholder="Busca un cliente por su nombre"></label></div>
+        <div class="actions"><button class="b b-gho" type="button" style="margin-right: auto; color: var(--d-fg)">Quitar cliente</button><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
+      </div>
+    </div>
+
+    <!-- 9. Reparto y unidad -->
+    <div class="stage">
+      <span class="stage-cap">Dialog · Reparto y unidad</span>
+      <div class="dlg static" role="dialog" aria-modal="true" aria-labelledby="mp-ru">
+        <div class="dlg-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mp-ru" class="h2">Reparto y unidad</h2><p class="sub">Pedido <span class="mono">2026-0000003</span>. Solo se cambian la unidad y el reparto en envases.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="f"><label for="mp-un">Unidad</label><button id="mp-un" class="in trig" type="button"><span>kg</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+        <div style="display: flex; flex-direction: column; gap: 8px"><span class="fl">Reparto en envases</span>
+          <div class="lbox">
+            <div class="lrow"><span>Garrafa 20 L</span><span style="display: inline-flex; align-items: center; gap: 12px"><span class="mono">× 4</span><button class="b b-gho b-sm" type="button">Quitar</button></span></div>
+            <div class="lrow"><span>Galón 3,78 L</span><span style="display: inline-flex; align-items: center; gap: 12px"><span class="mono">× 10</span><button class="b b-gho b-sm" type="button">Quitar</button></span></div>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 80px auto; gap: 8px; align-items: end"><div class="f"><label>Envase</label><button class="in trig" type="button"><span>Garrafa 20 L</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div><div class="f"><label>Cantidad</label><input class="in mono num" type="text" value="1"></div><button class="b b-out" type="button" style="height: 40px">Añadir</button></div>
+          <span class="cap">Disponible <span class="mono">18</span> · Cubre <span class="mono">117,80 kg</span></span>
+        </div>
+        <div class="actions"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
+      </div>
+    </div>
+
+    <!-- 10. Toasts del módulo -->
+    <div class="stage" style="align-items: flex-end; justify-content: flex-end">
+      <span class="stage-cap">Toasts del módulo</span>
+      <div style="display: flex; flex-direction: column; gap: 10px; width: 340px">
+        <div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Pedido creado.</span></div>
+        <div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Pedido actualizado.</span></div>
+        <div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Pedido cancelado.</span></div>
+        <div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Pedido eliminado.</span></div>
+        <div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Reparto actualizado.</span></div>
+        <div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Cliente actualizado.</span></div>
+        <div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Pedido entregado</span></div>
+        <div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Se añadieron <span class="mono">2</span> personas al pedido.</span></div>
+        <div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Responsable retirado del pedido.</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":3900}}'>
+class Component extends DCLogic {
+renderVals() {
+return { rootCls: this.props.oscuro ? 'qc dk' : 'qc' };
+}
+}
+</script>
+</body>
+</html>

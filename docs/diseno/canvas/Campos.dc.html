@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Campos de formulario</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 1200px; height: 1200px; padding: 40px 48px; display: flex; flex-direction: column; gap: 20px; position: relative; overflow: hidden">
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <h1 class="h1">Campos de formulario</h1>
+    <p class="sub" style="max-width: 860px">Una sola altura (40 px; 48 px en el operario), un solo anillo de foco y un solo error. Los popups (Select, autocompletado, calendario) entran con zoom de 96 % a 100 % desde su esquina. Las contraseñas y las keys usan siempre <span class="mono">PasswordField</span>.</p>
+  </div>
+
+  <div class="g3" style="gap: 20px">
+    <section class="card" aria-labelledby="cf-tf">
+      <span id="cf-tf" class="lab">TextField · deshabilitado</span>
+      <div class="f"><label for="cf-u">Nombre de usuario <span class="req" aria-hidden="true">*</span></label><input id="cf-u" class="in" type="text" value="lgomez" aria-describedby="cf-uh"><span id="cf-uh" class="help">Este nombre de usuario está libre: <span class="mono">lgomez</span></span></div>
+      <div class="f"><label for="cf-n">Nº de pedido</label><input id="cf-n" class="in mono" type="text" value="2026-0000012" disabled><span class="help">La fecha y el número los pone el sistema.</span></div>
+    </section>
+
+    <section class="card" aria-labelledby="cf-se">
+      <span id="cf-se" class="lab">SelectField · popup animado</span>
+      <div class="f">
+        <span class="fl" id="cf-pl">Prioridad</span>
+        <div class="anchor">
+          <button class="in trig" type="button" aria-haspopup="listbox" aria-expanded="{{ prioOpen }}" aria-labelledby="cf-pl" onClick="{{ togPrio }}"><span>{{ prio }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <div class="{{ prioPop }}" role="listbox" aria-labelledby="cf-pl">
+            <sc-for list="{{ prios }}" as="o" hint-placeholder-count="4">
+              <button class="{{ o.cls }}" type="button" role="option" aria-selected="{{ o.sel }}" onClick="{{ o.pick }}"><span style="flex: 1">{{ o.label }}</span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="opacity: {{ o.op }}"><path d="m5 12 5 5 9-10"></path></svg></button>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      <div class="f"><span class="fl">Versión</span><button class="in trig" type="button" disabled><span>Original</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button><span class="help">Deshabilitado hasta elegir receta.</span></div>
+    </section>
+
+    <section class="card" aria-labelledby="cf-ac">
+      <span id="cf-ac" class="lab">Autocompletado</span>
+      <div class="f">
+        <label for="cf-c">Cliente</label>
+        <div class="anchor">
+          <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="cf-c" class="in" type="text" role="combobox" aria-autocomplete="list" aria-expanded="{{ autoOpen }}" placeholder="Busca un cliente por su nombre" value="{{ q }}" onInput="{{ onQ }}" onClick="{{ openAuto }}"></label>
+          <div class="{{ autoPop }}" role="listbox">
+            <sc-for list="{{ auto }}" as="o" hint-placeholder-count="4">
+              <button class="opt" type="button" role="option" onClick="{{ o.pick }}"><span class="{{ o.avCls }}">{{ o.ini }}</span>{{ o.label }}</button>
+            </sc-for>
+            <sc-if value="{{ noHits }}" hint-placeholder-val="{{ false }}"><span class="opt" style="cursor: default; color: var(--muted-fg)">[Sin coincidencias]</span></sc-if>
+          </div>
+        </div>
+        <span class="help">Escribe para filtrar; busca sin tildes ni mayúsculas.</span>
+      </div>
+      <div class="f"><label for="cf-r">Receta</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="cf-r" class="in focus" type="text" value="Desengrasante alcalino"></label><span class="help">Con foco: anillo de 3 px en <span class="mono">--ring</span>.</span></div>
+    </section>
+  </div>
+
+  <div class="g3" style="gap: 20px">
+    <section class="card" aria-labelledby="cf-dp">
+      <span id="cf-dp" class="lab">DatePicker</span>
+      <div class="f">
+        <span class="fl" id="cf-dl">Fecha de solicitud</span>
+        <div class="anchor">
+          <button class="in trig" type="button" aria-haspopup="dialog" aria-expanded="{{ dateOpen }}" aria-labelledby="cf-dl" onClick="{{ togDate }}"><span style="display: inline-flex; align-items: center; gap: 8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--muted-fg)"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg><span class="mono">{{ dateStr }}</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <div class="{{ datePop }}" role="dialog" aria-label="Elegir fecha" style="top: calc(100% + 6px); left: 0; width: 290px; padding: 12px">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px"><button class="b b-gho b-ico b-sm" type="button" aria-label="Mes anterior" onClick="{{ prevM }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><span class="h3">{{ monthLabel }}</span><button class="b b-gho b-ico b-sm" type="button" aria-label="Mes siguiente" onClick="{{ nextM }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></div>
+            <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center">
+              <span class="cap">L</span><span class="cap">M</span><span class="cap">X</span><span class="cap">J</span><span class="cap">V</span><span class="cap">S</span><span class="cap">D</span>
+              <sc-for list="{{ cells }}" as="d" hint-placeholder-count="35">
+                <button class="opt mono" type="button" aria-label="{{ d.label }}" aria-pressed="{{ d.cur }}" onClick="{{ d.pick }}" style="justify-content: center; padding: 0; min-height: 34px; font-size: 13px; visibility: {{ d.vis }}; background: {{ d.bg }}; color: {{ d.fg }}; box-shadow: {{ d.ring }}">{{ d.n }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        <span class="help">Hoy, <span class="mono">10/10/2026</span>, lleva un aro.</span>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="cf-er">
+      <span id="cf-er" class="lab">Textarea · FieldError</span>
+      <div class="f"><label for="cf-m">Motivo de la cancelación</label><textarea id="cf-m" class="in" rows="2"></textarea></div>
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end">
+        <div class="f">
+          <span class="fl" id="cf-ml">Motivo</span>
+          <div class="anchor">
+            <button class="in trig" type="button" aria-haspopup="listbox" aria-expanded="{{ motOpen }}" aria-invalid="{{ errStr }}" aria-labelledby="cf-ml" aria-describedby="cf-me" onClick="{{ togMot }}"><span style="color: {{ motColor }}">{{ motLabel }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+            <div class="{{ motPop }}" role="listbox" aria-labelledby="cf-ml">
+              <sc-for list="{{ motivos }}" as="o" hint-placeholder-count="4">
+                <button class="opt" type="button" role="option" onClick="{{ o.pick }}">{{ o.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        <button class="b b-pri" type="button" style="height: 40px" onClick="{{ ajustar }}">Ajustar</button>
+      </div>
+      <div id="cf-me" aria-live="polite" style="min-height: 18px"><sc-if value="{{ err }}" hint-placeholder-val="{{ true }}"><span class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Elige un motivo.</span></sc-if></div>
+    </section>
+
+    <section class="card" aria-labelledby="cf-cb">
+      <span id="cf-cb" class="lab">Checkbox</span>
+      <label class="cbl"><button class="cb" type="button" role="checkbox" aria-checked="{{ c1 }}" onClick="{{ t1 }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></button>Solo cancelados</label>
+      <label class="cbl"><button class="cb" type="button" role="checkbox" aria-checked="{{ c2 }}" onClick="{{ t2 }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></button>Incluir fila <span class="mono">3</span></label>
+      <span class="cap">La marca se dibuja con el trazo (200 ms). Fila de 40 px: el objetivo táctil es la fila entera, no la caja de 20 px.</span>
+    </section>
+  </div>
+
+  <section class="card" aria-labelledby="cf-pw" style="gap: 14px">
+    <div class="card-hd"><span id="cf-pw" class="lab">PasswordField · un solo componente con ojo para contraseñas y keys</span><span class="sb t-info"><i></i>Nuevo</span></div>
+    <div class="g3" style="gap: 24px">
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <span class="h3">Contraseña · login</span>
+        <div class="f"><label for="cf-lu">Usuario</label><input id="cf-lu" class="in" type="text" value="lgomez" autocomplete="username"></div>
+        <div class="f"><label for="cf-lp">Contraseña</label><div class="pw"><input id="cf-lp" class="in" type="{{ eLogin.type }}" value="Quimi.2026" autocomplete="current-password"><button class="pw-eye" type="button" aria-pressed="{{ eLogin.pressed }}" aria-label="{{ eLogin.label }}" aria-controls="cf-lp" onClick="{{ eLogin.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><path class="eye-slash" d="M3 3l18 18"></path></svg></button></div></div>
+        <span class="cap">Hoy el login no tiene ojo; con el componente único lo gana.</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <span class="h3">Contraseña nueva · con reglas</span>
+        <div class="f"><label for="cf-np">Contraseña nueva</label><div class="pw"><input id="cf-np" class="in" type="{{ eNew.type }}" value="{{ pw }}" onInput="{{ onPw }}" autocomplete="new-password" aria-describedby="cf-rules"><button class="pw-eye" type="button" aria-pressed="{{ eNew.pressed }}" aria-label="{{ eNew.label }}" aria-controls="cf-np" onClick="{{ eNew.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><path class="eye-slash" d="M3 3l18 18"></path></svg></button></div></div>
+        <ul id="cf-rules" style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px">
+          <sc-for list="{{ rules }}" as="r" hint-placeholder-count="7">
+            <li class="{{ r.cls }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="{{ r.icon }}"></path></svg>{{ r.label }}<span class="sr">{{ r.sr }}</span></li>
+          </sc-for>
+        </ul>
+        <div class="f"><label for="cf-rp">Repite la contraseña</label><div class="pw"><input id="cf-rp" class="in" type="{{ eRep.type }}" value="{{ pw2 }}" onInput="{{ onPw2 }}" autocomplete="new-password" aria-invalid="{{ mismatchStr }}" aria-describedby="cf-mm"><button class="pw-eye" type="button" aria-pressed="{{ eRep.pressed }}" aria-label="{{ eRep.label }}" aria-controls="cf-rp" onClick="{{ eRep.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><path class="eye-slash" d="M3 3l18 18"></path></svg></button></div><div id="cf-mm" aria-live="polite"><sc-if value="{{ mismatch }}" hint-placeholder-val="{{ false }}"><span class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Las dos contraseñas no coinciden.</span></sc-if></div></div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <span class="h3">Secreto · key de integración</span>
+        <div class="f"><label for="cf-tk">[Token de acceso]</label><div class="pw"><input id="cf-tk" class="{{ tokCls }}" type="{{ eTok.type }}" value="EAAGm0PX4ZCpsBO7xQ2vLk9TfZB3nWq" autocomplete="off" spellcheck="false"><button class="pw-eye" type="button" aria-pressed="{{ eTok.pressed }}" aria-label="{{ eTok.label }}" aria-controls="cf-tk" onClick="{{ eTok.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><path class="eye-slash" d="M3 3l18 18"></path></svg></button></div></div>
+        <div class="f"><label for="cf-as">[App secret]</label><div class="pw"><input id="cf-as" class="{{ secCls }}" type="{{ eSec.type }}" value="9f2c4e7a1b8d3f6e0a5c2b7d4e1f8a3c" autocomplete="off" spellcheck="false"><button class="pw-eye" type="button" aria-pressed="{{ eSec.pressed }}" aria-label="{{ eSec.label }}" aria-controls="cf-as" onClick="{{ eSec.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><path class="eye-slash" d="M3 3l18 18"></path></svg></button></div></div>
+        <span class="cap">WhatsApp por empresa (QC-237, en curso): token y app secret se guardan cifrados. Valor en <span class="mono">Plex Mono</span>; oculto, con más espacio entre puntos. Solo el ojo: no hay «Copiar».</span>
+      </div>
+    </div>
+  </section>
+
+  <dl class="spec" style="margin-top: auto">
+    <dt>Componente</dt><dd><span class="mono">components/ui/input · textarea · checkbox · select · popover · calendar · autocomplete</span> · <span class="mono">components/shared/text-field · select-field · shared-select · date-picker · field-error · async-autocomplete</span> · <span class="mono">password-field.tsx</span> (nuevo, en <span class="mono">shared/</span>)</dd>
+    <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (Field, Select, Popover, Autocomplete, Checkbox, Toggle para el ojo) · <span class="mono">react-day-picker</span> (Calendar) · <span class="mono">lucide-react</span> (Eye / EyeOff)</dd>
+    <dt>Animación</dt><dd>borde y anillo de foco 100 ms · popup: opacidad + escala .96 → 1 en 200 ms al abrir, 150 ms al cerrar, desde su esquina · chevron gira 180° · error entra bajando 4 px en 150 ms · marca del checkbox y raya del ojo se dibujan con el trazo en 200 ms</dd>
+    <dt>PasswordField</dt><dd>Hoy: el login no tiene ojo, establecer contraseña sí (con <span class="mono">aria-pressed</span>) y <span class="mono">credential-field</span> no tiene control de mostrar/ocultar. Propuesta: un único componente (input + botón <span class="mono">aria-pressed</span>, «Mostrar la contraseña» / «Ocultar la contraseña») en todo sitio donde se pueda ver u ocultar una contraseña o una key; las reglas de <span class="mono">credential-requirements</span> se le enchufan debajo. La séptima regla la responde el servidor. Etiqueta del ojo para keys: [POR CONFIRMAR].</dd>
+  </dl>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":1200}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+const open = s.open || null;
+const tog = (k) => () => this.setState({ open: open === k ? null : k });
+const popCls = (k) => open === k ? 'pop full open' : 'pop full';
+const dateCls = open === 'date' ? 'pop open' : 'pop';
+const prio = s.prio || 'Media';
+const prios = ['Baja', 'Media', 'Alta', 'Crítica'].map((p) => ({ label: p, sel: p === prio ? 'true' : 'false', op: p === prio ? '1' : '0', cls: p === prio ? 'opt hl' : 'opt', pick: () => this.setState({ prio: p, open: null }) }));
+const q = s.q || '';
+const norm = (x) => x.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const people = ['Laura Gómez', 'Mateo Sánchez', 'Santiago Vargas', 'Valentina Herrera'];
+const hits = people.filter((p) => norm(p).indexOf(norm(q)) >= 0);
+const AV = { LG: 'av sm', MS: 'av sm c2', VH: 'av sm c3', SV: 'av sm c4', CR: 'av sm c5', CO: 'av sm c6', AR: 'av sm c2' };
+const auto = hits.map((p) => ({ label: p, ini: p.split(' ').map((w) => w[0]).join(''), avCls: AV[p.split(' ').map((w) => w[0]).join('')] || 'av sm', pick: () => this.setState({ q: p, open: null }) }));
+const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const m = s.m === undefined ? 9 : s.m;
+const base = new Date(2026, m, 1);
+const y = base.getFullYear();
+const mm = base.getMonth();
+const sel = s.date || [2026, 9, 2];
+const lead = (base.getDay() + 6) % 7;
+const dim = new Date(y, mm + 1, 0).getDate();
+const cells = [];
+for (let i = 0; i < lead; i++) cells.push({ n: '', vis: 'hidden', bg: 'transparent', fg: 'inherit', ring: 'none', cur: 'false', label: '', pick: () => {} });
+for (let d = 1; d <= dim; d++) {
+const isSel = sel[0] === y && sel[1] === mm && sel[2] === d;
+const today = y === 2026 && mm === 9 && d === 10;
+cells.push({ n: String(d), vis: 'visible', bg: isSel ? 'var(--primary)' : 'transparent', fg: isSel ? 'var(--primary-fg)' : 'inherit', ring: today && !isSel ? 'inset 0 0 0 1px var(--primary)' : 'none', cur: isSel ? 'true' : 'false', label: d + ' de ' + MONTHS[mm].toLowerCase() + ' de ' + y, pick: () => this.setState({ date: [y, mm, d], open: null }) });
+}
+const pad = (x) => String(x).padStart(2, '0');
+const motivo = s.motivo || '';
+const err = !!s.err && !motivo;
+const motivos = ['Merma', 'Rotura', 'Conteo físico', 'Error de carga'].map((x) => ({ label: x, pick: () => this.setState({ motivo: x, open: null, err: false }) }));
+const eyes = s.eyes || {};
+const eye = (k) => { const on = !!eyes[k]; return { type: on ? 'text' : 'password', pressed: on ? 'true' : 'false', label: on ? 'Ocultar la contraseña' : 'Mostrar la contraseña', toggle: () => this.setState({ eyes: Object.assign({}, eyes, { [k]: !on }) }) }; };
+const pw = s.pw === undefined ? 'Quimi' : s.pw;
+const pw2 = s.pw2 === undefined ? 'Quimi1' : s.pw2;
+const OK = 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6';
+const NO = 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z';
+const R = [
+['Al menos 8 caracteres', pw.length >= 8],
+['Como máximo 64 caracteres', pw.length > 0 && pw.length <= 64],
+['Al menos una letra mayúscula', /[A-ZÁÉÍÓÚÑ]/.test(pw)],
+['Al menos una letra minúscula', /[a-záéíóúñ]/.test(pw)],
+['Al menos un número', /[0-9]/.test(pw)],
+['Al menos un símbolo que no sea letra ni número', /[^A-Za-z0-9ÁÉÍÓÚÑáéíóúñ]/.test(pw)],
+['No debe figurar en una lista de credenciales filtradas', null]
+];
+const rules = R.map((r) => ({ label: r[0], icon: r[1] ? OK : NO, cls: r[1] ? 'rule ok' : 'rule', sr: r[1] === null ? '' : (r[1] ? ' (cumplido)' : ' (pendiente)') }));
+const mismatch = pw2 !== '' && pw2 !== pw;
+const val = (e) => (e && e.target ? e.target.value : '');
+return {
+prio: prio, prios: prios, prioOpen: open === 'prio' ? 'true' : 'false', prioPop: popCls('prio'), togPrio: tog('prio'),
+q: q, auto: auto, noHits: hits.length === 0, autoOpen: open === 'auto' ? 'true' : 'false', autoPop: popCls('auto'),
+onQ: (e) => this.setState({ q: val(e), open: 'auto' }), openAuto: () => this.setState({ open: 'auto' }),
+dateStr: pad(sel[2]) + '/' + pad(sel[1] + 1) + '/' + sel[0], dateOpen: open === 'date' ? 'true' : 'false', datePop: dateCls, togDate: tog('date'),
+monthLabel: MONTHS[mm] + ' ' + y, cells: cells,
+prevM: () => this.setState({ m: m - 1 }), nextM: () => this.setState({ m: m + 1 }),
+motOpen: open === 'mot' ? 'true' : 'false', motPop: popCls('mot'), togMot: tog('mot'), motivos: motivos,
+motLabel: motivo || '[Elegir]', motColor: motivo ? 'inherit' : 'var(--muted-fg)',
+err: err, errStr: err ? 'true' : 'false',
+ajustar: () => this.setState({ err: !motivo, open: null }),
+c1: s.c1 ? 'true' : 'false', t1: () => this.setState({ c1: !s.c1 }),
+c2: s.c2 === false ? 'false' : 'true', t2: () => this.setState({ c2: s.c2 === false }),
+eLogin: eye('login'), eNew: eye('new'), eRep: eye('rep'), eTok: eye('tok'), eSec: eye('sec'),
+tokCls: eyes.tok ? 'in mono' : 'in mono secret-mask', secCls: eyes.sec ? 'in mono' : 'in mono secret-mask',
+pw: pw, pw2: pw2, rules: rules, mismatch: mismatch, mismatchStr: mismatch ? 'true' : 'false',
+onPw: (e) => this.setState({ pw: val(e) }), onPw2: (e) => this.setState({ pw2: val(e) })
+};
+}
+}
+</script>
+</body>
+</html>

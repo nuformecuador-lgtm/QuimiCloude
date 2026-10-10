@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Proveedores</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="proveedores" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div class="ph">
+          <div class="ph-t"><h1 class="h1">Proveedores</h1></div>
+          <div class="ph-act" style="display: flex; gap: 8px"><button class="b b-pri b-touch-m" type="button" onClick="{{ openNew }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nuevo proveedor</button></div>
+        </div>
+
+        <div class="toolbar" role="toolbar" aria-label="Filtros de proveedores">
+          <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Producto" aria-label="Producto" value="{{ qProd }}"></label>
+          <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Proveedor" aria-label="Proveedor"></label>
+          <button class="b b-gho b-touch-m" type="button" onClick="{{ clearFilters }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>Limpiar filtros</button>
+        </div>
+
+        <sc-if value="{{ noSuppliers }}" hint-placeholder-val="{{ false }}">
+          <div class="box"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7M7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"></path></svg></span><span class="h3">Todavía no hay proveedores dados de alta.</span><button class="b b-pri" type="button" onClick="{{ openNew }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nuevo proveedor</button></div>
+        </sc-if>
+        <sc-if value="{{ noMatches }}" hint-placeholder-val="{{ false }}">
+          <div class="box"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg></span><span class="h3">Ningún proveedor coincide con la búsqueda o el filtro.</span><button class="b b-out" type="button" onClick="{{ clearFilters }}">Limpiar filtros</button></div>
+        </sc-if>
+
+        <sc-if value="{{ hasList }}" hint-placeholder-val="{{ true }}">
+          <div class="enter" style="display: flex; flex-direction: column; gap: 16px">
+            <sc-for list="{{ sups }}" as="p" hint-placeholder-count="3">
+              <article class="card" aria-labelledby="{{ p.hid }}" style="gap: 14px; padding: 18px 20px">
+                <div class="cq-stack" style="display: flex; justify-content: space-between; align-items: center; gap: 12px">
+                  <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0"><h2 id="{{ p.hid }}" class="h2">{{ p.name }}</h2><span class="cap">{{ p.count }}</span></div>
+                  <a class="b b-out b-sm b-go b-touch-m" href="ProveedorDetalle.dc.html">Ver ficha del proveedor<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+                </div>
+                <sc-if value="{{ p.has }}" hint-placeholder-val="{{ true }}">
+                  <div class="strip">
+                    <sc-for list="{{ p.items }}" as="it" hint-placeholder-count="5">
+                      <div class="{{ it.cls }}">
+                        <span class="thumb photo" role="img" aria-label="{{ it.alt }}" style="width: 100%; height: 108px; border-radius: 8px"></span>
+                        <span style="font-size: 13px; font-weight: 500; line-height: 1.3">{{ it.n }}</span>
+                        <span class="cap">{{ it.p }}</span>
+                      </div>
+                    </sc-for>
+                    <sc-if value="{{ p.rowLoading }}" hint-placeholder-val="{{ false }}">
+                      <div style="flex: 0 0 156px; display: flex; flex-direction: column; gap: 8px; padding: 8px" aria-busy="true"><span class="sk" style="height: 108px; border-radius: 8px"></span><span class="sk" style="width: 80%"></span><span class="sk" style="width: 50%"></span></div>
+                    </sc-if>
+                    <sc-if value="{{ p.canMore }}" hint-placeholder-val="{{ false }}">
+                      <div style="flex: 0 0 156px; display: flex; align-items: center; justify-content: center">
+                        <button class="b b-out b-touch-m" type="button" aria-label="{{ p.moreLabel }}" onClick="{{ p.loadMore }}" style="position: relative"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Cargar más<span class="tip">{{ p.moreLabel }}</span></button>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ p.empty }}" hint-placeholder-val="{{ false }}">
+                  <div class="panel" style="display: flex; align-items: center; gap: 10px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--muted-fg)"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"></path></svg><span class="sub">Sin productos todavía.</span></div>
+                </sc-if>
+              </article>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+          <div class="card" aria-busy="true" aria-label="Cargando más proveedores" style="gap: 14px">
+            <span class="sk" style="width: 220px; height: 18px"></span>
+            <div style="display: flex; gap: 12px; overflow: hidden"><span class="sk" style="flex: 0 0 156px; height: 150px; border-radius: 12px"></span><span class="sk" style="flex: 0 0 156px; height: 150px; border-radius: 12px"></span><span class="sk" style="flex: 0 0 156px; height: 150px; border-radius: 12px"></span><span class="sk" style="flex: 0 0 156px; height: 150px; border-radius: 12px"></span></div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ failed }}" hint-placeholder-val="{{ false }}">
+          <div class="box error" role="alert"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg></span><span class="h3">No se pudieron cargar más proveedores.</span><button class="b b-out b-touch-m" type="button" onClick="{{ more }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"></path></svg>Reintentar</button></div>
+        </sc-if>
+
+        <sc-if value="{{ showMore }}" hint-placeholder-val="{{ true }}">
+          <button class="b b-out b-touch-m" type="button" style="align-self: center" onClick="{{ more }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>Cargar más</button>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="proveedores" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <aside class="{{ sheetCls }}" role="dialog" aria-modal="true" aria-labelledby="pv-sh">
+    <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="pv-sh" class="h2">Nuevo proveedor</h2><p class="sub">Completa los datos del proveedor. Hace falta al menos un teléfono o un correo.</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="sheet-bd">
+      <div class="f"><label for="pv-n">Nombre <span class="req">*</span></label><input id="pv-n" class="in" type="text" value="Distribuidora Norte"></div>
+      <div class="f"><label for="pv-t">Teléfono</label><input id="pv-t" class="in mono" type="tel" value="604 444 1290"></div>
+      <div class="f"><label for="pv-c">Correo electrónico</label><input id="pv-c" class="in" type="email" placeholder="ventas@proveedor.com"></div>
+    </div>
+    <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ save }}">Guardar</button></div>
+  </aside>
+
+  <div class="toastwrap" aria-live="polite"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>[Proveedor creado.]</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"estado":{"editor":"enum","options":["con-datos","sin-proveedores","sin-coincidencias"],"default":"con-datos"},"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); clearTimeout(this.t2); clearTimeout(this.t3); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const estado = s.cleared ? 'con-datos' : (this.props.estado || 'con-datos');
+const base = [
+['qv', 'Químicos del Valle', [['Hidróxido de sodio','Saco 25 kg'],['Ácido cítrico','Saco 25 kg'],['Tensoactivo LESS 70 %','Tambor 200 L'],['Fragancia limón','Garrafa 20 L'],['Glicerina','Garrafa 20 L']], [['Benzoato de sodio','Saco 25 kg'],['Colorante amarillo','Frasco 1 L'],['Cloruro de sodio','Saco 50 kg']]],
+['ea', 'Envases Andinos', [['Galón 3,78 L','Galón 3,78 L'],['Garrafa 20 L','Garrafa 20 L'],['Tambor 200 L','Tambor 200 L'],['Frasco 1 L','Frasco 1 L']], []],
+['ts', 'Tapas y Válvulas del Sur', [], []]
+];
+const extra = [
+['dn', 'Distribuidora Norte', [['Hipoclorito de sodio 13 %','Garrafa 20 L'],['Ácido clorhídrico','Garrafa 20 L'],['Peróxido de hidrógeno','Garrafa 20 L']], []],
+['et', 'Etiquetas y Tapas', [['Tapa 38 mm','Tapa'],['Etiqueta galón','Etiqueta']], []]
+];
+const phase = s.phase || 'idle';
+const list = phase === 'done' ? base.concat(extra) : base;
+const rowMore = s.rowMore || {};
+const toast = (msg) => { this.setState({ toast: true }); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: false }), 3200); };
+const more = () => {
+  const attempts = s.attempts || 0;
+  this.setState({ phase: 'loading' });
+  clearTimeout(this.t2);
+  this.t2 = setTimeout(() => this.setState({ phase: attempts === 0 ? 'error' : 'done', attempts: attempts + 1 }), 1100);
+};
+const sups = list.map((p, i) => {
+  const loaded = !!rowMore[p[0]];
+  const items = p[2].map((it) => ({ n: it[0], p: it[1], alt: 'Imagen de ' + it[0], cls: 'pcard' })).concat(loaded ? p[3].map((it) => ({ n: it[0], p: it[1], alt: 'Imagen de ' + it[0], cls: 'pcard slide-n' })) : []);
+  const rowLoading = s.rowLoading === p[0];
+  return {
+    hid: 'pv-' + p[0], name: p[1],
+    count: items.length === 0 ? '' : (items.length + (p[3].length && !loaded ? '+' : '') + ' productos'),
+    items: items, has: items.length > 0, empty: items.length === 0,
+    rowLoading: rowLoading, canMore: p[3].length > 0 && !loaded && !rowLoading,
+    moreLabel: 'Cargar más productos de ' + p[1],
+    loadMore: () => { this.setState({ rowLoading: p[0] }); clearTimeout(this.t3); this.t3 = setTimeout(() => this.setState({ rowLoading: null, rowMore: Object.assign({}, rowMore, { [p[0]]: true }) }), 900); }
+  };
+});
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+qProd: estado === 'sin-coincidencias' ? 'Ácido bórico' : '',
+clearFilters: () => this.setState({ cleared: true }),
+noSuppliers: estado === 'sin-proveedores',
+noMatches: estado === 'sin-coincidencias',
+hasList: estado === 'con-datos',
+sups: sups,
+loading: estado === 'con-datos' && phase === 'loading',
+failed: estado === 'con-datos' && phase === 'error',
+showMore: estado === 'con-datos' && phase === 'idle',
+more: more,
+openNew: () => this.setState({ sheet: true }),
+sheetCls: s.sheet ? 'sheet open' : 'sheet',
+ovCls: (s.sheet || s.menu) ? 'ov open' : 'ov',
+closeAll: () => this.setState({ sheet: false, menu: false }),
+save: () => { this.setState({ sheet: false }); toast(); },
+toastCls: s.toast ? 'toast show' : 'toast'
+};
+}
+}
+</script>
+</body>
+</html>

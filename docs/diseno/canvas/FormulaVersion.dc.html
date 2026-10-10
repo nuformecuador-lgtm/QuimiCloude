@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Versión de fórmula</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="formulas" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter" style="max-width: 1040px">
+        <div class="ph">
+          <div class="ph-t" style="gap: 12px"><a class="b b-out b-back b-touch-m" href="Formula.dc.html" style="align-self: flex-start"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>[Volver a la receta]</a><h1 class="h1">{{ title }}</h1></div>
+        </div>
+
+        <section class="card" aria-labelledby="fv-n">
+          <h2 id="fv-n" class="sr">Nombre</h2>
+          <div class="f"><label for="fv-name">Nombre</label><input id="fv-name" class="in" type="text" value="Desengrasante alcalino · sin fragancia"></div>
+        </section>
+
+        <section class="card" aria-labelledby="fv-o">
+          <div class="card-hd"><h2 id="fv-o" class="h2">De la receta original</h2>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap"><span class="sb t-neutral"><i></i>Igual <span class="mono">{{ nSame }}</span></span><span class="sb t-waiting"><i></i>Cambiado <span class="mono">{{ nChg }}</span></span><span class="sb t-success"><i></i>Añadido <span class="mono">{{ nAdd }}</span></span></div>
+          </div>
+          <div class="hide-m" style="display: flex; gap: 10px; font-size: 12px; font-weight: 600; color: var(--muted-fg); padding: 0 12px"><span style="flex: 1 1 240px">Producto</span><span style="flex: 0 0 96px; text-align: right">[Original]</span><span style="flex: 0 0 110px">Porcentaje</span><span style="flex: 0 0 104px">[Estado]</span><span style="flex: 0 0 36px"></span></div>
+          <ul class="{{ listCls }}" style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+            <sc-for list="{{ lines }}" as="l" hint-placeholder-count="4">
+              <li style="{{ l.rowStyle }}">
+                <label class="wrap-ic" style="flex: 1 1 240px; min-width: 0"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="text" value="{{ l.name }}" placeholder="Elegir producto" aria-label="Producto"></label>
+                <span class="mono dim" style="flex: 0 0 96px; text-align: right; font-size: 13px; {{ l.origStyle }}">{{ l.orig }}</span>
+                <input class="in mono num" type="text" value="{{ l.val }}" aria-label="Porcentaje" style="flex: 0 0 110px">
+                <span style="flex: 0 0 104px"><span class="{{ l.stCls }}"><i></i>{{ l.st }}</span></span>
+                <button class="b b-gho b-ico" type="button" aria-label="{{ l.rmLabel }}" onClick="{{ l.remove }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+              </li>
+            </sc-for>
+          </ul>
+          <button class="b b-dash" type="button" onClick="{{ addLine }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Añadir ingrediente</button>
+
+          <div style="display: flex; flex-direction: column; gap: 8px; padding-top: 8px; border-top: 1px solid var(--border)">
+            <h3 class="h3">Quitados de la original</h3>
+            <sc-if value="{{ hasRemoved }}" hint-placeholder-val="{{ true }}">
+              <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px">
+                <sc-for list="{{ removed }}" as="r" hint-placeholder-count="1">
+                  <li class="fade" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px; border-radius: 10px; background: var(--d-bg); color: var(--d-fg)">
+                    <span style="flex: 1 1 200px; text-decoration: line-through">{{ r.name }}</span><span class="mono" style="font-size: 13px">{{ r.orig }}</span><span class="sb t-danger"><i></i>Quitado</span>
+                    <button class="b b-gho b-sm" type="button" onClick="{{ r.restore }}" style="height: 44px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"></path></svg>[Devolver]</button>
+                  </li>
+                </sc-for>
+              </ul>
+            </sc-if>
+            <sc-if value="{{ noRemoved }}" hint-placeholder-val="{{ false }}"><p class="cap">[No se quitó nada de la original.]</p></sc-if>
+          </div>
+        </section>
+      </div>
+
+      <footer class="form-ft" style="flex-wrap: wrap; align-items: center; margin-top: auto">
+        <a class="b b-out b-touch-m" href="Formula.dc.html">Cancelar</a>
+        <button class="b b-pri b-touch-m" type="button" onClick="{{ save }}">Guardar</button>
+      </footer>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="formulas" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <div class="toastwrap" aria-live="polite"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Versión creada.</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"modo":{"editor":"enum","options":["nueva","editar"],"default":"nueva"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const isNew = (this.props.modo || 'nueva') === 'nueva';
+const k = s.k || 0;
+const L0 = [
+{ name: 'Agua desmineralizada', orig: '81,50', val: '81,00', out: false },
+{ name: 'Hidróxido de sodio', orig: '5,00', val: '5,00', out: false },
+{ name: 'Tensoactivo LESS 70 %', orig: '13,00', val: '13,00', out: false },
+{ name: 'Fragancia limón', orig: '0,50', val: '0,50', out: true },
+{ name: 'Secuestrante EDTA', orig: null, val: '1,00', out: false }
+];
+const lines = s.lines || L0;
+const set = (arr) => this.setState({ lines: arr, k: k + 1 });
+const status = (l) => (l.orig === null ? 'Añadido' : l.val !== l.orig ? 'Cambiado' : 'Igual');
+const tone = { 'Igual': 'neutral', 'Cambiado': 'waiting', 'Añadido': 'success' };
+const live = lines.map((l, i) => ({ l: l, i: i })).filter((x) => !x.l.out);
+const outs = lines.map((l, i) => ({ l: l, i: i })).filter((x) => x.l.out);
+const count = (st) => live.filter((x) => status(x.l) === st).length;
+const rowBase = 'display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border);';
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+title: isNew ? 'Nueva versión de Desengrasante alcalino' : 'Desengrasante alcalino · sin fragancia',
+nSame: count('Igual'), nChg: count('Cambiado'), nAdd: count('Añadido'),
+listCls: k % 2 ? 'fade' : '',
+lines: live.map((x) => { const st = status(x.l); return {
+name: x.l.name, orig: x.l.orig === null ? '—' : x.l.orig + ' %', val: x.l.val + ' %', st: st, stCls: 'sb t-' + tone[st],
+origStyle: st === 'Cambiado' ? 'text-decoration: line-through' : '',
+rowStyle: rowBase + (st === 'Cambiado' ? ' background: color-mix(in oklch, var(--w-bg) 45%, var(--card)); border-color: var(--w-b);' : st === 'Añadido' ? ' background: color-mix(in oklch, var(--s-bg) 45%, var(--card)); border-color: var(--s-b);' : ' background: var(--card);'),
+rmLabel: 'Quitar ' + (x.l.name || 'el ingrediente'),
+remove: () => set(x.l.orig === null ? lines.filter((_, j) => j !== x.i) : lines.map((m, j) => (j === x.i ? Object.assign({}, m, { out: true }) : m)))
+}; }),
+removed: outs.map((x) => ({ name: x.l.name, orig: x.l.orig + ' %', restore: () => set(lines.map((m, j) => (j === x.i ? Object.assign({}, m, { out: false, val: m.orig }) : m))) })),
+hasRemoved: outs.length > 0, noRemoved: outs.length === 0,
+addLine: () => set(lines.concat([{ name: '', orig: null, val: '0,00', out: false }])),
+save: () => { this.setState({ toast: true }); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: false }), 3200); },
+ovCls: s.menu ? 'ov open' : 'ov',
+closeAll: () => this.setState({ menu: false }),
+toastCls: s.toast ? 'toast show' : 'toast'
+};
+}
+}
+</script>
+</body>
+</html>

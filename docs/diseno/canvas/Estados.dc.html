@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>StatusBadge y tonos</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 1200px; height: 1120px; padding: 40px 48px; display: flex; flex-direction: column; gap: 20px; position: relative; overflow: hidden">
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <h1 class="h1">StatusBadge</h1>
+    <p class="sub" style="max-width: 820px">Pieza nueva (P5 de QC-227). Siete tonos con significado fijo, un mapa de tono por dominio y una sola tabla de etiquetas por estado. Reemplaza los badges a mano, los <span class="mono">&lt;span data-status&gt;</span> sin estilo y las copias de etiquetas de pedido. El texto siempre acompaña al color y la etiqueta nunca se parte.</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px">
+    <div class="card" style="padding: 12px; gap: 8px"><span><span class="sb t-neutral"><i></i>Pendiente</span></span><span class="h3 mono" style="font-size: 13px">neutral</span><span class="cap">Aún no empieza</span></div>
+    <div class="card" style="padding: 12px; gap: 8px"><span><span class="sb t-progress"><i></i>En curso</span></span><span class="h3 mono" style="font-size: 13px">progress</span><span class="cap">Alguien trabaja; el punto late</span></div>
+    <div class="card" style="padding: 12px; gap: 8px"><span><span class="sb t-waiting"><i></i>Por revisar</span></span><span class="h3 mono" style="font-size: 13px">waiting</span><span class="cap">Espera una acción</span></div>
+    <div class="card" style="padding: 12px; gap: 8px"><span><span class="sb t-success"><i></i>Terminado</span></span><span class="h3 mono" style="font-size: 13px">success</span><span class="cap">Cerrado bien</span></div>
+    <div class="card" style="padding: 12px; gap: 8px"><span><span class="sb t-danger"><i></i>Bloqueado</span></span><span class="h3 mono" style="font-size: 13px">danger</span><span class="cap">Detenido, pide atención</span></div>
+    <div class="card" style="padding: 12px; gap: 8px"><span><span class="sb t-info"><i></i>Procesando</span></span><span class="h3 mono" style="font-size: 13px">info</span><span class="cap">Lo hace el sistema</span></div>
+    <div class="card" style="padding: 12px; gap: 8px"><span><span class="sb t-muted"><i></i>Cancelado</span></span><span class="h3 mono" style="font-size: 13px">muted</span><span class="cap">Fuera de juego</span></div>
+  </div>
+
+  <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px">
+    <div class="tabs" role="tablist" aria-label="Dominio">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="6">
+        <button class="tab" type="button" role="tab" aria-selected="{{ t.selected }}" onClick="{{ t.pick }}">{{ t.label }}<span class="count">{{ t.n }}</span></button>
+      </sc-for>
+    </div>
+    <span class="cap" style="max-width: 360px; text-align: right">{{ note }}</span>
+  </div>
+
+  <div class="{{ panelCls }}" style="display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); border-radius: 14px; overflow: hidden; border: 1px solid var(--border)" role="tabpanel">
+    <div style="padding: 10px 24px 14px; background: var(--card)">
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px minmax(0, 1fr); gap: 12px; align-items: center; height: 36px; border-bottom: 1px solid var(--border)"><span class="lab">Claro</span><span class="lab">Tono</span><span class="lab">Hoy en la app</span></div>
+      <sc-for list="{{ rows }}" as="r" hint-placeholder-count="10">
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px minmax(0, 1fr); gap: 12px; align-items: center; height: 36px; border-bottom: 1px solid var(--border)"><span><span class="{{ r.cls }}"><i></i>{{ r.label }}</span></span><span class="mono cap">{{ r.tone }}</span><span class="cap">{{ r.before }}</span></div>
+      </sc-for>
+    </div>
+    <div class="dk" style="padding: 10px 24px 14px">
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px; gap: 12px; align-items: center; height: 36px; border-bottom: 1px solid var(--border)"><span class="lab">Oscuro</span><span class="lab">Tono</span></div>
+      <sc-for list="{{ rows }}" as="r" hint-placeholder-count="10">
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px; gap: 12px; align-items: center; height: 36px; border-bottom: 1px solid var(--border)"><span><span class="{{ r.cls }}"><i></i>{{ r.label }}</span></span><span class="mono cap">{{ r.tone }}</span></div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 0.9fr); gap: 16px">
+    <div class="panel" style="display: flex; flex-direction: column; gap: 12px">
+      <span class="lab">Prioridad · PriorityMark, no badge</span>
+      <div style="display: flex; gap: 18px; flex-wrap: wrap">
+        <span class="pm"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="10" width="3" height="5" rx="1" fill="currentColor"></rect><rect x="6" y="6" width="3" height="9" rx="1" fill="currentColor" opacity=".2"></rect><rect x="11" y="2" width="3" height="13" rx="1" fill="currentColor" opacity=".2"></rect></svg>Baja</span>
+        <span class="pm"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="10" width="3" height="5" rx="1" fill="currentColor"></rect><rect x="6" y="6" width="3" height="9" rx="1" fill="currentColor"></rect><rect x="11" y="2" width="3" height="13" rx="1" fill="currentColor" opacity=".2"></rect></svg>Media</span>
+        <span class="pm"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="10" width="3" height="5" rx="1" fill="currentColor"></rect><rect x="6" y="6" width="3" height="9" rx="1" fill="currentColor"></rect><rect x="11" y="2" width="3" height="13" rx="1" fill="currentColor"></rect></svg>Alta</span>
+        <span class="pm crit"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14H1z" fill="currentColor"></path><rect x="7.2" y="6" width="1.6" height="4" fill="var(--card)"></rect><rect x="7.2" y="11" width="1.6" height="1.6" fill="var(--card)"></rect></svg>Crítica</span>
+      </div>
+      <span class="cap">Hoy la prioridad compite en color con el estado. Barras neutras; solo Crítica lleva color e icono.</span>
+    </div>
+
+    <div class="panel" style="display: flex; flex-direction: column; gap: 12px">
+      <span class="lab">Cambio de estado en vivo</span>
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+        <span style="display: inline-flex; padding: 8px 12px; border-radius: 10px; background: var(--card)"><span class="{{ liveCls }}"><i></i>{{ liveLabel }}</span></span>
+        <span class="dk" style="display: inline-flex; padding: 8px 12px; border-radius: 10px"><span class="{{ liveCls }}"><i></i>{{ liveLabel }}</span></span>
+        <button class="b b-out b-sm" type="button" onClick="{{ advance }}">Avanzar estado<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button>
+      </div>
+      <span class="cap">Fondo y texto cruzan en 200 ms con <span class="mono">--ease-standard</span>; el ancho no se anima, así no hay salto brusco. (El botón es un control del tablero.)</span>
+    </div>
+
+    <div class="panel" style="display: flex; flex-direction: column; gap: 10px">
+      <span class="lab">Nunca se parte</span>
+      <div style="width: 120px; padding: 8px 0; border-left: 1px dashed var(--input); border-right: 1px dashed var(--input); display: flex; flex-direction: column; gap: 6px; align-items: flex-start">
+        <span class="sb t-waiting"><i></i>Por revisar</span>
+        <span class="sb t-waiting"><i></i>Sin cobertura completa</span>
+        <span class="sb t-progress"><i></i>En acondicionamiento</span>
+      </div>
+      <span class="cap">Columna de 120 px: la etiqueta desborda o la tabla hace scroll, nunca salta de línea (<span class="mono">white-space: nowrap</span>, <span class="mono">flex: none</span>).</span>
+    </div>
+  </div>
+
+  <dl class="spec" style="margin-top: auto">
+    <dt>Componente</dt><dd><span class="mono">components/shared/status-badge.tsx</span> (nuevo) sobre <span class="mono">components/ui/badge.tsx</span> · <span class="mono">components/shared/priority-mark.tsx</span> · mapas de tono y etiqueta únicos por dominio en <span class="mono">lib/</span> (<span class="mono">ORDER_STATUS_TONE</span> + <span class="mono">ORDER_STATUS_LABELS</span>, y los de usuario, cobertura, versión, ejecución y documento)</dd>
+    <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (useRender, mergeProps) · <span class="mono">class-variance-authority</span></dd>
+    <dt>Animación</dt><dd>background-color y color 200 ms <span class="mono">--ease-standard</span> · punto de <span class="mono">progress</span> con pulso de 1.6 s (anillo que se expande y desvanece) · sin pulso con movimiento reducido</dd>
+    <dt>Notas</dt><dd>El punto es decorativo (<span class="mono">aria-hidden</span>); contraste del texto ≥ 4.5:1 en los dos temas. Documento tiene dos fases: subida (Sin subir · Subiendo · Subido · No se pudo subir) y proceso (En cola · Procesando · Listo · Error). «Hoy en la app» = variante de <span class="mono">Badge</span> que se usa ahora.</dd>
+  </dl>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":1120}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+const T = (t) => 'sb t-' + t;
+const domains = {
+pedido: { label: 'Pedido', note: 'Diez estados. Los tres «En …» laten: alguien está trabajando.', rows: [
+['Pendiente','neutral','outline'],['En curso','progress','default (petróleo lleno)'],['Por empacar','waiting','secondary'],['En empaque','progress','default'],['Por acondicionar','waiting','secondary'],['En acondicionamiento','progress','default'],['Terminado','success','secondary'],['Entregado','success','secondary'],['Cancelado','muted','destructive'],['Bloqueado','danger','destructive']]},
+usuario: { label: 'Usuario', note: 'Estado de la cuenta (Usuarios › Personas).', rows: [
+['Activo','success','default'],['Pendiente','neutral','outline'],['Inactivo','muted','secondary'],['Bloqueado','danger','destructive']]},
+cobertura: { label: 'Cobertura', note: 'Columna Cobertura de Pedidos: cuánto material está apartado.', rows: [
+['Apartado','success','[POR CONFIRMAR]'],['Sin apartar','neutral','[POR CONFIRMAR]'],['Sin cobertura completa','waiting','[POR CONFIRMAR]']]},
+version: { label: 'Versión de receta', note: 'Líneas frente a la receta original y estado de la versión.', rows: [
+['Igual','neutral','secondary'],['Cambiado','waiting','outline'],['Añadido','success','default'],['Quitado','danger','destructive'],['Por revisar','waiting','outline'],['Dada de baja','muted','[POR CONFIRMAR]']]},
+ejecucion: { label: 'Ejecución', note: 'Recorridos del Dashboard: marcas junto al número de pedido.', rows: [
+['En curso','progress','texto plano'],['Terminado','success','texto plano'],['Cancelado','muted','texto plano'],['Dado de baja','muted','texto plano']]},
+documento: { label: 'Documento', note: 'Subir PDFs: primero la subida, después el proceso en cola.', rows: [
+['Sin subir','neutral','texto plano'],['Subiendo','progress','texto plano'],['Subido','success','texto plano'],['No se pudo subir','danger','texto plano'],['En cola','neutral','texto plano'],['Procesando','info','texto plano'],['Listo','success','texto plano'],['Error','danger','texto plano']]}
+};
+const sel = s.d || 'pedido';
+const k = s.k || 0;
+const tabs = Object.keys(domains).map((key) => ({ label: domains[key].label, n: String(domains[key].rows.length), selected: key === sel ? 'true' : 'false', pick: () => this.setState({ d: key, k: k + 1 }) }));
+const rows = domains[sel].rows.map((r) => ({ label: r[0], cls: T(r[1]), tone: r[1], before: r[2] }));
+const flow = [['Pendiente','neutral'],['En curso','progress'],['Por empacar','waiting'],['En empaque','progress'],['Por acondicionar','waiting'],['En acondicionamiento','progress'],['Terminado','success'],['Entregado','success']];
+const i = s.i || 0;
+return {
+tabs: tabs, rows: rows, note: domains[sel].note,
+panelCls: k % 2 ? 'fade' : 'enter',
+liveLabel: flow[i][0], liveCls: T(flow[i][1]),
+advance: () => this.setState({ i: (i + 1) % flow.length })
+};
+}
+}
+</script>
+</body>
+</html>

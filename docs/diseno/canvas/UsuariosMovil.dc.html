@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Usuarios en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="Usuarios" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Usuarios · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">usuarios-tabs-switch · user-table · user-sheet · user-form · user-status-dialog · end-user-sessions-dialog · delete-user-dialog · work-group-table · work-group-sheet · work-group-form · work-group-members · delete-work-group-dialog · shared/data-table · row-actions-menu · form-sheet · responsible-avatars · select-field · date-picker · confirm-dialog · delete-confirm-dialog · ui/sonner</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">@tanstack/react-table · @base-ui/react</span> (Tabs, Menu, Dialog, AlertDialog, Sheet, Select) · <span class="mono">sonner · lucide-react</span></dd>
+      <dt>Escritorio</dt><dd>Pestañas «Personas» / «Grupos» cambian el botón principal, el buscador y las columnas · filtro único «Estado» · acciones de fila en ⋯ (Editar, Cambiar estado, «Cerrar todas las sesiones de X», Eliminar; en grupos Abrir, Eliminar) · miembros con avatares y «+N» («Ver los N miembros restantes»)</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono (78 px) · tabla con scroll horizontal dentro de su caja · Sheets anchos (600 px)</dd>
+      <dt>Teléfono</dt><dd>Pestañas con scroll horizontal · tabla a tarjetas (avatar, nombre, estado, usuario, correo, rol) · «Acciones» abre el menú centrado con objetivos de 48 px · Sheets a pantalla completa; Nombres/Apellidos y Correo/Teléfono pasan a una columna · la columna Rol del buscador del grupo se oculta</dd>
+      <dt>Animación</dt><dd>Entrada escalonada · cambio de pestaña con fundido de la tabla · Sheet 300/150 ms · «Cargando los datos de la persona…» con esqueleto · Agregar → Agregado sin salto · toasts «Usuario creado.», «Usuario actualizado.», «Estado de la cuenta actualizado.», «Se cerraron las sesiones de X.», «Usuario eliminado.», «Grupo creado.», «Grupo actualizado.», «Grupo eliminado.», «Persona añadida al grupo.», «Persona retirada del grupo.»</dd>
+      <dt>Por confirmar</dt><dd>Nombres de los roles distintos de Administrador (van como [Operario] / [Supervisor]) · placeholder del Rol en el alta ([Elige un rol]) · texto de la paginación de la tabla principal (se usa el mismo «Página X de Y · N en total» del grupo)</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

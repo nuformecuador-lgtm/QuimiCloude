@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Revisar fórmula en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="ImportarFormula" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Revisar fórmula · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">recipe-import-review · async-autocomplete · text-field · status-badge · confirm-dialog · empty-state</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (Select/Autocomplete, AlertDialog) · <span class="mono">zod · lucide-react</span></dd>
+      <dt>Escritorio</dt><dd>«Volver al listado» como botón · Nombre y Descripción · cada ingrediente con Porcentaje, Referencia del PDF y Producto («Elegir producto») o «Crear materia prima» («Nombre de la materia prima» / «Elegir producto existente») · Quitar · «Añadir ingrediente» · pie fijo «Confirmar» · choque de nombre Reemplazar / Cambiar el nombre · resumen con «Materias primas creadas» / «Materias primas reutilizadas» y «Ver la fórmula»</dd>
+      <dt>Tablet</dt><dd>Barra lateral en icono · Porcentaje y Producto en una fila</dd>
+      <dt>Teléfono</dt><dd>«Quitar» queda solo con icono (44 px, con aria-label) · Producto baja bajo Porcentaje · resumen en una columna · error «No se pudo abrir esta revisión.» con «Volver al listado»</dd>
+      <dt>Animación</dt><dd>Entrada escalonada · el campo cambia entre elegir y crear con fade 200 ms · AlertDialog con zoom 300 ms · el resumen entra subiendo 10 px</dd>
+      <dt>Por confirmar</dt><dd>Resto del texto del choque («Ya existe la fórmula «X»…») y su título · título del resumen · marca «Se crea» en la línea</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Ficha del proveedor en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="ProveedorDetalle" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Ficha del proveedor · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">supplier-detail-header · shared/supplier</span> (SupplierSheet) · <span class="mono">delete-supplier-dialog · catalog-list-section · catalog-table · catalog-columns · catalog-line-row-actions · catalog-line-sheet · catalog-line-form · unit-select · delete-catalog-line-dialog · catalog-pdf-upload</span> (shared/document-upload) · <span class="mono">shared/data-table · entity-image · ui/sonner</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">@tanstack/react-table · @base-ui/react</span> (Menu, Dialog, AlertDialog, Sheet, Select) · <span class="mono">sonner · lucide-react</span></dd>
+      <dt>Escritorio</dt><dd>«Volver a proveedores» como botón con flecha · h1 con Teléfono y Correo electrónico · acciones Editar, Dar de baja, Subir PDFs y «Nueva línea» (primaria) · «Buscar en el catálogo» · tabla con Imagen · Nombre · Presentación · Unidad · Costo · Mínimo de compra · Tiempo de entrega · Material · Medidas · Creado · Actualizado; acciones de fila en ⋯ (Editar / Dar de baja)</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono · la tabla de 12 columnas se desplaza en horizontal dentro de su caja</dd>
+      <dt>Teléfono</dt><dd>Contacto apilado · las cuatro acciones se reparten en dos filas a 44 px · cada línea es una tarjeta (imagen, nombre, presentación y costo arriba; medidas debajo) y «Acciones» abre el menú centrado · Sheets a pantalla completa, campos en una columna</dd>
+      <dt>Animación</dt><dd>Menú ⋯ 200/150 ms · Sheet 300/150 ms · Dialog con zoom 300 ms · subida de PDFs: Sin subir → Subiendo (barra indeterminada) → Subido + Procesando → Listo con «Revisar»; el segundo archivo cae en «No se pudo subir» con «Reanudar» · la línea editada parpadea suave · toasts «Línea de catálogo creada.», «Línea de catálogo actualizada.», «Línea de catálogo dada de baja.», «Proveedor dado de baja.»</dd>
+      <dt>Por confirmar</dt><dd>El código usa «Volver a la lista de proveedores» (supplier-not-found); aquí se pidió «Volver a proveedores» · toast al editar el proveedor no está en el inventario: «[Proveedor actualizado.]» · el límite real de archivos por tanda (se muestra <span class="mono">10</span>)</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

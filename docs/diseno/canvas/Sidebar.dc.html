@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Barra lateral</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<aside class="{{ sideCls }}" style="height: 100%; min-height: 640px; font-family: 'IBM Plex Sans', sans-serif" aria-label="Barra lateral">
+  <a class="brand" href="#" aria-label="QuimiCloude" style="color: inherit; text-decoration: none"><img src="/_blob/2791676cae5d6a8f7ecfe05f1c63f16d" alt=""><span class="brand-t">Quimi<span style="color: #48CCBF; font-weight: 600">Cloude</span></span></a>
+  <sc-if value="{{ rail }}" hint-placeholder-val="{{ true }}"><button class="railbtn" type="button" aria-label="Plegar o desplegar la barra lateral" aria-expanded="{{ expanded }}" onClick="{{ toggleCol }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button></sc-if>
+  <nav class="nav" aria-label="Navegación principal">
+    <span class="ind" style="transform: translateY({{ indY }}px)" aria-hidden="true"></span>
+    <sc-for list="{{ nav }}" as="n" hint-placeholder-count="14">
+      <sc-if value="{{ n.isGroup }}" hint-placeholder-val="{{ false }}"><span class="grp">{{ n.label }}</span></sc-if>
+      <sc-if value="{{ n.isItem }}" hint-placeholder-val="{{ true }}">
+        <a class="it" href="#" aria-current="{{ n.current }}" onClick="{{ n.go }}" title="{{ n.label }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ n.icon }}"></path></svg><span class="lbl">{{ n.label }}</span></a>
+      </sc-if>
+      <sc-if value="{{ n.isParent }}" hint-placeholder-val="{{ false }}">
+        <button class="it" type="button" aria-expanded="{{ n.openStr }}" onClick="{{ n.toggle }}" title="{{ n.label }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ n.icon }}"></path></svg><span class="lbl">{{ n.label }}</span><svg class="{{ n.chevCls }}" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button>
+        <div class="{{ n.collCls }}"><div style="display: flex; flex-direction: column; gap: 4px">
+          <sc-for list="{{ n.kids }}" as="k" hint-placeholder-count="1"><a class="it sub-it" href="#" aria-current="{{ k.current }}" onClick="{{ k.go }}"><span class="lbl">{{ k.label }}</span></a></sc-for>
+        </div></div>
+      </sc-if>
+    </sc-for>
+  </nav>
+  <div class="side-user"><span class="av c2">CR</span><span class="lbl" style="display: flex; flex-direction: column; min-width: 0"><span style="font-size: 13px; font-weight: 500">Carlos Restrepo</span><span style="font-size: 12px; color: var(--sb-muted)">Administrador</span></span></div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"active":{"editor":"enum","options":["asignacion","dashboard","inventario","pedidos","usuarios","formulas","proveedores","clientes","presentaciones","unidades","proveedor-ia","inventarios","whatsapp"],"default":"pedidos"},"sheet":{"editor":"boolean","default":false},"$preview":{"width":272,"height":760}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+const I = {
+asignacion: 'M9 3h6v4H9zM7 5H5v16h14V5h-2M9 14l2 2 4-4',
+dashboard: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z',
+inventario: 'M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8M7.5 5.5l9 5',
+pedidos: 'M8 3h8l1 3H7zM5 6h14v15H5zM9 11h6M9 15h6',
+usuarios: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
+produccion: 'M3 21V10l6 4v-4l6 4V5h6v16zM7 17h2M12 17h2M17 17h2',
+proveedores: 'M3 7h11v10H3zM14 10h4l3 3v4h-7M7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+clientes: 'M4 4h16v16H4zM12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM7 18c1-2 3-3 5-3s4 1 5 3',
+presentaciones: 'M3 13h8v8H3zM13 13h8v8h-8zM8 3h8v8H8z',
+unidades: 'M3 17 17 3l4 4L7 21zM7 13l2 2M10 10l2 2M13 7l2 2',
+integraciones: 'M14 3v3a2 2 0 1 0 4 0V3h3v7h-3a2 2 0 1 0 0 4h3v7h-7v-3a2 2 0 1 0-4 0v3H3v-7h3a2 2 0 1 0 0-4H3V3z'
+};
+const def = [
+['g','Operación'],['i','asignacion','Asignación'],['i','dashboard','Dashboard'],['i','inventario','Inventario'],['i','pedidos','Pedidos'],['i','usuarios','Usuarios'],
+['g','Cadena'],['p','produccion','Producción',[['formulas','Fórmulas']]],['i','proveedores','Proveedores'],['i','clientes','Clientes'],
+['g','Configuración'],['i','presentaciones','Presentaciones'],['i','unidades','Unidades'],['p','integraciones','Integraciones',[['proveedor-ia','Proveedor IA'],['inventarios','Inventarios'],['whatsapp','WhatsApp']]]
+];
+const cur = s.cur || this.props.active || 'pedidos';
+const open = Object.assign({ produccion: true, integraciones: true }, s.open || {});
+const go = (k) => (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ cur: k }); };
+let y = 0; let indY = 0;
+const nav = def.map((d) => {
+if (d[0] === 'g') { y += 34; return { isGroup: true, label: d[1] }; }
+if (d[0] === 'i') { if (d[1] === cur) indY = y; y += 44; return { isItem: true, label: d[2], icon: I[d[1]], current: d[1] === cur ? 'page' : 'false', go: go(d[1]) }; }
+const isOpen = !!open[d[1]];
+const parentY = y; y += 44;
+const kids = d[3].map((k) => { if (k[0] === cur) indY = isOpen ? y : parentY; if (isOpen) y += 40; return { label: k[1], current: k[0] === cur ? 'page' : 'false', go: go(k[0]) }; });
+return { isParent: true, label: d[2], icon: I[d[1]], openStr: isOpen ? 'true' : 'false', chevCls: isOpen ? 'ic chev-s open' : 'ic chev-s', collCls: isOpen ? 'coll open' : 'coll', kids: kids, toggle: () => this.setState({ open: Object.assign({}, open, { [d[1]]: !isOpen }) }) };
+});
+const col = !!s.col;
+const sheet = !!this.props.sheet;
+return {
+sideCls: 'side' + (sheet ? ' in-sheet force' : '') + (col && !sheet ? ' col' : ''),
+rail: !sheet, expanded: col ? 'false' : 'true',
+toggleCol: () => this.setState({ col: !col }),
+nav: nav, indY: indY
+};
+}
+}
+</script>
+</body>
+</html>

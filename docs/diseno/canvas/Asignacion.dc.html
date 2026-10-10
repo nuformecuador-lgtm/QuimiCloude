@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Asignación</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="asignacion" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div class="ph">
+          <div class="ph-t"><h1 class="h1">Asignación</h1></div>
+        </div>
+
+        <sc-if value="{{ showN1 }}" hint-placeholder-val="{{ true }}">
+          <div class="nt n-w enter" role="status">
+            <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"></path></svg>
+            <div style="flex: 1; min-width: 0"><b>Pedido <span class="mono">2026-0000004</span> por empacar</b></div>
+            <button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeN1 }}" style="margin: -6px -6px 0 0; color: inherit"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ showN2 }}" hint-placeholder-val="{{ true }}">
+          <div class="nt n-s enter" role="status">
+            <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg>
+            <div style="flex: 1; min-width: 0"><b>[Pedido <span class="mono">2026-0000001</span> acondicionado]</b></div>
+            <button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeN2 }}" style="margin: -6px -6px 0 0; color: inherit"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+          </div>
+        </sc-if>
+
+        <nav class="tabs scroll" aria-label="Vistas de asignación">
+          <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="7"><button class="tab" type="button" aria-current="{{ t.cur }}" onClick="{{ t.pick }}">{{ t.label }}<span class="count mono">{{ t.n }}</span></button></sc-for>
+        </nav>
+
+        <div class="toolbar" role="toolbar" aria-label="Buscar pedidos">
+          <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Buscar" aria-label="Buscar"></label>
+        </div>
+
+        <sc-if value="{{ hasRows }}" hint-placeholder-val="{{ true }}">
+          <div class="tw">
+            <div class="scroll">
+              <table class="collapse">
+                <thead><tr>
+                  <sc-for list="{{ heads }}" as="h" hint-placeholder-count="8"><th scope="col" class="{{ h.cls }}"><sc-if value="{{ h.vis }}" hint-placeholder-val="{{ true }}">{{ h.label }}</sc-if><sc-if value="{{ h.sr }}" hint-placeholder-val="{{ false }}"><span class="sr">{{ h.label }}</span></sc-if></th></sc-for>
+                  <th scope="col"><span class="sr">Acciones</span></th>
+                </tr></thead>
+                <tbody class="{{ bodyCls }}">
+                  <sc-for list="{{ rows }}" as="r" hint-placeholder-count="3">
+                    <tr>
+                      <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="8"><td class="{{ c.cls }}">
+                        <sc-if value="{{ c.isText }}" hint-placeholder-val="{{ true }}">{{ c.v }}</sc-if>
+                        <sc-if value="{{ c.isBadge }}" hint-placeholder-val="{{ false }}"><span class="{{ c.badge }}"><i></i>{{ c.v }}</span></sc-if>
+                        <sc-if value="{{ c.isPrio }}" hint-placeholder-val="{{ false }}"><span class="{{ c.pm }}"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="10" width="3" height="5" rx="1" fill="currentColor"></rect><rect x="6" y="6" width="3" height="9" rx="1" fill="currentColor" opacity="{{ c.o2 }}"></rect><rect x="11" y="2" width="3" height="13" rx="1" fill="currentColor" opacity="{{ c.o3 }}"></rect></svg>{{ c.v }}</span></sc-if>
+                        <sc-if value="{{ c.isAv }}" hint-placeholder-val="{{ false }}"><span class="avs"><sc-for list="{{ c.avs }}" as="a" hint-placeholder-count="2"><span class="{{ a.cls }}" title="{{ a.name }}">{{ a.ini }}</span></sc-for></span></sc-if>
+                        <sc-if value="{{ c.isWho }}" hint-placeholder-val="{{ false }}"><span style="display: inline-flex; align-items: center; gap: 8px"><span class="{{ c.avCls }}">{{ c.ini }}</span>{{ c.v }}</span></sc-if>
+                        <sc-if value="{{ c.isLink }}" hint-placeholder-val="{{ false }}"><a class="b b-pri b-sm b-go" href="Ejecucion.dc.html" aria-label="{{ c.label }}">Entrar<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a></sc-if>
+                        <sc-if value="{{ c.isBtn }}" hint-placeholder-val="{{ false }}"><button class="b b-pri b-sm b-go" type="button" aria-label="{{ c.label }}" onClick="{{ c.ask }}">Entrar<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></sc-if>
+                      </td></sc-for>
+                      <td class="rowact anchor">
+                        <button class="b b-gho b-ico" type="button" aria-label="{{ r.menuLabel }}" aria-haspopup="menu" aria-expanded="{{ r.open }}" onClick="{{ r.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button>
+                        <div class="{{ r.menuCls }}" role="menu">
+                          <sc-for list="{{ r.menu }}" as="m" hint-placeholder-count="2"><a class="mi" role="menuitem" href="{{ m.href }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ m.icon }}"></path></svg>{{ m.label }}</a></sc-for>
+                        </div>
+                      </td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+              <div class="rows-m">
+                <sc-for list="{{ rows }}" as="r" hint-placeholder-count="3">
+                  <div class="rm">
+                    <div class="rm-top"><span class="mono strong">{{ r.no }}</span><sc-if value="{{ r.hasSt }}" hint-placeholder-val="{{ true }}"><span class="{{ r.stCls }}"><i></i>{{ r.st }}</span></sc-if></div>
+                    <span class="strong">{{ r.rec }}</span>
+                    <div class="rm-meta"><sc-for list="{{ r.meta }}" as="x" hint-placeholder-count="2"><span class="{{ x.cls }}">{{ x.v }}</span></sc-for></div>
+                    <div class="rm-top" style="padding-top: 4px">
+                      <span class="avs"><sc-for list="{{ r.people }}" as="a" hint-placeholder-count="2"><span class="{{ a.cls }}" title="{{ a.name }}">{{ a.ini }}</span></sc-for></span>
+                      <span style="display: flex; gap: 8px">
+                        <button class="b b-out b-touch" type="button" onClick="{{ r.mobileActs }}" aria-label="{{ r.menuLabel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg>Acciones</button>
+                        <sc-if value="{{ r.enterLink }}" hint-placeholder-val="{{ false }}"><a class="b b-pri b-touch b-go" href="Ejecucion.dc.html" aria-label="{{ r.enterLabel }}">Entrar<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a></sc-if>
+                        <sc-if value="{{ r.enterBtn }}" hint-placeholder-val="{{ true }}"><button class="b b-pri b-touch b-go" type="button" aria-label="{{ r.enterLabel }}" onClick="{{ r.ask }}">Entrar<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></sc-if>
+                      </span>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div class="pg"><span>{{ pgText }}</span><span class="pgb"><button class="b b-out b-ico b-sm" type="button" aria-label="Página anterior" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><button class="b b-out b-ico b-sm" type="button" aria-label="Página siguiente" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></span></div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+          <div class="box fade"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7M7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"></path></svg></span><span class="h3">{{ emptyText }}</span></div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="asignacion" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <div class="{{ askCls }}" role="alertdialog" aria-modal="true" aria-labelledby="as-h" aria-describedby="as-d">
+    <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg></div>
+    <h2 id="as-h" class="h2">¿Comenzar el pedido?</h2>
+    <p class="cap" style="margin: 0"><span class="mono">{{ askNo }}</span> · {{ askRec }}</p>
+    <p id="as-d" class="sub">Una vez comenzado, el pedido no se puede devolver: tendrás que continuarlo hasta terminarlo.</p>
+    <div class="actions"><button class="b b-out b-touch-m" type="button" onClick="{{ closeAll }}">Cancelar</button><a class="b b-pri b-touch-m" href="Ejecucion.dc.html">Comenzar</a></div>
+  </div>
+
+  <div class="{{ actsCls }}" role="menu" aria-label="Acciones del pedido">
+    <div class="dlg-hd" style="padding: 0 4px 8px"><span class="h3">Pedido <span class="mono">{{ actsNo }}</span></span><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <sc-for list="{{ actsItems }}" as="m" hint-placeholder-count="2"><a class="mi" role="menuitem" href="{{ m.href }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ m.icon }}"></path></svg>{{ m.label }}</a></sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"vacio":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const tab = s.tab || 0;
+const k = s.k || 0;
+const open = s.open;
+const ICON_ENTER = 'M5 12h14M13 6l6 6-6 6';
+const ICON_ROUTE = 'M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM18 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM6 15V9a4 4 0 0 1 4-4h6M18 9v6a4 4 0 0 1-4 4H8';
+const P1 = { LG: ['LG', '', 'Laura Gómez'], MS: ['MS', 'c2', 'Mateo Sánchez'], VH: ['VH', 'c3', 'Valentina Herrera'], SV: ['SV', 'c4', 'Santiago Vargas'] };
+const av = (p) => ({ ini: p[0], cls: 'av sm' + (p[1] ? ' ' + p[1] : ''), name: p[2] });
+const T = (v, cls) => ({ v: v, cls: cls || '', isText: true });
+const B = (v, tone) => ({ v: v, badge: 'sb t-' + tone, isBadge: true, cls: '' });
+const PR = (v, l) => ({ v: v, isPrio: true, pm: l === 4 ? 'pm crit' : 'pm', o2: l >= 2 ? '1' : '0.2', o3: l >= 3 ? '1' : '0.2', cls: '' });
+const A = (ks) => ({ isAv: true, avs: ks.map((x) => av(P1[x])), cls: '' });
+const W = (x) => x ? { isWho: true, ini: P1[x][0], avCls: 'av sm' + (P1[x][1] ? ' ' + P1[x][1] : ''), v: P1[x][2], cls: '' } : T('—', 'dim');
+const ask = (no, rec) => () => this.setState({ ask: { no: no, rec: rec }, acts: null, open: null });
+const E = (no, rec, started) => ({ isLink: !!started, isBtn: !started, cls: 'num', label: 'Entrar al pedido ' + no, ask: ask(no, rec) });
+const mRoute = { label: 'Ver recorrido', href: 'Recorrido.dc.html', icon: ICON_ROUTE };
+const mPack = { label: 'Entrar', href: 'Empaque.dc.html', icon: ICON_ENTER };
+const mCond = { label: 'Entrar', href: 'Acondicionamiento.dc.html', icon: ICON_ENTER };
+const H = (labels) => labels.map((l) => ({ label: l === '#Entrar' ? 'Entrar' : l, vis: l !== '#Entrar', sr: l === '#Entrar', cls: (l === 'Cantidad' || l === 'Envases' || l === 'Fecha de terminado') ? 'num' : '' }));
+// fila: [no, receta, celdas, menu, estado(texto,tono)|null, meta[], personas[], entrar: null|'link'|'btn']
+const vacio = !!this.props.vacio;
+const mine = vacio ? [] : [
+['2026-0000003', 'Desengrasante alcalino', '120,00 kg', 'Garrafa 20 L', 'Alta', 3, 'En curso', 'progress', ['LG', 'MS'], true],
+['2026-0000011', 'Limpiador cítrico', '40,00 kg', 'Galón 3,78 L', 'Crítica', 4, 'Pendiente', 'neutral', ['LG'], false],
+['2026-0000012', 'Blanqueador hipoclorito 5 %', '200,00 L', 'Tambor 200 L', 'Media', 2, 'Pendiente', 'neutral', ['LG', 'VH'], false]
+];
+const done = [
+['2026-0000008', 'Limpiador multiusos limón', '30,00 kg', 'Galón 3,78 L', 'Alta', 3, '07/10/2026', ['LG']],
+['2026-0000007', 'Desengrasante alcalino', '90,00 kg', 'Garrafa 20 L', 'Baja', 1, '06/10/2026', ['MS', 'SV']]
+];
+const views = [
+{ label: 'Mis asignados', heads: H(['Nº de pedido', 'Receta', 'Cantidad', 'Presentación', 'Prioridad', 'Estado', 'Responsables', '#Entrar']), empty: 'No tienes pedidos asignados en curso o pendientes.',
+  rows: mine.map((d) => ({ no: d[0], rec: d[1], cells: [T(d[0], 'mono'), T(d[1], 'strong'), T(d[2], 'num mono'), T(d[3]), PR(d[4], d[5]), B(d[6], d[7]), A(d[8]), E(d[0], d[1], d[9])], menu: [mRoute], st: [d[6], d[7]], meta: [[d[2], 'mono'], [d[3], ''], [d[4], '']], people: d[8], enter: d[9] ? 'link' : 'btn' })) },
+{ label: 'Terminados', heads: H(['Nº de pedido', 'Receta', 'Cantidad', 'Presentación', 'Fecha de terminado', 'Responsables']),
+  rows: done.map((d) => ({ no: d[0], rec: d[1], cells: [T(d[0], 'mono'), T(d[1], 'strong'), T(d[2], 'num mono'), T(d[3]), T(d[6], 'num mono'), A(d[7])], menu: [mRoute], st: null, meta: [[d[2], 'mono'], [d[3], ''], [d[6], 'mono']], people: d[7] })) },
+{ label: 'Todos', heads: H(['Nº de pedido', 'Receta', 'Cantidad', 'Presentación', 'Prioridad', 'Estado', 'Responsables', 'Fecha de terminado']),
+  rows: mine.map((d) => ({ no: d[0], rec: d[1], cells: [T(d[0], 'mono'), T(d[1], 'strong'), T(d[2], 'num mono'), T(d[3]), PR(d[4], d[5]), B(d[6], d[7]), A(d[8]), T('—', 'num dim')], menu: [mRoute], st: [d[6], d[7]], meta: [[d[2], 'mono'], [d[3], '']], people: d[8] })).concat(done.map((d) => ({ no: d[0], rec: d[1], cells: [T(d[0], 'mono'), T(d[1], 'strong'), T(d[2], 'num mono'), T(d[3]), PR(d[4], d[5]), B('Terminado', 'success'), A(d[7]), T(d[6], 'num mono')], menu: [mRoute], st: ['Terminado', 'success'], meta: [[d[2], 'mono'], [d[3], ''], [d[6], 'mono']], people: d[7] }))) },
+{ label: 'Por empacar', heads: H(['Nº de pedido', 'Receta', 'Presentación', 'Envases', 'Estado', 'Quién empaca']),
+  empty: 'No hay pedidos por empacar en tu empresa.',
+  rows: vacio ? [] : [
+  ['2026-0000004', 'Limpiador multiusos limón', 'Galón 3,78 L', '22', 'Por empacar', 'waiting', null],
+  ['2026-0000005', 'Blanqueador hipoclorito 5 %', 'Tambor 200 L', '1', 'En empaque', 'progress', 'SV']
+  ].map((d) => ({ no: d[0], rec: d[1], cells: [T(d[0], 'mono'), T(d[1], 'strong'), T(d[2]), T(d[3], 'num mono'), B(d[4], d[5]), W(d[6])], menu: [mPack, mRoute], st: [d[4], d[5]], meta: [[d[2], ''], [d[3] + ' envases', 'mono']], people: d[6] ? [d[6]] : [] })) },
+{ label: 'Por acondicionar', heads: H(['Nº de pedido', 'Receta', 'Envases', 'Estado', 'Quién acondiciona']),
+  rows: [
+  ['2026-0000006', 'Limpiador multiusos limón', '12', 'Por acondicionar', 'waiting', null],
+  ['2026-0000002', 'Desengrasante alcalino', '6', 'En acondicionamiento', 'progress', 'VH']
+  ].map((d) => ({ no: d[0], rec: d[1], cells: [T(d[0], 'mono'), T(d[1], 'strong'), T(d[2], 'num mono'), B(d[3], d[4]), W(d[5])], menu: [mCond, mRoute], st: [d[3], d[4]], meta: [[d[2] + ' envases', 'mono']], people: d[5] ? [d[5]] : [] })) },
+{ label: 'Acondicionados', heads: H(['Nº de pedido', 'Receta', 'Envases', 'Estado', 'Quién acondiciona']),
+  rows: [['2026-0000001', 'Limpiador cítrico', '8', 'Terminado', 'success', 'MS']].map((d) => ({ no: d[0], rec: d[1], cells: [T(d[0], 'mono'), T(d[1], 'strong'), T(d[2], 'num mono'), B(d[3], d[4]), W(d[5])], menu: [mCond, mRoute], st: [d[3], d[4]], meta: [[d[2] + ' envases', 'mono']], people: [d[5]] })) },
+{ label: 'Entregados', heads: H(['Nº de pedido', 'Receta', 'Envases', 'Estado', 'Quién acondiciona']), rows: [], empty: '[No hay pedidos entregados.]' }
+];
+const v = views[tab];
+const n = v.rows.length;
+const rows = v.rows.map((r, idx) => {
+const id = tab + '-' + r.no;
+const isOpen = open === id;
+return {
+no: r.no, rec: r.rec, cells: r.cells,
+menu: r.menu.map((m) => ({ label: m.label, href: m.href, icon: m.icon })),
+open: isOpen ? 'true' : 'false', menuCls: 'pop right at-row' + ((idx === n - 1 && n > 1) ? ' up' : '') + (isOpen ? ' open' : ''),
+menuLabel: 'Acciones del pedido ' + r.no,
+toggle: () => this.setState({ open: isOpen ? null : id }),
+hasSt: !!r.st, st: r.st ? r.st[0] : '', stCls: r.st ? 'sb t-' + r.st[1] : 'sb',
+meta: r.meta.map((x) => ({ v: x[0], cls: x[1] })),
+people: r.people.map((x) => av(P1[x])),
+enterLink: r.enter === 'link', enterBtn: r.enter === 'btn', enterLabel: 'Entrar al pedido ' + r.no,
+ask: ask(r.no, r.rec),
+mobileActs: () => this.setState({ acts: { no: r.no, items: r.menu } , open: null })
+};
+});
+const acts = s.acts;
+
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+showN1: s.n1 !== false, showN2: s.n2 !== false,
+closeN1: () => this.setState({ n1: false }), closeN2: () => this.setState({ n2: false }),
+tabs: views.map((x, i) => ({ label: x.label, n: x.rows.length, cur: i === tab ? 'page' : 'false', pick: () => this.setState({ tab: i, open: null, k: k + 1 }) })),
+heads: v.heads,
+rows: rows,
+hasRows: n > 0, isEmpty: n === 0, emptyText: v.empty || '',
+pgText: n === 1 ? '1 pedido' : n + ' pedidos',
+bodyCls: k % 2 ? 'fade' : '',
+askCls: s.ask ? 'dlg open' : 'dlg', askNo: s.ask ? s.ask.no : '', askRec: s.ask ? s.ask.rec : '',
+actsCls: acts ? 'dlg menu open' : 'dlg menu', actsNo: acts ? acts.no : '',
+actsItems: acts ? acts.items : [],
+ovCls: (s.ask || s.menu || acts) ? 'ov open' : 'ov',
+closeAll: () => this.setState({ ask: null, menu: false, acts: null, open: null })
+
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Proveedores en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="Proveedores" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Proveedores · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">supplier-showcase-section · supplier-showcase-list · supplier-showcase-row · showcase-line-card · showcase-load-trigger · supplier-showcase-filters · supplier-showcase-skeleton · shared/supplier</span> (SupplierSheet) · <span class="mono">entity-image · empty-state · error-state · ui/sonner</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">react-intersection-observer</span> (carga al llegar al final; «Cargar más» queda como alternativa accesible) · <span class="mono">@base-ui/react</span> (Sheet) · <span class="mono">lucide-react</span></dd>
+      <dt>Escritorio</dt><dd>Filtros «Producto» y «Proveedor» + «Limpiar filtros» · una tarjeta por proveedor con «Ver ficha del proveedor» como botón (no enlace de texto) · tira horizontal de productos con «Cargar más» al final (nombre accesible «Cargar más productos de X», con tooltip) · «Cargar más» general con skeleton</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono (78 px) · la tira de productos mantiene scroll horizontal con <span class="mono">scroll-snap</span></dd>
+      <dt>Teléfono</dt><dd>Cabecera con «Alternar barra lateral» + isotipo · «Nuevo proveedor» a todo el ancho · filtros apilados · nombre arriba y «Ver ficha del proveedor» debajo a 44 px · la tira se desliza con el dedo · Sheet a pantalla completa</dd>
+      <dt>Animación</dt><dd>Entrada escalonada de proveedores (300 ms, sube 10 px) · tarjeta de producto con borde y sombra en hover · productos nuevos entran desde la derecha · skeleton con brillo (hoy <span class="mono">animate-pulse</span>) · primer «Cargar más» falla a propósito para mostrar «No se pudieron cargar más proveedores.» + «Reintentar»</dd>
+      <dt>Por confirmar</dt><dd>Toast al crear un proveedor: el inventario no lo trae, va como «[Proveedor creado.]» · la tarjeta de producto no tiene clase propia en <span class="mono">qc.css</span> (se usó <span class="mono">.ev-body</span> para el hover) · estados vacíos por la prop <span class="mono">estado</span></dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

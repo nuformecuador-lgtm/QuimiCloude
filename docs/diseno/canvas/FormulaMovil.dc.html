@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Fórmula en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="Formula" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Fórmula · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">recipe-form · recipe-steps-field · file-field · async-autocomplete · url-tabs · step-reader · status-badge · confirm-dialog · ui/sonner</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">@tiptap/react</span> (Negrilla, Cursiva, Lista de verificación) · <span class="mono">@dnd-kit/sortable</span> (arrastre de pasos) · <span class="mono">@base-ui/react</span> (Tabs, Dialog) · <span class="mono">zod</span></dd>
+      <dt>Escritorio</dt><dd>«Volver a la lista» como botón · formulario en tarjetas y «Versiones» al costado (badge «Por revisar» en una línea, nombre con elipsis) · pie fijo Vista previa / Cancelar / Guardar · Guardar abre «N versiones parten de esta receta»</dd>
+      <dt>Tablet</dt><dd>Barra lateral en icono · «Versiones» baja debajo del formulario · Vista previa como dialog grande</dd>
+      <dt>Teléfono</dt><dd>Filas de ingrediente se parten en dos líneas · pasos con asa y número a la izquierda, objetivos de 44 px · pie fijo con botones de 44 px · «Vista previa» ocupa la pantalla (sin margen ni radio) con Anterior / Siguiente abajo</dd>
+      <dt>Animación</dt><dd>Pestañas cruzan 200 ms · paso agarrado se eleva (sombra + escala 1,01) y los destinos se marcan con borde discontinuo · paso del lector entra deslizándose 28 px hacia donde avanzas · barra por pasos crece 300 ms · casillas dibujan su check 200 ms · espera con cuenta atrás real · toast al guardar</dd>
+      <dt>Por confirmar</dt><dd>Título de la tarjeta de datos · «Añadir herramienta» · cabecera «Herramienta» · campo de tiempo de espera por paso · toast al editar (solo existe «Receta creada.») · que «Pasos de envasado» use el mismo editor</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
