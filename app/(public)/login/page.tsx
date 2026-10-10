@@ -112,7 +112,7 @@ function pantallaDeLogin(next: string): ReactElement {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <h1>
-            <BrandLogo variant="vertical" tone="on-dark" height={79} alt={BRAND_LABEL} />
+            <BrandLogo variant="vertical" tone="on-dark" height={79} alt={BRAND_LABEL} preload />
           </h1>
         </CardHeader>
         <CardContent>
