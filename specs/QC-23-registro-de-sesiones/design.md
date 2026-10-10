@@ -503,6 +503,10 @@ por igual, por el camino de redirección que ya existe.
    heredan este borde** el día que decidan entrar a la persona justo después de cambiarle la
    contraseña; la salida, si alguna vez molesta, es la misma que usa R31: emitir con
    `firstIssuedAtAfterStamp(sello)` en vez de con `now`.
+   **Resuelto en el login desde QC-116** (2026-10-10): `verifyCredentials` emite con
+   `firstIssuedAtAfterStamp(sello)` si el sello cae en el segundo del login (tope de 2 s). El hueco
+   que deja —dos sellos de la misma persona en el mismo segundo con un login entre ellos— está en
+   `specs/QC-116-sesion-revocada-en-el-mismo-segundo/design.md > 6`. Ningún requisito de QC-23 cambia.
 5. **Una caída de la base se ve como un cierre de sesión** (§ 4.2). Precio de la decisión 13.
 6. **E2E diferida a QC-53** (R50): deuda con destinatario, no exención.
 7. **El botón del administrador no existe hasta QC-101** (R51): la operación queda implementada,
