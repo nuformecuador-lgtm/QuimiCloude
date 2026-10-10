@@ -171,7 +171,7 @@ Archivos:
 **Hecho cuando:** los archivos están en verde, cada caso lleva su `R<n>` y el gate de la tanda
 también.
 
-### [ ] B5 — Cableado real, actions e integración del caso de uso
+### [x] B5 — Cableado real, actions e integración del caso de uso
 Depende de: B2, B3, B4.
 
 Archivos:

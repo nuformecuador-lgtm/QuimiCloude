@@ -348,3 +348,108 @@ Decision humana 2026-10-09: enmendar qc91, como la enmienda del 2026-09-17.
 - `vitest run qc91-alcance qc121-alcance guard-libro-de-inventario`: 3 archivos, 90 pass, 0 fail.
 
 Veredicto: B2 cerrada.
+
+## B5 — cableado real, actions e integracion (backend_dev, 2026-10-09)
+
+### Archivos
+Modificados:
+- `lib/composition/index.ts`: fuera los dobles de T0 (`orderDeliveryHistoryReader`, `batchLotDirectory`,
+  `orderDeliveryVoidReads` y el `orderDeliveryVoidUnitOfWork` que lanzaba) y sus `import type`.
+  `orderDeliveryVoidUnitOfWork` real sobre `withOrderTransaction` con `createOrderWriteRepository(tx)`,
+  `createOrderDeliveryVoidRepository(tx)` y `createFinishedGoodsReturn(tx)` (molde de `orderDeliveryUnitOfWork`).
+  `listOrderDeliveries`: `history: createOrderDeliveryHistoryReader()`, `batchLots: batchLotDirectoryPrisma`,
+  `presentationCatalog`, `customerCatalog` y `assignmentDirectoryPrisma` (el mismo objeto que `peopleDirectory`,
+  que se declara mas abajo; se conserva la nota de T0). `voidDelivery`: `voids: createOrderDeliveryVoidRepository()`
+  (cliente global) y `orders: orderRepository`. Solo se tocaron los bloques de esta feature.
+- `tests/unit/identity/session-once-per-request-actions.test.ts`: `ACCIONES` + `listOrderDeliveriesAction` y
+  `voidDeliveryAction`, con nota fechada 2026-10-09; filas previas intactas.
+- `tests/integration/aislamiento.json`: las dos suites nuevas en `commit`, con motivo y `desde` 2026-10-09
+  (mismo modo y motivo que `order-delivery` y `order-delivery-concurrency` de QC-223).
+
+Nuevos:
+- `tests/unit/pedidos/order-actions-delivery-void.test.ts` (25 casos).
+- `tests/integration/pedidos/order-delivery-void.int.test.ts` (12 casos).
+- `tests/integration/pedidos/order-delivery-void-concurrency.int.test.ts` (4 casos).
+
+Sin cambio: `lib/modules/pedidos/adapters/driving/order-actions.ts`. T0 ya dejo `listOrderDeliveriesAction` y
+`voidDeliveryAction` con su cuerpo definitivo (`currentActor()` → caso de uso → `success`/`toErrorState`, igual que
+`getOrderDeliveryAction`/`deliverOrderAction`); con el cableado real ya no hay nada provisional en ellas.
+
+### Decisiones donde el spec no fija el detalle
+- R19 «pedido en otro estado» en la integracion: un pedido con entregas solo puede estar `TERMINADO`/`ENTREGADO` por
+  la aplicacion, asi que el caso lo fabrica con `prisma.order.update` a `EN_ACONDICIONAMIENTO` (con `finished_at`
+  `null` para cumplir los CHECK). El pedido borrado de R19 no se puede fabricar con entregas
+  (`orders_delivered_not_deleted`): queda en el unit de B4. R6 «borrado» si se cubre en la lista (pedido `PENDIENTE`
+  con `deleted_at`).
+- R29 en la integracion: `createVoidDelivery` cableado a mano con los adaptadores reales y una pieza que falla
+  (a) despues de que `returnForDeliveryVoid` real devolviera `returned` y (b) en `setStatus`. Molde: el
+  cableado manual de `order-delivery-concurrency.int.test.ts`.
+- R30 «anulacion y entrega a la vez»: dos casos. Uno donde cualquier orden admite las dos (se exige que se apliquen
+  las dos y que el pedido acabe `TERMINADO`), y otro donde la entrega solo cabe si la anulacion va primero (se acepta
+  `aplicada` o `delivery_exceeds_remaining`, y el resto de aserciones se ajusta al orden que ocurrio). Mas el de la
+  misma clave con la lectura previa sincronizada (R28, molde de QC-223).
+- La limpieza de cada caso borra antes asientos, `order_delivery_void_lines` y `order_delivery_voids`, y despues
+  llama a `borrarEmpresaDeEntrega`; el helper compartido `tests/helpers/order-delivery-seed.ts` no se toco
+  (no esta en `## Archivos esperados`).
+- El orden de presentaciones y lotes que espera el caso de `listOrderDeliveries` se calcula por id: el lector
+  ordena las lineas por `orderPresentationLineId, batchId` (B3).
+
+### R -> test (B5)
+`order-actions-delivery-void.test.ts`:
+- R4, R7: `listOrderDeliveriesAction entrega el id y el actor de la sesion, y devuelve la vista tal cual`
+- R8: `una lista sin entregas vuelve como success con la lista vacia`
+- R17: `voidDeliveryAction pasa la entrada tal cual al caso de uso, sin quitar ni anadir campos`; `… no recorta el motivo ni deduplica`
+- R27, R28: `success lleva el VoidDeliveryResult del caso de uso (voided | alreadyRegistered)`
+- R2, R4: `<action> lee cada cara de la sesion una sola vez por invocacion`; `<action> sin sesion entrega actor null y el rechazo vuelve como unauthorized`
+- R2, R3: `ninguna de las dos actions repite la comprobacion de permiso`
+- R6, R16, R18, R19, R21: `<action> traduce <code> al ErrorState del catalogo` (los seis codigos de design § 2.5, en las dos actions)
+- R29: `<action> devuelve un error ajeno como unexpected, sin su detalle`
+`session-once-per-request-actions.test.ts`: las dos filas nuevas de `ACCIONES` (R15 de QC-101, una lectura de sesion por peticion).
+`order-delivery-void.int.test.ts`:
+- R18: `la entrega de la empresa B y una que no existe son delivery_not_found, sin escribir nada`
+- R19: `un pedido que ya no esta TERMINADO ni ENTREGADO es action_not_allowed, sin escribir nada`
+- R20, R21: `una presentacion que no es de la entrega es invalid_input, y una ya anulada es delivery_already_voided sin anular las otras`
+- R22, R23, R24, R25: `guarda la anulacion y sus lineas, devuelve a cada lote lo que salio, asienta delivery_void y deja la entrega identica`
+- R27: `un pedido ENTREGADO pasa a TERMINADO con finished_at, packed_by y conditioned_by intactos; uno TERMINADO sigue TERMINADO`
+- R26: `tras anular, getOrderDelivery vuelve a ofrecer lo anulado y deliverOrder lo entrega de nuevo y deja el pedido ENTREGADO`
+- R28: `la misma clave dos veces deja un solo juego de filas y un solo asiento por lote, y la segunda es already_registered con el estado actual`
+- R29: `un fallo forzado (despues-de-devolver | set-status) no deja nada escrito: …` (2 casos)
+- R7, R9 (`listOrderDeliveries` de punta a punta): `lista las entregas de la mas reciente a la mas antigua, con cliente dado de baja, autor, presentaciones, lotes y la anulacion`
+- R8: `un pedido sin entregas devuelve la lista vacia`
+- R4, R6: `sin pedidos.consultar es unauthorized; el pedido de la empresa B, uno que no existe y uno borrado son order_not_found`
+`order-delivery-void-concurrency.int.test.ts`:
+- R30: `dos anulaciones a la vez de la misma presentacion: una aplicada y la otra delivery_already_voided, y los envases vuelven una sola vez`
+- R28, R30: `dos envios a la vez con la misma clave: uno voided y el otro already_registered, y una sola anulacion escrita`
+- R27, R30: `una anulacion y la entrega que completaria el pedido, a la vez: se aplican las dos una detras de otra, el pedido acaba TERMINADO y el libro cuadra`
+- R30: `una anulacion y una entrega que solo cabe si la anulacion va primero: o se aplican las dos o la entrega es delivery_exceeds_remaining, y el libro cuadra`
+  (los cuatro comprueban que cada lote = suma de sus asientos, ningun lote negativo y producto = suma de lotes).
+
+### Gate
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: 0 errores, 7 avisos ajenos (los mismos de T0).
+- `vitest related --run --project node --project ui lib/composition/index.ts` (unico archivo de produccion tocado):
+  280 archivos, 4372 pass, 1 skip, 0 fail (391 s). Una primera corrida la corto mi `timeout 590` (exit 124) con
+  rojos `ui` por timeout de 20 s y duraciones de ~9.2e6 ms (maquina suspendida); el rerun sin limite, verde.
+- `vitest run guard`: 62 archivos, 838 pass, 15 skip, 0 fail.
+- Unit tocados y censos (`order-actions-delivery-void`, `session-once-per-request-actions`, `order-actions`,
+  `order-actions-delivery`, `module-contract`, `tests/unit/composition/*`, `order-delivery-append-only`): 10 archivos,
+  214 pass, **1 fail aceptado**: `order-delivery-append-only.test.ts > R32: ningun camino … modifica o borra una entrega`
+  (lo enmienda TC). `order-actions-delivery-void`: 25 pass; `session-once-per-request-actions`: 76 pass.
+- `vitest run --project integration` contra copias efimeras de `qc224_anular_entrega` (plantilla `qct_tpl_2b5200f46f51`
+  reutilizada; cada copia borrada al terminar, `db:test list` solo muestra la base de la feature):
+  - `order-delivery-void` + `order-delivery-void-concurrency`: 2 archivos, 16 pass.
+  - QC-223 y B2/B3 afectados por el cableado (`order-delivery`, `order-delivery-concurrency`, `order-delivery-repository`,
+    `order-delivery-void-repository`, `finished-goods-return`, `finished-goods-dispatch`): 6 archivos, 46 pass.
+  - `order-delivery-void-concurrency` repetido 3 veces mas: 4/4 pass cada vez.
+- MCP del grafo no usado en esta tanda (Grep/Read sobre archivos ya conocidos por la bitacora).
+
+Veredicto: B5 lista para commit; el unico rojo es `order-delivery-append-only` (TC).
+
+## Cierre de la continuacion de la tanda 1 (implementer, 2026-10-09)
+
+- Cerradas: B2 (tras la enmienda de qc91) y B5. Sin empezar: F1–F4, TC, TI, TZ.
+- Verificacion del implementer: `vitest run guard` + qc91-alcance + order-actions-delivery-void +
+  session-once-per-request-actions + order-delivery-append-only: 66 archivos, 976 pass, 15 skip,
+  **1 fail** = `tests/unit/pedidos/order-delivery-append-only.test.ts > R32: ningun camino de lib/ ni
+  app/ modifica o borra una entrega…` (rojo aceptado; lo enmienda TC).
+- `pnpm run typecheck`: 0 errores.

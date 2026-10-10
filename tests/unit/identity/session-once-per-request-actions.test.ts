@@ -301,6 +301,26 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         ],
       }),
   },
+  // QC-224 2026-10-09: la lista de entregas y la anulacion resuelven el actor con `currentActor()`.
+  {
+    archivo: 'lib/modules/pedidos/adapters/driving/order-actions.ts',
+    nombre: 'listOrderDeliveriesAction',
+    invocar: async () =>
+      (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).listOrderDeliveriesAction(
+        '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+      ),
+  },
+  {
+    archivo: 'lib/modules/pedidos/adapters/driving/order-actions.ts',
+    nombre: 'voidDeliveryAction',
+    invocar: async () =>
+      (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).voidDeliveryAction({
+        deliveryId: 'cf7c6a95-8bac-4dbe-8f6d-5c9a0b7d3b86',
+        voidKey: 'd08d7ba6-9cbd-4ecf-9a7e-6dab1c8e4c97',
+        presentationLineIds: ['ad5a4e73-6f8a-4b9c-8d4b-3a7e9c5b1f64'],
+        reason: 'El cliente devolvio el producto',
+      }),
+  },
   {
     // Anadido el 2026-09-17 por QC-63, que estrena la pantalla de ejecucion: su archivo de
     // `driving/` resuelve las dos caras de la sesion, asi que el censo tiene que cubrirlo o R15

@@ -310,11 +310,14 @@ import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-reposito
 import type { OrderDeliveryUnitOfWork } from '@/lib/modules/pedidos/ports/order-delivery-unit-of-work';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import { createListOrderDeliveries, createVoidDelivery } from '@/lib/modules/pedidos';
-import type { BatchLotDirectory } from '@/lib/modules/inventario';
-import type {
-  OrderDeliveryHistoryReader,
-  OrderDeliveryVoidRepository,
-} from '@/lib/modules/pedidos/ports/order-delivery-void-repository';
+import {
+  createOrderDeliveryHistoryReader,
+  createOrderDeliveryVoidRepository,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-void-prisma';
+import {
+  batchLotDirectoryPrisma,
+  createFinishedGoodsReturn,
+} from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-return-prisma';
 import type { OrderDeliveryVoidUnitOfWork } from '@/lib/modules/pedidos/ports/order-delivery-void-unit-of-work';
 import {
   createRecipeExecutionReader,
@@ -1400,18 +1403,16 @@ const orderDeliveryUnitOfWork: OrderDeliveryUnitOfWork = {
     ),
 };
 
-// Dobles provisionales de la anulacion hasta que existan sus adaptadores: la lectura no encuentra
-// entregas ni lotes, y la escritura no anula nada.
-const orderDeliveryHistoryReader: OrderDeliveryHistoryReader = { listByOrder: async () => [] };
-const batchLotDirectory: BatchLotDirectory = { findLots: async () => new Map() };
-const orderDeliveryVoidReads: Pick<OrderDeliveryVoidRepository, 'findByKey' | 'findDelivery'> = {
-  findByKey: async () => null,
-  findDelivery: async () => null,
-};
+/** La anulacion, la devolucion a `inventario` y el regreso del pedido confirman o se deshacen juntos. */
 const orderDeliveryVoidUnitOfWork: OrderDeliveryVoidUnitOfWork = {
-  run: async () => {
-    throw new Error('orderDeliveryVoidUnitOfWork: la anulacion todavia no tiene adaptador');
-  },
+  run: (work) =>
+    withOrderTransaction((tx) =>
+      work({
+        orders: createOrderWriteRepository(tx),
+        voids: createOrderDeliveryVoidRepository(tx),
+        finishedGoods: createFinishedGoodsReturn(tx),
+      }),
+    ),
 };
 
 export const pedidos = {
@@ -1509,16 +1510,16 @@ export const pedidos = {
   listOrderDeliveries: createListOrderDeliveries({
     orders: orderRepository,
     lines: createOrderWriteRepository(),
-    history: orderDeliveryHistoryReader,
+    history: createOrderDeliveryHistoryReader(),
     presentations: presentationCatalog,
     customerCatalog,
     // El adaptador importado y no `peopleDirectory`, que se declara mas abajo.
     people: assignmentDirectoryPrisma,
-    batchLots: batchLotDirectory,
+    batchLots: batchLotDirectoryPrisma,
   }),
   voidDelivery: createVoidDelivery({
     unitOfWork: orderDeliveryVoidUnitOfWork,
-    voids: orderDeliveryVoidReads,
+    voids: createOrderDeliveryVoidRepository(),
     orders: orderRepository,
   }),
 } as const;
