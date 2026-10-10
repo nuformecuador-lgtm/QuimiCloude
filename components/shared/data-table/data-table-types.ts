@@ -98,6 +98,8 @@ export type DataTableColumn<TRow> = {
    * (`whitespace-normal` + `break-words`), util junto a `width`.
    */
   readonly hideText?: boolean;
+  /** Celda de lote, cantidad o fecha: Plex Mono con cifras tabulares. Solo el cuerpo. */
+  readonly tabular?: boolean;
 };
 
 /**

@@ -131,7 +131,12 @@ export async function PackingOrdersListSection({ params }: PackingOrdersListSect
           {items.map((order) => (
             <TableRow key={order.id} data-testid="packing-order-row">
               {columns.map((column) => (
-                <TableCell key={column.id}>{column.cell(order)}</TableCell>
+                <TableCell
+                  key={column.id}
+                  className={cn(column.tabular === true && 'font-mono tabular-nums')}
+                >
+                  {column.cell(order)}
+                </TableCell>
               ))}
             </TableRow>
           ))}

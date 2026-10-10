@@ -214,7 +214,7 @@ export function DataTableHeaderCell<TRow>({
       style={style}
       className={cn(
         column.align === 'end' && 'text-right',
-        pinned !== false && 'bg-background',
+        pinned !== false && 'bg-muted',
         toColumnTextClass(column),
         divider && 'relative',
       )}

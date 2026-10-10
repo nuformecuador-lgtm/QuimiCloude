@@ -377,6 +377,7 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
                           columnAlign(column.align),
                           pinnedSide !== false && 'bg-background',
                           toColumnTextClass(column),
+                          column.tabular === true && 'font-mono tabular-nums',
                           divider && 'relative',
                         )}
                       >
