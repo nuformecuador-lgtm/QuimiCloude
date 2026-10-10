@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 
-import { UNREADABLE_SECRET_MESSAGE } from '@/lib/modules/integraciones/domain/connection-secrets'
 import {
   SecretUnreadableError,
   ValidationError,
@@ -213,17 +212,15 @@ describe('editar la conexion de WhatsApp', () => {
     expect(repo.row(CONNECTION_ID)?.status).toBe('DISABLED')
   })
 
-  it('R13: si el token guardado no se descifra al editar el telefono, no llama a Graph, deja ERROR y relanza', async () => {
+  it('R13, D10: si el token guardado no se descifra al editar el telefono, no llama a Graph, no guarda nada y relanza', async () => {
     const { repo, graph, update } = setup({ record: { accessTokenEnc: 'v1:ilegible' } })
+    const antes = { ...repo.row(CONNECTION_ID) }
     const promesa = update(CONNECTION_ID, editInput({ phoneNumberId: 'telefono-nuevo' }), admin())
 
     await expect(promesa).rejects.toBeInstanceOf(SecretUnreadableError)
     expect(graph.fetchPhoneNumber).not.toHaveBeenCalled()
-    expect(repo.row(CONNECTION_ID)).toMatchObject({
-      status: 'ERROR',
-      lastError: UNREADABLE_SECRET_MESSAGE,
-      phoneNumberId: '3456789012',
-    })
+    expect(repo.update).not.toHaveBeenCalled()
+    expect(repo.row(CONNECTION_ID)).toEqual(antes)
   })
 
   it('R25: las reglas de R24 aplican al editar (displayName vacio, ID vacio, secreto de mas de 1024)', async () => {

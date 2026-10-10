@@ -21,6 +21,17 @@ export function connectionSecretContext(
   return { companyId: scope.companyId, recordId: connectionId, field };
 }
 
+/** Descifra un secreto guardado sin escribir nada; un secreto ilegible solo se relanza. */
+export function readStoredSecret(
+  deps: { readonly cipher: SecretCipher },
+  record: WhatsappConnectionRecord,
+  field: ConnectionSecretField,
+  scope: IntegracionesScope,
+): Promise<string> {
+  const stored = field === ACCESS_TOKEN_FIELD ? record.accessTokenEnc : record.appSecretEnc;
+  return deps.cipher.decrypt(stored, connectionSecretContext(record.id, field, scope));
+}
+
 /**
  * Un secreto ilegible no se arregla reintentando: la conexión queda en error pidiendo las
  * credenciales de nuevo. Una conexión deshabilitada sigue deshabilitada.
@@ -31,9 +42,8 @@ export async function decryptStoredSecret(
   field: ConnectionSecretField,
   scope: IntegracionesScope,
 ): Promise<string> {
-  const stored = field === ACCESS_TOKEN_FIELD ? record.accessTokenEnc : record.appSecretEnc;
   try {
-    return await deps.cipher.decrypt(stored, connectionSecretContext(record.id, field, scope));
+    return await readStoredSecret(deps, record, field, scope);
   } catch (error) {
     if (error instanceof SecretUnreadableError && record.status !== 'DISABLED') {
       await deps.connections.update(

@@ -54,7 +54,7 @@ Conclusión: no existe nada que resuelva parte del alcance. Se sigue.
 
 ```
 db/schema.prisma                                              ← modelo WhatsappConnection + 2 enums
-db/migrations/20261009120000_whatsapp_connections/{migration,down}.sql
+db/migrations/20261009130000_whatsapp_connections/{migration,down}.sql
 lib/shared/routes.ts                                          ← WHATSAPP_WEBHOOK_ROUTE_BASE + whatsappWebhookPath(id)
 lib/modules/integraciones/
   index.ts                                                    ← + errores, tipos y fábricas de casos de uso
@@ -169,7 +169,7 @@ model WhatsappConnection {
 - **Sin `@relation`**: `company_id` y `created_by` son FK escritas a mano (drift), como `customers`,
   para que ningún `include` cruce a `identity`.
 
-### 2.2 Migración `20261009120000_whatsapp_connections`
+### 2.2 Migración `20261009130000_whatsapp_connections`
 
 Escrita a mano (las FK de drift harían que `migrate dev` propusiera un reset, igual que en
 `customers`). En orden:
@@ -278,10 +278,13 @@ tocar un puerto.
 | `setWhatsappConnectionEnabled` | `(id, enabled, actor)` | `false`: `DISABLED` sin Graph; idempotente (R29). `true`: si no está `DISABLED`, no hace nada; si lo está, `decrypt` + prueba → buena: R19 + R31; fallida: sigue `DISABLED` y devuelve `message` (R30, D11) |
 | `regenerateWhatsappVerifyToken` | `(id, actor)` | `findLiveById` → token nuevo → `update({ verifyTokenHash })` sin tocar `status` (R15) → `{status:'regenerated', verifyToken}` |
 
-**R13 en detalle.** Si `decrypt` lanza `SecretUnreadableError`, el caso de uso escribe `ERROR` y
-`lastError = 'No se pudo leer una credencial guardada. Vuelve a escribir el Access Token y el App
-Secret.'` y **relanza** el error, que la acción traduce con el catálogo. En `enable`, la conexión
-sigue `DISABLED` (no pasa a `ERROR`), coherente con D11.
+**R13 en detalle.** Si `decrypt` lanza `SecretUnreadableError`:
+- En `test`, el caso de uso escribe `ERROR` y `lastError = 'No se pudo leer una credencial guardada.
+  Vuelve a escribir el Access Token y el App Secret.'` y **relanza** el error, que la acción traduce
+  con el catálogo (`integration_secret_unreadable`). `ERROR` + `lastError` solo aplica a `test`.
+- En `update` (editar), por D10 no se guarda **nada**: ni estado ni `lastError`. El error se relanza
+  y la acción lo traduce con el catálogo. Decisión humana del 2026-10-09.
+- En `enable`, la conexión sigue `DISABLED` (no pasa a `ERROR`), coherente con D11.
 
 **Estado tras prueba buena** (`domain/connection-status.ts`, R31, D12):
 `statusAfterGoodTest(record) = record.lastWebhookAt === null ? 'PENDING' : 'ACTIVE'`.

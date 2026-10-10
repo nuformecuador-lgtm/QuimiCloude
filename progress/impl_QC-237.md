@@ -6,7 +6,7 @@ empezar: 79 códigos, última migración `20261008150200_delivery_permission`).
 ## Estado de las tareas
 - T1–T11: hechas y marcadas `[x]` en `tasks.md`.
 - T12: **escrita pero sin marcar**. `integraciones-whatsapp.spec.ts` no se pudo ejecutar: la base local
-  de E2E no tiene la migración `20261009120000_whatsapp_connections`, y aplicarla es un paso manual de
+  de E2E no tiene la migración `20261009130000_whatsapp_connections`, y aplicarla es un paso manual de
   base (ver «Bloqueo»).
 - T13: este mapa está hecho y R43 comprobado. Falta `./init.sh`, que lo corre el leader.
 
@@ -21,7 +21,7 @@ empezar: 79 códigos, última migración `20261008150200_delivery_permission`).
 | (siguiente) | T12 escrita y esta bitácora |
 
 ## Archivos
-**Base de datos:** `db/schema.prisma` (bloque al final), `db/migrations/20261009120000_whatsapp_connections/{migration.sql,down.sql}`.
+**Base de datos:** `db/schema.prisma` (bloque al final), `db/migrations/20261009130000_whatsapp_connections/{migration.sql,down.sql}`.
 
 **Catálogo:** `lib/modules/errores/domain/error-codes.ts`, `error-catalog.ts` (los tres códigos van al final).
 
@@ -142,7 +142,7 @@ suite. Antes de pararla salió rojo `tests/integration/proveedores/catalog-line.
 no está en `tests/baseline-rojos.json`; no se comprobó si falla en `dev` limpio.
 
 ## Bloqueo (paso manual de base)
-La base local (`QuimiCloude`, localhost:5432) que usa el E2E no tiene `20261009120000_whatsapp_connections`.
+La base local (`QuimiCloude`, localhost:5432) que usa el E2E no tiene `20261009130000_whatsapp_connections`.
 `prisma migrate status` da como última común `20261008150200_delivery_permission` y además muestra tres
 migraciones de otras ramas que este worktree no tiene: `20260922160000_inventory_movement_kind_consumption`,
 `20260922160100_reservations_and_decimal_stock` y `20261009120000_product_batches_production_date`. Esta
@@ -164,6 +164,9 @@ humana. Después hay que repetir el comando de E2E de arriba y marcar T12.
    fallida, así que no aplica D10. **Ojo:** R13 en `requirements.md` solo habla de «probar o habilitar», y
    la fila de `update` del diseño cita R13. Es una ambigüedad, y el reviewer o el humano confirma si editar
    debe escribir `ERROR` o no escribir nada. Al habilitar, una conexión `DISABLED` sigue `DISABLED`.
+   **Resuelta por decisión humana (2026-10-09):** al editar se sigue D10 y no se guarda nada; el error se
+   relanza (`readStoredSecret`, sin escritura). `ERROR` + `lastError` queda solo para probar. Diseño
+   actualizado y test de `update` reescrito para afirmar que no hay escritura.
 6. Al editar sin App Secret nuevo, el guardado no se descifra (R11), así que el saneado del mensaje de Meta
    no puede tachar ese App Secret.
 7. Un id sin forma de uuid da `whatsapp_connection_not_found` sin llegar al puerto, igual que `isCustomerId`.
@@ -207,4 +210,10 @@ Todos los cambios en `db/schema.prisma`, `lib/composition/index.ts`, `error-code
 `catalogo.test.ts` y `guard-identificador-de-request.test.ts` son bloques o entradas al final. La única
 excepción es `composition/index.ts`: se quitó la línea `export const integraciones = …` de su sitio y se
 redeclaró al final. Si QC-224 crea una migración, hay que cuidar su orden con
-`20261009120000_whatsapp_connections`.
+`20261009130000_whatsapp_connections`.
+
+## Cambios del 2026-10-09 (decisión humana)
+- Migración renombrada a `20261009130000_whatsapp_connections` (chocaba por timestamp con
+  `20261009120000_product_batches_production_date` de QC-219 y con el rango de QC-224). No se aplicó a
+  ninguna base a mano.
+- D10 al editar con secreto ilegible: ver desviación 5.

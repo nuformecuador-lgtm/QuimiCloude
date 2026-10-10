@@ -3,7 +3,7 @@ import {
   ACCESS_TOKEN_FIELD,
   APP_SECRET_FIELD,
   connectionSecretContext,
-  decryptStoredSecret,
+  readStoredSecret,
 } from './connection-secrets';
 import { goodTestPatch } from './connection-status';
 import { ValidationError, WhatsappConnectionNotFoundError } from './errors';
@@ -65,8 +65,9 @@ export function createUpdateWhatsappConnection(
 
     let patch = textPatch;
     if (needsTest) {
+      // D10: una edición que falla no guarda nada, tampoco con un secreto ilegible.
       const accessToken =
-        data.accessToken ?? (await decryptStoredSecret(deps, record, ACCESS_TOKEN_FIELD, scope));
+        data.accessToken ?? (await readStoredSecret(deps, record, ACCESS_TOKEN_FIELD, scope));
       const probe = await deps.graph.fetchPhoneNumber({
         phoneNumberId: data.phoneNumberId,
         accessToken,

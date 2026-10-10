@@ -23,7 +23,7 @@
 
 - [x] **T1.** Esquema y migración (`design.md > 2`): los dos enums y `WhatsappConnection` con
       `/// @module integraciones` al final de `db/schema.prisma`; migración
-      `20261009120000_whatsapp_connections` escrita a mano con su `down.sql`; `prisma generate`.
+      `20261009130000_whatsapp_connections` escrita a mano con su `down.sql`; `prisma generate`.
       Tests `tests/integration/integraciones/whatsapp-connection-migration.int.test.ts` (ida, vuelta
       e ida) y la parte de R5 (RLS forzada) del `.int` de T5. Se tensa `module-shape.test.ts` R13 a
       exactamente un modelo. Sin columna de versión de clave (D9); índices únicos parciales de
@@ -119,8 +119,8 @@
 ## Archivos esperados
 
 - `db/schema.prisma`
-- `db/migrations/20261009120000_whatsapp_connections/migration.sql`
-- `db/migrations/20261009120000_whatsapp_connections/down.sql`
+- `db/migrations/20261009130000_whatsapp_connections/migration.sql`
+- `db/migrations/20261009130000_whatsapp_connections/down.sql`
 - `lib/modules/errores/domain/error-codes.ts`
 - `lib/modules/errores/domain/error-catalog.ts`
 - `lib/shared/routes.ts`
