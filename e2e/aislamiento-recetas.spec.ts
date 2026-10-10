@@ -34,6 +34,7 @@ import { expect, test } from '@playwright/test';
 
 import { normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
+import { normalizeProductName } from '@/lib/modules/inventario';
 import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { FORMULAS_ROUTE, recipeEditRoute } from '@/lib/shared/routes';
@@ -60,6 +61,9 @@ const COMPANY_B_NAME = `${SHARED_TOKEN}_cb`;
 
 const RECIPE_B_NAME = `${SHARED_TOKEN}_receta_b`;
 
+/** El ingrediente de A con el que el alta del paso 4 puede guardarse. */
+const PRODUCT_A_NAME = `${SHARED_TOKEN}_producto_a`;
+
 const ADMIN_USERNAME = `${SHARED_TOKEN}_admin`;
 const ADMIN_PASSWORD = `Qc50-Admin-${RUN_ID.slice(0, 12)}`;
 
@@ -75,6 +79,8 @@ const FORM_TITLE = 'recipe-form-title';
 const CREATE_OPEN = 'recipe-create-open';
 const FIELD_NAME = 'recipe-field-name';
 const FORM_SUBMIT = 'recipe-form-submit';
+const LINE_PRODUCT = 'recipe-line-product-0';
+const LINE_PERCENTAGE = 'recipe-line-percentage-0';
 
 let companyAId: string | null = null;
 let companyBId: string | null = null;
@@ -125,6 +131,9 @@ test.beforeAll(async () => {
   await prisma.recipe.deleteMany({
     where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
   });
+  await prisma.product.deleteMany({
+    where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
+  });
   await prisma.user.deleteMany({
     where: { username: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
   });
@@ -134,6 +143,17 @@ test.beforeAll(async () => {
 
   companyAId = await createCompany(COMPANY_A_NAME);
   companyBId = await createCompany(COMPANY_B_NAME);
+
+  // El ingrediente del alta del paso 4, en la empresa A: el formulario no deja guardar una receta
+  // sin al menos una linea con producto y una suma del 100 %.
+  await prisma.product.create({
+    data: {
+      name: PRODUCT_A_NAME,
+      nameNormalized: normalizeProductName(PRODUCT_A_NAME),
+      companyId: companyAId,
+    },
+    select: { id: true },
+  });
 
   // Hash real: el login tiene que pasar por bcrypt, el adaptador Prisma y la Server Action de verdad.
   const admin = await createFixtureUser({
@@ -178,6 +198,7 @@ test.afterAll(async () => {
   const companyIds = [companyAId, companyBId].filter((id): id is string => id !== null);
   const pasos: ReadonlyArray<() => Promise<unknown>> = [
     () => prisma.recipe.deleteMany({ where: { companyId: { in: companyIds } } }),
+    () => prisma.product.deleteMany({ where: { companyId: { in: companyIds } } }),
     () => prisma.user.deleteMany({ where: { username: ADMIN_USERNAME } }),
     () => prisma.company.deleteMany({ where: { name: { in: [COMPANY_A_NAME, COMPANY_B_NAME] } } }),
   ];
@@ -273,6 +294,17 @@ test.describe('aislamiento por empresa de recetas', () => {
     await expect(page.getByTestId(FORM_TITLE)).toBeVisible({ timeout: 60_000 });
 
     await page.getByTestId(FIELD_NAME).fill(RECIPE_B_NAME);
+    // Desde afa5a867 el Guardar solo se habilita con al menos una linea con producto y una suma
+    // del 100 %. El ingrediente es de A: el selector solo ofrece productos de la empresa activa.
+    const lineProduct = page.getByTestId(LINE_PRODUCT);
+    await lineProduct.click();
+    await lineProduct.fill(PRODUCT_A_NAME);
+    await page
+      .getByTestId(`${LINE_PRODUCT}-option`)
+      .filter({ hasText: PRODUCT_A_NAME })
+      .click();
+    await page.getByTestId(LINE_PERCENTAGE).fill('100');
+    await expect(page.getByTestId(FORM_SUBMIT)).toBeEnabled();
     await page.getByTestId(FORM_SUBMIT).click();
 
     // El alta redirige a la lista solo con exito: con el error de duplicado el formulario seguiria

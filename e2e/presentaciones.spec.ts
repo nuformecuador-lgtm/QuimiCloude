@@ -303,6 +303,10 @@ test.describe('pantalla de presentaciones', () => {
 
     // --- 3. El unico campo de negocio de una presentacion (R22).
     await page.getByTestId(FIELD_NAME_TESTID).fill(presentationName);
+    // La unidad es obligatoria desde QC-80: sin elegirla el envio se rechaza y el panel no se
+    // cierra. Mismo gesto que el alta rapida de `inventario.spec.ts` (566d122d).
+    await page.getByTestId('presentation-unit-select').click();
+    await page.getByTestId('presentation-unit-option').first().click();
 
     // --- 4. Guardar: la Server Action REAL de QC-20 contra Postgres, sin `fetch` de por medio
     // (R30).
