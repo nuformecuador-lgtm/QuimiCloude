@@ -65,7 +65,7 @@ export function createUpdateWhatsappConnection(
 
     let patch = textPatch;
     if (needsTest) {
-      // D10: una edición que falla no guarda nada, tampoco con un secreto ilegible.
+      // Una edición que falla no guarda nada, tampoco con un secreto ilegible.
       const accessToken =
         data.accessToken ?? (await readStoredSecret(deps, record, ACCESS_TOKEN_FIELD, scope));
       const probe = await deps.graph.fetchPhoneNumber({
