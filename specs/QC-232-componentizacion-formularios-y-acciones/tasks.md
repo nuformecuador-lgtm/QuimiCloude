@@ -271,6 +271,7 @@ lista aquí, para que `archivos-en-vuelo` no lo lea como ruta de esta feature. L
 - `app/(private)/inventario/components/product-table.tsx`
 - `app/(private)/inventario/components/product-columns.tsx`
 - `app/(private)/inventario/components/product-row-actions.tsx` (nuevo)
+- `app/(private)/inventario/components/index.ts` (barrel: exporta `product-row-actions`)
 - `app/(private)/inventario/components/finished-stock-table.tsx`
 - `app/(private)/inventario/components/finished-stock-columns.tsx`
 - `app/(private)/inventario/importar/components/import-dialog-parts.tsx`
@@ -280,6 +281,7 @@ lista aquí, para que `archivos-en-vuelo` no lo lea como ruta de esta feature. L
 - `app/(private)/produccion/formulas/components/recipe-table.tsx`
 - `app/(private)/produccion/formulas/components/recipe-columns.tsx`
 - `app/(private)/produccion/formulas/components/recipe-row-actions.tsx` (nuevo)
+- `app/(private)/produccion/formulas/components/index.ts` (barrel: exporta `recipe-row-actions`)
 
 ### proveedores
 - `app/(private)/proveedores/[id]/components/catalog-line-form.tsx`
@@ -290,6 +292,7 @@ lista aquí, para que `archivos-en-vuelo` no lo lea como ruta de esta feature. L
 - `app/(private)/proveedores/[id]/components/catalog-table.tsx`
 - `app/(private)/proveedores/[id]/components/catalog-columns.tsx`
 - `app/(private)/proveedores/[id]/components/catalog-line-row-actions.tsx` (nuevo)
+- `app/(private)/proveedores/[id]/components/index.ts` (barrel: exporta `catalog-line-row-actions`)
 - `app/(private)/proveedores/[id]/components/supplier-detail-header.tsx`
 
 ### pedidos (P1)
