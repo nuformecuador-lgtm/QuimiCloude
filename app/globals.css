@@ -65,6 +65,10 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  /* Lo que use `transition-*` sin `duration-*` ni `ease-*` propios cae aquí: el hover y el foco
+     de los controles. */
+  --default-transition-duration: var(--dur-instant);
+  --default-transition-timing-function: var(--ease-standard);
 }
 
 :root {
@@ -178,6 +182,46 @@
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
 }
 
+/* Toasts. Sonner inyecta su hoja en tiempo de ejecución, sin capa, y no se sabe si queda antes o
+   después de esta: por eso se gana por especificidad, con el ancestro delante, y no por orden.
+   Mientras se arrastra, Sonner quita la transición para que el toast siga al dedo; esa regla
+   no se pisa. */
+[data-sonner-toaster] [data-sonner-toast]:not([data-swiping='true']) {
+  transition-property: transform, opacity, height, box-shadow;
+  transition-duration: var(--dur-slow), var(--dur-slow), var(--dur-slow), var(--dur-base);
+  transition-timing-function: var(--ease-enter);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-removed='true']:not([data-swiping='true']),
+[data-sonner-toaster]
+  [data-sonner-toast][data-removed='true'][data-front='false'][data-swipe-out='false'][data-expanded='false'] {
+  transition-property: transform, opacity, height, box-shadow;
+  transition-duration: var(--dur-fast);
+  transition-timing-function: var(--ease-exit);
+}
+
+/* Movimiento reducido, para toda la app. Acorta en vez de quitar: los primitivos esperan a que
+   termine la animación para desmontar, y con 0.01 ms termina en el acto. Una sola iteración
+   también detiene los indicadores de carga en bucle. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* La regla de arriba deja la duración en 0.01 ms, pero no toca el retardo de la entrada de
+     pantalla: sin esto los bloques seguirían ocultos hasta 120 ms y aparecerían a saltos. Los
+     retardos van al final del archivo con la misma especificidad, así que aquí gana por
+     `!important` y no por orden. */
+  [data-screen-enter] > * > :nth-child(n) {
+    animation-delay: 0ms !important;
+  }
+}
+
 /* Las paradas van en hex porque así las fija la marca: convertirlas a oklch alteraría los valores. */
 :root {
   --sidebar-panel-gradient: linear-gradient(166deg, #0A4A47 0%, #003634 38%, #002828 70%, #021E1E 100%);
@@ -185,6 +229,69 @@
 
 .dark {
   --sidebar-panel-gradient: linear-gradient(166deg, #0B2F2F 0%, #062222 42%, #031515 100%);
+}
+
+:root {
+  --button-primary-gradient: linear-gradient(135deg, #0A4A47 0%, #02605A 45%, #0B7A72 100%);
+  --button-veil-color: rgb(2 96 90 / 0.1);
+}
+
+/* En oscuro el primario es claro con texto oscuro: los hex de la marca no sirven, así que las
+   paradas se derivan de --primary y la más oscura conserva el contraste del texto. */
+.dark {
+  --button-primary-gradient: linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--primary) 85%, black) 0%,
+    var(--primary) 45%,
+    color-mix(in oklch, var(--primary) 85%, white) 100%
+  );
+  --button-veil-color: color-mix(in oklch, var(--primary) 10%, transparent);
+}
+
+/* Utilidades y no clases de la variante: también las reciben los enlaces que usan
+   buttonVariants() sin el componente. Cada transición lista todas sus propiedades porque
+   una lista de duraciones más corta se repetiría sobre las que sobran, y va en un selector
+   más específico porque transition-all, que el botón trae en su base, sale después en la capa
+   de utilidades y la pisaría. */
+@utility btn-shine {
+  background-image: var(--button-primary-gradient);
+  background-size: 200% 100%;
+  background-position: 0% 0;
+  background-repeat: no-repeat;
+  &:not(:disabled) {
+    transition-property: background-position, scale, translate, box-shadow, border-color, opacity;
+    transition-duration:
+      var(--dur-base), var(--dur-instant), var(--dur-instant), var(--dur-instant),
+      var(--dur-instant), var(--dur-instant);
+    transition-timing-function: var(--ease-standard);
+  }
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      background-position: 100% 0;
+    }
+  }
+}
+
+@utility btn-veil {
+  background-image: linear-gradient(var(--button-veil-color), var(--button-veil-color));
+  background-size: 0% 100%;
+  background-position: 100% 0;
+  background-repeat: no-repeat;
+  &:not(:disabled) {
+    transition-property:
+      background-size, border-color, color, background-color, scale, translate, box-shadow, opacity;
+    transition-duration:
+      var(--dur-base), var(--dur-instant), var(--dur-instant), var(--dur-instant),
+      var(--dur-instant), var(--dur-instant), var(--dur-instant), var(--dur-instant);
+    transition-timing-function: var(--ease-standard);
+  }
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      background-size: 100% 100%;
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+  }
 }
 
 /* Reglas del panel flotante, a proposito FUERA de `@layer`.
@@ -266,6 +373,39 @@
    barras de acento a la vez -la del grupo y la del hijo- compiten por la misma lectura. */
 [data-slot='sidebar-menu-sub-button'][data-active] {
   box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--sidebar-primary) 22%, transparent);
+}
+
+/* Resaltado que se desliza entre items: el mismo fondo y anillo que las dos reglas de arriba.
+   Mientras el script no lo coloca, el contenedor no lleva `data-indicator-ready` y el boton se
+   sigue pintando solo; despues el boton deja de pintar fondo y anillo para no doblarlos. La
+   barra `::before`, el icono y el peso del texto se quedan en el boton. La opacidad inicial va
+   aqui y no como clase `opacity-0`: los tests de pantallas tactiles leen esa clase como un
+   control que solo revela el puntero. */
+[data-slot='sidebar-active-indicator'] {
+  opacity: 0;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklch, var(--sidebar-primary) 26%, transparent),
+    color-mix(in oklch, var(--sidebar-primary) 5%, transparent)
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--sidebar-primary) 32%, transparent);
+}
+
+[data-slot='sidebar-active-indicator'][data-variant='sub'] {
+  background: var(--sidebar-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--sidebar-primary) 22%, transparent);
+}
+
+[data-indicator-ready]
+  > [data-slot='sidebar-menu']
+  > [data-slot='sidebar-menu-item']
+  > [data-slot='sidebar-menu-button'][data-active],
+[data-indicator-ready]
+  > [data-slot='sidebar-menu-sub']
+  > [data-slot='sidebar-menu-sub-item']
+  > [data-slot='sidebar-menu-sub-button'][data-active] {
+  background: transparent;
+  box-shadow: none;
 }
 
 @layer base {
@@ -450,3 +590,30 @@
 }
 
 /* ══ Pantalla de login — FIN ══ */
+
+/* Entrada de pantalla al cambiar de módulo: entran los bloques de primer nivel de la página
+   (hijos de su raíz), escalonados; las filas de una tabla entran con su bloque, nunca solas. */
+@keyframes screen-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+[data-screen-enter] > * > * {
+  animation: screen-enter var(--dur-slow) var(--ease-enter) both;
+}
+
+[data-screen-enter] > * > :nth-child(2) {
+  animation-delay: 40ms;
+}
+
+[data-screen-enter] > * > :nth-child(3) {
+  animation-delay: 80ms;
+}
+
+[data-screen-enter] > * > :nth-child(n + 4) {
+  animation-delay: 120ms;
+}
+
+/* Con movimiento reducido el retardo se anula en el bloque global de arriba. */

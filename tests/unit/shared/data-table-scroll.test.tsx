@@ -259,6 +259,61 @@ describe('DataTable: flechas de scroll horizontal interno', () => {
   })
 })
 
+describe('DataTable: flechas de scroll y movimiento (QC-228)', () => {
+  function simularMovimientoReducido(reducido: boolean) {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({
+        matches: reducido && query === '(prefers-reduced-motion: reduce)',
+        media: query,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    })
+  }
+
+  afterEach(() => {
+    Reflect.deleteProperty(window, 'matchMedia')
+  })
+
+  it('R18: la flecha no encoge al pulsarse aunque la variante outline si lo haga', () => {
+    renderTabla({ tableId: 'scroll-sin-escala' })
+    simularDesbordamiento().notificar()
+
+    for (const testid of ['data-table-scroll-left', 'data-table-scroll-right']) {
+      const clases = screen.getByTestId(testid).className.split(/\s+/)
+      expect(clases).toContain('active:not-aria-[haspopup]:scale-100')
+      expect(clases).not.toContain('active:not-aria-[haspopup]:scale-[0.98]')
+      expect(clases).toContain('active:not-aria-[haspopup]:-translate-y-1/2')
+    }
+  })
+
+  it('R21: con movimiento reducido la flecha desplaza al instante', () => {
+    simularMovimientoReducido(true)
+    renderTabla({ tableId: 'scroll-reducido' })
+    const { notificar, scrollBy } = simularDesbordamiento()
+    notificar()
+
+    fireEvent.click(screen.getByTestId('data-table-scroll-right'))
+    expect(scrollBy).toHaveBeenCalledWith({ left: 300, behavior: 'auto' })
+  })
+
+  it('R21: sin movimiento reducido la flecha conserva el desplazamiento suave', () => {
+    simularMovimientoReducido(false)
+    renderTabla({ tableId: 'scroll-no-reducido' })
+    const { notificar, scrollBy } = simularDesbordamiento()
+    notificar()
+
+    fireEvent.click(screen.getByTestId('data-table-scroll-right'))
+    expect(scrollBy).toHaveBeenCalledWith({ left: 300, behavior: 'smooth' })
+  })
+})
+
 describe('DataTable: width fijo por columna', () => {
   function columnasConAncho(): readonly DataTableColumn<Producto>[] {
     return [
