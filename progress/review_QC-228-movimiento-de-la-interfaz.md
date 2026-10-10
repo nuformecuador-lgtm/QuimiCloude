@@ -64,3 +64,46 @@ Ningún bloqueante.
 ## Veredicto
 
 **OK**
+
+## Vuelta 2 (acotada a cb4a1fa5..0ffc330f)
+
+### Checklist
+
+- [x] **2e5ee47d (rojo de CI).** `e2e/movimiento.spec.ts` entra en la lista cerrada de
+  `tests/unit/shared/data-table-alcance.test.ts` en su sitio alfabético (entre `login` y
+  `pasos-de-envasado`), centinela 34 → 35, con nota fechada. Es real: el spec usa
+  `data-table-search` (línea 86). El archivo figura en `tasks.md`.
+- [x] **e9871c66 (enmienda D11).** Fila D11 en la tabla de decisiones (humano, 2026-10-09,
+  enmienda D8 en R17/R18), cobertura D11→R17, R18 añadida, notas `Enmienda 2026-10-09 (D11)` bajo
+  R17 y R18 en `requirements.md` y en `design.md`. `button.tsx` coincide con la enmienda:
+  `outline-dashed`, `secondary` y `ghost` pasan a `btn-veil` + `scale-[0.98]`, pierden sus
+  `hover:bg-*`/`hover:text-*`/`dark:hover:*` y conservan los `aria-expanded:*`; `destructive` solo
+  cambia la pulsación y conserva `hover:bg-destructive/*`; `link` sin cambio.
+- [x] **Tests de D11.** `motion-classes.test.tsx`: R17 (velo y sin hover anterior en las tres
+  variantes), R17 (destructive/link sin velo; destructive conserva el hover rojo), R18 (las seis
+  variantes escalan y ninguna se desplaza; link al revés). `motion-tokens.test.ts`: R17 nuevo de
+  contraste del texto petróleo sobre el velo compuesto en `secondary` y `background`, claro y
+  oscuro; los helpers de color se suben al `describe` sin cambiar su lógica.
+- [x] **d4c9b6a4 (snapshots).** Comprobado por script sobre `git diff -U0` de los `.snap`:
+  463 líneas quitadas / 463 añadidas, todas con `class=`, y quitando el atributo `class` las líneas
+  son idénticas (0 diferencias fuera de `class`). Clases quitadas: `active:not-aria-[haspopup]:translate-y-px`
+  (463), `hover:bg-muted` y `hover:text-foreground` (419), `dark:hover:bg-muted/50` (374),
+  `dark:hover:bg-input/50` (45). Añadidas: `active:not-aria-[haspopup]:scale-[0.98]` (463) y
+  `btn-veil` (419). Solo movimiento/hover de D11.
+- [x] **Regla 9 (comentarios).** `components/ui/button.tsx` no añade comentarios. Los comentarios
+  nuevos están en tests y no citan ficha ni requisito fuera del nombre del caso.
+- [x] **Verificación ejecutada:** `vitest run` de motion-classes, motion-tokens,
+  data-table-alcance y `tests/unit/paridad` → 24 archivos, 424 pasan, 2 skipped; `tsc --noEmit`
+  limpio; `eslint` de los archivos tocados sin problemas. `tasks.md` sin casillas abiertas.
+
+### Hallazgos
+
+- `menor`: en oscuro, `--button-veil-color` es `color-mix(in oklch, … transparent)`; el test de
+  contraste lo compone en sRGB con alfa 0.1, una aproximación. El margen (5.6:1) hace improbable
+  que cambie el resultado.
+
+Ningún bloqueante.
+
+### Veredicto vuelta 2
+
+**OK**
