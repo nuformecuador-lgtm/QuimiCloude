@@ -334,3 +334,5 @@ corregido. Se enmienda una sola aserción de `tests/unit/sidebar-ajuste.test.tsx
 (`padding: 10px` → `14px`), con nota `ENMIENDA QC-227`. La otra opción es borrarlas y reescribir
 ese caso para que mire las clases del primitivo. Es más limpio, pero toca más un test de otra
 ficha.
+
+> 2026-10-09: el humano aprobó la enmienda del sidebar colapsado (R31–R37, T12) con los defaults de P10–P12. Quedan cerradas.
