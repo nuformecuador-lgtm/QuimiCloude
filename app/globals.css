@@ -408,9 +408,17 @@
   box-shadow: none;
 }
 
+/* Item de navegacion inactivo en el tono apagado del panel. Solo dentro de `sidebar-content`: la
+   marca y el pie tambien son `sidebar-menu-button` y no cambian. Sin capa, gana a las utilidades
+   del primitivo, asi que excluye hover y foco para no anular su color. */
+[data-slot='sidebar-content']
+  :is([data-slot='sidebar-menu-button'], [data-slot='sidebar-menu-sub-button']):not([data-active]):not(:hover):not(:focus-visible) {
+  color: var(--sidebar-muted-foreground);
+}
+
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
   }
   body {
     @apply bg-background text-foreground;
