@@ -260,6 +260,9 @@
   (`CATALOG_LINE_ROW_ACTIONS_TESTID`, `CATALOG_LINE_ACTION_EDIT_TESTID`,
   `CATALOG_LINE_ACTION_DELETE_TESTID`). Los barrels no estaban en Archivos esperados.
 - **Dueño:** sin asignar.
+- **Resuelta (2026-10-09, misma rama):** los route-contracts de inventario y recetas exigían el
+  reexport; los tres barrels (inventario, fórmulas y proveedores/[id]) entraron en Archivos esperados
+  y exportan sus menús de fila (commit `6328954c`).
 
 ### D50 — Comentario obsoleto en `e2e/helpers/confirm-dialog.ts` (QC-232)
 - **Origen:** QC-232 (2026-10-09), al borrar `components/shared/confirm-action-dialog.tsx`.
