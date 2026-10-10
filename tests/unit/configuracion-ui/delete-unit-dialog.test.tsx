@@ -26,8 +26,8 @@ import {
   DeleteUnitDialog,
   UNIT_ACTION_DELETE_TESTID,
   UNIT_IN_USE_CODE,
+  UNIT_ROW_ACTIONS_TESTID,
   UnitRowActions,
-  deleteUnitLabel,
 } from '@/app/(private)/configuracion/unidades/components';
 import { UNEXPECTED_ERROR_CODE, type ErrorCode } from '@/lib/modules/errores';
 
@@ -51,6 +51,7 @@ import {
   errorInesperado,
   esperarSinIdentificador,
 } from '../../helpers/identificador-de-request';
+import { clickRowAction } from '../../helpers/row-actions-menu';
 import { setupUser } from '../../helpers/user-event';
 
 const { deleteUnitActionMock, routerMock } = vi.hoisted(() => ({
@@ -165,13 +166,12 @@ describe('mientras el usuario no confirme no se invoca el borrado (R40)', () => 
     const la = unidad();
     render(<UnitRowActions unit={la} baseUnits={[]} />);
 
-    await user.click(screen.getByTestId(UNIT_ACTION_DELETE_TESTID));
+    await clickRowAction(user, screen.getByTestId(UNIT_ROW_ACTIONS_TESTID), UNIT_ACTION_DELETE_TESTID);
 
     await screen.findByTestId(DELETE_UNIT_DIALOG_TESTID);
     // El nombre accesible del disparador identifica la unidad sobre la que se actua (R28).
-    expect(screen.getByTestId(UNIT_ACTION_DELETE_TESTID)).toHaveAttribute(
-      'aria-label',
-      deleteUnitLabel(la.name),
+    expect(screen.getByTestId(UNIT_ROW_ACTIONS_TESTID).getAttribute('aria-label')).toContain(
+      la.name,
     );
     expect(deleteUnitActionMock).not.toHaveBeenCalled();
   });
@@ -264,13 +264,13 @@ describe('la fila no se retira cuando el borrado se rechaza (R41)', () => {
         <UnitRowActions unit={unidad()} baseUnits={[]} />
       </div>,
     );
-    await user.click(screen.getByTestId(UNIT_ACTION_DELETE_TESTID));
+    await clickRowAction(user, screen.getByTestId(UNIT_ROW_ACTIONS_TESTID), UNIT_ACTION_DELETE_TESTID);
     await screen.findByTestId(DELETE_UNIT_DIALOG_TESTID);
     await user.click(screen.getByTestId(DELETE_UNIT_CONFIRM_TESTID));
 
     await screen.findByTestId(DELETE_UNIT_ERROR_TESTID);
     expect(screen.getByTestId(FILA_TESTID)).toBeInTheDocument();
-    expect(screen.getByTestId(UNIT_ACTION_DELETE_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(UNIT_ROW_ACTIONS_TESTID)).toBeInTheDocument();
     expect(screen.getByTestId(DELETE_UNIT_DIALOG_TESTID)).toBeInTheDocument();
     expect(routerMock.refresh).not.toHaveBeenCalled();
   });

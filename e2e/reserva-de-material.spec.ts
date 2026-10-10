@@ -66,6 +66,7 @@ import {
 } from './helpers/confirm-dialog';
 import { addPackagingLine, openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
+import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 const FIXTURE_PREFIX = 'qc141_e2e_';
 
@@ -745,7 +746,13 @@ test.describe('reserva de material del pedido', () => {
     await expect(productRow.getByTestId('product-available')).toContainText('500');
 
     // --- 7. El historial del lote guarda tanto el consumo de la reserva como la salida real.
-    await page.getByTestId('product-batches-open').click();
+    await (
+      await openRowActionsMenuItem(
+        page,
+        productRow.getByTestId('product-row-actions'),
+        'product-batches-open',
+      )
+    ).click();
     await expect(page.getByTestId('product-batches-sheet')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(`product-batch-${batchId}`)).toBeVisible({ timeout: 60_000 });
 

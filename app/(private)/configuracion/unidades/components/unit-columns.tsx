@@ -1,6 +1,6 @@
 'use client';
 
-import type { DataTableColumn } from '@/components/shared/data-table';
+import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
 import type { UnitRef, UnitView } from '@/lib/modules/unidades';
 
 import { NO_EQUIVALENCE_LABEL, formatUnitEquivalence } from './unit-equivalence';
@@ -95,15 +95,12 @@ export function createUnitColumns(
           unit.baseUnitId === null ? undefined : baseIndex[unit.baseUnitId],
         ),
     },
-    {
+    // Sin `sortable` (no ordena), sin `filter` (no aparece en la barra de filtros) y sin anclar.
+    actionsColumn<UnitView>({
       id: ACTIONS_COLUMN_ID,
       label: 'Acciones',
-      align: 'end',
-      // Sin `sortable` (no ordena) y sin `filter` (no aparece en la barra de filtros) — R19, R20.
-      // `pinnable: false` para que el usuario no pueda fijarla y tapar las columnas de datos.
-      pinnable: false,
       cell: (unit) => <UnitRowActions unit={unit} baseUnits={baseUnits} />,
-    },
+    }),
   ];
 }
 

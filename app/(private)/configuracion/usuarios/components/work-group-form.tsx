@@ -1,7 +1,6 @@
 'use client';
 
 import { useActionState, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
-import { useFormStatus } from 'react-dom';
 import { toast } from 'sonner';
 
 import {
@@ -12,16 +11,10 @@ import {
   type DataTableTexts,
 } from '@/components/shared/data-table';
 import { ErrorAlert } from '@/components/shared/error-alert';
+import { FormSheet } from '@/components/shared/form-sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { ErrorState } from '@/lib/modules/errores';
 import {
@@ -40,17 +33,13 @@ import {
   type CreateWorkGroupFormState,
   type WorkGroupMutationFormState,
 } from '@/lib/modules/identity/adapters/driving/work-group-actions';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * El formulario del alta y del renombrado de un grupo de trabajo (R21, R22, R23, R24;
  * `design.md > 5.1` y `> 5.2`), y el selector de candidatos que los dos modos comparten.
  *
- * **Es quien posee el `<SheetContent>` ENTERO** -cabecera, cuerpo con scroll y pie fijo-, igual
- * que `UserForm` (`user-form.tsx`): monta `isForm` con `formProps={{ action: formAction, ... }}`
- * y `footer={<FormActions .../>}`, asi Guardar/Cancelar quedan FIJOS fuera del area que hace
- * scroll, igual que en todos los demas paneles del repo. `WORK_GROUP_SHEET_TESTID` vive AQUI por
- * la misma razon: es quien pinta el `data-testid` de ese `SheetContent`.
+ * Pinta el panel entero con `FormSheet`, así Guardar y Cancelar quedan fijos fuera del área que
+ * hace scroll. `WORK_GROUP_SHEET_TESTID` vive aquí porque es este archivo quien lo pinta.
  *
  * **`children` lo pinta este archivo, pero lo decide `work-group-sheet.tsx`**: el panel pasa
  * `WorkGroupMembers` como hijo (solo en la edicion) para que el bloque de miembros reales quede
@@ -156,9 +145,6 @@ const CREATE_DESCRIPTION = 'Ponle nombre al grupo de trabajo.';
 const EDIT_DESCRIPTION = 'Cambia el nombre del grupo y gestiona sus miembros.';
 
 const NAME_LABEL = 'Nombre del grupo';
-const SUBMIT_LABEL = 'Guardar';
-const PENDING_SUBMIT_LABEL = 'Guardando…';
-const CANCEL_LABEL = 'Cancelar';
 
 const PENDING_MEMBERS_TITLE = 'Miembros iniciales';
 const PENDING_MEMBER_REMOVE_LABEL = 'Quitar';
@@ -373,145 +359,115 @@ export function WorkGroupForm({ group, onSaved, children }: WorkGroupFormProps) 
   const nameMessage = liveMessage ?? duplicateName;
 
   return (
-    <SheetContent
-      side="right"
+    <FormSheet
+      title={isEdit ? EDIT_TITLE : CREATE_TITLE}
+      description={isEdit ? EDIT_DESCRIPTION : CREATE_DESCRIPTION}
+      formAction={formAction}
       minScreenWidth={70}
-      className="w-full pb-[env(safe-area-inset-bottom)] data-[side=right]:w-full sm:max-w-md"
-      data-testid={WORK_GROUP_SHEET_TESTID}
-      data-mode={isEdit ? 'edit' : 'create'}
-      data-work-group-id={workGroupId ?? ''}
-      isForm
-      formProps={{ action: formAction, 'data-testid': WORK_GROUP_FORM_TESTID }}
-      footer={<FormActions disabled={issue !== null} />}
+      sheetData={{
+        'data-mode': isEdit ? 'edit' : 'create',
+        'data-work-group-id': workGroupId ?? '',
+      }}
+      testIds={{
+        sheet: WORK_GROUP_SHEET_TESTID,
+        form: WORK_GROUP_FORM_TESTID,
+        cancel: WORK_GROUP_FORM_CANCEL_TESTID,
+        submit: WORK_GROUP_FORM_SUBMIT_TESTID,
+      }}
+      disabled={issue !== null}
+      footerWrapperClassName="flex flex-row flex-wrap items-center justify-end gap-2"
+      bodyClassName="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4"
     >
-      <SheetHeader>
-        <SheetTitle>{isEdit ? EDIT_TITLE : CREATE_TITLE}</SheetTitle>
-        <SheetDescription>{isEdit ? EDIT_DESCRIPTION : CREATE_DESCRIPTION}</SheetDescription>
-      </SheetHeader>
+      {/* El sujeto del renombrado viaja como campo OCULTO: nadie lo escribe. */}
+      {workGroupId === undefined ? null : (
+        <input
+          type="hidden"
+          name={WORK_GROUP_ID_FIELD}
+          value={workGroupId}
+          readOnly
+          data-testid={WORK_GROUP_FORM_ID_TESTID}
+        />
+      )}
 
-      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4">
-        {/* El sujeto del renombrado viaja como campo OCULTO: nadie lo escribe (R23). */}
-        {workGroupId === undefined ? null : (
-          <input
-            type="hidden"
-            name={WORK_GROUP_ID_FIELD}
-            value={workGroupId}
-            readOnly
-            data-testid={WORK_GROUP_FORM_ID_TESTID}
-          />
-        )}
-
-        {formError === undefined ? null : (
-          // Region de error del formulario: aqui van los rechazos que no senalan al campo.
-          <ErrorAlert
-            error={formError}
-            id={formErrorId}
-            className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            testId={WORK_GROUP_FORM_ERROR_TESTID}
-            withDataCode
-            renderCatalogued={(catalogued) => (
-              <>
-                <p>{catalogued.message}</p>
-                <p className="text-xs" data-testid={WORK_GROUP_FORM_ERROR_CODE_TESTID}>
-                  {catalogued.code}
-                </p>
-              </>
-            )}
-          />
-        )}
-
-        <div className="flex flex-col gap-2">
-          <Label htmlFor={nameId}>{NAME_LABEL}</Label>
-          <Input
-            id={nameId}
-            name={WORK_GROUP_NAME_FIELD}
-            type="text"
-            autoComplete="off"
-            value={name}
-            onChange={(event) => {
-              setName(event.target.value);
-              setTouched(true);
-            }}
-            onBlur={() => setTouched(true)}
-            className={`min-h-11 ${FIELD_TEXT}`}
-            aria-invalid={nameMessage === undefined ? undefined : true}
-            aria-describedby={nameMessage === undefined ? undefined : nameErrorId}
-            data-testid={WORK_GROUP_NAME_FIELD_TESTID}
-          />
-          {nameMessage === undefined ? null : (
-            <p
-              id={nameErrorId}
-              role="alert"
-              className="text-sm text-destructive"
-              data-testid={WORK_GROUP_NAME_ERROR_TESTID}
-              data-code={liveMessage === undefined && serverError !== undefined ? serverError.code : undefined}
-              data-issue={liveMessage === undefined ? undefined : (issue ?? undefined)}
-            >
-              {nameMessage}
-            </p>
+      {formError === undefined ? null : (
+        // Region de error del formulario: aqui van los rechazos que no senalan al campo.
+        <ErrorAlert
+          error={formError}
+          id={formErrorId}
+          className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
+          testId={WORK_GROUP_FORM_ERROR_TESTID}
+          withDataCode
+          renderCatalogued={(catalogued) => (
+            <>
+              <p>{catalogued.message}</p>
+              <p className="text-xs" data-testid={WORK_GROUP_FORM_ERROR_CODE_TESTID}>
+                {catalogued.code}
+              </p>
+            </>
           )}
-        </div>
+        />
+      )}
 
-        {/* SOLO en el alta: el grupo todavia no existe, asi que lo elegido aqui vive en estado
-            local hasta que `submit` lo mande, de a una, tras la creacion. En la edicion este bloque
-            no se pinta: la gestion de miembros reales es cosa de `work-group-sheet.tsx` ->
-            `WorkGroupMembers`, que llega por `children`. */}
-        {workGroupId === undefined ? (
-          <div className="flex flex-col gap-4">
-            <PendingMembersList
-              members={pendingMembers}
-              onRemove={(id) =>
-                setPendingMembers((previous) => previous.filter((member) => member.id !== id))
-              }
-            />
-            <WorkGroupMemberPicker
-              busy={false}
-              selectedIds={pendingMembers.map((member) => member.id)}
-              onAdd={(candidate) =>
-                setPendingMembers((previous) =>
-                  previous.some((member) => member.id === candidate.id)
-                    ? previous
-                    : [...previous, candidate],
-                )
-              }
-            />
-          </div>
-        ) : null}
-
-        {children}
+      <div className="flex flex-col gap-2">
+        <Label htmlFor={nameId}>{NAME_LABEL}</Label>
+        <Input
+          id={nameId}
+          name={WORK_GROUP_NAME_FIELD}
+          type="text"
+          autoComplete="off"
+          value={name}
+          onChange={(event) => {
+            setName(event.target.value);
+            setTouched(true);
+          }}
+          onBlur={() => setTouched(true)}
+          className={`min-h-11 ${FIELD_TEXT}`}
+          aria-invalid={nameMessage === undefined ? undefined : true}
+          aria-describedby={nameMessage === undefined ? undefined : nameErrorId}
+          data-testid={WORK_GROUP_NAME_FIELD_TESTID}
+        />
+        {nameMessage === undefined ? null : (
+          <p
+            id={nameErrorId}
+            role="alert"
+            className="text-sm text-destructive"
+            data-testid={WORK_GROUP_NAME_ERROR_TESTID}
+            data-code={liveMessage === undefined && serverError !== undefined ? serverError.code : undefined}
+            data-issue={liveMessage === undefined ? undefined : (issue ?? undefined)}
+          >
+            {nameMessage}
+          </p>
+        )}
       </div>
-    </SheetContent>
-  );
-}
 
-/** Las dos salidas del formulario, siempre visibles y siempre enfocables (R40). */
-function FormActions({ disabled }: { readonly disabled: boolean }) {
-  const { pending } = useFormStatus();
-
-  return (
-    <div className="flex flex-row flex-wrap items-center justify-end gap-2">
-      <SheetClose
-        render={
-          <Button
-            type="button"
-            variant="outline-dashed"
-            className={touchTarget}
-            data-testid={WORK_GROUP_FORM_CANCEL_TESTID}
+      {/* SOLO en el alta: el grupo todavia no existe, asi que lo elegido aqui vive en estado
+          local hasta que `submit` lo mande, de a una, tras la creacion. En la edicion este bloque
+          no se pinta: la gestion de miembros reales es cosa de `work-group-sheet.tsx` ->
+          `WorkGroupMembers`, que llega por `children`. */}
+      {workGroupId === undefined ? (
+        <div className="flex flex-col gap-4">
+          <PendingMembersList
+            members={pendingMembers}
+            onRemove={(id) =>
+              setPendingMembers((previous) => previous.filter((member) => member.id !== id))
+            }
           />
-        }
-      >
-        {CANCEL_LABEL}
-      </SheetClose>
-      <Button
-        type="submit"
-        touch
-        disabled={disabled || pending}
-        aria-busy={pending}
-        data-testid={WORK_GROUP_FORM_SUBMIT_TESTID}
-      >
-        {pending ? PENDING_SUBMIT_LABEL : SUBMIT_LABEL}
-      </Button>
-    </div>
+          <WorkGroupMemberPicker
+            busy={false}
+            selectedIds={pendingMembers.map((member) => member.id)}
+            onAdd={(candidate) =>
+              setPendingMembers((previous) =>
+                previous.some((member) => member.id === candidate.id)
+                  ? previous
+                  : [...previous, candidate],
+              )
+            }
+          />
+        </div>
+      ) : null}
+
+      {children}
+    </FormSheet>
   );
 }
 

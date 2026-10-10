@@ -237,6 +237,9 @@ export function WorkGroupTable({
    * y llama a `closePanel(false)` al cerrar.
    */
   const [panel, setPanel] = useState<WorkGroupPanel | null>(null);
+  // El ultimo grupo del borrado: tras la primera apertura el dialogo sigue montado y su salida
+  // anima con el contenido de ese grupo.
+  const [lastDeleteGroup, setLastDeleteGroup] = useState<WorkGroupRow | null>(null);
 
   /** Cerrar es siempre lo mismo: soltar el estado. Estable, para no rearmar las piezas. */
   const closePanel = useCallback((next: boolean) => {
@@ -250,7 +253,10 @@ export function WorkGroupTable({
       createWorkGroupColumns({
         canModify,
         onEdit: (group) => setPanel({ mode: 'edit', group }),
-        onDelete: (group) => setPanel({ mode: 'delete', group }),
+        onDelete: (group) => {
+          setLastDeleteGroup(group);
+          setPanel({ mode: 'delete', group });
+        },
       }),
     [canModify],
   );
@@ -290,10 +296,14 @@ export function WorkGroupTable({
         <WorkGroupSheet group={editGroup} open onOpenChange={closePanel} />
       )}
 
-      {/* Y UNA del dialogo de borrado, tambien solo mientras esta abierto: un rechazo anterior no
-          reaparece porque la pieza se desmonta al cerrarse (R34). */}
-      {deleteGroup === null ? null : (
-        <DeleteWorkGroupDialog group={deleteGroup} open onOpenChange={closePanel} />
+      {/* Y UNA del dialogo de borrado, montada desde su primera apertura para que el cierre anime.
+          Un rechazo anterior no reaparece porque su contenido se desmonta al cerrarse. */}
+      {lastDeleteGroup === null ? null : (
+        <DeleteWorkGroupDialog
+          group={deleteGroup ?? lastDeleteGroup}
+          open={deleteGroup !== null}
+          onOpenChange={closePanel}
+        />
       )}
     </div>
   );

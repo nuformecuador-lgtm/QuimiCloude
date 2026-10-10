@@ -4,6 +4,7 @@ import {
   UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
 } from '@/components/shared/unexpected-error-notice';
 import { REFERENCIA_DEL_CASO, errorInesperado } from '../../helpers/identificador-de-request';
+import { clickRowAction, getRowActionItem } from '../../helpers/row-actions-menu';
 import { setupUser } from '../../helpers/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 
@@ -167,6 +168,7 @@ vi.mock('sonner', async (importOriginal) => ({
 const testId = {
   // La tabla compartida nombra la fila por el id de la linea (`data-table-row-<id>`).
   fila: /^data-table-row-/,
+  menuFila: 'catalog-line-row-actions',
   abrirBaja: 'catalog-line-delete-open',
   dialogo: 'delete-catalog-line-dialog',
   mensaje: 'delete-catalog-line-message',
@@ -298,7 +300,7 @@ async function renderPantalla() {
 
 /** Abre el dialogo de baja de la primera fila del catalogo. */
 async function abrirBaja(user: ReturnType<typeof setupUser>) {
-  await user.click(screen.getAllByTestId(testId.abrirBaja)[0]);
+  await clickRowAction(user, screen.getAllByTestId(testId.menuFila)[0], testId.abrirBaja);
   return screen.findByTestId(testId.dialogo);
 }
 
@@ -342,7 +344,7 @@ describe('baja de una linea de catalogo — sin confirmar (R36)', () => {
 
     // El dialogo NOMBRA la linea y advierte de que no se puede deshacer.
     expect(within(dialogo).getByTestId(testId.mensaje)).toHaveTextContent(linea().name);
-    expect(within(fila).getByTestId(testId.abrirBaja)).toBeInTheDocument();
+    expect(within(fila).getByTestId(testId.menuFila)).toBeInTheDocument();
     expect(deleteCatalogLineActionMock).not.toHaveBeenCalled();
   });
 
@@ -437,7 +439,7 @@ describe('baja de una linea de catalogo — al confirmar (R36, R33)', () => {
 
     await renderPantalla();
 
-    await user.click(screen.getAllByTestId(testId.abrirBaja)[1]);
+    await clickRowAction(user, screen.getAllByTestId(testId.menuFila)[1], testId.abrirBaja);
     const dialogo = await screen.findByTestId(testId.dialogo);
 
     expect(within(dialogo).getByTestId(testId.mensaje)).toHaveTextContent(otra.name);
@@ -456,10 +458,14 @@ describe('baja de una linea de catalogo — accesibilidad y plataforma (R47, R48
 
       await renderPantalla();
 
-      const disparador = screen.getAllByTestId(testId.abrirBaja)[0];
-      expect(disparador, `a ${ancho}px`).toHaveAccessibleName(`Dar de baja ${linea().name}`);
+      const disparador = screen.getAllByTestId(testId.menuFila)[0];
+      expect(disparador, `a ${ancho}px`).toHaveAccessibleName(`Acciones de ${linea().name}`);
       expect(disparador.className, `a ${ancho}px`).toContain('min-h-11');
       expect(disparador.className, `a ${ancho}px`).toContain('min-w-11');
+      const item = await getRowActionItem(user, disparador, testId.abrirBaja);
+      expect(item, `a ${ancho}px`).toHaveAccessibleName('Dar de baja');
+      expect(item.className, `a ${ancho}px`).toContain('min-h-11');
+      await user.keyboard('{Escape}');
 
       const dialogo = await abrirBaja(user);
       expect(dialogo).toHaveAttribute('role', 'alertdialog');

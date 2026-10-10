@@ -19,6 +19,7 @@ import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 
 import { loginAndLand } from './helpers/landing';
 import { exactProductNameCellText } from './helpers/product-name-cell';
+import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 const FIXTURE_PREFIX = 'qc199_e2e_';
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -95,7 +96,13 @@ function filaDelProducto(page: Page): Locator {
 }
 
 async function abrirPanelDeLotes(page: Page): Promise<Locator> {
-  await filaDelProducto(page).getByTestId('product-batches-open').click();
+  await (
+    await openRowActionsMenuItem(
+      page,
+      filaDelProducto(page).getByTestId('product-row-actions'),
+      'product-batches-open',
+    )
+  ).click();
   const sheet = page.getByTestId('product-batches-sheet');
   await expect(sheet).toBeVisible({ timeout: 60_000 });
   await expect(sheet.getByTestId('product-batches-panel')).toBeVisible({ timeout: 60_000 });

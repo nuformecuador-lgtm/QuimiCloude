@@ -1,4 +1,5 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { clickRowAction } from '../../helpers/row-actions-menu';
 import { setupUser } from '../../helpers/user-event';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 
@@ -117,6 +118,7 @@ vi.mock('sonner', async (importOriginal) => ({
 
 const testId = {
   abrirAlta: 'catalog-line-create-open',
+  menuFila: 'catalog-line-row-actions',
   abrirEdicion: 'catalog-line-edit-open',
   formulario: 'catalog-line-form',
   enviar: 'catalog-line-form-submit',
@@ -250,7 +252,7 @@ async function abrirAlta(user: ReturnType<typeof setupUser>) {
 }
 
 async function abrirEdicion(user: ReturnType<typeof setupUser>) {
-  await user.click(screen.getAllByTestId(testId.abrirEdicion)[0]);
+  await clickRowAction(user, screen.getAllByTestId(testId.menuFila)[0], testId.abrirEdicion);
   await screen.findByTestId(testId.formulario);
 }
 

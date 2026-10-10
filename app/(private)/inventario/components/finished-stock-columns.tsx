@@ -3,7 +3,7 @@
 import { ChevronRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import type { DataTableColumn } from '@/components/shared/data-table';
+import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
 import { Button } from '@/components/ui/button';
 import type {
@@ -203,15 +203,11 @@ export function buildFinishedStockColumns({
       align: 'center',
       cell: (item) => (item.kind === 'line' ? qtyAlertCell(item.line.product, units) : null),
     },
-    {
+    actionsColumn<FinishedStockTableRow>({
       id: ACTIONS_COLUMN_ID,
       label: ACTIONS_COLUMN_LABEL,
-      align: 'end',
       defaultPinned: 'right',
-      cell: (item) =>
-        item.kind === 'line' ? (
-          <div className="flex justify-end gap-1">{lineActions(item.parent, item.line)}</div>
-        ) : null,
-    },
+      cell: (item) => (item.kind === 'line' ? lineActions(item.parent, item.line) : null),
+    }),
   ];
 }

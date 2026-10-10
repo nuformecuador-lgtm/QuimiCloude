@@ -1,0 +1,363 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`acciones por fila — catalogo de proveedor > R20 R21 R23 — con permiso: mismas acciones, orden, testids y destino 1`] = `
+[
+  [
+    {
+      "abre": "catalog-line-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "catalog-line-edit-open",
+    },
+    {
+      "abre": "delete-catalog-line-dialog",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "catalog-line-delete-open",
+    },
+  ],
+]
+`;
+
+exports[`acciones por fila — catalogo de proveedor > R22 — solo con permisos de consulta 1`] = `
+[
+  [
+    {
+      "abre": "catalog-line-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "catalog-line-edit-open",
+    },
+    {
+      "abre": "delete-catalog-line-dialog",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "catalog-line-delete-open",
+    },
+  ],
+]
+`;
+
+exports[`acciones por fila — clientes > R20 R21 R23 — con permiso: mismas acciones, orden, testids y destino 1`] = `
+[
+  [
+    {
+      "abre": "customer-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "customer-action-edit",
+    },
+    {
+      "abre": "delete-customer-dialog",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "customer-action-delete",
+    },
+  ],
+]
+`;
+
+exports[`acciones por fila — clientes > R22 — solo con permisos de consulta 1`] = `
+[
+  [],
+]
+`;
+
+exports[`acciones por fila — grupos de trabajo > R20 R21 R23 — con permiso: mismas acciones, orden, testids y destino 1`] = `
+[
+  [
+    {
+      "abre": "work-group-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "work-group-action-edit",
+    },
+    {
+      "abre": "delete-work-group-dialog",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "work-group-action-delete",
+    },
+  ],
+  [
+    {
+      "abre": "work-group-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "work-group-action-edit",
+    },
+    {
+      "abre": "delete-work-group-dialog",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "work-group-action-delete",
+    },
+  ],
+]
+`;
+
+exports[`acciones por fila — grupos de trabajo > R22 — solo con permisos de consulta 1`] = `
+[
+  [],
+  [],
+]
+`;
+
+exports[`acciones por fila — presentaciones > R20 R21 R23 — con permiso: mismas acciones, orden, testids y destino 1`] = `
+[
+  [
+    {
+      "abre": "presentation-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "presentation-action-edit",
+    },
+    {
+      "abre": "delete-presentation-dialog",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "presentation-action-delete",
+    },
+  ],
+]
+`;
+
+exports[`acciones por fila — producto terminado > R20 R21 R23 — con permiso: mismas acciones, orden, testids y destino 1`] = `
+[
+  [],
+  [
+    {
+      "abre": "product-batches-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "product-batches-open",
+    },
+    {
+      "abre": "product-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "product-edit-open",
+    },
+    {
+      "abre": "delete-product-dialog",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "product-delete-open",
+    },
+  ],
+]
+`;
+
+exports[`acciones por fila — producto terminado > R22 — solo con permisos de consulta 1`] = `
+[
+  [],
+  [
+    {
+      "abre": "product-batches-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "product-batches-open",
+    },
+    {
+      "abre": "product-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "product-edit-open",
+    },
+    {
+      "abre": "delete-product-dialog",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "product-delete-open",
+    },
+  ],
+]
+`;
+
+exports[`acciones por fila — productos > R20 R21 R23 — con permiso: mismas acciones, orden, testids y destino 1`] = `
+[
+  [
+    {
+      "abre": "product-batches-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "product-batches-open",
+    },
+    {
+      "abre": "product-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "product-edit-open",
+    },
+    {
+      "abre": "delete-product-dialog",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "product-delete-open",
+    },
+  ],
+]
+`;
+
+exports[`acciones por fila — productos > R22 — solo con permisos de consulta 1`] = `
+[
+  [
+    {
+      "abre": "product-batches-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "product-batches-open",
+    },
+    {
+      "abre": "product-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "product-edit-open",
+    },
+    {
+      "abre": "delete-product-dialog",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "product-delete-open",
+    },
+  ],
+]
+`;
+
+exports[`acciones por fila — recetas > R20 R21 R23 — con permiso: mismas acciones, orden, testids y destino 1`] = `
+[
+  [
+    {
+      "abre": null,
+      "deshabilitada": false,
+      "href": "/produccion/formulas/88888888-8888-4888-8888-888888888888",
+      "testid": "recipe-edit-open",
+    },
+    {
+      "abre": "delete-recipe-dialog",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "recipe-delete-open",
+    },
+  ],
+  [
+    {
+      "abre": null,
+      "deshabilitada": false,
+      "href": "/produccion/formulas/89898989-8989-4898-8989-898989898989",
+      "testid": "recipe-edit-open",
+    },
+    {
+      "abre": "delete-recipe-dialog",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "recipe-delete-open",
+    },
+  ],
+]
+`;
+
+exports[`acciones por fila — recetas > R22 — solo con permisos de consulta 1`] = `
+[
+  [
+    {
+      "abre": null,
+      "deshabilitada": false,
+      "href": "/produccion/formulas/88888888-8888-4888-8888-888888888888",
+      "testid": "recipe-edit-open",
+    },
+    {
+      "abre": "delete-recipe-dialog",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "recipe-delete-open",
+    },
+  ],
+  [
+    {
+      "abre": null,
+      "deshabilitada": false,
+      "href": "/produccion/formulas/89898989-8989-4898-8989-898989898989",
+      "testid": "recipe-edit-open",
+    },
+    {
+      "abre": "delete-recipe-dialog",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "recipe-delete-open",
+    },
+  ],
+]
+`;
+
+exports[`acciones por fila — unidades > R20 R21 R23 — con permiso: mismas acciones, orden, testids y destino 1`] = `
+[
+  [],
+  [
+    {
+      "abre": "unit-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "unit-action-edit",
+    },
+    {
+      "abre": "delete-unit-dialog",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "unit-action-delete",
+    },
+  ],
+]
+`;
+
+exports[`acciones por fila — usuarios > R20 R21 R23 — con permiso: mismas acciones, orden, testids y destino 1`] = `
+[
+  [
+    {
+      "abre": "user-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "user-action-edit",
+    },
+    {
+      "abre": "user-status-dialog",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "user-action-status",
+    },
+    {
+      "abre": "delete-user-dialog",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "user-action-delete",
+    },
+  ],
+  [
+    {
+      "abre": "user-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "user-action-edit",
+    },
+    {
+      "abre": "user-status-dialog",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "user-action-status",
+    },
+    {
+      "abre": "delete-user-dialog",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "user-action-delete",
+    },
+  ],
+]
+`;
+
+exports[`acciones por fila — usuarios > R22 — solo con permisos de consulta 1`] = `
+[
+  [],
+  [],
+]
+`;

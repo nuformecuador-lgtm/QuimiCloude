@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 
-import type { DataTableColumn } from '@/components/shared/data-table';
+import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
 import { compareQuantities, productDisplayName, type ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
@@ -33,9 +33,6 @@ import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
  * ignora seria pintar un control que miente. `imagePath` no esta en esa lista blanca y por eso la
  * columna de imagen no ordena ni filtra: no se ordena por una ruta de archivo.
  */
-
-/** Lo sigue importando `product-batches-panel.tsx`; el resto usa `EMPTY_MARK`. */
-export const EMPTY_CELL = EMPTY_MARK;
 
 /**
  * Campos de `ProductView` que quedan FUERA de la tabla como columna propia: el identificador
@@ -186,7 +183,7 @@ function aggregateQuantityCell(
 
 export type ProductColumnsDeps = {
   /**
-   * Acciones de la fila (editar, dar de baja). Es un **slot**: la declaracion de columnas no
+   * Acciones de la fila (el menu de la fila). Es un **slot**: la declaracion de columnas no
    * importa el panel lateral ni el dialogo, los enchufa quien monta la tabla.
    */
   readonly rowActions: (product: ProductView) => ReactNode;
@@ -252,12 +249,13 @@ export function buildProductColumns({ rowActions, units }: ProductColumnsDeps): 
       cell: (product) => aggregateQuantityCell(product.available, 'product-available', product, units),
     },
     {
+      ...actionsColumn<ProductView>({
+        id: ACTIONS_COLUMN_ID,
+        label: ACTIONS_COLUMN_LABEL,
+        defaultPinned: 'right',
+        cell: (product) => rowActions(product),
+      }),
       id: ACTIONS_COLUMN_ID,
-      label: ACTIONS_COLUMN_LABEL,
-      align: 'end',
-      // No ordena, no filtra y no se fija: no es un dato de la fila.
-      defaultPinned: 'right',
-      cell: (product) => <div className="flex justify-end gap-1">{rowActions(product)}</div>,
     },
   ];
 }

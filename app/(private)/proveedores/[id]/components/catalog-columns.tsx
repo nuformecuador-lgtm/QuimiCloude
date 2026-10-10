@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 
-import type { DataTableColumn } from '@/components/shared/data-table';
+import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
 import type {
   CatalogLineListItem,
@@ -57,11 +57,8 @@ import {
  * precarga con `trimDecimal`, que no redondea. Mismo criterio que la tabla de pedidos.
  */
 
-// Solo la importa `supplier-detail-header.tsx`.
-export const EMPTY_CELL = EMPTY_MARK;
-
 /**
- * Marca de «no resuelto» de presentacion y unidad (R22). Es **distinta** de `EMPTY_CELL` en
+ * Marca de «no resuelto» de presentacion y unidad. Es **distinta** de `EMPTY_MARK` en
  * significado -«no se pudo resolver el nombre» no es lo mismo que «este dato no existe»- y por eso
  * es tambien un glifo distinto: con la misma raya para los dos casos, una linea sin unidad -que
  * R40 permite expresamente- y un nombre que el diccionario no pudo resolver se leian igual en
@@ -147,8 +144,8 @@ export type CatalogColumnsDeps = {
   /** Diccionarios id -> nombre, construidos UNA vez por render de la seccion (R22, R46). */
   readonly directories: CatalogDirectories;
   /**
-   * Acciones de la fila (editar, dar de baja). Es un **slot**: la declaracion de columnas no
-   * importa el panel lateral ni el dialogo, los enchufa quien monta la tabla.
+   * Acciones de la fila (el menu de editar y dar de baja). Es un **slot**: la declaracion de
+   * columnas no importa el panel lateral ni el dialogo, los enchufa quien monta la tabla.
    */
   readonly rowActions: (line: CatalogLineListItem) => ReactNode;
 };
@@ -261,11 +258,12 @@ export function buildCatalogColumns({
       cell: (line) => formatCivilDate(line.updatedAt),
     },
     {
+      ...actionsColumn<CatalogLineListItem>({
+        id: ACTIONS_COLUMN_ID,
+        label: CATALOG_ACTIONS_COLUMN_LABEL,
+        cell: (line) => rowActions(line),
+      }),
       id: ACTIONS_COLUMN_ID,
-      label: CATALOG_ACTIONS_COLUMN_LABEL,
-      align: 'end',
-      pinnable: false,
-      cell: (line) => <div className="flex justify-end gap-1">{rowActions(line)}</div>,
     },
   ];
 }

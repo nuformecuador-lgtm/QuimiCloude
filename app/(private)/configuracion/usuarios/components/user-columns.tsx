@@ -1,6 +1,6 @@
 'use client';
 
-import type { DataTableColumn } from '@/components/shared/data-table';
+import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
 import { Badge } from '@/components/ui/badge';
 import { USER_QUERYABLE, type UserAccountStatus, type UserRow } from '@/lib/modules/identity';
 
@@ -35,9 +35,8 @@ import { UserRowActions, type UserRowActionHandler } from './user-row-actions';
  * del contrato. **No hay filtro por rol** y no es un olvido: `USER_QUERYABLE.filterable` declara
  * solo `accountStatus` y R15 prohibe ampliarlo desde aqui (alternativa H, descartada).
  *
- * **La columna de acciones es una columna NORMAL con `pinnable: false`**, el patron que QC-45 fijo
- * y QC-39 heredo: `DataTableColumn.cell` ya devuelve `ReactNode`. **No se anade ninguna prop a la
- * tabla compartida ni se abre un solo archivo de `components/shared/data-table/`** (R9).
+ * **La columna de acciones se declara con `actionsColumn()`**: no ordena, no filtra y no se puede
+ * fijar. **No se anade ninguna prop a la tabla compartida**.
  */
 
 /** Ids de las seis columnas. Constantes porque los comparten la tabla y los tests (R41). */
@@ -163,14 +162,11 @@ export function createUserColumns({
       filter: { kind: 'select', options: USER_STATUS_FILTER_OPTIONS },
       cell: (user) => <UserStatusBadge status={user.accountStatus} />,
     },
-    {
+    // Sin `sortable` (ordenar por unas acciones no significa nada), sin `filter` (no aparece en la
+    // barra de filtros) y sin anclar, para no tapar las columnas de datos.
+    actionsColumn<UserRow>({
       id: ACTIONS_COLUMN_ID,
       label: 'Acciones',
-      align: 'end',
-      // Sin `sortable` (ordenar por unos botones no significa nada) y sin `filter` (no aparece en
-      // la barra de filtros). `pinnable: false` para que el usuario no pueda fijarla y tapar las
-      // columnas de datos.
-      pinnable: false,
       cell: (user) => (
         <UserRowActions
           user={user}
@@ -180,7 +176,7 @@ export function createUserColumns({
           onStatusChange={onStatusChange}
         />
       ),
-    },
+    }),
   ];
 }
 

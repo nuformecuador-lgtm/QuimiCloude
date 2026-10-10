@@ -2,17 +2,7 @@
 
 import { useActionState, useId, useState } from 'react';
 
-import { ErrorAlert } from '@/components/shared/error-alert';
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+import { ConfirmDialogBody, ConfirmDialogFrame } from '@/components/shared/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -21,7 +11,6 @@ import {
 } from '@/lib/modules/asignaciones/adapters/driving/order-execution-actions';
 import type { ErrorCode } from '@/lib/modules/errores';
 import { cancelOrderSchema } from '@/lib/modules/pedidos';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Cancela el pedido desde la ejecucion pidiendo antes el motivo. La accion redirige a la lista
@@ -73,24 +62,23 @@ export type OrderCancelDialogProps = {
 
 export function OrderCancelDialog({ orderId, stepPosition }: OrderCancelDialogProps) {
   return (
-    <AlertDialog>
-      <AlertDialogTrigger
-        render={
+    <ConfirmDialogFrame
+      trigger={{
+        render: (
           <Button
             type="button"
             variant="outline"
             touch
             data-testid={ORDER_CANCEL_TRIGGER_TESTID}
           />
-        }
-      >
-        {ORDER_CANCEL_TEXTS.trigger}
-      </AlertDialogTrigger>
-      <AlertDialogContent data-testid={ORDER_CANCEL_DIALOG_TESTID}>
-        {/* El popup se desmonta al cerrar: cada apertura empieza sin motivo ni error previos. */}
-        <OrderCancelForm orderId={orderId} stepPosition={stepPosition} />
-      </AlertDialogContent>
-    </AlertDialog>
+        ),
+        children: ORDER_CANCEL_TEXTS.trigger,
+      }}
+      testId={ORDER_CANCEL_DIALOG_TESTID}
+    >
+      {/* El popup se desmonta al cerrar: cada apertura empieza sin motivo ni error previos. */}
+      <OrderCancelForm orderId={orderId} stepPosition={stepPosition} />
+    </ConfirmDialogFrame>
   );
 }
 
@@ -121,15 +109,40 @@ function OrderCancelForm({ orderId, stepPosition }: OrderCancelDialogProps) {
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <form action={formAction} className="flex flex-col gap-4" data-testid={ORDER_CANCEL_FORM_TESTID}>
-      <AlertDialogHeader>
-        <AlertDialogTitle>{ORDER_CANCEL_TEXTS.title}</AlertDialogTitle>
-        <AlertDialogDescription>{ORDER_CANCEL_TEXTS.description}</AlertDialogDescription>
-      </AlertDialogHeader>
-
-      <input type="hidden" name={ORDER_CANCEL_ORDER_ID_FIELD} value={orderId} />
-      <input type="hidden" name={ORDER_CANCEL_STEP_POSITION_FIELD} value={stepPosition ?? ''} />
-
+    <ConfirmDialogBody
+      texts={{
+        title: ORDER_CANCEL_TEXTS.title,
+        description: ORDER_CANCEL_TEXTS.description,
+        dismiss: ORDER_CANCEL_TEXTS.dismiss,
+        confirm: ORDER_CANCEL_TEXTS.confirm,
+      }}
+      testIds={{
+        form: ORDER_CANCEL_FORM_TESTID,
+        dismiss: ORDER_CANCEL_DISMISS_TESTID,
+        confirm: ORDER_CANCEL_CONFIRM_TESTID,
+        error: ORDER_CANCEL_ERROR_TESTID,
+      }}
+      variant="destructive"
+      layout="form-wraps-all"
+      confirmAs="button"
+      submit={{
+        kind: 'action',
+        action: formAction,
+        formClassName: 'flex flex-col gap-4',
+        hidden: [
+          { name: ORDER_CANCEL_ORDER_ID_FIELD, value: orderId, controlled: true },
+          {
+            name: ORDER_CANCEL_STEP_POSITION_FIELD,
+            value: stepPosition === null ? '' : String(stepPosition),
+            controlled: true,
+          },
+        ],
+      }}
+      isPending={isPending}
+      dismissDisabled={isPending}
+      error={error}
+      errorId={errorId}
+    >
       <div className="flex flex-col gap-2">
         <label htmlFor={reasonId} className="text-sm font-medium">
           {ORDER_CANCEL_TEXTS.reasonLabel}
@@ -145,37 +158,6 @@ function OrderCancelForm({ orderId, stepPosition }: OrderCancelDialogProps) {
           data-testid={ORDER_CANCEL_REASON_TESTID}
         />
       </div>
-
-      {error === undefined ? null : (
-        <ErrorAlert
-          error={error}
-          id={errorId}
-          className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-          testId={ORDER_CANCEL_ERROR_TESTID}
-          withDataCode
-        />
-      )}
-
-      <AlertDialogFooter>
-        <AlertDialogCancel
-          type="button"
-          className={touchTarget}
-          disabled={isPending}
-          data-testid={ORDER_CANCEL_DISMISS_TESTID}
-        >
-          {ORDER_CANCEL_TEXTS.dismiss}
-        </AlertDialogCancel>
-        <Button
-          type="submit"
-          variant="destructive"
-          touch
-          disabled={isPending}
-          aria-busy={isPending}
-          data-testid={ORDER_CANCEL_CONFIRM_TESTID}
-        >
-          {ORDER_CANCEL_TEXTS.confirm}
-        </Button>
-      </AlertDialogFooter>
-    </form>
+    </ConfirmDialogBody>
   );
 }

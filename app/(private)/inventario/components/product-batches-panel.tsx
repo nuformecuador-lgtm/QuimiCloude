@@ -9,8 +9,7 @@ import {
 } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
-
-import { EMPTY_CELL } from './product-columns';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
 const LOT_LABEL = 'Lote';
 const QUANTITY_LABEL = 'Cantidad';
@@ -55,7 +54,7 @@ type PackagingInfo =
 function packagingInfo(product: ProductBatchesPanelProps['product']): PackagingInfo {
   if (product === undefined || product.type !== PRODUCT_TYPES.PACKAGING) return null;
   if (product.presentationId == null) return { kind: 'legacy' };
-  return { kind: 'fixed', presentationName: product.presentationName ?? EMPTY_CELL };
+  return { kind: 'fixed', presentationName: product.presentationName ?? EMPTY_MARK };
 }
 
 /**
@@ -66,7 +65,7 @@ function packagingInfo(product: ProductBatchesPanelProps['product']): PackagingI
 function unitLabel(unitId: string | null, units: readonly UnitRef[] | undefined): string | null {
   if (unitId === null || units === undefined) return null;
   const unit = units.find((candidate) => candidate.id === unitId);
-  return unit?.symbol ?? unit?.name ?? EMPTY_CELL;
+  return unit?.symbol ?? unit?.name ?? EMPTY_MARK;
 }
 
 /**

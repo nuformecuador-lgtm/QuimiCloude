@@ -2,26 +2,12 @@
 
 import { LogOutIcon } from 'lucide-react';
 import { useActionState, useEffect, useId, useState, type ReactNode } from 'react';
-import { useFormStatus } from 'react-dom';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
+import { FormSheet } from '@/components/shared/form-sheet';
+import { SelectField } from '@/components/shared/select-field';
+import { TextField } from '@/components/shared/text-field';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { errorMessage, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
 import { DOCUMENT_TYPE_CODES, type RoleOption, type UserDetail } from '@/lib/modules/identity';
 import {
@@ -89,7 +75,7 @@ export const USER_BUSINESS_FIELDS = [
 /** Nombre de campo del formulario. Derivado de la lista: no hay una segunda union escrita a mano. */
 export type UserFieldName = (typeof USER_BUSINESS_FIELDS)[number];
 
-/** `data-testid` del panel lateral. Lo declara este archivo, que es quien pinta el `SheetContent`. */
+/** `data-testid` del panel lateral. Lo declara este archivo, que es quien pinta el panel. */
 export const USER_SHEET_TESTID = 'user-sheet';
 
 export const USER_FORM_TESTID = 'user-form';
@@ -153,9 +139,6 @@ const CODE_TO_FIELD: Readonly<Partial<Record<ErrorCode, UserFieldName>>> = {
   duplicate_document: USER_DOCUMENT_NUMBER_FIELD,
   role_not_found: USER_ROLE_FIELD,
 };
-
-/** >= 16 px en TODOS los anchos: por debajo, iOS hace zoom al enfocar el campo (R40). */
-const FIELD_TEXT = 'text-base md:text-base';
 
 const FIELD_LABELS: Readonly<Record<UserFieldName, string>> = {
   firstNames: 'Nombres',
@@ -409,207 +392,202 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
       : null;
 
   return (
-    <SheetContent
-      side="right"
+    <FormSheet
+      title={isEdit ? EDIT_TITLE : CREATE_TITLE}
+      description={isEdit ? EDIT_DESCRIPTION : CREATE_DESCRIPTION}
+      formAction={formAction}
       minScreenWidth={70}
-      className="w-full pb-[env(safe-area-inset-bottom)] data-[side=right]:w-full sm:max-w-md"
-      data-testid={USER_SHEET_TESTID}
-      isForm
-      formProps={{ action: formAction, 'data-testid': USER_FORM_TESTID }}
-      footer={<FormActions />}
+      testIds={{
+        sheet: USER_SHEET_TESTID,
+        form: USER_FORM_TESTID,
+        cancel: USER_FORM_CANCEL_TESTID,
+        submit: USER_FORM_SUBMIT_TESTID,
+      }}
     >
-      <SheetHeader>
-        <SheetTitle>{isEdit ? EDIT_TITLE : CREATE_TITLE}</SheetTitle>
-        <SheetDescription>{isEdit ? EDIT_DESCRIPTION : CREATE_DESCRIPTION}</SheetDescription>
-      </SheetHeader>
-
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-        {formError === undefined ? null : (
-          // Region de error del formulario: aqui van los rechazos que no senalan campo.
-          <ErrorAlert
-            error={formError}
-            id={formErrorId}
-            className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            testId={USER_FORM_ERROR_TESTID}
-            withDataCode
-            renderCatalogued={(catalogued) => (
-              <>
-                <p>{catalogued.message}</p>
-                <p className="text-xs" data-testid={USER_FORM_ERROR_CODE_TESTID}>
-                  {catalogued.code}
-                </p>
-              </>
-            )}
-          />
-        )}
-
-        {/*
-          Nombres y apellidos EN UNA FILA (decision humana): rejilla de 12 columnas que en angosto
-          se apila -movil primero (R45)- y en `sm` o mas ancho reparte 6+6.
-        */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
-          <div className="sm:col-span-6">
-            <UserTextField
-              id={`${fieldId}-${USER_FIRST_NAMES_FIELD}`}
-              name={USER_FIRST_NAMES_FIELD}
-              value={isEdit ? valueOf(USER_FIRST_NAMES_FIELD) : autofill.firstNames}
-              onValueChange={
-                isEdit ? undefined : (value) => changeName(USER_FIRST_NAMES_FIELD, value)
-              }
-              error={fieldErrors.firstNames}
-            />
-          </div>
-          <div className="sm:col-span-6">
-            <UserTextField
-              id={`${fieldId}-${USER_LAST_NAMES_FIELD}`}
-              name={USER_LAST_NAMES_FIELD}
-              value={isEdit ? valueOf(USER_LAST_NAMES_FIELD) : autofill.lastNames}
-              onValueChange={
-                isEdit ? undefined : (value) => changeName(USER_LAST_NAMES_FIELD, value)
-              }
-              error={fieldErrors.lastNames}
-            />
-          </div>
-        </div>
-
-        {/* Fecha de nacimiento, correo y telefono EN UNA FILA (decision humana): 4+4+4 desde `sm`. */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
-          <div className="sm:col-span-4">
-            {/*
-              `type="date"`: emite `YYYY-MM-DD`, que es exactamente lo que `z.iso.date()` espera
-              (R26).
-            */}
-            <UserTextField
-              id={`${fieldId}-${USER_BIRTH_DATE_FIELD}`}
-              name={USER_BIRTH_DATE_FIELD}
-              type="date"
-              value={valueOf(USER_BIRTH_DATE_FIELD)}
-              error={fieldErrors.birthDate}
-            />
-          </div>
-          <div className="sm:col-span-4">
-            <UserTextField
-              id={`${fieldId}-${USER_EMAIL_FIELD}`}
-              name={USER_EMAIL_FIELD}
-              type="email"
-              value={valueOf(USER_EMAIL_FIELD)}
-              error={fieldErrors.email}
-            />
-          </div>
-          <div className="sm:col-span-4">
-            <UserTextField
-              id={`${fieldId}-${USER_PHONE_FIELD}`}
-              name={USER_PHONE_FIELD}
-              type="tel"
-              value={valueOf(USER_PHONE_FIELD)}
-              error={fieldErrors.phone}
-            />
-          </div>
-        </div>
-
-        {/*
-          Tipo y numero de documento y nombre de usuario EN UNA FILA (decision humana): 4+4+4 desde
-          `sm`.
-        */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
-          <div className="sm:col-span-4">
-            {/* R25: las opciones salen del conjunto cerrado del contrato, nunca de literales. */}
-            <UserSelectField
-              idPrefix={`${fieldId}-${USER_DOCUMENT_TYPE_FIELD}`}
-              name={USER_DOCUMENT_TYPE_FIELD}
-              value={valueOf(USER_DOCUMENT_TYPE_FIELD)}
-              error={fieldErrors.documentTypeCode}
-              optionTestId={USER_DOCUMENT_TYPE_OPTION_TESTID}
-              options={DOCUMENT_TYPE_CODES.map((code) => ({ value: code, label: code }))}
-            />
-          </div>
-          <div className="sm:col-span-4">
-            <UserTextField
-              id={`${fieldId}-${USER_DOCUMENT_NUMBER_FIELD}`}
-              name={USER_DOCUMENT_NUMBER_FIELD}
-              value={valueOf(USER_DOCUMENT_NUMBER_FIELD)}
-              error={fieldErrors.documentNumber}
-            />
-          </div>
-          <div className="sm:col-span-4">
-            <UserTextField
-              id={`${fieldId}-${USER_USERNAME_FIELD}`}
-              name={USER_USERNAME_FIELD}
-              value={isEdit ? valueOf(USER_USERNAME_FIELD) : autofill.username}
-              onValueChange={isEdit ? undefined : changeUsername}
-              error={fieldErrors.username}
-            >
-              {suggestedUsername === null ? null : (
-                <div
-                  className="flex flex-col gap-2 text-sm"
-                  data-testid={USER_USERNAME_SUGGESTION_TESTID}
-                >
-                  <p>{USERNAME_SUGGESTION_HINT}</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className={`w-full ${touchTarget}`}
-                    data-testid={USER_USERNAME_SUGGESTION_APPLY_TESTID}
-                    onClick={() => changeUsername(suggestedUsername)}
-                  >
-                    <span className="truncate">{applySuggestionLabel(suggestedUsername)}</span>
-                  </Button>
-                </div>
-              )}
-            </UserTextField>
-          </div>
-        </div>
-
-        {/*
-          R24: las opciones vienen de la consulta de roles del modulo. SI esa consulta fallo, se
-          dice de forma identificable y el selector queda SIN opciones: no se inventa ninguna y no
-          se aparenta tenerlas.
-        */}
-        {rolesError === null ? null : (
-          <ErrorAlert
-            error={rolesError}
-            className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            testId={USER_ROLES_ERROR_TESTID}
-            withDataCode
-            renderCatalogued={() => <p>{ROLES_UNAVAILABLE}</p>}
-          />
-        )}
-        <UserSelectField
-          idPrefix={`${fieldId}-${USER_ROLE_FIELD}`}
-          name={USER_ROLE_FIELD}
-          value={valueOf(USER_ROLE_FIELD)}
-          error={fieldErrors.roleId}
-          optionTestId={USER_ROLE_OPTION_TESTID}
-          options={roles.map((role) => ({ value: role.id, label: role.name }))}
+      {formError === undefined ? null : (
+        // Region de error del formulario: aqui van los rechazos que no senalan campo.
+        <ErrorAlert
+          error={formError}
+          id={formErrorId}
+          className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
+          testId={USER_FORM_ERROR_TESTID}
+          withDataCode
+          renderCatalogued={(catalogued) => (
+            <>
+              <p>{catalogued.message}</p>
+              <p className="text-xs" data-testid={USER_FORM_ERROR_CODE_TESTID}>
+                {catalogued.code}
+              </p>
+            </>
+          )}
         />
+      )}
 
-        {/*
-          QC-101 R7, R11, R12, R15: el cierre de todas las sesiones de la persona del panel, al pie
-          del cuerpo. SOLO si el panel lo entrega; sin `endSessions` no se emite ni un contenedor.
-          `type="button"` es OBLIGATORIO: todo el panel es un `<form>` y un boton sin tipo enviaria
-          la edicion. Pulsarlo solo abre la confirmacion; la escritura es del dialogo (R9, R10).
-        */}
-        {endSessions === undefined ? null : (
-          <div className="border-t pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              className={`w-full ${touchTarget}`}
-              aria-label={endUserSessionsLabel(endSessions.displayName)}
-              data-testid={USER_FORM_END_SESSIONS_TESTID}
-              onClick={endSessions.onEndSessions}
-            >
-              <LogOutIcon aria-hidden="true" />
-              {endUserSessionsLabel(endSessions.displayName)}
-            </Button>
-          </div>
-        )}
+      {/*
+        Nombres y apellidos EN UNA FILA (decision humana): rejilla de 12 columnas que en angosto
+        se apila -movil primero- y en `sm` o mas ancho reparte 6+6.
+      */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+        <div className="sm:col-span-6">
+          <UserTextField
+            id={`${fieldId}-${USER_FIRST_NAMES_FIELD}`}
+            name={USER_FIRST_NAMES_FIELD}
+            value={isEdit ? valueOf(USER_FIRST_NAMES_FIELD) : autofill.firstNames}
+            onValueChange={
+              isEdit ? undefined : (value) => changeName(USER_FIRST_NAMES_FIELD, value)
+            }
+            error={fieldErrors.firstNames}
+          />
+        </div>
+        <div className="sm:col-span-6">
+          <UserTextField
+            id={`${fieldId}-${USER_LAST_NAMES_FIELD}`}
+            name={USER_LAST_NAMES_FIELD}
+            value={isEdit ? valueOf(USER_LAST_NAMES_FIELD) : autofill.lastNames}
+            onValueChange={
+              isEdit ? undefined : (value) => changeName(USER_LAST_NAMES_FIELD, value)
+            }
+            error={fieldErrors.lastNames}
+          />
+        </div>
       </div>
-    </SheetContent>
+
+      {/* Fecha de nacimiento, correo y telefono EN UNA FILA (decision humana): 4+4+4 desde `sm`. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+        <div className="sm:col-span-4">
+          {/*
+            `type="date"`: emite `YYYY-MM-DD`, que es exactamente lo que `z.iso.date()` espera.
+          */}
+          <UserTextField
+            id={`${fieldId}-${USER_BIRTH_DATE_FIELD}`}
+            name={USER_BIRTH_DATE_FIELD}
+            type="date"
+            value={valueOf(USER_BIRTH_DATE_FIELD)}
+            error={fieldErrors.birthDate}
+          />
+        </div>
+        <div className="sm:col-span-4">
+          <UserTextField
+            id={`${fieldId}-${USER_EMAIL_FIELD}`}
+            name={USER_EMAIL_FIELD}
+            type="email"
+            value={valueOf(USER_EMAIL_FIELD)}
+            error={fieldErrors.email}
+          />
+        </div>
+        <div className="sm:col-span-4">
+          <UserTextField
+            id={`${fieldId}-${USER_PHONE_FIELD}`}
+            name={USER_PHONE_FIELD}
+            type="tel"
+            value={valueOf(USER_PHONE_FIELD)}
+            error={fieldErrors.phone}
+          />
+        </div>
+      </div>
+
+      {/*
+        Tipo y numero de documento y nombre de usuario EN UNA FILA (decision humana): 4+4+4 desde
+        `sm`.
+      */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+        <div className="sm:col-span-4">
+          {/* Las opciones salen del conjunto cerrado del contrato, nunca de literales. */}
+          <UserSelectField
+            idPrefix={`${fieldId}-${USER_DOCUMENT_TYPE_FIELD}`}
+            name={USER_DOCUMENT_TYPE_FIELD}
+            value={valueOf(USER_DOCUMENT_TYPE_FIELD)}
+            error={fieldErrors.documentTypeCode}
+            optionTestId={USER_DOCUMENT_TYPE_OPTION_TESTID}
+            options={DOCUMENT_TYPE_CODES.map((code) => ({ value: code, label: code }))}
+          />
+        </div>
+        <div className="sm:col-span-4">
+          <UserTextField
+            id={`${fieldId}-${USER_DOCUMENT_NUMBER_FIELD}`}
+            name={USER_DOCUMENT_NUMBER_FIELD}
+            value={valueOf(USER_DOCUMENT_NUMBER_FIELD)}
+            error={fieldErrors.documentNumber}
+          />
+        </div>
+        <div className="sm:col-span-4">
+          <UserTextField
+            id={`${fieldId}-${USER_USERNAME_FIELD}`}
+            name={USER_USERNAME_FIELD}
+            value={isEdit ? valueOf(USER_USERNAME_FIELD) : autofill.username}
+            onValueChange={isEdit ? undefined : changeUsername}
+            error={fieldErrors.username}
+          >
+            {suggestedUsername === null ? null : (
+              <div
+                className="flex flex-col gap-2 text-sm"
+                data-testid={USER_USERNAME_SUGGESTION_TESTID}
+              >
+                <p>{USERNAME_SUGGESTION_HINT}</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={`w-full ${touchTarget}`}
+                  data-testid={USER_USERNAME_SUGGESTION_APPLY_TESTID}
+                  onClick={() => changeUsername(suggestedUsername)}
+                >
+                  <span className="truncate">{applySuggestionLabel(suggestedUsername)}</span>
+                </Button>
+              </div>
+            )}
+          </UserTextField>
+        </div>
+      </div>
+
+      {/*
+        Las opciones vienen de la consulta de roles del modulo. SI esa consulta fallo, se
+        dice de forma identificable y el selector queda SIN opciones: no se inventa ninguna y no
+        se aparenta tenerlas.
+      */}
+      {rolesError === null ? null : (
+        <ErrorAlert
+          error={rolesError}
+          className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
+          testId={USER_ROLES_ERROR_TESTID}
+          withDataCode
+          renderCatalogued={() => <p>{ROLES_UNAVAILABLE}</p>}
+        />
+      )}
+      <UserSelectField
+        idPrefix={`${fieldId}-${USER_ROLE_FIELD}`}
+        name={USER_ROLE_FIELD}
+        value={valueOf(USER_ROLE_FIELD)}
+        error={fieldErrors.roleId}
+        optionTestId={USER_ROLE_OPTION_TESTID}
+        options={roles.map((role) => ({ value: role.id, label: role.name }))}
+      />
+
+      {/*
+        El cierre de todas las sesiones de la persona del panel, al pie
+        del cuerpo. SOLO si el panel lo entrega; sin `endSessions` no se emite ni un contenedor.
+        `type="button"` es OBLIGATORIO: todo el panel es un `<form>` y un boton sin tipo enviaria
+        la edicion. Pulsarlo solo abre la confirmacion; la escritura es del dialogo.
+      */}
+      {endSessions === undefined ? null : (
+        <div className="border-t pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            className={`w-full ${touchTarget}`}
+            aria-label={endUserSessionsLabel(endSessions.displayName)}
+            data-testid={USER_FORM_END_SESSIONS_TESTID}
+            onClick={endSessions.onEndSessions}
+          >
+            <LogOutIcon aria-hidden="true" />
+            {endUserSessionsLabel(endSessions.displayName)}
+          </Button>
+        </div>
+      )}
+    </FormSheet>
   );
 }
 
-/** Un campo de texto con su etiqueta y su hueco de error en linea. */
+/** Con `onValueChange` el campo es controlado; sin ella, no controlado. */
 function UserTextField({
   id,
   name,
@@ -623,64 +601,34 @@ function UserTextField({
   readonly name: UserFieldName;
   readonly type?: 'text' | 'email' | 'tel' | 'date';
   readonly value: string;
-  /** Con ella el campo pasa a controlado; sin ella sigue como no controlado. */
   readonly onValueChange?: (value: string) => void;
   readonly error?: string;
   readonly children?: ReactNode;
 }) {
-  const errorId = `${id}-error`;
   const controlled = onValueChange !== undefined;
 
   return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={id}>{FIELD_LABELS[name]}</Label>
-      {/*
-        `key={value}`: Base UI avisa cuando el `defaultValue` de un campo no controlado cambia
-        despues de montarse, y la clave fuerza el remontaje justo en ese salto —el de volver de un
-        intento fallido con lo escrito—. Controlado, la clave es fija: remontar en cada tecla
-        quitaria el foco.
-      */}
-      <Input
-        key={controlled ? name : value}
-        id={id}
-        name={name}
-        type={type}
-        autoComplete="off"
-        required
-        value={controlled ? value : undefined}
-        defaultValue={controlled ? undefined : value}
-        onChange={
-          onValueChange === undefined
-            ? undefined
-            : (event) => onValueChange(event.currentTarget.value)
-        }
-        className={`min-h-11 ${FIELD_TEXT}`}
-        aria-invalid={error === undefined ? undefined : true}
-        aria-describedby={error === undefined ? undefined : errorId}
-        data-testid={USER_FIELD_TESTIDS[name]}
-      />
-      {error === undefined ? null : (
-        <p
-          id={errorId}
-          role="alert"
-          className="text-sm text-destructive"
-          data-testid={USER_ERROR_TESTIDS[name]}
-        >
-          {error}
-        </p>
-      )}
+    <TextField
+      id={id}
+      name={name}
+      label={FIELD_LABELS[name]}
+      type={type}
+      autoComplete="off"
+      required
+      value={controlled ? value : undefined}
+      defaultValue={controlled ? undefined : value}
+      onValueChange={onValueChange}
+      remountOnDefault
+      error={error}
+      testId={USER_FIELD_TESTIDS[name]}
+      errorTestId={USER_ERROR_TESTIDS[name]}
+    >
       {children}
-    </div>
+    </TextField>
   );
 }
 
-/**
- * Un selector con su etiqueta y su hueco de error. El primitivo monta un `input` oculto con este
- * `name`, asi que el valor viaja en el `FormData` como cualquier otro campo.
- *
- * **Sin opciones no se inventa ninguna** (R24): la lista que llega es la que se pinta, y si esta
- * vacia el desplegable no ofrece nada.
- */
+/** Sin opciones no se inventa ninguna: la lista que llega es la que se pinta. */
 function UserSelectField({
   idPrefix,
   name,
@@ -696,84 +644,19 @@ function UserSelectField({
   readonly options: readonly { readonly value: string; readonly label: string }[];
   readonly optionTestId: string;
 }) {
-  const labelId = `${idPrefix}-label`;
-  const errorId = `${idPrefix}-error`;
-
   return (
-    <div className="flex flex-col gap-2">
-      <span id={labelId} className="text-sm font-medium">
-        {FIELD_LABELS[name]}
-      </span>
-      <Select
-        key={value}
-        name={name}
-        defaultValue={value}
-        items={options.map((option) => ({ label: option.label, value: option.value }))}
-      >
-        <SelectTrigger
-          aria-labelledby={labelId}
-          aria-invalid={error === undefined ? undefined : true}
-          aria-describedby={error === undefined ? undefined : errorId}
-          className={`w-full ${touchTarget} ${FIELD_TEXT}`}
-          data-testid={USER_FIELD_TESTIDS[name]}
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={option.value} value={option.value} data-testid={optionTestId}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {error === undefined ? null : (
-        <p
-          id={errorId}
-          role="alert"
-          className="text-sm text-destructive"
-          data-testid={USER_ERROR_TESTIDS[name]}
-        >
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function FormActions() {
-  return (
-    <>
-      <SheetClose
-        render={
-          <Button
-            type="button"
-            variant="outline-dashed"
-            className={touchTarget}
-            data-testid={USER_FORM_CANCEL_TESTID}
-          />
-        }
-      >
-        Cancelar
-      </SheetClose>
-      <SaveButton />
-    </>
-  );
-}
-
-/** `useFormStatus()` ve el envio desde el pie porque el panel entero es un `<form>`. */
-function SaveButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button
-      type="submit"
-      touch
-      disabled={pending}
-      aria-busy={pending}
-      data-testid={USER_FORM_SUBMIT_TESTID}
-    >
-      {pending ? 'Guardando…' : 'Guardar'}
-    </Button>
+    <SelectField
+      name={name}
+      label={FIELD_LABELS[name]}
+      options={options}
+      defaultValue={value}
+      remountOnDefault
+      labelId={`${idPrefix}-label`}
+      errorId={`${idPrefix}-error`}
+      triggerTestId={USER_FIELD_TESTIDS[name]}
+      optionTestId={optionTestId}
+      error={error}
+      errorTestId={USER_ERROR_TESTIDS[name]}
+    />
   );
 }

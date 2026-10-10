@@ -34,6 +34,7 @@
 
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { setupUser } from '../../helpers/user-event';
+import { clickRowAction, openRowActionsMenu } from '../../helpers/row-actions-menu';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -364,7 +365,8 @@ describe.each(VIEWPORTS)('pantalla de presentaciones en viewport %s (%i px)', (_
   // R19, R34 — Nada detras del puntero
   // ------------------------------------------------------------------------------------------
 
-  it('editar y borrar estan en el DOM y visibles desde el primer render, sin :hover (R34)', async () => {
+  it('editar y borrar se alcanzan, visibles, desde el disparador de cada fila, sin :hover (R34)', async () => {
+    const user = setupUser();
     await renderPantalla();
 
     // 1) En el DOM: los dos controles de CADA fila estan visibles ya, sin pasar el puntero por
@@ -372,19 +374,25 @@ describe.each(VIEWPORTS)('pantalla de presentaciones en viewport %s (%i px)', (_
     //    accesible, que es el contrato que R19 exige y que compone el propio componente.
     for (const presentacion of [PRESENTACION, PRESENTACION_LARGA]) {
       const fila = screen.getByTestId(`data-table-row-${presentacion.id}`);
+      const menu = await openRowActionsMenu(
+        user,
+        within(fila).getByTestId(PRESENTATION_ROW_ACTIONS_TESTID),
+      );
 
       for (const accion of [PRESENTATION_ACTION_EDIT_TESTID, PRESENTATION_ACTION_DELETE_TESTID]) {
-        const control = within(fila).getByTestId(accion);
+        const control = within(menu).getByTestId(accion);
         expect(control, `${accion} a ${ancho}px`).toBeVisible();
         expect(control, `${accion} a ${ancho}px`).toBeEnabled();
       }
 
       expect(
-        within(fila).getByRole('button', { name: editPresentationLabel(presentacion.name) }),
+        within(menu).getByRole('menuitem', { name: editPresentationLabel() }),
       ).toBeVisible();
       expect(
-        within(fila).getByRole('button', { name: deletePresentationLabel(presentacion.name) }),
+        within(menu).getByRole('menuitem', { name: deletePresentationLabel() }),
       ).toBeVisible();
+
+      await user.keyboard('{Escape}');
     }
 
     expect(screen.getByTestId(PRESENTATION_CREATE_OPEN_TESTID)).toBeVisible();
@@ -418,8 +426,7 @@ describe.each(VIEWPORTS)('pantalla de presentaciones en viewport %s (%i px)', (_
 
     const fila = screen.getByTestId(`data-table-row-${PRESENTACION.id}`);
     const controles = [
-      within(fila).getByTestId(PRESENTATION_ACTION_EDIT_TESTID),
-      within(fila).getByTestId(PRESENTATION_ACTION_DELETE_TESTID),
+      within(fila).getByTestId(PRESENTATION_ROW_ACTIONS_TESTID),
       screen.getByTestId(PRESENTATION_CREATE_OPEN_TESTID),
     ];
 
@@ -480,7 +487,11 @@ describe.each(VIEWPORTS)('pantalla de presentaciones en viewport %s (%i px)', (_
     await renderPantalla();
 
     const fila = screen.getByTestId(`data-table-row-${PRESENTACION.id}`);
-    await user.click(within(fila).getByTestId(PRESENTATION_ACTION_DELETE_TESTID));
+    await clickRowAction(
+      user,
+      within(fila).getByTestId(PRESENTATION_ROW_ACTIONS_TESTID),
+      PRESENTATION_ACTION_DELETE_TESTID,
+    );
 
     const dialogo = await screen.findByTestId(DELETE_PRESENTATION_DIALOG_TESTID);
     expect(dialogo, `el dialogo a ${ancho}px`).toBeVisible();
