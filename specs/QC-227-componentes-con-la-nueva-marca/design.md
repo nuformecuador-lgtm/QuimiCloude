@@ -32,6 +32,11 @@ les ganen desde fuera. La única excepción es la barra lateral (§5): el ítem 
 una regla sin capa en `globals.css`, y el inactivo va al lado, por la misma razón (no editar
 `components/ui/sidebar.tsx`, que vigila `ui-primitivas-intactas.test.ts` y toca QC-228).
 
+> **Enmienda 2026-10-09 (§16).** El centrado del carril colapsado (R31–R37) sí edita
+> `components/ui/sidebar.tsx`. Solo cambia las dos clases del modo icono del botón de menú. A un
+> `!important` en capa no se le gana desde una regla sin capa (§16.1). El color del ítem inactivo
+> sigue en `globals.css`, como dice este apartado.
+
 ## 2. Archivos
 
 | Archivo | Cambio | R |
@@ -53,6 +58,10 @@ una regla sin capa en `globals.css`, y el inactivo va al lado, por la misma raz�
 | `components/shared/shared-select.tsx`, `presentation-select.tsx`, `presentation-unit-select.tsx`, `date-picker.tsx`, `file-field.tsx`, `data-table/data-table-filters.tsx`, `responsible-avatars.tsx` | Foco opaco (campo o control, según §7) | R22–R24 |
 | `app/(private)/inventario/components/product-field.tsx`, `app/(private)/dashboard/components/execution-trace-columns.tsx`, `app/(private)/dashboard/recorrido/[id]/components/execution-trace-detail.tsx` | Foco opaco | R22 |
 | `components/shared/brand-logo.tsx`, `app/(public)/login/page.tsx` | Precarga del logo vertical (P1) | R26 |
+| `components/ui/sidebar.tsx` (enmienda 2026-10-09) | Botón de menú en modo icono: `size-8!`/`p-2!` → `size-11!`/`p-3.5!` | R31, R32, R33, R34 |
+| `components/private/app-sidebar.tsx` (enmienda 2026-10-09) | Enlace de marca: `group-data-[collapsible=icon]:p-1.5!` | R31, R35 |
+| `components/private/nav-user.tsx` (enmienda 2026-10-09, P11) | Avatar centrado solo en modo icono | R32 |
+| `app/globals.css` (enmienda 2026-10-09, P12) | Relleno del botón en modo icono a 14 px y comentario corregido | R31 |
 
 ## 3. Badges (R1–R9)
 
@@ -251,6 +260,7 @@ nota `ENMIENDA QC-227` en el caso:
 | `tests/guards/guard-piezas-base.test.ts`, `guard-formularios-y-acciones.test.ts`, `guard-buscadores.test.ts` | Si alguno fija una clase de foco, de borde o de badge que esta ficha cambia |
 | `tests/unit/theme/color-tokens.test.ts` | Solo si hay que exportar su conversión de contraste (ver §11); su lógica no cambia |
 | `tests/guards/guard-identificador-de-request.test.ts` | Alta de `marca-componentes.spec.ts` en `E2E_ESPERADOS` (es su punto de extensión) |
+| `tests/unit/sidebar-ajuste.test.tsx` (enmienda 2026-10-09, P12) | Solo la aserción `padding: 10px !important` del caso «en modo icono el boton se fuerza a 44px con !important» pasa a `14px`, y se corrige su comentario (§16.1) |
 
 Si falla otro test, no se enmienda: se para y se reporta.
 
@@ -264,10 +274,21 @@ Si falla otro test, no se enmienda: se para y se reporta.
 | `tests/unit/paridad/__snapshots__/*.snap` | 13 archivos | 21 archivos (todos) |
 | `tests/unit/shared-ui/button-touch.test.tsx`, `tests/unit/theme/color-tokens.test.ts`, `tests/guards/guard-identificador-de-request.test.ts` | Enmiendas y alta de E2E | Ídem (§9) |
 
-**No comparten** `components/ui/sidebar.tsx` ni `components/private/app-sidebar.tsx`: la regla del
-ítem inactivo va en `globals.css` justo para no tocarlos. Los cambios son de líneas distintas, pero
-en los mismos archivos, y los snapshots no se pueden fusionar a mano. Por eso F2 empieza con QC-228
-en `dev` (T0), y QC-227 parte de sus clases y no al revés.
+**Actualizado por la enmienda del 2026-10-09.** La versión aprobada decía que las dos fichas no
+compartían `components/ui/sidebar.tsx` ni `components/private/app-sidebar.tsx`: la regla del ítem
+inactivo iba en `globals.css` justo para no tocarlos. Con R31–R37, QC-227 **sí los toca** (§16),
+y también `components/private/nav-user.tsx` (P11), que QC-228 no toca. No hay choque en vuelo: el
+código de QC-227 empieza cuando QC-228 está mergeada en `dev` (T0) y parte de sus clases finales,
+incluido `components/private/sidebar-active-indicator.tsx`, que esta ficha **no** edita.
+
+| Archivo | QC-228 | QC-227 (enmienda) |
+| --- | --- | --- |
+| `components/ui/sidebar.tsx` | Duraciones y curvas (`duration-(--dur-base)`, `ease-(--ease-standard)`) | Las dos clases del modo icono del botón de menú |
+| `components/private/app-sidebar.tsx` | `SidebarActiveIndicator` alrededor de cada lista, rotación del chevron | Una clase del enlace de marca en modo icono |
+
+Los cambios son de líneas distintas, pero en los mismos archivos, y los snapshots no se pueden
+fusionar a mano. Por eso F2 empieza con QC-228 en `dev` (T0), y QC-227 parte de sus clases y no al
+revés.
 
 ## 11. Verificación (R → test)
 
@@ -287,6 +308,9 @@ en `dev` (T0), y QC-227 parte de sus clases y no al revés.
 | R28 | `tests/unit/theme/sin-dependencias-nuevas.test.ts` y `guard-dependencias-aprobadas` |
 | R29 | La suite existente (CI) y la comprobación de snapshots sin clases de §9 |
 | R30 | `tests/guards/guard-movimiento.test.ts` (llega con QC-228), en verde y sin editar |
+| R31–R36 (medido) | `e2e/marca-componentes.spec.ts`, bloque «carril colapsado» (§16.4), en Chromium y WebKit |
+| R31, R35, R36, R37 (clases) | `tests/unit/marca/sidebar-carril.test.ts` (§16.4) |
+| R36 | Además: `tests/unit/sidebar-ajuste.test.tsx`, `tests/unit/sidebar-desktop.test.tsx`, `tests/unit/app-sidebar.test.tsx` y `tests/unit/theme/ui-primitivas-intactas.test.ts` en verde, sin editar aserciones, salvo la de P12 |
 
 ## 12. Alternativas descartadas
 
@@ -339,3 +363,155 @@ en `globals.css` y en `button.tsx`. El E2E corre en WebKit.
 
 **Ninguna** (R28). Tailwind v4, `class-variance-authority`, `next/image` y Playwright ya están. No
 hay fila nueva en `docs/dependencias.md`.
+
+## 16. ENMIENDA 2026-10-09 — Carril colapsado (R31–R37, D11)
+
+Pedida por el humano con el spec ya aprobado. El código se leyó en el worktree de QC-228 (PR #197),
+que es la base de la que parte F2 (T0). El diagnóstico sale de **leer el código y la cascada de
+CSS**: no se ha medido en un navegador. El primer paso de T12 lo confirma midiendo (§16.5).
+
+### 16.1 Lo que ya existe y por qué falla
+
+**Geometría real en modo icono.** El diagnóstico preliminar suponía un carril de 3rem (unos 28 px
+útiles). **No se sostiene:** `app/(private)/layout.tsx:89` pisa la variable con
+`'--sidebar-width-icon': '4.875rem'` (78 px, QC-29 R19). Además, el `p-[18px]` de
+`app-sidebar.tsx:108` no viene de QC-226: es el «margen exterior de 18 px» de QC-29 R18, que
+QC-226 R10 solo conservó. Las medidas, en px:
+
+| Caja | Ancho | De dónde sale |
+| --- | --- | --- |
+| `sidebar-container` (flotante) | 96 | `calc(var(--sidebar-width-icon) + --spacing(4) + 2px)` = 78 + 16 + 2 (`sidebar.tsx:247`) |
+| `sidebar-inner` (el carril visible) | 60 | 96 − 2 × 18 de `p-[18px]` |
+| Caja de contenido de `SidebarHeader` y de `SidebarGroup` | 44 | 60 − 2 × 8 de `p-2` |
+
+Con un botón de 44 px, el carril queda centrado con 0 px de holgura. El ancho no es el problema
+(P10).
+
+**La causa: una regla con `!important` sin capa pierde contra otra con `!important` en capa.**
+- `sidebarMenuButtonVariants` (`sidebar.tsx:489`) fuerza en modo icono
+  `group-data-[collapsible=icon]:size-8!` y `group-data-[collapsible=icon]:p-2!`. Son utilidades
+  con `!important` **dentro de `@layer utilities`**.
+- `globals.css:323-337` intenta ganarles con reglas **sin capa** y `!important`
+  (`width/height: 44px`, `padding: 10px`, y `padding: 6px` en el enlace de marca).
+- En la cascada con capas, el orden se invierte para las declaraciones `!important`: una
+  declaración importante **en capa** gana a una importante **sin capa**. El comentario de
+  `globals.css:321` («es la única forma de ganarle a un `!important` de una utilidad») es falso.
+  `tests/unit/sidebar-ajuste.test.tsx:302` solo comprueba el texto del CSS con una regex, así que
+  sigue en verde aunque la regla no gane.
+
+**Lo que se ve, según ese cálculo:**
+- **Botones de navegación.** Miden 32 × 44: el ancho sale de `size-8!` y el alto, del
+  `min-height: 44px` sin capa. Arrancan en el borde izquierdo de la caja de 44 px, así que su
+  centro queda en x = 24 y el eje del carril está en x = 30: **6 px a la izquierda**. El icono
+  está centrado en su botón, pero el botón no lo está en el carril.
+- **Indicador del ítem activo** (`sidebar-active-indicator.tsx`). Copia la caja del botón activo
+  (`offsetWidth`, `offsetLeft`): sale como un rectángulo de 32 × 44, **6 px a la izquierda**. El
+  fondo de hover también es el del botón, así que tiene el mismo desvío.
+- **Isotipo.** El enlace de marca queda con `p-2!`, así que su caja de contenido mide 16 px de
+  ancho. La regla `img { max-width: 100% }` del preflight de Tailwind lo reduce a **16 px de
+  ancho**, la mitad de lo que pide QC-226 R13, y además va desplazado. Es el «extremadamente
+  pequeño y descentrado» que ve el humano.
+- **Avatar del pie** (`nav-user.tsx`). Mide 24 px y va alineado a la izquierda en una fila de
+  44 px con `p-2`: su centro queda en x = 28, **2 px a la izquierda** del eje (P11).
+
+### 16.2 Cambio
+
+**`components/ui/sidebar.tsx`** — en la base de `sidebarMenuButtonVariants`, y en ningún otro
+sitio:
+
+```
+group-data-[collapsible=icon]:size-8!  →  group-data-[collapsible=icon]:size-11!
+group-data-[collapsible=icon]:p-2!     →  group-data-[collapsible=icon]:p-3.5!
+```
+
+- Quedan 44 × 44 con 14 px de relleno, así que la caja de contenido mide 16 px, lo mismo que el
+  icono (`[&_svg]:size-4`). Es el mismo patrón del shadcn original (32 − 2 × 8 = 16). El icono
+  queda centrado aunque la etiqueta `<span>` siga en el flujo: el icono ocupa toda la caja de
+  contenido, y la etiqueta y el `gap` desbordan hacia la derecha, donde `overflow-hidden` los
+  recorta.
+- La variante `lg` (`group-data-[collapsible=icon]:p-0!`) no la usa la barra privada y no cambia.
+- No se tocan `SIDEBAR_WIDTH`, `SIDEBAR_WIDTH_ICON` ni `rounded-lg`, que son los literales que
+  vigila `ui-primitivas-intactas.test.ts`.
+
+**`components/private/app-sidebar.tsx`** — el `className` del enlace de marca gana
+`group-data-[collapsible=icon]:p-1.5!`. `tailwind-merge` lo resuelve contra el `p-3.5!` de la
+variante, porque comparten modificador e importancia. Quedan 44 − 2 × 6 = 32 px de contenido: el
+isotipo cabe entero a 32 px, el preflight ya no lo encoge y queda centrado. `BrandLogo` y su
+`height={32}` no cambian.
+
+**`components/private/nav-user.tsx`** (P11) — la fila de identidad gana
+`group-data-[collapsible=icon]:justify-center`. En modo icono la fila solo contiene el avatar,
+porque el nombre ya no se renderiza.
+
+**`app/globals.css`** (P12) — la regla `[data-collapsible='icon'] [data-slot='sidebar-menu-button']`
+pasa de `padding: 10px !important` a `14px !important`, y se reescribe su comentario. El nuevo
+dice que las medidas del modo icono las fija el primitivo y que esta regla las repite como
+contrato. Las reglas de la marca (`padding: 6px`, `img` a 32 px) se quedan. Ninguna cambia
+nada en pantalla.
+
+**Lo que no se toca:**
+- `sidebar-active-indicator.tsx`: al medir un botón de 44 × 44 centrado, el indicador sale
+  centrado solo. Al colapsar, su `ResizeObserver` ya lo recoloca.
+- La barra de acento `::before` (R17, QC-228 R15): sigue pegada al borde izquierdo del botón,
+  así que no es una caja centrada y R33 no la mide.
+- La vista expandida (R36): todos los cambios llevan el prefijo `group-data-[collapsible=icon]:`
+  o viven bajo `[data-collapsible='icon']`.
+
+### 16.3 Contratos de prueba
+
+- **Eje del carril:** `x + width / 2` del `boundingBox()` de `[data-slot="sidebar-inner"]`.
+  Tolerancia ±1 px en todas las comparaciones.
+- **Modo icono en el E2E:**
+  - se entra con la cookie de preferencia (`SIDEBAR_STATE_COOKIE` con el valor de
+    `lib/shared/ui/sidebar-state.ts`) antes de cargar la página, sin pulsar el control;
+  - se emula `reducedMotion: 'reduce'`;
+  - antes de medir se espera a que el ancho del contenedor sea estable, por la transición de
+    ancho y el `ResizeObserver` del indicador.
+- **Ruta activa:** una cuyo ítem sea un enlace de primer nivel. La elige el implementer a partir de
+  `private-nav.ts`, nunca con un literal.
+
+### 16.4 Verificación (R → test)
+
+| R | Test | Qué afirma |
+| --- | --- | --- |
+| R31 | E2E | Caja de `private-brand-link` y de cada `[data-slot="sidebar-content"] [data-slot="sidebar-menu-button"]`: 44 × 44 y centro en el eje |
+| R32 | E2E | Centro del `svg` de cada botón de primer nivel y del avatar (`[data-testid="private-user-initials"]`, o su avatar contenedor) en el eje |
+| R33 | E2E | `[data-slot="sidebar-active-indicator"][data-variant="menu"]` con opacidad 1: caja igual a la del botón `[data-active]` y centro en el eje |
+| R34 | E2E | Tras `hover()` sobre un botón inactivo, el `background-color` calculado no es transparente y la caja del botón está centrada en el eje |
+| R35 | E2E | `img` de `private-brand-link`: 32 × 32, centro en el eje y caja dentro de la del enlace |
+| R36 | E2E | Expandida: `img` del logo de 28 px de alto, cada botón de primer nivel tan ancho como su `sidebar-menu` y de al menos 44 px de alto, indicador con la caja del activo |
+| R31, R35 | `tests/unit/marca/sidebar-carril.test.ts` | `sidebarMenuButtonVariants()` contiene `size-11!` y `p-3.5!` con prefijo de modo icono y ya no `size-8!` ni `p-2!`; el enlace de marca renderizado lleva `group-data-[collapsible=icon]:p-1.5!` |
+| R36 | `tests/unit/marca/sidebar-carril.test.ts` | Las clases de `sidebarMenuButtonVariants()` **sin** el prefijo `group-data-[collapsible=icon]:` son exactamente una lista congelada, copiada del `dev` de T0 |
+| R37 | `tests/unit/marca/sidebar-carril.test.ts` | `app/(private)/layout.tsx` sigue con `'--sidebar-width': '17rem'` y `'--sidebar-width-icon': '4.875rem'`, y `app-sidebar.tsx` sigue con `p-[18px]` |
+
+El E2E es el que vale para R31–R35. jsdom no calcula cajas ni resuelve la cascada, y la cascada es
+justo lo que falló: una regex sobre el CSS daba verde con la regla perdiendo. El test unitario fija
+las clases, para que un cambio en el primitivo dé rojo sin tener que levantar un navegador.
+
+### 16.5 Riesgos
+
+| Riesgo | Mitigación |
+| --- | --- |
+| El diagnóstico de §16.1 es de lectura y no está medido | T12 empieza midiendo con el E2E sobre el `dev` de T0, antes de cambiar nada, y anota las cajas en `progress/impl_QC-227.md`. Si no sale el desvío de 6 px y el isotipo de 16 px, se para y se reporta |
+| QC-228 cambia las clases del modo icono antes de mergear | T0 parte de su versión final; la lista congelada de R36 se copia de ese `dev` |
+| Un tooltip o el menú flotante del grupo (`NavGroupFloating`) se ancla a otra caja | Se anclan al botón, que ahora mide 44 × 44: el ancla se mueve 6 px a la derecha. Se revisa en las capturas de T10 |
+
+### 16.6 Alternativas descartadas
+
+**A6. Ganar a los `!important` del primitivo con reglas `!important` dentro de `@layer base`.**
+Funcionaría: para las declaraciones importantes, una capa anterior gana a una posterior. Se
+descarta porque depende de una regla de la cascada poco conocida, y por desconocerla falla hoy la
+regla sin capa. La medida quedaría lejos del componente que la necesita. Cambiar dos clases en el
+primitivo deja la medida en un solo sitio, a la vista.
+
+**A7. Cambiar el ancho del carril o quitar el `p-[18px]`.** No arregla nada: el botón sigue
+forzado a 32 px y alineado a la izquierda, sea cual sea el ancho. Además rompería QC-29 R18 y R19
+(P10, R37).
+
+**A8. `justify-center` en modo icono y ocultar la etiqueta, conservando 10 px de relleno.** Haría
+falta ocultar el `<span>` de cada ítem (`group-data-[collapsible=icon]:[&>span]:hidden`) para que
+el `gap` no empuje el icono 4 px a la izquierda. Son dos reglas en vez de una, y el resultado
+depende de la estructura del contenido de cada botón. Igualar la caja de contenido al tamaño del
+icono, como hace shadcn, no depende de eso.
+
+**Dependencias:** ninguna (R28).

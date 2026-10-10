@@ -37,6 +37,14 @@ tokens que dejó QC-226.
 - Dependencias nuevas.
 - Cambiar el valor de cualquier token: la paleta la cerró QC-226 (D2).
 
+> **ENMIENDA 2026-10-09 (pedida por el humano, spec ya aprobado).** Entra además la geometría de
+> la barra lateral **en modo icono**. Con el carril colapsado, los iconos, el isotipo y el
+> resaltado del ítem activo (indicador, fondo de activo y de hover) no quedan centrados, y el
+> isotipo sale diminuto. Se añaden D11 y R31–R37. Los requisitos R1–R30 no cambian. Por eso entran
+> en el diff `components/ui/sidebar.tsx` y `components/private/app-sidebar.tsx`, que este spec
+> dejaba fuera para no chocar con QC-228. Ya no hay choque: el código empieza con QC-228 en `dev`
+> (P7, `tasks.md > T0`). Diagnóstico y diseño: `design.md > 16`.
+
 ## Decisiones cerradas (no reabrir)
 
 | # | Decisión | Quién y cuándo | Enmienda a | Cubierta por |
@@ -51,6 +59,7 @@ tokens que dejó QC-226.
 | D8 | Sin dependencias nuevas | humano (ficha) | — | R28 |
 | D9 | «Botón secundario» es la variante `outline` (la de los «Cancelar»); la variante `secondary` no la usa ninguna pantalla | humano, 2026-10-09 (respuesta a QC-228 P1) | — | R19 |
 | D10 | Los valores de los tokens no se tocan: la paleta «Verde Petróleo» la cerró QC-226 | humano, 2026-10-08 (QC-226 D2) | — | R2, R10, R15, R18, R20, R21, R23 |
+| D11 | Enmienda: con la barra colapsada (modo icono), los iconos, el isotipo y el indicador o fondo del ítem activo quedan centrados en el eje del carril (±1 px); el isotipo, a un tamaño legible según la guía de marca; la vista expandida no cambia | humano, 2026-10-09 (enmienda al spec aprobado) | — | R31–R37 |
 
 ## Requisitos (EARS)
 
@@ -190,11 +199,56 @@ de `design.md > 9`.
 **R30.** El sistema NO DEBE añadir animaciones ni transiciones nuevas: ni `@keyframes`, ni
 `animation`, ni clases `animate-*`, ni `transition-*` que no existieran ya en la línea que se toca.
 
+### Carril colapsado (ENMIENDA 2026-10-09, D11)
+
+> Añadidos el 2026-10-09 a petición del humano, con el spec ya aprobado. R1–R30 no cambian.
+
+Términos de esta sección:
+
+- **Modo icono**: la barra lateral colapsada en viewport ancho (`data-collapsible="icon"`). En
+  viewport angosto nunca se aplica (QC-11 R34).
+- **Carril**: el panel visible de la barra en modo icono (`[data-slot="sidebar-inner"]`).
+- **Eje del carril**: la vertical que pasa por el centro horizontal de la caja del carril.
+- **Centrado**: el centro horizontal de la caja medida está a ±1 px del eje del carril.
+
+**R31.** MIENTRAS la barra lateral está en modo icono, el sistema DEBE pintar el enlace de marca y
+cada botón de navegación de primer nivel (enlaces y disparadores de grupo) como un cuadrado de
+44 × 44 px (±1 px), centrado en el eje del carril.
+
+**R32.** MIENTRAS la barra lateral está en modo icono, el sistema DEBE pintar el icono de cada
+botón de navegación de primer nivel y el avatar del pie (P11) centrados en el eje del carril.
+
+**R33.** MIENTRAS la barra lateral está en modo icono y un ítem de primer nivel es el activo, el
+sistema DEBE pintar el indicador del ítem activo (QC-228) con la misma caja que el botón activo
+(±1 px en posición, ancho y alto), y por tanto centrado en el eje del carril.
+
+**R34.** CUANDO el puntero pasa sobre un botón de navegación del carril, el sistema DEBE pintar el
+fondo de hover dentro de la caja de ese botón (R31), centrado en el eje del carril.
+
+**R35.** MIENTRAS la barra lateral está en modo icono, el sistema DEBE mostrar el isotipo del
+enlace de marca con una caja de 32 × 32 px (±1 px), que es el tamaño de QC-226 R13 y está por
+encima del mínimo de 24 px de la guía de marca («Isotipo completo: desde 24 px»). La caja DEBE
+estar centrada en el eje del carril y entera dentro de la caja del enlace, sin recorte.
+
+**R36.** MIENTRAS la barra lateral está expandida, el sistema NO DEBE cambiar su aspecto:
+- el logo horizontal mide 28 px de alto (QC-226 R12);
+- cada botón de navegación de primer nivel ocupa el ancho de su lista y mide al menos 44 px de
+  alto (QC-29 R20);
+- el indicador del ítem activo tiene la misma caja que el botón activo (±1 px);
+- las clases del botón de menú que no llevan el prefijo `group-data-[collapsible=icon]:` son las
+  mismas que en `dev` antes de esta ficha.
+
+**R37.** El sistema NO DEBE cambiar el ancho del carril (`--sidebar-width-icon: 4.875rem`, QC-29
+R19), el ancho expandido (`--sidebar-width: 17rem`) ni el margen exterior de 18 px del panel
+(QC-29 R18) (propuesta de P10).
+
 ### Cobertura de las decisiones cerradas
 
 D1→R1–R26 · D2→`tasks.md > T11` (proceso, no conducta del sistema) · D3→R1–R9 · D4→R10–R13 ·
 D5→R14–R17 · D6→R18–R25 · D7→R29, R30 y `tasks.md > T11` · D8→R28 · D9→R19 · D10→R2, R10, R15,
 R18, R20, R21, R23, R27.
+
+Enmienda 2026-10-09: D11→R31–R37.
 
 ## Preguntas abiertas
 
@@ -254,3 +308,29 @@ lotes.
 añade a la lista de `design.md > 4.2` antes de implementar.
 
 > 2026-10-09: el humano aprobó el spec con los valores por defecto de P1–P9 (incluidos los dos cambios de tono de P2). Quedan cerradas.
+
+### Abiertas por la enmienda del 2026-10-09 (D11)
+
+Siguen la misma regla: si el humano aprueba la enmienda sin responderlas, vale la propuesta.
+
+**P10. Ancho del carril.** QC-29 R19 pide «78 px como ancho en modo icono». Hoy esos 78 px son la
+variable `--sidebar-width-icon`. El panel visible mide **60 px**: el contenedor flotante mide
+78 + 16 + 2 = 96 px y el margen exterior de 18 px se come 36 (`design.md > 16.1`). En esos 60 px
+caben justo los botones de 44 px con los 8 px de relleno del grupo, así que el centrado no
+necesita cambiar el ancho. **Propuesta: el ancho no cambia** (R37). Si el humano quiere que el
+panel visible mida 78 px, la variable pasa a 6rem y el hueco del contenido crece 18 px. Eso es un
+cambio visible y una relectura de QC-29 R19, así que iría en una enmienda aparte.
+
+**P11. Avatar del pie.** El avatar de usuario del pie (24 px) sale hoy 2 px a la izquierda del
+eje: va alineado a la izquierda dentro de una fila de 44 px. No es un botón del menú, pero en el
+carril se lee como un icono más. **Propuesta: entra** (R32), con una clase solo para el modo icono
+en `components/private/nav-user.tsx`.
+
+**P12. Reglas de `globals.css` que hoy no ganan.** Las reglas sin capa del modo icono
+(`width/height: 44px !important`, `padding: 10px !important` y el `padding: 6px !important` de la
+marca) pierden contra los `size-8!` y `p-2!` del primitivo (`design.md > 16.1`). **Propuesta:** se
+quedan, con el relleno a **14 px** para que coincida con el primitivo y con el comentario
+corregido. Se enmienda una sola aserción de `tests/unit/sidebar-ajuste.test.tsx`
+(`padding: 10px` → `14px`), con nota `ENMIENDA QC-227`. La otra opción es borrarlas y reescribir
+ese caso para que mire las clases del primitivo. Es más limpio, pero toca más un test de otra
+ficha.

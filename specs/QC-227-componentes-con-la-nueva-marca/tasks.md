@@ -9,6 +9,11 @@ juntos en T9. Un commit por task.
 **Antes de empezar:** P7 decide cuándo arranca el código (propuesta: con QC-228 mergeada en `dev`).
 P1 decide si entra T8. Las demás preguntas tienen propuesta por defecto y no bloquean.
 
+**Enmienda 2026-10-09:** se añade T12 (R31–R37), con P10–P12 abiertas y con propuesta por
+defecto. Los archivos `components/ui/sidebar.tsx` y `components/private/app-sidebar.tsx` entran
+en «Archivos esperados». Antes quedaban fuera para no chocar con QC-228; ahora ese choque ya no
+existe, porque el código empieza con QC-228 en `dev` (T0).
+
 ## Tanda 0 — Punto de partida (leader)
 
 - [ ] **T0. Sincronizar con `dev` y capturas «antes»** (P7; R29)
@@ -72,6 +77,35 @@ P1 decide si entra T8. Las demás preguntas tienen propuesta por defecto y no bl
   - **Hecho cuando:** el test está verde, `e2e/login-skin.spec.ts` sigue verde y el aviso de LCP de
     `next dev` ya no sale (se anota en `progress/impl_QC-227.md`).
 
+- [ ] **T12 (Dep.: T0, T3). Carril colapsado centrado** (R31–R37) — ENMIENDA 2026-10-09
+  - Depende de T3 porque las dos tocan `app/globals.css`. No es `[P]` con T3; con las demás de la
+    tanda, sí.
+  - **Primero medir, sin cambiar nada.** Escribir el bloque «carril colapsado» de
+    `e2e/marca-componentes.spec.ts` (`design.md > 16.3, 16.4`) y correrlo sobre el `dev` de T0.
+    Debe salir rojo, con los botones a 32 px de ancho y 6 px a la izquierda del eje, y el isotipo a
+    unos 16 px. Anotar las cajas medidas en `progress/impl_QC-227.md`. Si no salen esas cifras, se
+    para y se reporta: el diagnóstico de `design.md > 16.1` no se sostiene.
+  - Si `e2e/marca-componentes.spec.ts` nace en esta task, su alta en `E2E_ESPERADOS`
+    (`tests/guards/guard-identificador-de-request.test.ts`) se adelanta aquí, para que las guardias
+    sigan en verde. T10 añade el resto de casos al mismo archivo.
+  - Hacer el cambio de `design.md > 16.2`:
+    - `components/ui/sidebar.tsx`: `size-8!`/`p-2!` → `size-11!`/`p-3.5!`, solo con el prefijo del
+      modo icono;
+    - `components/private/app-sidebar.tsx`: `group-data-[collapsible=icon]:p-1.5!` en el enlace de
+      marca;
+    - `components/private/nav-user.tsx`: `group-data-[collapsible=icon]:justify-center` (P11);
+    - `app/globals.css`: relleno a 14 px y comentario corregido (P12).
+  - Enmienda de `tests/unit/sidebar-ajuste.test.tsx`: solo la aserción `padding: 10px` → `14px`,
+    con nota `ENMIENDA QC-227` (P12).
+  - Test nuevo `tests/unit/marca/sidebar-carril.test.ts`. La lista congelada de R36 se copia del
+    `dev` de T0.
+  - **Hecho cuando:**
+    - el bloque «carril colapsado» del E2E está verde en Chromium y WebKit;
+    - `sidebar-carril.test.ts` está verde;
+    - `sidebar-ajuste.test.tsx` (con su enmienda), `sidebar-desktop.test.tsx`,
+      `app-sidebar.test.tsx` y `theme/ui-primitivas-intactas.test.ts` están verdes;
+    - `sidebar-active-indicator.tsx` no aparece en el diff.
+
 ## Tanda 2 — Pantallas (Dep.: T1, T2, T4)
 
 - [ ] **T6. Columnas de cifras y panel de lotes** (R7, R11, R12, R13)
@@ -96,7 +130,7 @@ P1 decide si entra T8. Las demás preguntas tienen propuesta por defecto y no bl
 
 ## Tanda 3 — Paridad, E2E y cierre
 
-- [ ] **T9 (Dep.: T1–T8). Snapshots de paridad y enmiendas** (R29)
+- [ ] **T9 (Dep.: T1–T8, T12). Snapshots de paridad y enmiendas** (R29)
   - `pnpm exec vitest run tests/unit/paridad`. Para cada `.snap` que cambie, comprobar que viejo y
     nuevo son idénticos quitando los `class="…"` (`design.md > 9`). Anotar el resultado por archivo
     en `progress/impl_QC-227.md`.
@@ -115,12 +149,16 @@ P1 decide si entra T8. Las demás preguntas tienen propuesta por defecto y no bl
     la misma lista que T0, y deja la tabla de parejas en `progress/features/QC-227.md`.
   - **Hecho cuando:** los cuatro specs están verdes y cada captura «antes» tiene su pareja. Si la
     base local no responde, se anota la salida en `progress/impl_QC-227.md` como rojo de entorno.
+  - Enmienda 2026-10-09: el bloque «carril colapsado» (R31–R36) lo escribe T12 dentro de
+    `e2e/marca-componentes.spec.ts`. Aquí se corre con el resto. Las capturas de la barra en modo
+    icono, antes y después, van en la tabla de parejas.
 
 - [ ] **T11 (Dep.: T10). Cierre y trazabilidad** (D2, D7; R28)
   - `git diff --diff-filter=A --name-only origin/dev...HEAD -- components app` no lista ningún
     `.tsx` (D2), y `git diff --name-only origin/dev...HEAD -- lib/modules db` sale vacío (D7). Las
     dos salidas se anotan en `progress/impl_QC-227.md`.
-  - Mapa `R<n> -> test` de R1–R30 en `progress/impl_QC-227.md`.
+  - Mapa `R<n> -> test` de R1–R30 en `progress/impl_QC-227.md`, y de R31–R37 (enmienda
+    2026-10-09, `design.md > 16.4`).
   - `node scripts/archivos-en-vuelo.mjs --candidata QC-227` sin `CHOCA`, y `./init.sh` en verde.
   - **Hecho cuando:** cada R tiene un test, las dos comprobaciones de diff están anotadas y el gate
     local está verde.
@@ -138,6 +176,11 @@ P1 decide si entra T8. Las demás preguntas tienen propuesta por defecto y no bl
 - `components/ui/tabs.tsx`
 - `components/ui/calendar.tsx`
 - `components/ui/table.tsx`
+- `components/ui/sidebar.tsx`
+- `components/private/app-sidebar.tsx`
+- `components/private/nav-user.tsx`
+- `tests/unit/marca/sidebar-carril.test.ts`
+- `tests/unit/sidebar-ajuste.test.tsx`
 - `components/shared/brand-logo.tsx`
 - `components/shared/shared-select.tsx`
 - `components/shared/presentation-select.tsx`
