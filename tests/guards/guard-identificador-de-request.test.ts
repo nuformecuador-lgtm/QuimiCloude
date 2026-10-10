@@ -159,6 +159,14 @@ export const E2E_ESPERADOS = [
   // lee ni afirma nada sobre el identificador ni sobre `reference`, asi que ese diferimiento
   // sigue INTACTO.
   'clientes.spec.ts',
+  // Alta el 2026-10-09 (QC-219) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: el acondicionador ve Terminar bloqueado, la
+  // base rechaza vencimiento de hoy, produccion de manana y un lote que choca, guarda datos validos
+  // y termina; el Administrador ve lote y vencimiento en `/inventario`. NO ejercita el cruce
+  // borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
+  // identificador ni sobre `reference`, asi que ese diferimiento sigue INTACTO.
+  'datos-de-lote-en-acondicionamiento.spec.ts',
   // Sube tres PDFs desde el detalle de un proveedor y ve cambiar el estado de cada uno, con el
   // almacenamiento, la cola y la IA doblados. No afirma nada sobre el identificador de peticion.
   'documentos.spec.ts',
@@ -529,6 +537,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261008150050_inventory_movement_kind_delivery',
   '20261008150100_order_deliveries',
   '20261008150200_delivery_permission',
+  // El dia de produccion del lote; no toca el identificador.
+  '20261009120000_product_batches_production_date',
 ] as const
 
 export function hallazgosDeMigraciones(

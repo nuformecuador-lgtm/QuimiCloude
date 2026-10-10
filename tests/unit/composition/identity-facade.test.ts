@@ -361,3 +361,79 @@ describe('identity — los siete casos de uso de grupos de trabajo (fachada cabl
     expect(acotada.pageSize).toBe(25);
   });
 });
+
+// QC-249 T2 (R11, R12) — bloque NUEVO al final, aditivo. Se afirma el CABLEADO del transporte:
+// con `MAIL_TRANSPORT=desactivado` la fachada usa ese adaptador (el real, sin doblar) y no toca
+// ninguno de los otros tres; sin la variable sigue usando `resend`. El repositorio del enlace y los
+// tres transportes que envian se doblan para no necesitar ni base ni red.
+const transporte = vi.hoisted(() => ({
+  issueForPendingUser: vi.fn(),
+  resend: vi.fn(),
+  smtp: vi.fn(),
+  outbox: vi.fn(),
+}));
+
+vi.mock('@/lib/modules/identity/adapters/driven/persistence/credential-setup-link-prisma', () => ({
+  issueForPendingUser: transporte.issueForPendingUser,
+  applyCredentialAndActivate: vi.fn(),
+}));
+
+vi.mock('@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-resend', () => ({
+  sendCredentialSetupLink: transporte.resend,
+}));
+
+vi.mock('@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-smtp', () => ({
+  sendCredentialSetupLink: transporte.smtp,
+}));
+
+vi.mock('@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-outbox', () => ({
+  sendCredentialSetupLink: transporte.outbox,
+}));
+
+describe('identity — el transporte de correo desactivado (fachada cableada)', () => {
+  const ACTOR = { id: SUB, companyId: COMPANY_ID, permissions: ['usuarios.modificar'] };
+  const USUARIO_PENDIENTE = '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d';
+  const DESTINATARIO = 'persona@dominio-de-prueba.com';
+  const originalTransport = process.env.MAIL_TRANSPORT;
+  let warn: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    transporte.issueForPendingUser.mockResolvedValue({ email: DESTINATARIO });
+    transporte.resend.mockResolvedValue('sent');
+    transporte.smtp.mockResolvedValue('sent');
+    transporte.outbox.mockResolvedValue('sent');
+    warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    warn.mockRestore();
+    if (originalTransport === undefined) delete process.env.MAIL_TRANSPORT;
+    else process.env.MAIL_TRANSPORT = originalTransport;
+  });
+
+  it('R11: con MAIL_TRANSPORT=desactivado la fachada usa ese transporte y devuelve failed', async () => {
+    process.env.MAIL_TRANSPORT = 'desactivado';
+
+    const resultado = await identity.issueCredentialSetupLink(ACTOR, { userId: USUARIO_PENDIENTE });
+
+    expect(resultado).toEqual({ mail: 'failed' });
+    expect(transporte.issueForPendingUser).toHaveBeenCalledTimes(1);
+    expect(transporte.resend).not.toHaveBeenCalled();
+    expect(transporte.smtp).not.toHaveBeenCalled();
+    expect(transporte.outbox).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toContain('correo desactivado');
+    expect(String(warn.mock.calls[0]?.[0])).not.toContain(DESTINATARIO);
+  });
+
+  it('R12: sin MAIL_TRANSPORT la fachada sigue usando resend', async () => {
+    delete process.env.MAIL_TRANSPORT;
+
+    const resultado = await identity.issueCredentialSetupLink(ACTOR, { userId: USUARIO_PENDIENTE });
+
+    expect(resultado).toEqual({ mail: 'sent' });
+    expect(transporte.resend).toHaveBeenCalledTimes(1);
+    expect(transporte.resend.mock.calls[0]?.[0]).toMatchObject({ to: DESTINATARIO });
+    expect(warn).not.toHaveBeenCalled();
+  });
+});

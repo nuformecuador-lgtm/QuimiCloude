@@ -37,6 +37,7 @@ import { normalizeRecipeName } from '../../lib/modules/recetas'
 import { normalizeUnitName } from '../../lib/modules/unidades'
 import { prisma } from '../../lib/shared/db/prisma'
 
+import { DEMO_PREFIX } from './data'
 import type { DemoProduct, DemoUser } from './data'
 import type { DemoSeedGateway, OrderStep, StepActors } from './run'
 
@@ -423,6 +424,7 @@ async function applyOrderStep(
       })
       return
     case 'finishConditioning':
+      await saveDemoBatchData(await actor(actors.conditioner), orderId)
       await asignaciones.finishConditioning(await actor(actors.conditioner), { orderId })
       return
     case 'cancel':
@@ -430,6 +432,36 @@ async function applyOrderStep(
       await pedidos.cancelOrder(orderId, { reason: cancellationReason }, await actor(actors.admin))
       return
   }
+}
+
+/**
+ * Terminar exige los datos de lote de cada linea. Se escriben solo en las lineas que tienen lote y
+ * aun no los tienen, asi que repetir la siembra no los cambia. El lote se deriva del provisional,
+ * que ya es unico en la empresa; las fechas salen del dia UTC de la corrida: produccion hoy y
+ * vencimiento dentro de dos anos.
+ */
+async function saveDemoBatchData(conditioner: Actor, orderId: string): Promise<void> {
+  const detail = await asignaciones.getConditioningOrder(conditioner, { orderId })
+  const pending = (detail.batchData?.lines ?? []).flatMap((line) =>
+    line.batchId === null || line.provisionalLot === null
+      ? []
+      : [{ batchId: line.batchId, provisionalLot: line.provisionalLot }],
+  )
+  if (pending.length === 0) return
+
+  const today = new Date()
+  const productionDate = today.toISOString().slice(0, 10)
+  const expiry = new Date(Date.UTC(today.getUTCFullYear() + 2, today.getUTCMonth(), today.getUTCDate()))
+  const expiryDate = expiry.toISOString().slice(0, 10)
+  await asignaciones.saveConditioningBatchData(conditioner, {
+    orderId,
+    lines: pending.map((line) => ({
+      batchId: line.batchId,
+      lot: `${DEMO_PREFIX}-PT-${line.provisionalLot}`,
+      expiryDate,
+      productionDate,
+    })),
+  })
 }
 
 function productInput(

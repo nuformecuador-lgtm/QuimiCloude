@@ -126,6 +126,23 @@ que se lee como un fallo de código.
   `DATABASE_URL` no apunta a `localhost`, `127.0.0.1` o un socket Unix (el parámetro `?host=`, si
   viene, manda; repetido o vacío, se niega). Solo la regla de base local la salta la bandera
   `--forzar` de la línea de comandos, y avisa; `VERCEL_ENV` y CI no las salta nada.
+- **Enmienda 2026-10-09 (QC-249): en preview sí, contra la base de preview.** Preview ya no usa la
+  base de producción: tiene su propio proyecto de Supabase, y el build de preview siembra la demo
+  en él (`docs/architecture.md > Previews (QC-249)`). Las reglas de la guarda
+  (`scripts/seed-demo/guard.ts`) quedan así:
+  - **`VERCEL_ENV=preview`:** se permite **solo** si `VERCEL` está definida (dentro de Vercel),
+    `PREVIEW_SUPABASE_REF` tiene valor y `DATABASE_URL` y `DIRECT_URL` lo contienen. Entonces corre
+    **sin** `--forzar`, aunque la base sea remota y aunque haya `CI`. Si algo de eso no se cumple, se
+    niega nombrando lo que falla, y `--forzar` **no** lo anula.
+  - **Cualquier otro `VERCEL_ENV` no vacío distinto de `development`** (`production` incluido): se
+    niega siempre, con o sin `--forzar`. Sin cambios.
+  - **`VERCEL_ENV` vacío o `development`:** las reglas de antes (CI, base local, `--forzar` solo
+    para la base local). Sin cambios.
+
+  QC-230 no tiene spec (`sdd: false`), así que la enmienda queda fechada aquí, en la cabecera de
+  `scripts/seed-demo/guard.ts` y en `specs/QC-249-entorno-de-preview/design.md > 8`. El texto del
+  punto anterior es el de QC-230 y se conserva como estaba; donde dice que preview usa la base de
+  producción, manda esta enmienda. Lo cubre `tests/unit/scripts/seed-demo-guard.test.ts`.
 - **Idempotente:** cada cosa se busca por su nombre antes de crearla y un pedido a medias se
   retoma desde su estado. Una segunda corrida no crea nada.
 - **Qué crea**, todo ficticio y con el prefijo `DEMO` (lotes `DEMO-`, usuarios `demo.`):

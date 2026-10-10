@@ -1,0 +1,159 @@
+# QC-219 · datos-de-lote-en-acondicionamiento · bitácora de implementación
+
+Rama `feature/QC-219-datos-de-lote-en-acondicionamiento`, 2026-10-09. T1–T17 hechas; T18 es del leader.
+
+## Commits por tanda
+
+| Tanda | Commit | Qué | ¿Compila aislado? |
+|---|---|---|---|
+| T15 | `f96911a8` | vencimiento en el panel de lotes de `/inventario` | sí |
+| T1–T5 (no compartido) | `817806a4` | migración, contrato `FinishedBatchLabels`, adaptador, `typedLotSchema`/`civilDateSchema`, 5 clases de error | **no**: faltan schema, `inventario/index.ts`, `product-prisma.ts` y catálogo |
+| T6–T12 (no compartido) | `65577195` | guardar, Terminar exige datos, detalle con `batchData`, «Entregados», action, seed-demo | **no**: falta lo compartido y la composición |
+| T13, T14, T16 | `d2b0b73e` | formulario, Terminar bloqueado, detalle de `ENTREGADO`, pestaña «Entregados» | **no** (igual que arriba) |
+| compartido QC-223 | `7a049e55` | `db/schema.prisma`, `inventario-schema.test.ts`, migración en `MIGRACIONES_ESPERADAS` | **no** |
+| compartido QC-223 | `8a43e0ac` | `error-codes.ts`, `error-catalog.ts` | **no** |
+| compartido QC-223 | `e773a19f` | `inventario/index.ts`, `product-prisma.ts` (`writeFinishedBatchLabels`), `guard-libro-de-inventario`, `qc91-alcance` | **no**: falta la composición |
+| compartido QC-223 | `ae93047b` | `lib/composition/index.ts`, `tests/integration/aislamiento.json` | **sí**: desde aquí el árbol compila |
+| T17 | `46236c42` | `e2e/datos-de-lote-en-acondicionamiento.spec.ts` | sí |
+| listas cerradas | `aa8fdc14` | E2E nuevo en `data-table-alcance` | sí |
+| compartido QC-223 | `a1ac1073` | E2E nuevo en `E2E_ESPERADOS` | sí |
+
+En los archivos compartidos con QC-223 solo hay añadidos, salvo:
+- `guard-libro-de-inventario.test.ts`: `CENSO_ESPERADO` une `CAMINOS_ESPERADOS` y `CAMINOS_SIN_ASIENTO`, y cambia el título del caso del censo (2 líneas);
+- `qc91-alcance.test.ts`: el caso R21 admite `update` en `adjustBatchStock` y en `writeFinishedBatchLabels` (2 líneas);
+- `aislamiento.json`: el `}` previo pasa a `},`.
+
+## Archivos fuera de «Archivos esperados»
+
+| Archivo | Motivo |
+|---|---|
+| `tests/unit/errores/catalogo.test.ts` | cuenta literal de códigos: 76 → 79 |
+| `tests/unit/errores/conditioning-batch-data-codes.test.ts` (nuevo) | códigos y `batchId` de las 5 clases, aparte para no tocar los imports de `catalogo.test.ts` |
+| `tests/unit/inventario/qc121-alcance.test.ts` | exige recalcular `products.stock` en toda escritura de lote; `writeFinishedBatchLabels` entra como excepción nombrada con nota fechada |
+| `tests/unit/asignaciones/acondicionamiento-authorization.test.ts` | R2 de QC-217 pasa a 3 vistas |
+| `tests/integration/asignaciones/finished-orders.int.test.ts` | termina un pedido con línea pero sin lote; se le da un doble de `listOfOrder` con datos |
+| `tests/unit/asignaciones-ui/asignacion-page.test.tsx` | lista de vistas esperada pasa a 3 |
+| `app/(private)/asignacion/components/assignment-view-tabs.tsx` | el tipo de vistas es exhaustivo: etiqueta y testid de «Entregados» |
+| `app/(private)/asignacion/components/conditioned-orders-table.tsx` | prop opcional `view` (por defecto `acondicionados`) para que la paginación de «Entregados» no caiga en «Terminados» |
+| `scripts/seed-demo/gateway.ts` | Terminar exige datos: antes de terminar guarda lote `DEMO-PT-<provisional>`, producción = hoy UTC, vencimiento = hoy + 2 años, solo en líneas sin datos |
+| `tests/unit/shared/data-table-alcance.test.ts` | lista cerrada de E2E que referencian `data-table`: 32 → 33 |
+
+Archivos esperados no tocados: `lib/shared/routes.ts` (no hizo falta).
+
+## Mapa R → test
+
+| R | Test |
+|---|---|
+| R1 | `asignaciones-ui/conditioning-batch-data-form.test.tsx` «R1: …»; `conditioning-order-screen.test.tsx` «R1 R18 R21: …»; `asignaciones/get-conditioning-order.test.ts` bloque «los datos de lote del detalle» |
+| R2 | `conditioning-batch-data-form.test.tsx` «R2: una línea con datos…», «R2: una línea sin datos…» |
+| R3 | `conditioning-order-screen.test.tsx` «R3: …» (2); `get-conditioning-order.test.ts` |
+| R4 | `conditioning-order-screen.test.tsx` «R4: …» (3); `conditioning-order-page.test.tsx` «R4: …» (2); `conditioning-batch-data.test.ts` |
+| R5 | `conditioning-batch-data-form.test.tsx` «R5: …» (4); `order-conditioning-actions.test.ts` (`batchId` en el error); `errores/conditioning-batch-data-codes.test.ts` |
+| R6 | `integration/inventario/finished-batch-labels.int.test.ts`; `save-conditioning-batch-data.test.ts` |
+| R7 | `save-conditioning-batch-data.test.ts`; `order-conditioning-actions.test.ts` (omisión de líneas vacías) |
+| R8 | `save-conditioning-batch-data.test.ts`; E2E paso «R8 - …» |
+| R9 | `save-conditioning-batch-data.test.ts`; E2E paso «R9 - …» |
+| R10 | `finished-batch-labels.int.test.ts` (otro pedido, mismo pedido, intercambio, sin choque consigo ni con otra empresa); `save-conditioning-batch-data.test.ts`; E2E paso «R10 - …» |
+| R11 | `finished-batch-labels.int.test.ts` (carrera con `Promise.all` y determinista con `pg.Client`); traducción en `save-conditioning-batch-data.test.ts` |
+| R12 | `finished-batch-labels.int.test.ts` (otro pedido, otra empresa, sin asiento `production`, inexistente); `save-conditioning-batch-data.test.ts` |
+| R13 | `save-conditioning-batch-data.test.ts` |
+| R14 | `save-conditioning-batch-data.test.ts` |
+| R15 | `finish-conditioning.test.ts`; `conditioning-batch-data.test.ts`; `integration/asignaciones/finish-conditioning-batch-data.int.test.ts` |
+| R16 | `finish-conditioning.test.ts`; `finish-conditioning-batch-data.int.test.ts` |
+| R17 | `conditioning-batch-data.test.ts`; `finish-conditioning.test.ts`; `finish-conditioning-batch-data.int.test.ts` |
+| R18 | `save-conditioning-batch-data.test.ts`; `conditioning-order-page.test.tsx` «R18: …»; `finish-conditioning-batch-data.int.test.ts` |
+| R19 | `finished-batch-labels.int.test.ts` (el registro del lote sigue siendo el mismo) |
+| R20 | `assignment-views.test.ts`; `list-delivered-conditioned-orders.test.ts`; `delivered-conditioned-orders-list-section.test.tsx` (5); `asignacion-page.test.tsx` (4) |
+| R21 | `conditioning-order-screen.test.tsx` «R21: …»; `conditioning-order-page.test.tsx` «R21: …» (2); `get-conditioning-order.test.ts` |
+| R22 | `inventario/product-batches-panel.test.tsx` «R22 — …» (2); E2E paso «R22 - …» |
+| R23 | `inventario/schema/inventario-schema.test.ts` |
+| R24 | `inventario/schema/product-batch-production-date-migration.test.ts`; `integration/inventario/product-batch-production-date-migration.int.test.ts`; `inventario-schema.test.ts` |
+| R25 | `finish-conditioning-batch-data.int.test.ts` |
+| R26 | `identity/roles/acondicionamiento-rol.test.ts`; `composition/asignaciones-facade.test.ts`; `list-delivered-conditioned-orders.test.ts` |
+| R27 | `guards/guard-libro-de-inventario.test.ts` y `inventario/qc91-alcance.test.ts` (bloques nuevos con mutación); `inventario/qc121-alcance.test.ts` |
+| R28 | `e2e/datos-de-lote-en-acondicionamiento.spec.ts` |
+| R29 | `e2e/acondicionar-con-equipo.spec.ts` verde sin tocar; `e2e/acondicionamiento.spec.ts` verde 8/8 con la única aserción que permite la enmienda (`c6a8fb9f`) |
+| R30 | sin cambios en `package.json` |
+
+## Salida de la verificación (árbol completo, tras el último commit)
+
+- `pnpm run typecheck` → exit 0.
+- `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)`, todos en `tests/unit/documentos/confirm-catalog-import.test.ts` y `tests/unit/pedidos/order-service.test.ts` (ajenos, sin tocar).
+- `pnpm exec vitest run tests/guards tests/unit/asignaciones tests/unit/asignaciones-ui tests/unit/inventario tests/unit/shared tests/unit/recetas-ui tests/unit/identity tests/unit/composition tests/unit/errores tests/unit/scripts` → `Test Files 416 passed (416)` · `Tests 7167 passed | 47 skipped (7214)`.
+  Incluye las listas cerradas: `data-table-alcance`, `guard-identificador-de-request` (E2E_ESPERADOS y MIGRACIONES_ESPERADAS), `recipe-route-contract`, `session-once-per-request-*`, catálogo de errores, `guard-piezas-base`, `guard-libro-de-inventario`, `qc91-alcance`.
+  Antes de dar de alta el E2E nuevo, `data-table-alcance` y `guard-identificador-de-request` salían rojos (esperaban la lista sin él); se corrigió en `aa8fdc14` y `a1ac1073`.
+- Con `.env` de la raíz exportado: `pnpm exec vitest run tests/integration/inventario/finished-batch-labels.int.test.ts tests/integration/inventario/product-batch-production-date-migration.int.test.ts tests/integration/asignaciones tests/integration/inventario/order-batches.int.test.ts tests/integration/scripts` → `Test Files 28 passed (28)` · `Tests 179 passed (179)`.
+- Migración en la base local `QuimiCloude`: `db:migrate` aplicada → `db:rollback` «aplicando down.sql de 20261009120000_product_batches_production_date … revertida» (columna y CHECK desaparecen) → `db:migrate` de nuevo. Queda aplicada.
+- No se corrió `./init.sh` ni `vitest related` (OOM / cuelgue en local; el gate lo corre CI).
+
+## E2E (uno por uno, base local)
+
+- `pnpm exec playwright test e2e/datos-de-lote-en-acondicionamiento.spec.ts` → `2 passed (50.5s)` (chromium, webkit).
+- `pnpm exec playwright test e2e/acondicionar-con-equipo.spec.ts` → `2 passed (31.6s)`.
+- `pnpm exec playwright test e2e/acondicionamiento.spec.ts` → `2 failed · 6 passed (48.5s)`: el caso R22 (`:375`) en los dos navegadores, en
+  `:388 expect(tabs).toHaveCount(2)` → `Received: 3`.
+
+## Bloqueo (decisión humana)
+
+**Choque R20/D13 contra R29.** R20 añade la tercera pestaña «Entregados»; R29 prohíbe cambiar aserciones de
+`e2e/acondicionamiento.spec.ts`, cuyo `:388` exige exactamente dos pestañas. No se ha tocado el archivo. Opciones:
+(a) enmendar R29 y pasar `:388` a tres pestañas (más la aserción de la tercera), o (b) otra decisión del humano.
+CI (E2E en el PR a producción) lo dará rojo hasta entonces.
+
+**Resuelto (2026-10-09).** El humano aprobó enmendar R29 (`54cbf3c7`): se permite un único cambio de aserción.
+En `c6a8fb9f`, `e2e/acondicionamiento.spec.ts` pasa de `toHaveCount(2)` a `toHaveCount(3)` y afirma que `tabs.nth(2)`
+tiene el testid `${ASSIGNMENT_VIEW_TAB_TESTID_PREFIX}acondicionados_entregados` y el texto exacto «Entregados».
+Se usa el prefijo que ya define el spec, en vez de importar la constante del componente, así el diff se queda dentro
+del bloque. También se actualizó el comentario del paso 1. Nada más cambia en ese archivo ni en
+`acondicionar-con-equipo.spec.ts`.
+- `pnpm exec playwright test e2e/acondicionamiento.spec.ts` → `8 passed (1.5m)` (4 chromium + 4 webkit).
+- `pnpm run typecheck` → exit 0. `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)`, los mismos ajenos.
+
+## Decisiones menores a revisar
+
+- La paginación de «Entregados» usa `deliveredConditionedOrdersHref`, que delega en el `listHref` ya existente de
+  `conditioning-orders-href.ts` (mismo patrón que `conditionedOrdersHref`, sin nuevo código de `?vista=`); pestañas y
+  vuelta usan `assignmentViewHref`.
+- «Entregados» reutiliza `ConditioningOrdersSkeleton list="acondicionados"`: su texto sr-only dice «Cargando pedidos terminados…».
+- Línea sin lote de producción (`batchId: null`): `<fieldset disabled>`, sin texto explicativo (el spec no lo define).
+- En `ENTREGADO` la pantalla muestra el estado «Entregado» (texto no listado en design § 6).
+- E2E: `waitForFormHydration` espera la hidratación antes de teclear (en WebKit lo tecleado antes se perdía).
+
+## F2.3 — merge de `origin/dev` (2026-10-09)
+
+Merge `a772757f` (sin rebase). Trae QC-223 (entrega, PR #190) y QC-234. Conflictos, todos resueltos por unión:
+
+| Archivo | Resolución |
+|---|---|
+| `lib/composition/index.ts` | imports de los dos lados (`createFinishedBatchLabels` + `createFinishedGoodsDispatch`/`findDeliverableBatches`) |
+| `error-codes.ts` | cabecera en orden de fecha (QC-223 10-08, QC-234 10-09, QC-219 10-09) y los 6 códigos en `ERROR_CODES` |
+| `error-catalog.ts` | las 6 claves y los 6 textos |
+| `product-prisma.ts` | los dos `import type` (`FinishedBatchLabel…` y `FinishedGoodsDispatchOutcome`) |
+| `guard-identificador-de-request.test.ts` | `MIGRACIONES_ESPERADAS`: las tres de QC-223 (`20261008150050/150100/150200`) y después la nuestra (`20261009120000`), en orden de timestamp |
+| `guard-libro-de-inventario.test.ts` | título del censo con los 8 caminos (`dispatchFinishedGoods` en `CAMINOS_ESPERADOS`, `writeFinishedBatchLabels` en `CAMINOS_SIN_ASIENTO`) |
+| `qc121-alcance.test.ts` | los dos caminos en `CAMINOS_ESPERADOS` y en la fuente fabricada; «siete» → «ocho», «octavo» → «noveno» |
+| `tests/integration/aislamiento.json` | las 4 entradas `commit` (2 de QC-223, 2 nuestras); JSON válido, 103 entradas `commit` |
+| `tests/unit/errores/catalogo.test.ts` | 76 + 3 (QC-223/QC-234) + 3 (QC-219) = **82** |
+| `tests/unit/shared/data-table-alcance.test.ts` | nota de QC-223 y después la nuestra; 32 + 2 = **34** E2E |
+
+**Semántica con QC-223, sin choque:**
+- la entrega deja `ENTREGADO` solo con `setStatus(TERMINADO → ENTREGADO)`, que no toca `conditioned_by`, así que «Entregados» (ENTREGADO + quien acondicionó) los lista;
+- la entrega parcial deja el pedido en `TERMINADO`;
+- la elección de lotes ordena por `purchaseDate` y `lot` y lee `expiryDate`; `writeFinishedBatchLabels` no toca `purchaseDate` ni `stock`;
+- `order_delivery_lines` guarda `batch_id` y no copia el texto del lote, así que corregir el lote tras la entrega no desfasa el registro;
+- en dev nadie más llama a Terminar (solo la composición).
+
+Migraciones: `prisma generate`; `db:migrate` → «No pending migrations to apply» (la base local ya tenía las de QC-223).
+
+Hallazgo menor del reviewer, en su propio commit (`a621e619`): el esqueleto de «Entregados» tiene su entrada
+`acondicionados_entregados` («Cargando pedidos entregados…») y un test en `asignacion-page.test.tsx`.
+
+**Verificación tras el merge:**
+- `pnpm run typecheck` → exit 0. `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)`, los mismos ajenos.
+- `vitest run tests/guards tests/unit/{errores,inventario,inventario-ui,asignaciones,asignaciones-ui,shared,composition,scripts,pedidos,pedidos-ui,identity,recetas-ui,integraciones}` → `Test Files 548 passed (548)` · `Tests 9840 passed | 51 skipped`.
+- Integración (con el `.env` exportado): `tests/integration/asignaciones`, `inventario/{order-batches,finished-batch-labels,product-batch-production-date-migration}`, `tests/integration/scripts` y `pedidos/order-delivery{,-concurrency}` → `Test Files 30 passed (30)` · `Tests 192 passed`.
+- E2E, de uno en uno, chromium y webkit:
+  - `datos-de-lote-en-acondicionamiento` → `2 passed`;
+  - `acondicionamiento` → `8 passed`;
+  - `acondicionar-con-equipo` → `2 passed`;
+  - `entregar-producto-terminado` → `4 passed`.

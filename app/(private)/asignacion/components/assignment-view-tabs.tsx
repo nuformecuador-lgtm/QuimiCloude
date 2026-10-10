@@ -17,6 +17,7 @@ export const ASSIGNMENT_VIEW_LABELS: Readonly<Record<AssignmentViewKind, string>
   por_empacar: 'Por empacar',
   por_acondicionar: 'Por acondicionar',
   acondicionados: 'Terminados',
+  acondicionados_entregados: 'Entregados',
 };
 
 export const ASSIGNMENT_VIEW_TAB_TESTIDS: Readonly<Record<AssignmentViewKind, string>> = {
@@ -26,6 +27,7 @@ export const ASSIGNMENT_VIEW_TAB_TESTIDS: Readonly<Record<AssignmentViewKind, st
   por_empacar: 'assignment-view-tab-por_empacar',
   por_acondicionar: 'assignment-view-tab-por_acondicionar',
   acondicionados: 'assignment-view-tab-acondicionados',
+  acondicionados_entregados: 'assignment-view-tab-acondicionados_entregados',
 };
 
 /** Objetivo tactil minimo de 44x44 px: la primitiva mide 32 px de alto por defecto. */

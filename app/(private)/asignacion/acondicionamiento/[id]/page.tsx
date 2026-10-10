@@ -67,6 +67,7 @@ export default async function ConditioningOrderPage({
 
   const canStart = order.status === 'POR_ACONDICIONAR';
   const canFinish = order.status === 'EN_ACONDICIONAMIENTO' && order.conditionedById === actor.id;
+  const finishBlocked = order.batchData !== null && order.batchData.missingCount > 0;
 
   let candidates: ConditioningTeamCandidates | null = null;
   let candidatesError: ErrorState | null = null;
@@ -84,6 +85,7 @@ export default async function ConditioningOrderPage({
       order={order}
       canStart={canStart}
       canFinish={canFinish}
+      finishBlocked={finishBlocked}
       candidates={candidates}
       candidatesError={candidatesError}
     />
