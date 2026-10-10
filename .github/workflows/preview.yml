@@ -40,13 +40,16 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # Solo Node, sin pnpm ni `pnpm install`: la CLI va por `npx` y el build es remoto.
       - name: Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
+          # setup-node v5 activa la cache sola si package.json tiene `packageManager` (pnpm);
+          # aqui no hay pnpm y fallaria al pedir el store.
+          package-manager-cache: false
 
       - name: Secrets de Vercel presentes
         shell: bash
