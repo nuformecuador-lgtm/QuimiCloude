@@ -29,6 +29,7 @@ import {
   PRESENTATION_LIST_RETRY_TESTID,
   PRESENTATION_LIST_SKELETON_TESTID,
   PRESENTATION_LIST_TESTID,
+  PRESENTATION_ROW_ACTIONS_TESTID,
   PRESENTATION_ROW_SKELETON_TESTID,
   PRESENTATION_UNIT_SELECT_TESTID,
 } from '@/app/(private)/configuracion/presentaciones/components';
@@ -47,6 +48,8 @@ import {
   errorInesperado,
   esperarSinIdentificador,
 } from '../../helpers/identificador-de-request';
+import { openRowActionsMenu } from '../../helpers/row-actions-menu';
+import { setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
 const {
@@ -463,6 +466,7 @@ describe('QC-80 R19 — sin catalogo de unidades no se ofrece ni el alta ni la e
     listPresentationsActionMock.mockResolvedValue(pagina([presentacion({ name: 'Saco 25 kg' })]));
 
     await renderPantalla();
+    await openRowActionsMenu(setupUser(), screen.getByTestId(PRESENTATION_ROW_ACTIONS_TESTID));
 
     expect(screen.getByTestId(PRESENTATION_CREATE_OPEN_TESTID)).toBeInTheDocument();
     expect(screen.getAllByTestId(PRESENTATION_ACTION_EDIT_TESTID)).toHaveLength(1);

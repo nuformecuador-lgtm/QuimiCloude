@@ -64,9 +64,11 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // QC-223 2026-10-08: 78 y no 76: entran `delivery_exceeds_remaining` y
       // `delivery_batch_insufficient`.
       // QC-234 2026-10-09: 79 y no 78: entra `integration_secret_unreadable`.
-      // 2026-10-09: 82 y no 79: entran `whatsapp_connection_not_found`,
+      // QC-219 2026-10-09: 82 y no 79: entran `batch_expiry_not_future`,
+      // `batch_production_date_future` y `conditioning_batch_data_missing`.
+      // QC-237 2026-10-09: 85 y no 82: entran `whatsapp_connection_not_found`,
       // `whatsapp_connection_exists` y `whatsapp_phone_number_taken`.
-      expect(ERROR_CODES).toHaveLength(82)
+      expect(ERROR_CODES).toHaveLength(85)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 

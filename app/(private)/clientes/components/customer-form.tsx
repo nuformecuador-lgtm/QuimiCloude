@@ -1,19 +1,10 @@
 'use client';
 
 import { useActionState, useEffect, useId } from 'react';
-import { useFormStatus } from 'react-dom';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { FormSheet } from '@/components/shared/form-sheet';
+import { TextField } from '@/components/shared/text-field';
 import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import {
   createCustomerSchema,
@@ -74,7 +65,7 @@ export const CUSTOMER_REQUIRED_FIELDS = [
 
 export type CustomerFieldName = (typeof CUSTOMER_BUSINESS_FIELDS)[number];
 
-/** `data-testid` del `SheetContent`, que lo pinta este archivo, no `customer-sheet.tsx`. */
+/** `data-testid` del panel, que lo pinta este archivo, no `customer-sheet.tsx`. */
 export const CUSTOMER_SHEET_TESTID = 'customer-sheet';
 
 export const CUSTOMER_FORM_TESTID = 'customer-form';
@@ -100,9 +91,6 @@ export const CUSTOMER_ERROR_TESTIDS: Readonly<Record<CustomerFieldName, string>>
   email: 'customer-error-email',
   address: 'customer-error-address',
 };
-
-/** 16 px en TODOS los anchos: por debajo, iOS hace zoom al enfocar el campo. */
-const FIELD_TEXT = 'text-base md:text-base';
 
 const FIELD_LABELS: Readonly<Record<CustomerFieldName, string>> = {
   firstNames: 'Nombres',
@@ -269,150 +257,57 @@ export function CustomerForm({ customer, onSaved }: CustomerFormProps) {
     values?.[field] ?? (customer?.[field] ?? '');
 
   return (
-    <SheetContent
-      side="right"
-      className="w-full pb-[env(safe-area-inset-bottom)] data-[side=right]:w-full sm:max-w-md"
-      data-testid={CUSTOMER_SHEET_TESTID}
-      isForm
-      formProps={{ action: formAction, 'data-testid': CUSTOMER_FORM_TESTID }}
-      footer={<FormActions />}
+    <FormSheet
+      title={isEdit ? 'Editar cliente' : 'Nuevo cliente'}
+      description={isEdit ? 'Cambia los datos del cliente.' : 'Describe el nuevo cliente.'}
+      formAction={formAction}
+      cancelTouch="prop"
+      testIds={{
+        sheet: CUSTOMER_SHEET_TESTID,
+        form: CUSTOMER_FORM_TESTID,
+        cancel: CUSTOMER_FORM_CANCEL_TESTID,
+        submit: CUSTOMER_FORM_SUBMIT_TESTID,
+      }}
     >
-      <SheetHeader>
-        <SheetTitle>{isEdit ? 'Editar cliente' : 'Nuevo cliente'}</SheetTitle>
-        <SheetDescription>
-          {isEdit ? 'Cambia los datos del cliente.' : 'Describe el nuevo cliente.'}
-        </SheetDescription>
-      </SheetHeader>
+      {formError === undefined ? null : (
+        <ErrorAlert
+          error={formError}
+          id={formErrorId}
+          className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
+          testId={CUSTOMER_FORM_ERROR_TESTID}
+          withDataCode
+          renderCatalogued={(catalogued) => (
+            <>
+              <p>{catalogued.message}</p>
+              <p className="text-xs" data-testid={CUSTOMER_FORM_ERROR_CODE_TESTID}>
+                {catalogued.code}
+              </p>
+            </>
+          )}
+        />
+      )}
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-        {formError === undefined ? null : (
-          <ErrorAlert
-            error={formError}
-            id={formErrorId}
-            className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            testId={CUSTOMER_FORM_ERROR_TESTID}
-            withDataCode
-            renderCatalogued={(catalogued) => (
-              <>
-                <p>{catalogued.message}</p>
-                <p className="text-xs" data-testid={CUSTOMER_FORM_ERROR_CODE_TESTID}>
-                  {catalogued.code}
-                </p>
-              </>
-            )}
-          />
-        )}
-
-        {CUSTOMER_BUSINESS_FIELDS.map((field) => (
-          <CustomerTextField
+      {CUSTOMER_BUSINESS_FIELDS.map((field) => {
+        const required = (CUSTOMER_REQUIRED_FIELDS as readonly string[]).includes(field);
+        return (
+          <TextField
             key={field}
             id={`${fieldId}-${field}`}
             name={field}
-            required={(CUSTOMER_REQUIRED_FIELDS as readonly string[]).includes(field)}
-            value={valueOf(field)}
+            label={FIELD_LABELS[field]}
+            inputMode={FIELD_INPUT_MODE[field]}
+            autoComplete="off"
+            required={required}
+            ariaRequired={required}
+            maxLength={FIELD_MAX_LENGTH[field]}
+            defaultValue={valueOf(field)}
+            remountOnDefault
             error={fieldErrors[field]}
+            testId={CUSTOMER_FIELD_TESTIDS[field]}
+            errorTestId={CUSTOMER_ERROR_TESTIDS[field]}
           />
-        ))}
-      </div>
-    </SheetContent>
-  );
-}
-
-/** Un campo de texto con su etiqueta y su hueco de error en linea. */
-function CustomerTextField({
-  id,
-  name,
-  required,
-  value,
-  error,
-}: {
-  readonly id: string;
-  readonly name: CustomerFieldName;
-  readonly required: boolean;
-  readonly value: string;
-  readonly error?: string;
-}) {
-  const errorId = `${id}-error`;
-
-  return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={id}>{FIELD_LABELS[name]}</Label>
-      {/*
-        `key={value}`: Base UI avisa cuando el `defaultValue` de un campo no controlado cambia
-        despues de montarse, y la clave fuerza el remontaje justo en ese salto -el de volver de
-        un intento fallido con lo escrito-. El campo sigue sin estar controlado.
-      */}
-      <Input
-        key={value}
-        id={id}
-        name={name}
-        type="text"
-        inputMode={FIELD_INPUT_MODE[name]}
-        autoComplete="off"
-        required={required}
-        aria-required={required}
-        maxLength={FIELD_MAX_LENGTH[name]}
-        defaultValue={value}
-        className={`min-h-11 ${FIELD_TEXT}`}
-        aria-invalid={error === undefined ? undefined : true}
-        aria-describedby={error === undefined ? undefined : errorId}
-        data-testid={CUSTOMER_FIELD_TESTIDS[name]}
-      />
-      {error === undefined ? null : (
-        <p
-          id={errorId}
-          role="alert"
-          className="text-sm text-destructive"
-          data-testid={CUSTOMER_ERROR_TESTIDS[name]}
-        >
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/**
- * Acciones del pie: cancelar y guardar. Cancelar es `type="button"` porque el panel entero es un
- * `<form>` y cualquier boton sin tipo dentro de el lo enviaria. Cierra por el primitivo
- * (`SheetClose`), y al no navegar la URL conserva pagina, tamano, orden y busqueda.
- */
-function FormActions() {
-  return (
-    <>
-      <SheetClose
-        render={
-          <Button
-            type="button"
-            variant="outline-dashed"
-            touch
-            data-testid={CUSTOMER_FORM_CANCEL_TESTID}
-          />
-        }
-      >
-        Cancelar
-      </SheetClose>
-      <SaveButton />
-    </>
-  );
-}
-
-/**
- * Boton de envio. Componente aparte porque `useFormStatus()` solo lee el estado del `<form>`
- * ANCESTRO: dentro del componente que renderiza el `<form>` devolveria siempre `pending: false`.
- */
-function SaveButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button
-      type="submit"
-      touch
-      disabled={pending}
-      aria-busy={pending}
-      data-testid={CUSTOMER_FORM_SUBMIT_TESTID}
-    >
-      {pending ? 'Guardando…' : 'Guardar'}
-    </Button>
+        );
+      })}
+    </FormSheet>
   );
 }

@@ -2,13 +2,11 @@
 
 import Link from 'next/link';
 import { useActionState, useEffect, useId } from 'react';
-import { useFormStatus } from 'react-dom';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
+import { FormSheet } from '@/components/shared/form-sheet';
 import { PRESENTATION_FIELD, PresentationSelect } from '@/components/shared/presentation-select';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { TextField } from '@/components/shared/text-field';
 import {
   Select,
   SelectContent,
@@ -16,13 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import {
   createCatalogLineSchema,
@@ -437,214 +428,176 @@ export function CatalogLineForm({ supplierId, line, units, onSaved }: CatalogLin
   );
 
   return (
-    /*
-      `isForm`: el panel ENTERO es el <form>, asi que el boton de guardar vive en el pie y
-      `useFormStatus()` lo sigue viendo, porque el formulario es su ancestro.
-
-      `w-full` en angosto y `sm:max-w-md` a partir de ahi, y `pb-[env(safe-area-inset-bottom)]`
-      para que el pie no quede bajo la barra de gestos de iOS (R48). El desbordamiento vertical lo
-      absorbe el CUERPO, no el panel.
-    */
-    <SheetContent
-      side="right"
-      className="w-full pb-[env(safe-area-inset-bottom)] data-[side=right]:w-full sm:max-w-md"
-      data-testid="catalog-line-sheet"
-      isForm
-      formProps={{ action: formAction, 'data-testid': 'catalog-line-form' }}
-      footer={<FormActions />}
+    <FormSheet
+      title={isEdit ? 'Editar línea de catálogo' : 'Nueva línea de catálogo'}
+      description={
+        isEdit
+          ? 'Cambia los datos de la línea. Se guardan todos los campos.'
+          : 'Completa los datos de la línea. La presentación es obligatoria y la unidad es opcional.'
+      }
+      formAction={formAction}
+      testIds={{
+        sheet: 'catalog-line-sheet',
+        form: 'catalog-line-form',
+        cancel: 'catalog-line-form-cancel',
+        submit: 'catalog-line-form-submit',
+      }}
     >
-      <SheetHeader>
-        <SheetTitle>{isEdit ? 'Editar línea de catálogo' : 'Nueva línea de catálogo'}</SheetTitle>
-        <SheetDescription>
-          {isEdit
-            ? 'Cambia los datos de la línea. Se guardan todos los campos.'
-            : 'Completa los datos de la línea. La presentación es obligatoria y la unidad es opcional.'}
-        </SheetDescription>
-      </SheetHeader>
-
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-        {/*
-          El proveedor viaja en un campo oculto y SOLO en el alta (R31): la edicion no puede
-          cambiarlo, y `updateCatalogLineAction` ni siquiera lo lee del formulario.
-        */}
-        {isEdit ? null : (
-          <input
-            type="hidden"
-            name={SUPPLIER_FIELD}
-            defaultValue={supplierId}
-            data-testid="catalog-line-supplier-id"
-          />
-        )}
-
-        {/*
-          La imagen viaja oculta y con el valor de la linea: el formulario no ofrece subirla ni
-          quitarla, asi que enviarla vacia -o distinta de la que ya tenia- solo puede pasar aqui
-          si alguien reemplaza este campo por su cuenta.
-        */}
+      {/* Solo en el alta: `updateCatalogLineAction` no lee el proveedor del formulario. */}
+      {isEdit ? null : (
         <input
           type="hidden"
-          name={IMAGE_PATH_FIELD}
-          defaultValue={line?.imagePath ?? ''}
-          data-testid="catalog-line-image-path"
+          name={SUPPLIER_FIELD}
+          defaultValue={supplierId}
+          data-testid="catalog-line-supplier-id"
         />
+      )}
 
-        {formError === undefined ? null : (
-          // Region de error del formulario: aqui van los rechazos que no senalan campo.
-          <ErrorAlert
-            error={formError}
-            id={formErrorId}
-            className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            testId="catalog-line-form-error"
-            renderCatalogued={(catalogued) => (
-              <>
-                <p data-testid="catalog-line-form-error-message">{catalogued.message}</p>
-                <p className="text-xs" data-testid="catalog-line-form-error-code">
-                  {catalogued.code}
-                </p>
-              </>
-            )}
-            after={
-              isMissing ? (
-                // La linea o el proveedor dejaron de existir mientras el panel estaba abierto;
-                // cual de las dos lo dice el mensaje de arriba.
-                <Link
-                  href={SUPPLIERS_ROUTE}
-                  className={`${touchTarget} inline-flex items-center underline underline-offset-4`}
-                  data-testid="catalog-line-form-back-to-list"
-                >
-                  {BACK_TO_LIST_LABEL}
-                </Link>
-              ) : null
-            }
-          />
-        )}
+      {/* El formulario no ofrece subir ni quitar la imagen: solo conserva la que ya tenia. */}
+      <input
+        type="hidden"
+        name={IMAGE_PATH_FIELD}
+        defaultValue={line?.imagePath ?? ''}
+        data-testid="catalog-line-image-path"
+      />
 
-        <CatalogField
-          name="name"
-          label={FIELD_LABELS.name}
-          required
-          defaultValue={initialValue('name', line?.name ?? '')}
-          error={fieldErrors.name}
+      {formError === undefined ? null : (
+        <ErrorAlert
+          error={formError}
+          id={formErrorId}
+          className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
+          testId="catalog-line-form-error"
+          renderCatalogued={(catalogued) => (
+            <>
+              <p data-testid="catalog-line-form-error-message">{catalogued.message}</p>
+              <p className="text-xs" data-testid="catalog-line-form-error-code">
+                {catalogued.code}
+              </p>
+            </>
+          )}
+          after={
+            isMissing ? (
+              <Link
+                href={SUPPLIERS_ROUTE}
+                className={`${touchTarget} inline-flex items-center underline underline-offset-4`}
+                data-testid="catalog-line-form-back-to-list"
+              >
+                {BACK_TO_LIST_LABEL}
+              </Link>
+            ) : null
+          }
         />
+      )}
 
-        {/*
-          Presentacion OBLIGATORIA, con el selector promovido a `components/shared/` (R37, R38):
-          alcanza cualquier presentacion existente con «Cargar más» y permite crear una sin salir
-          del formulario, dejandola seleccionada y sin perder lo ya escrito.
-        */}
-        <PresentationSelect
-          defaultValue={initialValue(PRESENTATION_FIELD, line?.presentationId ?? '') || undefined}
-          error={fieldErrors.presentationId}
-          // QC-80 (R10, R11): el alta rapida de presentacion tambien exige unidad. Se le pasa el
-          // MISMO catalogo que ya baja por props hasta esta pantalla (R46), pedido una sola vez
-          // por la pagina de detalle; el selector no consulta nada por su cuenta.
-          units={units}
-        />
+      <CatalogField
+        name="name"
+        label={FIELD_LABELS.name}
+        required
+        defaultValue={initialValue('name', line?.name ?? '')}
+        error={fieldErrors.name}
+      />
 
-        {/*
-          Unidad OPCIONAL (R40). La `key` fuerza el remontaje cuando el valor a precargar cambia
-          tras un intento fallido: el selector es no controlado y su valor inicial solo se lee al
-          montarse.
-        */}
-        <UnitSelect
-          key={`unit-${unitFromLine}`}
-          units={units}
-          defaultValue={unitFromLine}
-          error={fieldErrors.unitId}
-        />
+      <PresentationSelect
+        defaultValue={initialValue(PRESENTATION_FIELD, line?.presentationId ?? '') || undefined}
+        error={fieldErrors.presentationId}
+        // El alta rapida de presentacion tambien exige unidad: recibe el mismo catalogo de la
+        // pagina, sin consultarlo por su cuenta.
+        units={units}
+      />
 
-        <CatalogField
-          name="cost"
-          label={FIELD_LABELS.cost}
-          required
-          // R41: cadena decimal de punta a punta. NUNCA `type="number"`.
-          inputMode="decimal"
-          pattern={DECIMAL_INPUT_PATTERN}
-          defaultValue={initialValue('cost', trimDecimal(line?.cost ?? ''))}
-          error={fieldErrors.cost}
-        />
+      {/* No controlado: la `key` lo remonta cuando cambia el valor a precargar tras un fallo. */}
+      <UnitSelect
+        key={`unit-${unitFromLine}`}
+        units={units}
+        defaultValue={unitFromLine}
+        error={fieldErrors.unitId}
+      />
 
-        <CatalogField
-          name="minPurchase"
-          label={FIELD_LABELS.minPurchase}
-          inputMode="decimal"
-          pattern={DECIMAL_INPUT_PATTERN}
-          defaultValue={initialValue('minPurchase', trimDecimal(line?.minPurchase ?? ''))}
-          error={fieldErrors.minPurchase}
-        />
+      <CatalogField
+        name="cost"
+        label={FIELD_LABELS.cost}
+        required
+        // Cadena decimal de punta a punta: `type="number"` pasaria por coma flotante.
+        inputMode="decimal"
+        pattern={DECIMAL_INPUT_PATTERN}
+        defaultValue={initialValue('cost', trimDecimal(line?.cost ?? ''))}
+        error={fieldErrors.cost}
+      />
 
-        {/*
-          El tiempo de entrega SI es un entero en el contrato (`z.number().int()`), asi que aqui
-          el control numerico del navegador es correcto: no hay importe que proteger.
-        */}
-        <CatalogField
-          name="deliveryTime"
-          label={FIELD_LABELS.deliveryTime}
-          type="number"
-          step="1"
-          min="0"
-          inputMode="numeric"
-          defaultValue={initialValue('deliveryTime', deliveryTimeFromLine)}
-          error={fieldErrors.deliveryTime}
-        />
+      <CatalogField
+        name="minPurchase"
+        label={FIELD_LABELS.minPurchase}
+        inputMode="decimal"
+        pattern={DECIMAL_INPUT_PATTERN}
+        defaultValue={initialValue('minPurchase', trimDecimal(line?.minPurchase ?? ''))}
+        error={fieldErrors.minPurchase}
+      />
 
-        <CatalogField
-          name="material"
-          label={FIELD_LABELS.material}
-          defaultValue={initialValue('material', line?.material ?? '')}
-          error={fieldErrors.material}
-        />
+      {/* Entero en el contrato y sin importe que proteger: aqui si vale el control numerico. */}
+      <CatalogField
+        name="deliveryTime"
+        label={FIELD_LABELS.deliveryTime}
+        type="number"
+        step="1"
+        min="0"
+        inputMode="numeric"
+        defaultValue={initialValue('deliveryTime', deliveryTimeFromLine)}
+        error={fieldErrors.deliveryTime}
+      />
 
-        {/*
-          Medidas: diametro y alto llevan su propio valor y su propia unidad (mm o cm), sin
-          convertir. La boca es texto libre -un acabado de rosca no es una longitud-.
-        */}
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-            <CatalogField
-              name="diameterValue"
-              label={FIELD_LABELS.diameterValue}
-              inputMode="decimal"
-              pattern={DECIMAL_INPUT_PATTERN}
-              defaultValue={initialValue('diameterValue', measurements?.diameter?.value ?? '')}
-              error={fieldErrors.diameterValue}
-            />
-            <MeasurementUnitSelect
-              key={`diameterUnit-${diameterUnitFromLine}`}
-              name="diameterUnit"
-              label="Unidad de diámetro"
-              defaultValue={diameterUnitFromLine}
-              error={fieldErrors.diameterUnit}
-            />
-          </div>
+      <CatalogField
+        name="material"
+        label={FIELD_LABELS.material}
+        defaultValue={initialValue('material', line?.material ?? '')}
+        error={fieldErrors.material}
+      />
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-            <CatalogField
-              name="heightValue"
-              label={FIELD_LABELS.heightValue}
-              inputMode="decimal"
-              pattern={DECIMAL_INPUT_PATTERN}
-              defaultValue={initialValue('heightValue', measurements?.height?.value ?? '')}
-              error={fieldErrors.heightValue}
-            />
-            <MeasurementUnitSelect
-              key={`heightUnit-${heightUnitFromLine}`}
-              name="heightUnit"
-              label="Unidad de alto"
-              defaultValue={heightUnitFromLine}
-              error={fieldErrors.heightUnit}
-            />
-          </div>
-
+      {/* La boca es texto libre: un acabado de rosca no es una longitud. */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
           <CatalogField
-            name="mouth"
-            label={FIELD_LABELS.mouth}
-            defaultValue={initialValue('mouth', measurements?.mouth ?? '')}
-            error={fieldErrors.mouth}
+            name="diameterValue"
+            label={FIELD_LABELS.diameterValue}
+            inputMode="decimal"
+            pattern={DECIMAL_INPUT_PATTERN}
+            defaultValue={initialValue('diameterValue', measurements?.diameter?.value ?? '')}
+            error={fieldErrors.diameterValue}
+          />
+          <MeasurementUnitSelect
+            key={`diameterUnit-${diameterUnitFromLine}`}
+            name="diameterUnit"
+            label="Unidad de diámetro"
+            defaultValue={diameterUnitFromLine}
+            error={fieldErrors.diameterUnit}
           />
         </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+          <CatalogField
+            name="heightValue"
+            label={FIELD_LABELS.heightValue}
+            inputMode="decimal"
+            pattern={DECIMAL_INPUT_PATTERN}
+            defaultValue={initialValue('heightValue', measurements?.height?.value ?? '')}
+            error={fieldErrors.heightValue}
+          />
+          <MeasurementUnitSelect
+            key={`heightUnit-${heightUnitFromLine}`}
+            name="heightUnit"
+            label="Unidad de alto"
+            defaultValue={heightUnitFromLine}
+            error={fieldErrors.heightUnit}
+          />
+        </div>
+
+        <CatalogField
+          name="mouth"
+          label={FIELD_LABELS.mouth}
+          defaultValue={initialValue('mouth', measurements?.mouth ?? '')}
+          error={fieldErrors.mouth}
+        />
       </div>
-    </SheetContent>
+    </FormSheet>
   );
 }
 
@@ -669,18 +622,8 @@ type CatalogFieldProps = {
 };
 
 /**
- * Un campo de texto de la linea: etiqueta, control y error en linea (R32, R41, R48).
- *
- * **Sin `maxLength`**: el largo maximo es del esquema (`CATALOG_LINE_NAME_MAX_LENGTH`) y quien lo
- * aplica es el, en el cliente y en el servidor. Un `maxLength` truncaria en silencio lo pegado en
- * vez de decir que sobra.
- *
- * **`key={defaultValue}`** por lo mismo que en `supplier-field.tsx`: Base UI avisa cuando el
- * `defaultValue` de un campo no controlado cambia despues de montarse, y la clave fuerza un
- * remontaje justo en ese salto. El campo sigue sin estar controlado.
- *
- * **Fuente de 16 px y alto de 44 px en todos los anchos** (R48): por debajo de 16 px Safari en
- * iOS hace zoom sobre el campo al enfocarlo.
+ * Un campo de texto de la linea. **Sin `maxLength`**: el largo lo aplica el esquema, y un
+ * `maxLength` truncaria en silencio lo pegado en vez de decir que sobra.
  */
 function CatalogField({
   name,
@@ -695,36 +638,26 @@ function CatalogField({
   pattern,
 }: CatalogFieldProps) {
   const fieldId = useId();
-  const inputId = `${fieldId}-${name}`;
-  const errorId = `${inputId}-error`;
 
   return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={inputId}>{label}</Label>
-
-      <Input
-        key={defaultValue}
-        id={inputId}
-        name={name}
-        type={type ?? 'text'}
-        step={step}
-        min={min}
-        inputMode={inputMode}
-        pattern={pattern}
-        required={required}
-        defaultValue={defaultValue}
-        className={`${touchTarget} ${FIELD_TEXT}`}
-        aria-invalid={error === undefined ? undefined : true}
-        aria-describedby={error === undefined ? undefined : errorId}
-        data-testid={`catalog-field-${name}`}
-      />
-
-      {error === undefined ? null : (
-        <p id={errorId} className="text-sm text-destructive" data-testid={`catalog-error-${name}`}>
-          {error}
-        </p>
-      )}
-    </div>
+    <TextField
+      id={`${fieldId}-${name}`}
+      name={name}
+      label={label}
+      type={type ?? 'text'}
+      step={step}
+      min={min}
+      inputMode={inputMode}
+      pattern={pattern}
+      required={required}
+      defaultValue={defaultValue}
+      remountOnDefault
+      inputClassName={`${touchTarget} ${FIELD_TEXT}`}
+      error={error}
+      errorTestId={`catalog-error-${name}`}
+      errorAlert={false}
+      testId={`catalog-field-${name}`}
+    />
   );
 }
 
@@ -783,50 +716,5 @@ function MeasurementUnitSelect({ name, label, defaultValue, error }: Measurement
         </p>
       )}
     </div>
-  );
-}
-
-/**
- * Acciones del pie: cancelar y guardar. **Cancelar es `type="button"`** -y no un submit- porque
- * desde que el panel entero es un `<form>` cualquier boton sin tipo dentro de el lo enviaria.
- */
-function FormActions() {
-  return (
-    <>
-      <SheetClose
-        render={
-          <Button
-            type="button"
-            variant="outline-dashed"
-            className={touchTarget}
-            data-testid="catalog-line-form-cancel"
-          />
-        }
-      >
-        Cancelar
-      </SheetClose>
-      <SaveButton />
-    </>
-  );
-}
-
-/**
- * Boton de envio. Componente aparte por una necesidad tecnica: `useFormStatus()` solo lee el
- * estado del `<form>` ANCESTRO, asi que dentro del componente que renderiza el `<form>` devolveria
- * siempre `pending: false` y el boton no se deshabilitaria nunca.
- */
-function SaveButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button
-      type="submit"
-      touch
-      disabled={pending}
-      aria-busy={pending}
-      data-testid="catalog-line-form-submit"
-    >
-      {pending ? 'Guardando…' : 'Guardar'}
-    </Button>
   );
 }

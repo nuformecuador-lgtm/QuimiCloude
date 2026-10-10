@@ -12,6 +12,7 @@ import {
 } from '@/lib/modules/asignaciones/domain/errors';
 import { ROLE_ADMINISTRADOR, ROLE_EMPACADOR, ROLE_OPERADOR, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity';
 
+import type { FinishedBatchOfOrderLine } from '@/lib/modules/inventario';
 import type { AssignedOrderSummary } from '@/lib/modules/pedidos';
 import type { ConditioningTeamMemberRow } from '@/lib/modules/asignaciones/ports/conditioning-team-repository';
 
@@ -23,6 +24,7 @@ import {
   PEDIDO_1,
   UNIDAD,
   actoresSinElPermiso,
+  loteDeLinea,
   montar,
   persona,
   receta,
@@ -35,8 +37,9 @@ const LINEAS = [
   { presentationId: 'pres-1k', packages: 4, packagingName: '1 kg' },
 ];
 
-function montarCon(item: AssignedOrderSummary | null) {
+function montarCon(item: AssignedOrderSummary | null, batches?: readonly FinishedBatchOfOrderLine[]) {
   return montar({
+    batches,
     items: item === null ? [] : [item],
     refs: [receta()],
     people: [persona(ANA, 'Ana Lopez'), persona(BETO, 'Beto Ruiz')],
@@ -82,7 +85,7 @@ describe('R20 — la entrada es exactamente `{ orderId: <uuid> }`', () => {
 });
 
 describe('R15 — el detalle muestra la misma fila que la lista', () => {
-  it('R15: consulta ese pedido de la empresa del actor con los tres estados que abre el detalle', async () => {
+  it('R15, D13 (QC-219): consulta ese pedido de la empresa del actor con los cuatro estados que abre el detalle', async () => {
     const { deps, listAliveSummariesByIds } = montarCon(resumen(PEDIDO_1));
 
     await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
@@ -90,7 +93,7 @@ describe('R15 — el detalle muestra la misma fila que la lista', () => {
     expect(listAliveSummariesByIds).toHaveBeenCalledWith(
       EMPRESA,
       [PEDIDO_1],
-      ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'],
+      ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO'],
       1,
       1,
     );
@@ -119,11 +122,15 @@ describe('R15 — el detalle muestra la misma fila que la lista', () => {
     const detalle = montarCon(item);
     const lista = montarCon(item);
 
-    const { team, ...fila } = await createGetConditioningOrder(detalle.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const { team, batchData, ...fila } = await createGetConditioningOrder(detalle.deps)(ACONDICIONADOR, {
+      orderId: PEDIDO_1,
+    });
     const [deLaLista] = (await createListConditioningOrders(lista.deps)(ACONDICIONADOR, { page: 1 })).items;
 
     expect(fila).toEqual(deLaLista);
     expect(team).toEqual([]);
+    // QC-219 R3: los datos de lote solo viajan a quien acondiciona, desde que comenzo.
+    expect(batchData === null).toBe(item.status === 'POR_ACONDICIONAR' || item.conditionedBy !== ANA);
     expect(fila.status).toBe(item.status);
     expect(fila.numberText).toBe('2026-0000007');
     expect(fila.recipeName).toBe('Jabon liquido');
@@ -148,25 +155,26 @@ describe('R17 — el mismo `order_not_found` en todos los casos que el detalle n
     await expect(resultado).rejects.toMatchObject({ code: 'order_not_found' });
   });
 
-  it('R17: un ENTREGADO, aunque lo acondicionara el actor, no esta entre los estados consultados', async () => {
+  it('R17: los estados de antes del acondicionamiento y CANCELADO no estan entre los consultados', async () => {
     const { deps, listAliveSummariesByIds } = montarCon(null);
 
     await expect(createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 })).rejects.toBeInstanceOf(
       OrderNotFoundError,
     );
     const estados = listAliveSummariesByIds.mock.calls[0]?.[2];
-    expect(estados).not.toContain('ENTREGADO');
     for (const fuera of ['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR', 'EN_EMPAQUE', 'CANCELADO', 'BLOQUEADO']) {
       expect(estados).not.toContain(fuera);
     }
   });
 
   it.each([
-    ['TERMINADO que acondiciono otra persona', BETO],
-    ['TERMINADO sin quien acondiciona', null],
-  ])('R17: %s es `order_not_found`, sin componer la fila', async (_nombre, conditionedBy) => {
-    const { deps, findRefsIncludingDeleted, findRefsIncludingDeletedInCompany } = montarCon(
-      resumen(PEDIDO_1, { status: 'TERMINADO', conditionedBy, finishedAt: new Date('2026-10-02T00:00:00.000Z') }),
+    ['TERMINADO que acondiciono otra persona', 'TERMINADO', BETO],
+    ['TERMINADO sin quien acondiciona', 'TERMINADO', null],
+    ['ENTREGADO que acondiciono otra persona (D13, QC-219 R21)', 'ENTREGADO', BETO],
+    ['ENTREGADO sin quien acondiciona (D13, QC-219 R21)', 'ENTREGADO', null],
+  ] as const)('R17: %s es `order_not_found`, sin componer la fila', async (_nombre, status, conditionedBy) => {
+    const { deps, findRefsIncludingDeleted, findRefsIncludingDeletedInCompany, listOfOrder } = montarCon(
+      resumen(PEDIDO_1, { status, conditionedBy, finishedAt: new Date('2026-10-02T00:00:00.000Z') }),
     );
 
     const resultado = createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
@@ -175,6 +183,7 @@ describe('R17 — el mismo `order_not_found` en todos los casos que el detalle n
     await expect(resultado).rejects.toMatchObject({ code: 'order_not_found' });
     expect(findRefsIncludingDeleted).not.toHaveBeenCalled();
     expect(findRefsIncludingDeletedInCompany).not.toHaveBeenCalled();
+    expect(listOfOrder).not.toHaveBeenCalled();
   });
 
   it('R17: todos los casos lanzan el mismo error, con el mismo codigo y mensaje', async () => {
@@ -276,5 +285,105 @@ describe('R25 — el detalle trae el equipo guardado (D12)', () => {
 
     expect(dobles.listTeamByOrderInCompany).not.toHaveBeenCalled();
     expect(detalle.team).toEqual([]);
+  });
+});
+
+describe('QC-219 — los datos de lote del detalle', () => {
+  const LOTE_500 = uuid('7');
+  const LOTE_1K = uuid('8');
+  const DATOS = { lot: 'CR-2610-A', expiryDate: '2027-04-30', productionDate: '2026-10-01' };
+
+  it.each([
+    ['POR_ACONDICIONAR', resumen(PEDIDO_1, { presentationLines: LINEAS })],
+    [
+      'EN_ACONDICIONAMIENTO de otra persona',
+      resumen(PEDIDO_1, { status: 'EN_ACONDICIONAMIENTO', conditionedBy: BETO, presentationLines: LINEAS }),
+    ],
+  ])('R3: en %s `batchData` es null y no se leen los lotes', async (_nombre, item) => {
+    const { deps, listOfOrder } = montarCon(item, [loteDeLinea('pres-500', LOTE_500, DATOS)]);
+
+    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(detalle.batchData).toBeNull();
+    expect(listOfOrder).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['EN_ACONDICIONAMIENTO', resumen(PEDIDO_1, { status: 'EN_ACONDICIONAMIENTO', conditionedBy: ANA, presentationLines: LINEAS })],
+    [
+      'TERMINADO',
+      resumen(PEDIDO_1, { status: 'TERMINADO', conditionedBy: ANA, finishedAt: new Date(), presentationLines: LINEAS }),
+    ],
+    [
+      'ENTREGADO (D13)',
+      resumen(PEDIDO_1, { status: 'ENTREGADO', conditionedBy: ANA, finishedAt: new Date(), presentationLines: LINEAS }),
+    ],
+  ])('R1, R2, R4, R18, R21: en %s propio trae una linea por linea del reparto, en orden, y cuenta las que faltan', async (_n, item) => {
+    const { deps, listOfOrder } = montarCon(item, [
+      loteDeLinea('pres-1k', LOTE_1K),
+      loteDeLinea('pres-500', LOTE_500, DATOS),
+    ]);
+
+    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(listOfOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO_1);
+    expect(detalle.batchData).toEqual({
+      lines: [
+        {
+          batchId: LOTE_500,
+          presentationId: 'pres-500',
+          presentationName: 'Bolsa 500 g',
+          packagingName: '500 g',
+          packages: 12,
+          provisionalLot: null,
+          lot: 'CR-2610-A',
+          expiryDate: '2027-04-30',
+          productionDate: '2026-10-01',
+        },
+        {
+          batchId: LOTE_1K,
+          presentationId: 'pres-1k',
+          presentationName: 'Bolsa 1 kg',
+          packagingName: '1 kg',
+          packages: 4,
+          provisionalLot: 'AUTO-pres-1k',
+          lot: null,
+          expiryDate: null,
+          productionDate: null,
+        },
+      ],
+      missingCount: 1,
+    });
+  });
+
+  it('R17: una linea sin lote de produccion va sin `batchId` ni lote provisional y cuenta como sin datos', async () => {
+    const { deps } = montarCon(
+      resumen(PEDIDO_1, { status: 'EN_ACONDICIONAMIENTO', conditionedBy: ANA, presentationLines: LINEAS }),
+      [loteDeLinea('pres-500', LOTE_500, DATOS)],
+    );
+
+    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(detalle.batchData?.lines[1]).toMatchObject({ batchId: null, provisionalLot: null, lot: null });
+    expect(detalle.batchData?.missingCount).toBe(1);
+  });
+
+  it('R17: un pedido sin reparto trae la seccion vacia y nada que falte', async () => {
+    const { deps } = montarCon(resumen(PEDIDO_1, { status: 'EN_ACONDICIONAMIENTO', conditionedBy: ANA }));
+
+    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(detalle.batchData).toEqual({ lines: [], missingCount: 0 });
+  });
+
+  it('D13 (QC-219 R21): un ENTREGADO propio abre con su equipo', async () => {
+    const { deps, listTeamByOrderInCompany } = montarCon(
+      resumen(PEDIDO_1, { status: 'ENTREGADO', conditionedBy: ANA, finishedAt: new Date() }),
+    );
+
+    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(detalle.status).toBe('ENTREGADO');
+    expect(listTeamByOrderInCompany).toHaveBeenCalledWith(EMPRESA, PEDIDO_1);
   });
 });

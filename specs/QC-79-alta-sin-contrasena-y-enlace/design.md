@@ -674,6 +674,14 @@ enlace ya no sirve** (R12) y que el login con la contraseña nueva entra al dash
 **no** hace es cubrir los seis rechazos de R22 uno a uno: eso es unitario e integración, y un E2E por
 cada rama sería la batería que `CHECKPOINTS.md` no pide.
 
+> **Nota 2026-10-09 (QC-249):** hay un cuarto transporte, `MAIL_TRANSPORT=desactivado`
+> (`credential-setup-mailer-desactivado.ts`), para las previews de Vercel: no contacta a ningún
+> proveedor ni escribe archivos, devuelve `failed` y registra una línea sin destinatario, URL ni
+> secreto. Es el valor obligatorio en el scope Preview (el build de preview falla con otro). Las
+> condiciones 1 y 2 de arriba no cambian: `resend` sigue siendo el valor por defecto y `outbox`
+> sigue negándose con `NODE_ENV === 'production'`. Detalle en
+> `specs/QC-249-entorno-de-preview/design.md > 6`.
+
 ---
 
 ## 10. Consecuencias aceptadas

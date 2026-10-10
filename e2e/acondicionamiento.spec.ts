@@ -377,7 +377,7 @@ test.describe('las pestañas del acondicionador (R22)', () => {
   }) => {
     const { A, B, C, D, E } = seeded();
 
-    // --- 1. Aterriza en `/asignacion` con exactamente «Por acondicionar» y «Terminados».
+    // --- 1. Aterriza en `/asignacion` con exactamente «Por acondicionar», «Terminados» y «Entregados».
     const landing = await loginAndLand(page, conditioner1User);
     expect(landing).toBe(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
@@ -385,11 +385,16 @@ test.describe('las pestañas del acondicionador (R22)', () => {
     const tabs = page
       .getByTestId(ASSIGNMENT_VIEW_TABS_TESTID)
       .locator(`[data-testid^="${ASSIGNMENT_VIEW_TAB_TESTID_PREFIX}"]`);
-    await expect(tabs).toHaveCount(2);
+    await expect(tabs).toHaveCount(3);
     await expect(tabs.nth(0)).toHaveAttribute('data-testid', TAB_POR_ACONDICIONAR_TESTID);
     await expect(tabs.nth(0)).toHaveText(exactText('Por acondicionar'));
     await expect(tabs.nth(1)).toHaveAttribute('data-testid', TAB_ACONDICIONADOS_TESTID);
     await expect(tabs.nth(1)).toHaveText(exactText('Terminados'));
+    await expect(tabs.nth(2)).toHaveAttribute(
+      'data-testid',
+      `${ASSIGNMENT_VIEW_TAB_TESTID_PREFIX}acondicionados_entregados`,
+    );
+    await expect(tabs.nth(2)).toHaveText(exactText('Entregados'));
 
     // --- 2. «Por acondicionar»: A con su reparto entero y B con el nombre de quien lo acondiciona.
     await expect(page.getByTestId(CONDITIONING_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });

@@ -1,10 +1,7 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useCallback } from 'react';
-import { toast } from 'sonner';
-
 import { Sheet } from '@/components/ui/sheet';
+import { useEntitySheet } from '@/hooks/use-entity-sheet';
 import type { WorkGroupRow } from '@/lib/modules/identity';
 
 import { WorkGroupForm } from './work-group-form';
@@ -64,17 +61,11 @@ export type WorkGroupSheetProps = {
 };
 
 export function WorkGroupSheet({ group, open, onOpenChange }: WorkGroupSheetProps) {
-  const router = useRouter();
-  const isEdit = group !== null;
-
-  const handleSaved = useCallback(() => {
-    // R35, en este orden: cerrar, avisar y poner la lista al dia sin recargar la pantalla.
-    onOpenChange(false);
-    toast.success(isEdit ? UPDATE_SUCCESS : CREATE_SUCCESS);
-    // Ni `push` ni `replace`: `refresh` reejecuta el Server Component con la MISMA URL, asi que
-    // pagina, tamano, orden, busqueda y pestana siguen siendo los de antes de abrir (R20, R35).
-    router.refresh();
-  }, [isEdit, onOpenChange, router]);
+  const { handleSaved } = useEntitySheet({
+    open,
+    onOpenChange,
+    successMessage: group === null ? CREATE_SUCCESS : UPDATE_SUCCESS,
+  });
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

@@ -5,7 +5,8 @@ import { ProductTable } from '@/app/(private)/inventario/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import { PRODUCT_TYPES, type ProductBatchView, type ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
-import { esperarInteractiva, setupUser } from '../../helpers/user-event';
+import { clickRowAction } from '../../helpers/row-actions-menu';
+import { setupUser } from '../../helpers/user-event';
 
 /**
  * Enganche del panel de lotes al listado (R22, `specs/QC-92-ajuste-de-inventario/tasks.md > T13`).
@@ -84,7 +85,7 @@ function lote(overrides: Partial<ProductBatchView> = {}): ProductBatchView {
 
 async function abrirPanel() {
   const user = setupUser();
-  await user.click(await esperarInteractiva(screen.getByTestId('product-batches-open')));
+  await clickRowAction(user, screen.getByTestId('product-row-actions'), 'product-batches-open');
   return user;
 }
 
@@ -203,7 +204,7 @@ describe('el panel se titula "nombre · unidad" (T15)', () => {
     );
 
     expect(
-      screen.getByRole('button', { name: 'Lotes de Acido citrico · kg' }),
+      screen.getByRole('button', { name: 'Acciones de Acido citrico · kg' }),
     ).toBeInTheDocument();
 
     await abrirPanel();
@@ -220,7 +221,7 @@ describe('el panel se titula "nombre · unidad" (T15)', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Lotes de Acido citrico' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Acciones de Acido citrico' })).toBeInTheDocument();
 
     await abrirPanel();
 
@@ -237,7 +238,7 @@ describe('el panel se titula "nombre · unidad" (T15)', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Lotes de Acido citrico' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Acciones de Acido citrico' })).toBeInTheDocument();
 
     await abrirPanel();
 

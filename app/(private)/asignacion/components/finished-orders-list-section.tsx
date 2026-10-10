@@ -1,7 +1,11 @@
 import type { DataTableParams } from '@/components/shared/data-table';
 import { listFinishedOrdersAction } from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions';
 
-import { AssignedOrdersError } from './assigned-orders-error';
+import {
+  AssignmentListError,
+  AssignmentListSectionFrame,
+  firstPageHrefWhenPast,
+} from './assignment-list-parts';
 import { FIRST_PAGE } from './assignment-view-params';
 import { FinishedOrdersEmpty } from './finished-orders-empty';
 import { FinishedOrdersTable, finishedOrdersHref } from './finished-orders-table';
@@ -23,9 +27,9 @@ export async function FinishedOrdersListSection({ params }: FinishedOrdersListSe
 
   if (result.status === 'error') {
     return (
-      <div data-testid={FINISHED_ORDERS_SECTION_TESTID}>
-        <AssignedOrdersError error={result} />
-      </div>
+      <AssignmentListSectionFrame testId={FINISHED_ORDERS_SECTION_TESTID}>
+        <AssignmentListError error={result} />
+      </AssignmentListSectionFrame>
     );
   }
 
@@ -33,21 +37,19 @@ export async function FinishedOrdersListSection({ params }: FinishedOrdersListSe
 
   if (items.length === 0) {
     return (
-      <div data-testid={FINISHED_ORDERS_SECTION_TESTID}>
+      <AssignmentListSectionFrame testId={FINISHED_ORDERS_SECTION_TESTID}>
         <FinishedOrdersEmpty
-          firstPageHref={
-            currentPage > FIRST_PAGE
-              ? finishedOrdersHref({ ...params, page: FIRST_PAGE })
-              : undefined
-          }
+          firstPageHref={firstPageHrefWhenPast(currentPage, FIRST_PAGE, () =>
+            finishedOrdersHref({ ...params, page: FIRST_PAGE }),
+          )}
         />
-      </div>
+      </AssignmentListSectionFrame>
     );
   }
 
   return (
-    <div data-testid={FINISHED_ORDERS_SECTION_TESTID}>
+    <AssignmentListSectionFrame testId={FINISHED_ORDERS_SECTION_TESTID}>
       <FinishedOrdersTable rows={items} params={params} totalPages={totalPages} />
-    </div>
+    </AssignmentListSectionFrame>
   );
 }

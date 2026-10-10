@@ -226,7 +226,39 @@ describe('readMailTransportFromEnv: resend por defecto, outbox o smtp a peticion
       process.env.MAIL_TRANSPORT = transporte;
       expect(readMailTransportFromEnv()).toBe(transporte);
     }
-    expect(MAIL_TRANSPORTS).toEqual(['resend', 'outbox', 'smtp']);
+    expect(MAIL_TRANSPORTS).toEqual(['resend', 'outbox', 'smtp', 'desactivado']);
+  });
+
+  it('R11: desactivado se admite y se resuelve tal cual', () => {
+    for (const name of ALL_VARS) delete process.env[name];
+
+    process.env.MAIL_TRANSPORT = 'desactivado';
+    expect(readMailTransportFromEnv()).toBe('desactivado');
+
+    process.env.MAIL_TRANSPORT = '  desactivado  ';
+    expect(readMailTransportFromEnv()).toBe('desactivado');
+  });
+
+  it('R12: ausente o vacia sigue siendo resend, y resend sigue siendo el primero de la lista', () => {
+    for (const name of ALL_VARS) delete process.env[name];
+    expect(readMailTransportFromEnv()).toBe('resend');
+
+    process.env.MAIL_TRANSPORT = '';
+    expect(readMailTransportFromEnv()).toBe('resend');
+
+    expect(MAIL_TRANSPORTS[0]).toBe('resend');
+    expect(MAIL_TRANSPORTS.indexOf('desactivado')).toBe(MAIL_TRANSPORTS.length - 1);
+  });
+
+  it('R12: variantes de desactivado que no son exactas fallan', () => {
+    for (const invalido of ['DESACTIVADO', 'desactivada', 'disabled', 'off']) {
+      for (const name of ALL_VARS) delete process.env[name];
+      process.env.MAIL_TRANSPORT = invalido;
+
+      const mensaje = mensajeDe(readMailTransportFromEnv);
+      expect(mensaje, `el valor ${invalido} deberia fallar`).toContain(TRANSPORT_VAR);
+      expect(mensaje).not.toContain(invalido);
+    }
   });
 
   it('cualquier otro valor falla nombrando la variable y sin repetir el valor recibido', () => {

@@ -37,6 +37,15 @@ export {
 } from './product-columns';
 export { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
 export {
+  PRODUCT_ACTION_BATCHES_TESTID,
+  PRODUCT_ACTION_DELETE_TESTID,
+  PRODUCT_ACTION_EDIT_TESTID,
+  PRODUCT_ROW_ACTIONS_TESTID,
+  ProductRowActions,
+  productRowActionsLabel,
+  type ProductRowActionsProps,
+} from './product-row-actions';
+export {
   COST_INPUT_SCALE,
   divideCost,
   multiplyCost,

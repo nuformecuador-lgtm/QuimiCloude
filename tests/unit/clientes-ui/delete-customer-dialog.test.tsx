@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   CUSTOMER_ACTION_DELETE_TESTID,
+  CUSTOMER_ROW_ACTIONS_TESTID,
   CustomerRowActions,
   DELETE_CUSTOMER_CONFIRM_TESTID,
   DELETE_CUSTOMER_DIALOG_TESTID,
@@ -24,7 +25,7 @@ import {
   DELETE_CUSTOMER_ID_TESTID,
   DELETE_CUSTOMER_MESSAGE_TESTID,
   DeleteCustomerDialog,
-  deleteCustomerLabel,
+  customerRowActionsLabel,
 } from '@/app/(private)/clientes/components';
 import {
   UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
@@ -42,6 +43,7 @@ import {
   errorInesperado,
   esperarSinIdentificador,
 } from '../../helpers/identificador-de-request';
+import { clickRowAction } from '../../helpers/row-actions-menu';
 import { setupUser } from '../../helpers/user-event';
 
 const { deleteCustomerActionMock, routerMock } = vi.hoisted(() => ({
@@ -166,12 +168,12 @@ describe('mientras el usuario no confirme no se invoca la baja (R31)', () => {
     const el = cliente();
     render(<CustomerRowActions customer={el} canModify />);
 
-    await user.click(screen.getByTestId(CUSTOMER_ACTION_DELETE_TESTID));
+    await clickRowAction(user, screen.getByTestId(CUSTOMER_ROW_ACTIONS_TESTID), CUSTOMER_ACTION_DELETE_TESTID);
 
     await screen.findByTestId(DELETE_CUSTOMER_DIALOG_TESTID);
-    expect(screen.getByTestId(CUSTOMER_ACTION_DELETE_TESTID)).toHaveAttribute(
+    expect(screen.getByTestId(CUSTOMER_ROW_ACTIONS_TESTID)).toHaveAttribute(
       'aria-label',
-      deleteCustomerLabel(`${el.firstNames} ${el.lastNames}`),
+      customerRowActionsLabel(`${el.firstNames} ${el.lastNames}`),
     );
     expect(deleteCustomerActionMock).not.toHaveBeenCalled();
   });
@@ -260,13 +262,13 @@ describe('la fila no se retira cuando la baja se rechaza (R32)', () => {
         <CustomerRowActions customer={cliente()} canModify />
       </div>,
     );
-    await user.click(screen.getByTestId(CUSTOMER_ACTION_DELETE_TESTID));
+    await clickRowAction(user, screen.getByTestId(CUSTOMER_ROW_ACTIONS_TESTID), CUSTOMER_ACTION_DELETE_TESTID);
     await screen.findByTestId(DELETE_CUSTOMER_DIALOG_TESTID);
     await user.click(screen.getByTestId(DELETE_CUSTOMER_CONFIRM_TESTID));
 
     await screen.findByTestId(DELETE_CUSTOMER_ERROR_TESTID);
     expect(screen.getByTestId(FILA_TESTID)).toBeInTheDocument();
-    expect(screen.getByTestId(CUSTOMER_ACTION_DELETE_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(CUSTOMER_ROW_ACTIONS_TESTID)).toBeInTheDocument();
     expect(screen.getByTestId(DELETE_CUSTOMER_DIALOG_TESTID)).toBeInTheDocument();
     expect(routerMock.refresh).not.toHaveBeenCalled();
   });

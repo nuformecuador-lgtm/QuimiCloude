@@ -1,8 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,6 +11,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { useEntitySheet } from '@/hooks/use-entity-sheet';
 import type { ErrorState } from '@/lib/modules/errores';
 import type { RoleOption, UserDetail, UserRow } from '@/lib/modules/identity';
 import { getUserAction } from '@/lib/modules/identity/adapters/driving/user-actions';
@@ -100,7 +99,6 @@ export function UserSheet({
   open,
   onOpenChange,
 }: UserSheetProps) {
-  const router = useRouter();
   const isEdit = user !== null;
   const userId = user?.id;
   const [detail, setDetail] = useState<DetailState>({ status: 'loading' });
@@ -126,14 +124,11 @@ export function UserSheet({
     };
   }, [open, userId]);
 
-  const handleSaved = useCallback(() => {
-    // R29, en este orden: cerrar, avisar y poner la lista al dia sin recargar la pantalla.
-    onOpenChange(false);
-    toast.success(isEdit ? UPDATE_SUCCESS : CREATE_SUCCESS);
-    // Ni `push` ni `replace`: `refresh` reejecuta el Server Component con la MISMA URL, asi que
-    // pagina, tamano, orden, filtro y busqueda siguen siendo los de antes de abrir (R22, R29).
-    router.refresh();
-  }, [isEdit, onOpenChange, router]);
+  const { handleSaved } = useEntitySheet({
+    open,
+    onOpenChange,
+    successMessage: isEdit ? UPDATE_SUCCESS : CREATE_SUCCESS,
+  });
 
   const openEndSessions = useCallback(() => setEndSessionsOpen(true), []);
 

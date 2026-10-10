@@ -1,7 +1,11 @@
 import type { DataTableParams } from '@/components/shared/data-table';
 import { listCompanyOrdersAction } from '@/lib/modules/asignaciones/adapters/driving/order-assignment-actions';
 
-import { AssignedOrdersError } from './assigned-orders-error';
+import {
+  AssignmentListError,
+  AssignmentListSectionFrame,
+  firstPageHrefWhenPast,
+} from './assignment-list-parts';
 import { FIRST_PAGE, type RouteOrderStatus } from './assignment-view-params';
 import { CompanyOrdersEmpty } from './company-orders-empty';
 import { CompanyOrdersTable, companyOrdersHref } from './company-orders-table';
@@ -29,9 +33,9 @@ export async function CompanyOrdersListSection({ params, statuses }: CompanyOrde
 
   if (result.status === 'error') {
     return (
-      <div data-testid={COMPANY_ORDERS_SECTION_TESTID}>
-        <AssignedOrdersError error={result} />
-      </div>
+      <AssignmentListSectionFrame testId={COMPANY_ORDERS_SECTION_TESTID}>
+        <AssignmentListError error={result} />
+      </AssignmentListSectionFrame>
     );
   }
 
@@ -39,21 +43,19 @@ export async function CompanyOrdersListSection({ params, statuses }: CompanyOrde
 
   if (items.length === 0) {
     return (
-      <div data-testid={COMPANY_ORDERS_SECTION_TESTID}>
+      <AssignmentListSectionFrame testId={COMPANY_ORDERS_SECTION_TESTID}>
         <CompanyOrdersEmpty
-          firstPageHref={
-            currentPage > FIRST_PAGE
-              ? companyOrdersHref({ page: FIRST_PAGE, pageSize: params.pageSize }, statuses)
-              : undefined
-          }
+          firstPageHref={firstPageHrefWhenPast(currentPage, FIRST_PAGE, () =>
+            companyOrdersHref({ page: FIRST_PAGE, pageSize: params.pageSize }, statuses),
+          )}
         />
-      </div>
+      </AssignmentListSectionFrame>
     );
   }
 
   return (
-    <div data-testid={COMPANY_ORDERS_SECTION_TESTID}>
+    <AssignmentListSectionFrame testId={COMPANY_ORDERS_SECTION_TESTID}>
       <CompanyOrdersTable rows={items} params={params} totalPages={totalPages} statuses={statuses} />
-    </div>
+    </AssignmentListSectionFrame>
   );
 }

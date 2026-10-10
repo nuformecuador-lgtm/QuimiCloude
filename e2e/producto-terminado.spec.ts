@@ -78,6 +78,7 @@ import {
 import { addPackagingLine } from './helpers/order-distribution';
 import { batchStock, seedPackaging } from './helpers/packaging';
 import { exactProductNameCellText } from './helpers/product-name-cell';
+import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 const FIXTURE_PREFIX = 'qc150_e2e_';
 
@@ -243,9 +244,11 @@ async function setPresentationContent(page: Page, content: string): Promise<void
   await gotoSettled(page, presentationsUrl(PRESENTATION_NAME));
   await expect(page.getByTestId('presentaciones-title')).toBeVisible({ timeout: 60_000 });
 
-  const rowActions = page.locator(`[data-presentation-id="${presentationId}"]`);
+  const rowActions = page.locator(
+    `[data-testid="presentation-row-actions"][data-presentation-id="${presentationId}"]`,
+  );
   await expect(rowActions).toBeVisible({ timeout: 60_000 });
-  await rowActions.getByTestId('presentation-action-edit').click();
+  await (await openRowActionsMenuItem(page, rowActions, 'presentation-action-edit')).click();
   await expect(page.getByTestId('presentation-sheet')).toBeVisible({ timeout: 60_000 });
 
   await page.getByTestId('presentation-field-content').fill(content);
@@ -324,7 +327,9 @@ async function openFinishedGoodsBatchesPanel(page: Page, productName: string): P
   const row = page
     .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
     .filter({ has: nameCell });
-  await row.getByTestId('product-batches-open').click();
+  await (
+    await openRowActionsMenuItem(page, row.getByTestId('product-row-actions'), 'product-batches-open')
+  ).click();
   await expect(page.getByTestId('product-batches-sheet')).toBeVisible({ timeout: 60_000 });
 
   return page.getByTestId('product-batches-sheet');

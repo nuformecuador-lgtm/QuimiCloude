@@ -1,14 +1,18 @@
 'use client';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
-import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
-import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import type { CompanyOrderView } from '@/lib/modules/asignaciones';
 import type { OrderPriority, OrderStatus } from '@/lib/modules/pedidos';
 import { formatCivilDate } from '@/lib/shared/ui/date-civil';
 import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
-import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
+import {
+  orderNumberColumn,
+  presentationColumn,
+  quantityColumn,
+  recipeColumn,
+  responsiblesColumn,
+} from './assignment-list-parts';
 import { ROUTE_ORDER_STATUS_VALUES } from './assignment-view-params';
 
 /**
@@ -20,14 +24,6 @@ import { ROUTE_ORDER_STATUS_VALUES } from './assignment-view-params';
  * `['ENTREGADO']` o `['TERMINADO']`: `showFinishedAt` la decide quien construye las columnas a partir de
  * los parametros ya parseados en el servidor, nunca esta declaracion por su cuenta.
  */
-
-function MissingValue({ field }: { readonly field: string }) {
-  return (
-    <span aria-label="Sin dato" data-testid={`company-order-missing-${field}`}>
-      {EMPTY_MARK}
-    </span>
-  );
-}
 
 export const COMPANY_ORDER_NUMBER_COLUMN_ID = 'orderNumber';
 export const COMPANY_ORDER_RECIPE_NAME_COLUMN_ID = 'recipeName';
@@ -83,36 +79,10 @@ export function buildCompanyOrdersColumns({
   showFinishedAt,
 }: CompanyOrdersColumnsDeps): readonly DataTableColumn<CompanyOrderView>[] {
   const columns: DataTableColumn<CompanyOrderView>[] = [
-    {
-      id: COMPANY_ORDER_NUMBER_COLUMN_ID,
-      label: 'Nº de pedido',
-      align: 'start',
-      // Nace fijada: es un defecto, con preferencia guardada gana la del usuario.
-      defaultPinned: 'left',
-      cell: (order) => order.numberText,
-    },
-    {
-      id: COMPANY_ORDER_RECIPE_NAME_COLUMN_ID,
-      label: 'Receta',
-      align: 'start',
-      cell: (order) =>
-        order.recipeName ?? <MissingValue field={COMPANY_ORDER_RECIPE_NAME_COLUMN_ID} />,
-    },
-    {
-      id: COMPANY_ORDER_QUANTITY_COLUMN_ID,
-      label: 'Cantidad',
-      align: 'end',
-      cell: (order) =>
-        order.unitLabel === null
-          ? formatDecimalDisplay(order.quantity)
-          : `${formatDecimalDisplay(order.quantity)} ${order.unitLabel}`,
-    },
-    {
-      id: COMPANY_ORDER_PRESENTATION_COLUMN_ID,
-      label: 'Presentación',
-      align: 'start',
-      cell: (order) => <OrderDistributionLabel lines={order.presentationLines} />,
-    },
+    orderNumberColumn(COMPANY_ORDER_NUMBER_COLUMN_ID),
+    recipeColumn(COMPANY_ORDER_RECIPE_NAME_COLUMN_ID, 'company-order'),
+    quantityColumn(COMPANY_ORDER_QUANTITY_COLUMN_ID, formatDecimalDisplay),
+    presentationColumn(COMPANY_ORDER_PRESENTATION_COLUMN_ID),
     {
       id: COMPANY_ORDER_PRIORITY_COLUMN_ID,
       label: 'Prioridad',
@@ -145,13 +115,7 @@ export function buildCompanyOrdersColumns({
     });
   }
 
-  columns.push({
-    id: COMPANY_ORDER_RESPONSIBLES_COLUMN_ID,
-    label: 'Responsables',
-    align: 'start',
-    // Sin `onShowAll`: esta pantalla no tiene panel de edicion donde desplegar el resto.
-    cell: (order) => <ResponsibleAvatars responsibles={order.responsibles} />,
-  });
+  columns.push(responsiblesColumn(COMPANY_ORDER_RESPONSIBLES_COLUMN_ID, (order) => order.responsibles));
 
   return columns;
 }

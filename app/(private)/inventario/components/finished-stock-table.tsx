@@ -13,11 +13,9 @@ import type { ErrorState as OperationError } from '@/lib/modules/errores';
 import type { FinishedStockProductLine, FinishedStockRow } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 
-import { DeleteProductDialog } from './delete-product-dialog';
 import { buildFinishedStockColumns, type FinishedStockTableRow } from './finished-stock-columns';
 import { productListHref } from './product-list-params';
-import { ProductBatchesSheet } from './product-batches-sheet';
-import { ProductSheet } from './product-sheet';
+import { ProductRowActions } from './product-row-actions';
 import { PRODUCT_TABLE_TEXTS, productTableStates, type ProductTableStatus } from './product-table';
 import { ProductTypeTabs } from './product-type-tabs';
 
@@ -74,16 +72,12 @@ export function FinishedStockTable({
             return next;
           }),
         lineActions: (parent, line) => (
-          <>
-            <ProductBatchesSheet
-              product={line.product}
-              units={units}
-              canAdjust={canAdjust}
-              loadBatches={loadLineBatches(parent, line)}
-            />
-            <ProductSheet product={line.product} units={units} />
-            <DeleteProductDialog product={line.product} />
-          </>
+          <ProductRowActions
+            product={line.product}
+            units={units}
+            canAdjust={canAdjust}
+            loadBatches={loadLineBatches(parent, line)}
+          />
         ),
         units,
       }),

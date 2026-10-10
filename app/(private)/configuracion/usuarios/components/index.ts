@@ -204,7 +204,9 @@ export {
 } from './work-group-labels';
 export {
   WORK_GROUP_ACTIONS_COLUMN_ID,
+  WORK_GROUP_ACTION_DELETE_LABEL,
   WORK_GROUP_ACTION_DELETE_TESTID,
+  WORK_GROUP_ACTION_EDIT_LABEL,
   WORK_GROUP_ACTION_EDIT_TESTID,
   WORK_GROUP_COLUMNS,
   WORK_GROUP_COLUMN_COUNT,
@@ -213,6 +215,7 @@ export {
   WORK_GROUP_ROW_ACTIONS_TESTID,
   WorkGroupRowActions,
   createWorkGroupColumns,
+  workGroupRowActionsLabel,
   type WorkGroupColumnsDeps,
   type WorkGroupRowActionHandler,
   type WorkGroupRowActionsProps,

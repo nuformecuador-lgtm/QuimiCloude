@@ -333,6 +333,9 @@ model ProductBatch {
   /// Contenido del envase con el que se contaron las unidades del lote. Solo en lotes de
   /// producto terminado.
   packageContent Decimal?  @map("package_content") @db.Decimal(14, 4)
+  /// Solo lo escribe el acondicionamiento, junto con el vencimiento; el CHECK que exige el
+  /// vencimiento cuando hay dia de produccion es drift.
+  productionDate DateTime? @map("production_date") @db.Date
 
   product      Product             @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   presentation Presentation?       @relation(fields: [presentationId], references: [id], onDelete: Restrict, onUpdate: Cascade)

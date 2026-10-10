@@ -11,6 +11,19 @@ import {
 const LOCAL_URL = 'postgresql://postgres:x@localhost:5433/QuimiCloude?schema=public'
 const REMOTE_URL = 'postgresql://postgres:x@db.abcdefgh.supabase.co:6543/postgres'
 
+const PREVIEW_REF = 'refinventadopreviewx'
+const OTHER_REF = 'refinventadoprodxxxx'
+const OTHER_PROJECT_URL = `postgresql://postgres.${OTHER_REF}:x@aws-0-xx.pooler.supabase.com:6543/postgres`
+
+/** Un build de preview de Vercel contra la base de preview (identificador inventado). */
+const PREVIEW_ENV: Record<string, string | undefined> = {
+  VERCEL: '1',
+  VERCEL_ENV: 'preview',
+  PREVIEW_SUPABASE_REF: PREVIEW_REF,
+  DATABASE_URL: `postgresql://postgres.${PREVIEW_REF}:x@aws-0-xx.pooler.supabase.com:6543/postgres`,
+  DIRECT_URL: `postgresql://postgres:x@db.${PREVIEW_REF}.supabase.co:5432/postgres`,
+}
+
 describe('seed de demo — guardas de entorno', () => {
   it('permite una base en localhost', () => {
     expect(evaluateDemoSeedGuard({ argv: [], env: { DATABASE_URL: LOCAL_URL } })).toEqual({ allowed: true, forced: false })
@@ -21,7 +34,7 @@ describe('seed de demo — guardas de entorno', () => {
     expect(evaluateDemoSeedGuard({ argv: [], env })).toEqual({ allowed: true, forced: false })
   })
 
-  it('rechaza VERCEL_ENV=production aunque la base sea local', () => {
+  it('rechaza VERCEL_ENV=production aunque la base sea local (R15)', () => {
     const verdict = evaluateDemoSeedGuard({ argv: [], env: { DATABASE_URL: LOCAL_URL, VERCEL_ENV: 'production' } })
     expect(verdict.allowed).toBe(false)
     if (!verdict.allowed) {
@@ -53,28 +66,124 @@ describe('seed de demo — guardas de entorno', () => {
     })
   })
 
-  it('--forzar no anula VERCEL_ENV=production', () => {
+  it('--forzar no anula VERCEL_ENV=production (R15)', () => {
     const env = { DATABASE_URL: REMOTE_URL, VERCEL_ENV: 'production' }
     const verdict = evaluateDemoSeedGuard({ argv: [DEMO_SEED_FORCE_FLAG], env })
     expect(verdict.allowed).toBe(false)
     if (!verdict.allowed) expect(verdict.reason).toContain('VERCEL_ENV=production')
   })
 
-  it('--forzar no anula VERCEL_ENV=preview (comparte la base de produccion)', () => {
-    for (const DATABASE_URL of [LOCAL_URL, REMOTE_URL]) {
-      const verdict = evaluateDemoSeedGuard({ argv: [DEMO_SEED_FORCE_FLAG], env: { DATABASE_URL, VERCEL_ENV: 'preview' } })
-      expect(verdict.allowed).toBe(false)
-      if (!verdict.allowed) {
-        expect(verdict.reason).toContain('VERCEL_ENV=preview')
-        expect(verdict.reason).toContain(`${DEMO_SEED_FORCE_FLAG} no lo anula`)
+  it('VERCEL_ENV=preview dentro de Vercel contra la base de preview: permitido sin --forzar, aunque la base sea remota y haya CI (R13)', () => {
+    for (const CI of [undefined, 'true', '1']) {
+      expect(evaluateDemoSeedGuard({ argv: [], env: { ...PREVIEW_ENV, CI } })).toEqual({ allowed: true, forced: false })
+    }
+    expect(evaluateDemoSeedGuard({ argv: [DEMO_SEED_FORCE_FLAG], env: PREVIEW_ENV })).toEqual({ allowed: true, forced: false })
+  })
+
+  it('VERCEL_ENV=preview sin VERCEL: negado, tambien con --forzar (R14)', () => {
+    for (const VERCEL of [undefined, '', '  ']) {
+      for (const argv of [[], [DEMO_SEED_FORCE_FLAG]]) {
+        const verdict = evaluateDemoSeedGuard({ argv, env: { ...PREVIEW_ENV, VERCEL } })
+        expect(verdict.allowed).toBe(false)
+        if (!verdict.allowed) {
+          expect(verdict.reason).toContain('VERCEL_ENV=preview')
+          expect(verdict.reason).toContain(`${DEMO_SEED_FORCE_FLAG} no lo anula`)
+        }
       }
     }
   })
 
-  it('--forzar no anula un VERCEL_ENV arbitrario distinto de development', () => {
+  it('VERCEL_ENV=preview sin PREVIEW_SUPABASE_REF: negado nombrandola, tambien con --forzar (R14)', () => {
+    for (const PREVIEW_SUPABASE_REF of [undefined, '']) {
+      for (const argv of [[], [DEMO_SEED_FORCE_FLAG]]) {
+        const verdict = evaluateDemoSeedGuard({ argv, env: { ...PREVIEW_ENV, PREVIEW_SUPABASE_REF } })
+        expect(verdict.allowed).toBe(false)
+        if (!verdict.allowed) {
+          expect(verdict.reason).toContain('PREVIEW_SUPABASE_REF')
+          expect(verdict.reason).toContain(`${DEMO_SEED_FORCE_FLAG} no lo anula`)
+        }
+      }
+    }
+  })
+
+  it('VERCEL_ENV=preview con DATABASE_URL o DIRECT_URL de otro proyecto o local: negado nombrandola, tambien con --forzar (R14)', () => {
+    for (const nombre of ['DATABASE_URL', 'DIRECT_URL'] as const) {
+      for (const url of [OTHER_PROJECT_URL, LOCAL_URL]) {
+        for (const argv of [[], [DEMO_SEED_FORCE_FLAG]]) {
+          const verdict = evaluateDemoSeedGuard({ argv, env: { ...PREVIEW_ENV, [nombre]: url } })
+          expect(verdict.allowed).toBe(false)
+          if (!verdict.allowed) {
+            expect(verdict.reason).toContain(nombre)
+            expect(verdict.reason).not.toContain(OTHER_REF)
+            expect(verdict.reason).not.toContain(PREVIEW_REF)
+          }
+        }
+      }
+    }
+  })
+
+  it('VERCEL_ENV=preview hereda el candado estricto de R9: ref sin forma de Reference ID con URL de produccion, negado (R14, m1)', () => {
+    const deProduccion = {
+      DATABASE_URL: OTHER_PROJECT_URL,
+      DIRECT_URL: `postgresql://postgres:x@db.${OTHER_REF}.supabase.co:5432/postgres`,
+    }
+    for (const PREVIEW_SUPABASE_REF of ['supabase', 'postgres', OTHER_REF.slice(0, 19)]) {
+      for (const argv of [[], [DEMO_SEED_FORCE_FLAG]]) {
+        const verdict = evaluateDemoSeedGuard({ argv, env: { ...PREVIEW_ENV, ...deProduccion, PREVIEW_SUPABASE_REF } })
+        expect(verdict.allowed, `ref=${PREVIEW_SUPABASE_REF}`).toBe(false)
+        if (!verdict.allowed) {
+          expect(verdict.reason).toContain('PREVIEW_SUPABASE_REF')
+          expect(verdict.reason).not.toContain(OTHER_REF)
+        }
+      }
+    }
+  })
+
+  it('VERCEL_ENV=preview con el ref de preview solo fuera de su posicion (nombre de la base, parametro): negado (R14, m1)', () => {
+    const fueraDePosicion = [
+      `postgresql://postgres.${OTHER_REF}:x@aws-0-xx.pooler.supabase.com:6543/${PREVIEW_REF}`,
+      `postgresql://postgres:x@db.${OTHER_REF}.supabase.co:5432/postgres?options=db.${PREVIEW_REF}.supabase.co`,
+    ]
+    for (const nombre of ['DATABASE_URL', 'DIRECT_URL'] as const) {
+      for (const url of fueraDePosicion) {
+        const verdict = evaluateDemoSeedGuard({ argv: [], env: { ...PREVIEW_ENV, [nombre]: url } })
+        expect(verdict.allowed, `${nombre}=${url}`).toBe(false)
+        if (!verdict.allowed) expect(verdict.reason).toContain(nombre)
+      }
+    }
+  })
+
+  it('VERCEL_ENV=preview con el ref en su posicion y `host` en la query: negado sin el valor, tambien con --forzar (R14, enmienda R9)', () => {
+    const hostDeProduccion = `db.${OTHER_REF}.supabase.co`
+    for (const nombre of ['DATABASE_URL', 'DIRECT_URL'] as const) {
+      for (const query of [`?host=${hostDeProduccion}`, `?pgbouncer=true&HOST=${hostDeProduccion}`, '?host=']) {
+        for (const argv of [[], [DEMO_SEED_FORCE_FLAG]]) {
+          const verdict = evaluateDemoSeedGuard({ argv, env: { ...PREVIEW_ENV, [nombre]: `${PREVIEW_ENV[nombre]}${query}` } })
+          expect(verdict.allowed, `${nombre} ${query}`).toBe(false)
+          if (!verdict.allowed) {
+            expect(verdict.reason).toContain(nombre)
+            expect(verdict.reason).not.toContain(OTHER_REF)
+            expect(verdict.reason).not.toContain(PREVIEW_REF)
+          }
+        }
+      }
+    }
+  })
+
+  it('--forzar no anula un VERCEL_ENV arbitrario distinto de development (R15)', () => {
     const verdict = evaluateDemoSeedGuard({ argv: [DEMO_SEED_FORCE_FLAG], env: { DATABASE_URL: LOCAL_URL, VERCEL_ENV: 'staging' } })
     expect(verdict.allowed).toBe(false)
     if (!verdict.allowed) expect(verdict.reason).toContain('VERCEL_ENV=staging')
+  })
+
+  it('VERCEL_ENV=production o arbitrario se niega aunque el entorno apunte a la base de preview, con o sin --forzar (R15)', () => {
+    for (const VERCEL_ENV of ['production', 'staging']) {
+      for (const argv of [[], [DEMO_SEED_FORCE_FLAG]]) {
+        const verdict = evaluateDemoSeedGuard({ argv, env: { ...PREVIEW_ENV, VERCEL_ENV } })
+        expect(verdict.allowed).toBe(false)
+        if (!verdict.allowed) expect(verdict.reason).toContain(`VERCEL_ENV=${VERCEL_ENV}`)
+      }
+    }
   })
 
   it('VERCEL_ENV=development sigue la regla normal de base local y --forzar', () => {

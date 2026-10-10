@@ -5,18 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { ErrorAlert } from '@/components/shared/error-alert';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { Button } from '@/components/ui/button';
 import type { SupplierView } from '@/lib/modules/proveedores';
 import {
@@ -51,62 +40,45 @@ export function DeleteSupplierDialog({ supplier }: { readonly supplier: Supplier
   }, [state, router]);
 
   return (
-    <AlertDialog open={open} onOpenChange={(next) => setRequestedOpen(next)}>
-      <AlertDialogTrigger
-        render={
+    <DeleteConfirmDialog
+      open={open}
+      onOpenChange={(next) => setRequestedOpen(next)}
+      trigger={{
+        render: (
           <Button
             variant="ghost"
             className={touchTarget}
             aria-label={`Dar de baja ${supplier.name}`}
             data-testid="supplier-delete-open"
           />
-        }
-      >
-        <Trash2Icon />
-      </AlertDialogTrigger>
-      <AlertDialogContent data-testid="delete-supplier-dialog">
-        <AlertDialogHeader>
-          <AlertDialogTitle>Dar de baja el proveedor</AlertDialogTitle>
-          <AlertDialogDescription data-testid="delete-supplier-message">
-            Se va a dar de baja «{supplier.name}». Esta acción no se puede deshacer.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
+        ),
+        children: <Trash2Icon />,
+      }}
+      texts={{
+        title: 'Dar de baja el proveedor',
+        description: <>Se va a dar de baja «{supplier.name}». Esta acción no se puede deshacer.</>,
+        dismiss: 'Cancelar',
+        confirm: 'Dar de baja',
+      }}
+      testIds={{
+        dialog: 'delete-supplier-dialog',
+        message: 'delete-supplier-message',
+        dismiss: 'delete-supplier-cancel',
+        confirm: 'delete-supplier-confirm',
+        error: 'delete-supplier-error',
+      }}
+      submit={{
+        kind: 'action',
+        action: formAction,
+        hidden: [{ name: 'id', value: supplier.id, testId: 'delete-supplier-id' }],
+      }}
+      aside={
         <p className="text-sm text-muted-foreground" data-testid="delete-supplier-cascade">
           Sus líneas de catálogo se dan de baja con él.
         </p>
-
-        {state.status !== 'error' ? null : (
-          <ErrorAlert
-            error={state}
-            cataloguedAs="p"
-            className="text-sm text-destructive"
-            testId="delete-supplier-error"
-          />
-        )}
-
-        <form action={formAction}>
-          <input
-            type="hidden"
-            name="id"
-            defaultValue={supplier.id}
-            data-testid="delete-supplier-id"
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel className={touchTarget} data-testid="delete-supplier-cancel">
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              type="submit"
-              variant="destructive"
-              touch
-              data-testid="delete-supplier-confirm"
-            >
-              Dar de baja
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </form>
-      </AlertDialogContent>
-    </AlertDialog>
+      }
+      error={state.status === 'error' ? state : undefined}
+      errorStyle="inline"
+    />
   );
 }
