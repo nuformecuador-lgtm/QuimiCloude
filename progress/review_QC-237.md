@@ -163,3 +163,25 @@ Se respetan tal como están:
 
 El código, la seguridad y el aislamiento por empresa están bien, y la verificación unitaria, de guardias y
 de integración está en verde.
+
+## Vuelta 2 (acotada a a1ed2b41..fecb9659)
+
+### Checklist
+- [x] **B2.** 54790b3f quita el prefijo `D10:` del comentario en `update-whatsapp-connection.ts`. El cambio es de una línea y no deja otra cita del spec en ese archivo.
+- [x] **B1.** `progress/impl_QC-237.md > E2E` registra lo que hizo el leader con el OK del humano: aplicó solo `20261009130000_whatsapp_connections` a la base local y corrió `playwright test e2e/integraciones-whatsapp.spec.ts e2e/integraciones.spec.ts`, con `14 passed (2.4m)`. T12 queda `[x]` (22d1f3a1). Yo no corrí Playwright, porque el encargo lo excluye, así que la evidencia es la de la bitácora.
+- [x] **m7.** El humano aprueba los textos de UI tal cual. Está en `progress/features/QC-237.md > Decisiones` y en impl.
+- [x] **Deuda de la regex de `guard-dobles-e2e`.** Queda anotada en `progress/deudas.md` (3c4f6659), con el arreglo concreto.
+- [x] **Sin regresiones.** El diff de la vuelta solo toca un comentario y archivos de `progress/`/`specs/`.
+- [~] **Rojo del gate rápido: `tests/integration/proveedores/catalog-line.int.test.ts` R32.** Lo reproduje: 1 failed, 13 passed.
+  - No es de esta feature. El diff de QC-237 no toca `proveedores` y el test no cambia en la rama.
+  - Según D33, el test depende del `lc_messages` del Postgres. Con un Postgres en inglés (Docker y CI) Prisma da `meta.constraint`; la base local compartida no lo da.
+  - No está en `tests/baseline-rojos.json`, porque D33 se dio por resuelta y se borró del baseline. Aun así, el CI está en verde.
+  - **Juicio:** no bloquea T13. «`./init.sh` en verde» se cumple con todo verde menos un rojo de entorno, ajeno al diff, que el CI cubre. Con eso T13 se puede marcar.
+
+### Hallazgos
+- **menor M1.** T13 sigue `[ ]` en `tasks.md`. Hay que marcarla `[x]` antes del PR y anotar que el único rojo local es R32 de catalog-line (entorno, D33). No se reabre la review por esto.
+- **menor M2.** `progress/deudas.md` tiene ahora **dos** `D35`: la de QC-167 (línea 131) y la nueva de la regex (línea 214). La nueva debería renumerarse al siguiente libre (D37), y también las referencias en este archivo y en `QC-237.md`.
+- **menor M3.** D33 figura como «resuelta», pero el test sigue rojo con una base local en español. Conviene reabrirla como deuda de entorno: o el test no depende del idioma, o se documenta que la base local debe tener `lc_messages=en_US`. No es de QC-237.
+
+### Veredicto
+**OK.** B1 y B2 quedan resueltos y no hay bloqueantes. Los tres hallazgos son menores; M1 hay que hacerlo antes de abrir el PR.
