@@ -30,6 +30,14 @@ export {
 } from './recipe-list-params';
 export { RecipeListSection } from './recipe-list-section';
 export {
+  RECIPE_ACTION_DELETE_TESTID,
+  RECIPE_ACTION_EDIT_TESTID,
+  RECIPE_ROW_ACTIONS_TESTID,
+  RecipeRowActions,
+  recipeRowActionsLabel,
+  type RecipeRowActionsProps,
+} from './recipe-row-actions';
+export {
   RECIPE_NO_RESULTS_TEXT,
   RECIPE_TABLE_ID,
   RECIPE_TABLE_TEXTS,
