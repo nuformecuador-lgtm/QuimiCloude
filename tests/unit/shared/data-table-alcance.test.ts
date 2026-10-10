@@ -580,7 +580,13 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // de clientes, ya en esta lista, escribe en `data-table-search` para comprobar que filtrar dentro
   // del modulo no repite la entrada de pantalla. El centinela pasa de TREINTA Y CUATRO a TREINTA Y
   // CINCO; la lista sigue CERRADA.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos treinta y cinco', () => {
+  //
+  // 2026-10-10: entra `e2e/marca-componentes.spec.ts` (QC-227), y no afloja la lista. No estrena
+  // tabla: en la lista de clientes, ya en esta lista, mide con el navegador los colores de la
+  // cabecera (`data-table-head-*`), la fuente de las celdas (`data-table-cell-*`), la columna fijada
+  // por su menu y el foco de `data-table-search`. El centinela pasa de TREINTA Y CINCO a TREINTA Y
+  // SEIS; la lista sigue CERRADA.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos treinta y seis', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -590,7 +596,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos treinta y cinco E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos treinta y seis E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
       'e2e/acondicionamiento.spec.ts',
       // La SEXTA entrada la trae QC-49 el 2026-09-11 (R27): su E2E recorre LAS DOS pantallas que
@@ -632,6 +638,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // La DECIMA la trae QC-93 el 2026-09-15 (R18): ver la nota de arriba. Es la sonda del usuario
       // sin permisos de modulo: afirma que `data-table` NO esta, no consume la tabla.
       'e2e/login.spec.ts',
+      // Ver la nota de arriba (2026-10-10, QC-227). Entre `login` y `movimiento` porque la lista
+      // esta ORDENADA: 'a' precede a 'o'.
+      'e2e/marca-componentes.spec.ts',
       // Ver la nota de arriba (2026-10-09). Entre `login` y `pasos-de-envasado` porque la lista esta
       // ORDENADA: 'm' va entre 'l' y 'p'.
       'e2e/movimiento.spec.ts',

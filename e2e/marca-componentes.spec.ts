@@ -6,8 +6,9 @@
  * capa, y un test que solo lee el texto del CSS sigue en verde. Aqui se mide con
  * `getBoundingClientRect` y `getComputedStyle`, en claro y en oscuro.
  *
- * DATOS: una empresa y un Administrador del seed por worker, con el prefijo `qc227_e2e_` y el
- * `RUN_ID` del proceso. Se entra una sola vez por worker por el login real (`loginAndLand`) y las
+ * DATOS: una empresa, un Administrador del seed y un cliente por worker, con el prefijo
+ * `qc227_e2e_` y el `RUN_ID` del proceso. El cliente da una fila a la lista de Clientes, que es la
+ * tabla donde se miden cabecera, celdas y campo (sin filas, `DataTable` no pinta la cabecera). Se entra una sola vez por worker por el login real (`loginAndLand`) y las
  * pruebas reutilizan esa sesion en contextos nuevos, cada uno con sus cookies de tema y de barra.
  * El `afterAll` borra por la empresa exacta del worker; la limpieza defensiva, por prefijo y edad.
  *
@@ -18,10 +19,12 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 
+import { normalizeCustomerText } from '@/lib/modules/clientes';
 import { DOCUMENT_TYPE_CC, ROLE_ADMINISTRADOR, normalizeCompanyName } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { prisma } from '@/lib/shared/db/prisma';
 import { PRIVATE_NAV_ITEMS, type NavLink } from '@/lib/shared/navigation/private-nav';
+import { CUSTOMERS_ROUTE } from '@/lib/shared/routes';
 import { readSidebarOpenState, SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 import { THEME_COOKIE } from '@/lib/shared/ui/theme-state';
 
@@ -72,6 +75,13 @@ const adminUser: Credentials = {
 
 const companyName = `${FIXTURE_PREFIX}empresa_${RUN_ID}`;
 let companyId: string | null = null;
+
+/** El cliente sembrado: la fila de la tabla de Clientes. */
+const seededCustomer = {
+  firstNames: `Qc227${RUN_ID.slice(0, 8)}`,
+  lastNames: `Marca${RUN_ID}`,
+  city: `${FIXTURE_PREFIX}ciudad_${RUN_ID}`,
+} as const;
 
 type StorageState = Awaited<ReturnType<BrowserContext['storageState']>>;
 let session: { state: StorageState; activeRoute: string; activeTestId: string } | null = null;
@@ -400,6 +410,138 @@ async function iconClass(page: Page, testId: string): Promise<string> {
   return (await page.getByTestId(testId).locator('svg').first().getAttribute('class')) ?? '';
 }
 
+// --- Tablas, barra, botones y campos (design.md > 11): colores y fuentes calculados ---
+
+/** Contraste minimo de un componente de interfaz (contorno, borde de campo). */
+const MIN_UI_CONTRAST = 3;
+/** Tolerancia por canal (sRGB lineal) al comparar dos colores calculados. */
+const COLOR_EPSILON = 0.003;
+/** Tope de pulsaciones de tabulador para llegar a un control. */
+const MAX_TABS = 80;
+
+const SEARCH_BOX_TESTID = 'data-table-search';
+const CUSTOMERS_TITLE_TESTID = 'clientes-title';
+const NAME_COLUMN_ID = 'lastNames';
+const DATE_COLUMN_ID = 'createdAt';
+const INSET_BUTTON = '[data-slot="sidebar-inset"] [data-slot="button"]';
+
+/** Color calculado de un token, leido de una sonda con `color: var(--token)` en el documento. */
+async function tokenColor(page: Page, token: string): Promise<string> {
+  return page.evaluate((name) => {
+    const probe = document.createElement('span');
+    probe.style.color = `var(${name})`;
+    document.body.appendChild(probe);
+    const value = getComputedStyle(probe).color;
+    probe.remove();
+    return value;
+  }, token);
+}
+
+/** `font-family` calculada de un token de fuente, por la misma via que la de una celda. */
+async function tokenFont(page: Page, token: string): Promise<string> {
+  return page.evaluate((name) => {
+    const probe = document.createElement('span');
+    probe.style.fontFamily = `var(${name})`;
+    document.body.appendChild(probe);
+    const value = getComputedStyle(probe).fontFamily;
+    probe.remove();
+    return value;
+  }, token);
+}
+
+function sameColor(a: string, b: string): boolean {
+  const x = parseCssColor(a);
+  const y = parseCssColor(b);
+  return (
+    Math.abs(x.r - y.r) <= COLOR_EPSILON &&
+    Math.abs(x.g - y.g) <= COLOR_EPSILON &&
+    Math.abs(x.b - y.b) <= COLOR_EPSILON &&
+    Math.abs(x.a - y.a) <= COLOR_EPSILON
+  );
+}
+
+function expectColor(actual: string, expected: string, what: string): void {
+  expect.soft(sameColor(actual, expected), `${what}: ${actual} no es ${expected}`).toBe(true);
+}
+
+/** Separa una lista de `box-shadow` por las comas de primer nivel (no las de `oklch(...)`). */
+function splitShadows(value: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (const ch of value) {
+    if (ch === '(') depth += 1;
+    if (ch === ')') depth -= 1;
+    if (ch === ',' && depth === 0) {
+      parts.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts;
+}
+
+/** Sombras `color 0 0 0 <spread>` (anillos) con su color y su grosor. */
+function ringsOf(boxShadow: string): { color: string; spread: string }[] {
+  if (boxShadow === 'none') return [];
+  return splitShadows(boxShadow).flatMap((shadow) => {
+    const color = shadow.match(/[a-z-]+\([^)]*\)|transparent/i)?.[0];
+    const lengths = shadow.replace(color ?? '', '').trim().split(/\s+/);
+    if (!color || lengths.length < 4) return [];
+    const [x, y, blur, spread] = lengths;
+    if (x !== '0px' || y !== '0px' || blur !== '0px') return [];
+    return [{ color, spread }];
+  });
+}
+
+/**
+ * Lleva el foco con `Tab` hasta el primer elemento que case con `selector`. El WebKit de
+ * Playwright tabula enlaces y botones con `Tab` (con `Alt+Tab` se salta los enlaces).
+ */
+async function tabTo(page: Page, selector: string, what: string): Promise<void> {
+  for (let i = 0; i < MAX_TABS; i += 1) {
+    await page.keyboard.press('Tab');
+    const hit = await page.evaluate((s) => document.activeElement?.matches(s) ?? false, selector);
+    if (hit) return;
+  }
+  throw new Error(`${what}: ${MAX_TABS} pulsaciones de Tab no llegaron a ${selector}`);
+}
+
+/** Estilos calculados del elemento enfocado, tras acabar sus transiciones (WebKit lee a medias). */
+async function focusedStyle(page: Page) {
+  return page.evaluate(async () => {
+    const el = document.activeElement as HTMLElement;
+    await Promise.all(el.getAnimations().map((a) => a.finished));
+    const s = getComputedStyle(el);
+    return {
+      id: el.getAttribute('data-testid'),
+      label: el.getAttribute('aria-label') ?? el.textContent,
+      focusVisible: el.matches(':focus-visible'),
+      color: s.color,
+      borderColor: s.borderTopColor,
+      boxShadow: s.boxShadow,
+      outlineStyle: s.outlineStyle,
+      outlineWidth: s.outlineWidth,
+      outlineOffset: s.outlineOffset,
+      outlineColor: s.outlineColor,
+    };
+  });
+}
+
+/** Abre «Clientes» con la fila sembrada pintada y la pagina hidratada. */
+async function openCustomers(page: Page): Promise<void> {
+  await page.goto(CUSTOMERS_ROUTE);
+  await expect(page.getByTestId(CUSTOMERS_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('[data-indicator-ready]').first()).toBeAttached({ timeout: 60_000 });
+  await expect(page.getByTestId(`data-table-cell-${NAME_COLUMN_ID}`).first()).toHaveText(
+    seededCustomer.lastNames,
+    { timeout: 60_000 },
+  );
+  await page.mouse.move(DESKTOP_VIEWPORT.width - 1, DESKTOP_VIEWPORT.height - 1);
+}
+
 test.beforeAll(async () => {
   const orphanCutoff = new Date(Date.now() - ORPHAN_MIN_AGE_MS);
   const orphans = await prisma.company.findMany({
@@ -408,6 +550,7 @@ test.beforeAll(async () => {
   });
   const orphanIds = orphans.map((c) => c.id);
   if (orphanIds.length > 0) {
+    await prisma.customer.deleteMany({ where: { companyId: { in: orphanIds } } });
     await prisma.user.deleteMany({ where: { companyId: { in: orphanIds } } });
     await prisma.company.deleteMany({ where: { id: { in: orphanIds } } });
   }
@@ -444,11 +587,24 @@ test.beforeAll(async () => {
     },
     select: { id: true },
   });
+
+  await prisma.customer.create({
+    data: {
+      ...seededCustomer,
+      firstNamesNormalized: normalizeCustomerText(seededCustomer.firstNames),
+      lastNamesNormalized: normalizeCustomerText(seededCustomer.lastNames),
+      cityNormalized: normalizeCustomerText(seededCustomer.city),
+      companyId,
+    },
+    select: { id: true },
+  });
 });
 
 test.afterAll(async () => {
+  // Orden de la FK restrictiva: clientes -> usuarios -> empresa, solo de ESTE worker.
   try {
     if (companyId) {
+      await prisma.customer.deleteMany({ where: { companyId } });
       await prisma.user.deleteMany({ where: { companyId } });
     }
   } finally {
@@ -707,6 +863,225 @@ for (const theme of THEMES) {
       const after = await iconClass(page, HEADER_TOGGLE_TESTID);
       log(`${theme} R39 encabezado abierto clase="${after}"`);
       expect.soft(after).toContain(CLOSE_ICON_CLASS);
+      await context.close();
+    });
+  });
+
+  test.describe(`tablas, barra y foco calculados (${theme})`, () => {
+    test('R10 la cabecera pinta --muted-foreground sobre --muted, tambien la columna fijada, con 4.5:1', async ({
+      browser,
+      baseURL,
+    }) => {
+      const { context, page } = await enter(browser, baseURL as string, { theme });
+      await openCustomers(page);
+      const muted = await tokenColor(page, '--muted');
+      const mutedForeground = await tokenColor(page, '--muted-foreground');
+      const background = await tokenColor(page, '--background');
+
+      const head = page.getByTestId(`data-table-head-${NAME_COLUMN_ID}`);
+      const header = await head.evaluate((th) => {
+        const thead = th.closest('thead') as HTMLElement;
+        const svg = th.querySelector('svg');
+        return {
+          theadBackground: getComputedStyle(thead).backgroundColor,
+          color: getComputedStyle(th).color,
+          iconColor: svg ? getComputedStyle(svg).color : null,
+        };
+      });
+      log(`${theme} R10 cabecera fondo=${header.theadBackground} texto=${header.color} icono=${header.iconColor}`);
+      expectColor(header.theadBackground, muted, 'R10 fondo de la cabecera');
+      expectColor(header.color, mutedForeground, 'R10 texto de la cabecera');
+      if (header.iconColor !== null) {
+        expectColor(header.iconColor, mutedForeground, 'R10 icono de orden');
+      }
+      const ratio = contrastRatio(parseCssColor(header.color), parseCssColor(header.theadBackground));
+      log(`${theme} R10 contraste cabecera=${round(ratio)}`);
+      expect.soft(ratio, 'R10 contraste de la cabecera').toBeGreaterThanOrEqual(MIN_CONTRAST);
+
+      // Columna fijada por su menu: la celda de cabecera pasa a `bg-muted`; la del cuerpo, no.
+      await page.getByTestId(`data-table-header-menu-${NAME_COLUMN_ID}`).click();
+      await page.getByTestId(`data-table-pin-${NAME_COLUMN_ID}`).click();
+      await expect(head).toHaveAttribute('data-pinned', /left|right/);
+      await page.mouse.move(DESKTOP_VIEWPORT.width - 1, DESKTOP_VIEWPORT.height - 1);
+      const pinned = await head.evaluate((th) => ({
+        background: getComputedStyle(th).backgroundColor,
+        color: getComputedStyle(th).color,
+      }));
+      const pinnedBody = await page
+        .getByTestId(`data-table-cell-${NAME_COLUMN_ID}`)
+        .first()
+        .evaluate((td) => getComputedStyle(td).backgroundColor);
+      log(`${theme} R10 fijada fondo=${pinned.background} texto=${pinned.color} cuerpo=${pinnedBody}`);
+      expectColor(pinned.background, muted, 'R10 fondo de la cabecera fijada');
+      expectColor(pinned.color, mutedForeground, 'R10 texto de la cabecera fijada');
+      expectColor(pinnedBody, background, 'R10 celda fijada del cuerpo');
+      await context.close();
+    });
+
+    test('R11 R13 la celda de fecha va en Plex Mono tabular; la de nombre y la cabecera, en Plex Sans', async ({
+      browser,
+      baseURL,
+    }) => {
+      const { context, page } = await enter(browser, baseURL as string, { theme });
+      await openCustomers(page);
+      const mono = await tokenFont(page, '--font-mono');
+      const sans = await tokenFont(page, '--font-sans');
+      expect(mono, 'las fuentes mono y sans calculan igual').not.toBe(sans);
+
+      const font = (testId: string) =>
+        page
+          .getByTestId(testId)
+          .first()
+          .evaluate((el) => ({
+            family: getComputedStyle(el).fontFamily,
+            numeric: getComputedStyle(el).fontVariantNumeric,
+          }));
+      const dateCell = await font(`data-table-cell-${DATE_COLUMN_ID}`);
+      const nameCell = await font(`data-table-cell-${NAME_COLUMN_ID}`);
+      const dateHead = await font(`data-table-head-${DATE_COLUMN_ID}`);
+      log(`${theme} R11 fecha ${JSON.stringify(dateCell)} R13 nombre ${JSON.stringify(nameCell)} cabecera ${JSON.stringify(dateHead)}`);
+
+      expect.soft(dateCell.family, 'R11 fuente de la celda de fecha').toBe(mono);
+      expect.soft(dateCell.numeric, 'R11 cifras de la celda de fecha').toContain('tabular-nums');
+      expect.soft(nameCell.family, 'R13 fuente de la celda de nombre').toBe(sans);
+      expect.soft(nameCell.numeric, 'R13 cifras de la celda de nombre').not.toContain('tabular-nums');
+      expect.soft(dateHead.family, 'R13 fuente de la cabecera de fecha').toBe(sans);
+      expect.soft(dateHead.numeric, 'R13 cifras de la cabecera de fecha').not.toContain('tabular-nums');
+      await context.close();
+    });
+
+    test('R15 R16 un item inactivo pinta --sidebar-muted-foreground con 4.5:1 y --sidebar-accent-foreground con hover', async ({
+      browser,
+      baseURL,
+    }) => {
+      const { context, page } = await enter(browser, baseURL as string, { theme });
+      await settleDesktop(page, false);
+      const mutedForeground = await tokenColor(page, '--sidebar-muted-foreground');
+      const accentForeground = await tokenColor(page, '--sidebar-accent-foreground');
+      const sidebar = await tokenColor(page, '--sidebar');
+
+      const inactiveSelector = `${CONTENT_BUTTONS}:not([data-active])`;
+      const inactive = page.locator(inactiveSelector).first();
+      const read = () =>
+        inactive.evaluate(async (el) => {
+          await Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished));
+          const svg = el.querySelector('svg');
+          return {
+            id: el.getAttribute('data-testid'),
+            text: getComputedStyle(el).color,
+            icon: svg ? getComputedStyle(svg).color : null,
+          };
+        });
+
+      await page.mouse.move(DESKTOP_VIEWPORT.width - 1, DESKTOP_VIEWPORT.height - 1);
+      const rest = await read();
+      const ratio = contrastRatio(parseCssColor(rest.text), parseCssColor(sidebar));
+      log(`${theme} R15 ${rest.id} reposo texto=${rest.text} icono=${rest.icon} contraste=${round(ratio)}`);
+      expectColor(rest.text, mutedForeground, 'R15 texto del inactivo');
+      if (rest.icon !== null) expectColor(rest.icon, mutedForeground, 'R15 icono del inactivo');
+      expect.soft(ratio, 'R15 contraste contra --sidebar').toBeGreaterThanOrEqual(MIN_CONTRAST);
+
+      await inactive.hover();
+      const hovered = await read();
+      log(`${theme} R16 ${hovered.id} hover texto=${hovered.text}`);
+      expectColor(hovered.text, accentForeground, 'R16 texto con hover');
+      await context.close();
+    });
+
+    test('R16 un item inactivo con foco por teclado pinta --sidebar-accent-foreground', async ({
+      browser,
+      baseURL,
+      browserName,
+    }) => {
+      const { context, page } = await enter(browser, baseURL as string, { theme });
+      await settleDesktop(page, false);
+      const accentForeground = await tokenColor(page, '--sidebar-accent-foreground');
+      const inactiveSelector = `${CONTENT_BUTTONS}:not([data-active])`;
+
+      await page.mouse.move(DESKTOP_VIEWPORT.width - 1, DESKTOP_VIEWPORT.height - 1);
+      if (browserName === 'webkit') {
+        // El WebKit de Playwright no tabula enlaces (ni con Tab ni con Alt+Tab): tras una tecla,
+        // el foco por programa queda en modo teclado y casa con `:focus-visible` (se comprueba).
+        await page.keyboard.press('Shift');
+        await page.locator(inactiveSelector).first().focus();
+      } else {
+        await tabTo(page, inactiveSelector, 'R16 foco');
+      }
+      const focused = await focusedStyle(page);
+      const sidebarForeground = await tokenColor(page, '--sidebar-foreground');
+      log(
+        `${theme} R16 ${focused.id} foco texto=${focused.color} focus-visible=${focused.focusVisible} ` +
+          `es --sidebar-foreground=${sameColor(focused.color, sidebarForeground)}`,
+      );
+      expect.soft(focused.focusVisible, 'R16 el foco por teclado no es :focus-visible').toBe(true);
+      expectColor(focused.color, accentForeground, 'R16 texto con foco');
+      await context.close();
+    });
+
+    test('R21 R23 R24 con el teclado: el boton pinta un contorno opaco de --ring de 2 px a 2 px; el campo, borde y anillo de 1 px', async ({
+      browser,
+      baseURL,
+    }) => {
+      const { context, page } = await enter(browser, baseURL as string, { theme });
+      await openCustomers(page);
+      const ring = await tokenColor(page, '--ring');
+      const input = await tokenColor(page, '--input');
+      const card = await tokenColor(page, '--card');
+      const background = await tokenColor(page, '--background');
+
+      // R23: campo en reposo.
+      const field = page.getByTestId(SEARCH_BOX_TESTID);
+      const restField = await field.evaluate(async (el) => {
+        await Promise.all(el.getAnimations().map((a) => a.finished));
+        return {
+          borderWidth: getComputedStyle(el).borderTopWidth,
+          borderColor: getComputedStyle(el).borderTopColor,
+        };
+      });
+      log(`${theme} R23 campo reposo borde=${restField.borderWidth} ${restField.borderColor}`);
+      expect.soft(restField.borderWidth, 'R23 grosor del borde').toBe('1px');
+      expectColor(restField.borderColor, input, 'R23 color del borde');
+      for (const [name, surface] of [
+        ['--card', card],
+        ['--background', background],
+      ] as const) {
+        const ratio = controlContrast(restField.borderColor, [surface]);
+        log(`${theme} R23 borde contra ${name}=${round(ratio)}`);
+        expect.soft(ratio, `R23 borde contra ${name}`).toBeGreaterThanOrEqual(MIN_UI_CONTRAST);
+      }
+
+      // R24: campo con foco por teclado.
+      await tabTo(page, `[data-testid="${SEARCH_BOX_TESTID}"]`, 'R24 campo');
+      const focusedField = await focusedStyle(page);
+      log(`${theme} R24 campo foco borde=${focusedField.borderColor} sombra=${focusedField.boxShadow} contorno=${focusedField.outlineStyle}`);
+      expectColor(focusedField.borderColor, ring, 'R24 borde con foco');
+      const rings = ringsOf(focusedField.boxShadow).filter((r) => parseCssColor(r.color).a > 0);
+      expect.soft(rings.length, `R24 anillos visibles: ${focusedField.boxShadow}`).toBe(1);
+      if (rings[0]) {
+        expect.soft(rings[0].spread, 'R24 grosor del anillo').toBe('1px');
+        expectColor(rings[0].color, ring, 'R24 color del anillo');
+        expect.soft(parseCssColor(rings[0].color).a, 'R24 anillo opaco').toBe(1);
+      }
+      expect.soft(focusedField.outlineStyle, 'R24 sin contorno separado').toBe('none');
+
+      // R21: el siguiente boton del contenido con foco por teclado.
+      await tabTo(page, INSET_BUTTON, 'R21 boton');
+      const focusedButton = await focusedStyle(page);
+      log(`${theme} R21 boton "${focusedButton.label}" ${JSON.stringify(focusedButton)}`);
+      expect.soft(focusedButton.focusVisible, 'R21 foco por teclado').toBe(true);
+      expect.soft(focusedButton.outlineStyle, 'R21 estilo del contorno').toBe('solid');
+      expect.soft(focusedButton.outlineWidth, 'R21 grosor del contorno').toBe('2px');
+      expect.soft(focusedButton.outlineOffset, 'R21 separacion del contorno').toBe('2px');
+      expectColor(focusedButton.outlineColor, ring, 'R21 color del contorno');
+      expect.soft(parseCssColor(focusedButton.outlineColor).a, 'R21 contorno opaco').toBe(1);
+      for (const [name, surface] of [
+        ['--card', card],
+        ['--background', background],
+      ] as const) {
+        const ratio = contrastRatio(parseCssColor(focusedButton.outlineColor), parseCssColor(surface));
+        log(`${theme} R21 contorno contra ${name}=${round(ratio)}`);
+        expect.soft(ratio, `R21 contorno contra ${name}`).toBeGreaterThanOrEqual(MIN_UI_CONTRAST);
+      }
       await context.close();
     });
   });

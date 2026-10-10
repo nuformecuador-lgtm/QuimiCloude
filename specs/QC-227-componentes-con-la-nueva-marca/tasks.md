@@ -271,3 +271,5 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
 - `tests/unit/pedidos-ui/order-columns.test.tsx`
 - `tests/unit/login-skin.test.tsx`
 - `tests/unit/shared-ui/motion-classes.test.tsx`
+- `tests/unit/clientes/scope.test.ts` (T10: alta de `marca-componentes.spec.ts` en `E2E_PERMITIDOS`)
+- `tests/unit/shared/data-table-alcance.test.ts` (T10: alta en la lista cerrada de E2E que referencian `data-table`)

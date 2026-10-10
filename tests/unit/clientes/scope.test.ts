@@ -297,11 +297,14 @@ describe('R28 — los UNICOS E2E que nombran clientes son e2e/clientes.spec.ts y
   // sigue CERRADA.
   // `movimiento.spec.ts` navega a Clientes y da de alta uno: necesita un panel y un toast reales
   // para medir el movimiento de entrada y salida.
+  // `marca-componentes.spec.ts` (QC-227) siembra un cliente para que la lista de Clientes tenga
+  // una fila y mide en ella cabecera, celdas y foco del buscador con el navegador.
   const E2E_PERMITIDOS: ReadonlySet<string> = new Set([
     'clientes.spec.ts',
     'pedido-con-cliente.spec.ts',
     'entregar-producto-terminado.spec.ts',
     'movimiento.spec.ts',
+    'marca-componentes.spec.ts',
   ])
   const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
 
