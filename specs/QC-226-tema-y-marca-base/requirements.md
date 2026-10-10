@@ -123,6 +123,10 @@ fondo `linear-gradient(90deg, <--sidebar-primary al 26 %>, <--sidebar-primary al
 anillo interior de 1 px de `--sidebar-primary` al 32 % y el texto en blanco con peso 600. La
 regla de la barra de acento del borde izquierdo (`::before`) DEBE quedar sin cambios (D18).
 
+> **Nota QC-228 (R13–R15, `design.md > 5`):** con JavaScript, el fondo y el anillo del ítem activo
+> los pinta el indicador deslizante de QC-228, en la misma posición, tamaño y aspecto; sin cambio
+> visual. Sin JavaScript el botón se sigue pintando con esta regla, que no se edita.
+
 ### Marca en la zona privada
 
 **R12.** MIENTRAS la barra lateral está expandida, en escritorio y en el `Sheet` móvil, el
@@ -218,6 +222,10 @@ y copiados del kit sin modificar.
 **R32.** El sistema NO DEBE declarar en `app/globals.css` reglas de movimiento fuera del bloque
 del login: ni la regla global de `prefers-reduced-motion` de `tokens.css`, ni `@keyframes`,
 `animation` o `transition` nuevas para otros elementos.
+
+> **Enmendado por QC-228 (D5):** la regla global de movimiento reducido y el movimiento fuera del
+> login pasan a QC-228 R19 (entrada de pantalla) y R21 (movimiento reducido). R32 queda en que el
+> bloque del login siga como está (`color-tokens.test.ts > R32`, con `ENMIENDA QC-228 (D5)`).
 
 **R33.** El sistema NO DEBE modificar ningún archivo de `components/ui/`.
 

@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
 import { NavUser } from '@/components/private/nav-user';
+import { SidebarActiveIndicator } from '@/components/private/sidebar-active-indicator';
 import { BrandLogo } from '@/components/shared/brand-logo';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -144,32 +145,34 @@ export function AppSidebar({ user, navItems }: AppSidebarProps) {
                   </SidebarGroupLabel>
                 )}
                 <SidebarGroupContent>
-                  <SidebarMenu>
-                    {seccion.items.map((item) =>
-                      item.kind === 'link' ? (
-                        <NavLinkItem
-                          key={item.testId}
-                          item={item}
-                          pathname={pathname}
-                          onNavigate={closeMobilePanel}
-                        />
-                      ) : isIconMode ? (
-                        <NavGroupFloating
-                          key={item.testId}
-                          group={item}
-                          pathname={pathname}
-                          onNavigate={closeMobilePanel}
-                        />
-                      ) : (
-                        <NavGroupInline
-                          key={item.testId}
-                          group={item}
-                          pathname={pathname}
-                          onNavigate={closeMobilePanel}
-                        />
-                      ),
-                    )}
-                  </SidebarMenu>
+                  <SidebarActiveIndicator variant="menu">
+                    <SidebarMenu>
+                      {seccion.items.map((item) =>
+                        item.kind === 'link' ? (
+                          <NavLinkItem
+                            key={item.testId}
+                            item={item}
+                            pathname={pathname}
+                            onNavigate={closeMobilePanel}
+                          />
+                        ) : isIconMode ? (
+                          <NavGroupFloating
+                            key={item.testId}
+                            group={item}
+                            pathname={pathname}
+                            onNavigate={closeMobilePanel}
+                          />
+                        ) : (
+                          <NavGroupInline
+                            key={item.testId}
+                            group={item}
+                            pathname={pathname}
+                            onNavigate={closeMobilePanel}
+                          />
+                        ),
+                      )}
+                    </SidebarMenu>
+                  </SidebarActiveIndicator>
                 </SidebarGroupContent>
               </SidebarGroup>
             ))}
@@ -285,24 +288,26 @@ function NavGroupInline({ group, pathname, onNavigate }: NavGroupProps) {
         >
           {Icon ? <Icon aria-hidden="true" /> : null}
           <span>{group.label}</span>
-          <ChevronRightIcon className="ml-auto transition-transform duration-200 group-data-open/menu-button:rotate-90" />
+          <ChevronRightIcon className="ml-auto transition-transform duration-(--dur-base) ease-(--ease-standard) group-data-open/menu-button:rotate-90" />
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <SidebarMenuSub>
-            {group.items.map((child) => (
-              <SidebarMenuSubItem key={child.testId}>
-                <SidebarMenuSubButton
-                  render={<Link href={child.href} />}
-                  isActive={pathname === child.href}
-                  aria-current={pathname === child.href ? 'page' : undefined}
-                  onClick={onNavigate}
-                  data-testid={child.testId}
-                >
-                  <span>{child.label}</span>
-                </SidebarMenuSubButton>
-              </SidebarMenuSubItem>
-            ))}
-          </SidebarMenuSub>
+          <SidebarActiveIndicator variant="sub">
+            <SidebarMenuSub>
+              {group.items.map((child) => (
+                <SidebarMenuSubItem key={child.testId}>
+                  <SidebarMenuSubButton
+                    render={<Link href={child.href} />}
+                    isActive={pathname === child.href}
+                    aria-current={pathname === child.href ? 'page' : undefined}
+                    onClick={onNavigate}
+                    data-testid={child.testId}
+                  >
+                    <span>{child.label}</span>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              ))}
+            </SidebarMenuSub>
+          </SidebarActiveIndicator>
         </CollapsibleContent>
       </Collapsible>
     </SidebarMenuItem>

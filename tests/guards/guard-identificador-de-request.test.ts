@@ -342,6 +342,11 @@ export const E2E_ESPERADOS = [
   // cliente, entrega que completa y usuario sin permiso. No lee ni afirma nada sobre el
   // identificador de peticion ni sobre `reference`.
   'entregar-producto-terminado.spec.ts',
+  // Alta el 2026-10-09 (QC-228) por el mismo motivo que las demas. Mide en navegador real las
+  // duraciones y curvas calculadas de un panel, un dialogo y un toast, el indicador del item activo
+  // y la entrada de pantalla, tambien con movimiento reducido. No lee ni afirma nada sobre el
+  // identificador de peticion ni sobre `reference`.
+  'movimiento.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */

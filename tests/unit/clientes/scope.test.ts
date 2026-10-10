@@ -295,10 +295,13 @@ describe('R28 — los UNICOS E2E que nombran clientes son e2e/clientes.spec.ts y
   // dos clientes por Prisma -la entrega exige uno y el recorrido lo cambia- con la normalizacion
   // del barrel de `clientes`, la unica definicion. No recorre la pantalla de clientes. La lista
   // sigue CERRADA.
+  // `movimiento.spec.ts` navega a Clientes y da de alta uno: necesita un panel y un toast reales
+  // para medir el movimiento de entrada y salida.
   const E2E_PERMITIDOS: ReadonlySet<string> = new Set([
     'clientes.spec.ts',
     'pedido-con-cliente.spec.ts',
     'entregar-producto-terminado.spec.ts',
+    'movimiento.spec.ts',
   ])
   const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
 

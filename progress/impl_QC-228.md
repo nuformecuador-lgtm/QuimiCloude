@@ -1,0 +1,450 @@
+# QC-228 — bitácora de implementación (frontend_dev)
+
+## Tanda 1 — T1 y T4
+
+### Archivos
+- `app/globals.css` (modificado): `--default-transition-duration` / `--default-transition-timing-function`
+  en `@theme inline`; reglas de Sonner (entrada, salida y toast de atrás); regla global de
+  `prefers-reduced-motion` del kit.
+- `tests/unit/theme/color-tokens.test.ts` (modificado): R32 enmendado (`ENMIENDA QC-228 (D5)`);
+  en R6, el localizador pasa de `--dur-instant` a `--dur-instant:` (misma enmienda: `@theme inline`
+  ya nombra `var(--dur-instant)` y el localizador antiguo caía en él). Ninguna aserción de R6 cambia.
+- `tests/unit/theme/motion-tokens.test.ts` (nuevo).
+
+### Verificación del supuesto de `design.md > 1` (CSS compilado con `@tailwindcss/node` 4.3.3)
+- `tw-animate-css` 1.4.0: `--animate-in: enter var(--tw-animation-duration,var(--tw-duration,.15s))var(--tw-ease,ease)…` → lee `--tw-duration` y `--tw-ease`. **Sí.**
+- `duration-(--dur-slow)` compila a `--tw-duration: var(--dur-slow); transition-duration: var(--dur-slow)`;
+  `ease-(--ease-enter)` a `--tw-ease: var(--ease-enter); …`. **Sí.**
+- `zoom-in-96` → `--tw-enter-scale: calc(96*1%)`; `zoom-out-96` → `--tw-exit-scale: calc(96*1%)`. **Existen.**
+- `transition-colors` / `transition-all` → `transition-duration: var(--tw-duration, var(--dur-instant))`, curva `var(--tw-ease, var(--ease-standard))`.
+- P2: `animate-spin` es `animation: var(--animate-spin)` (shorthand con `infinite`); la longhand
+  `animation-iteration-count: 1 !important` de la regla global lo pisa. No hace falta nada más.
+
+### Mapa R → test
+| R | Test |
+| --- | --- |
+| R3 | `motion-tokens.test.ts > R3: las transiciones sin duracion ni curva propias…` |
+| R10 | `motion-tokens.test.ts > R10: toasts > *` (6 casos: regla de 500 ms de Sonner, entrada, salida incl. toast de atrás, especificidad sin `!important`, arrastre, ≤ 400 ms) |
+| R21 | `motion-tokens.test.ts > R21: con movimiento reducido…` y `> R21: los indicadores de carga en bucle se detienen…` |
+| R22 | `motion-tokens.test.ts > R22: la regla global no cambia el nombre de ninguna animacion…`; `color-tokens.test.ts > R32 (ENMIENDA QC-228)` |
+
+### Salida de los comandos
+- `pnpm run typecheck`: verde (antes hizo falta `prisma generate` y `next typegen` en el worktree: sin ellos, 978 errores ajenos de `@prisma/client` y `LayoutProps`).
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)`, todos preexistentes (`confirm-catalog-import.test.ts`, `order-service.test.ts`).
+- `pnpm exec vitest related --run app/globals.css tests/unit/theme/color-tokens.test.ts tests/unit/theme/motion-tokens.test.ts`: `Test Files 4 passed (4) · Tests 53 passed (53)`.
+- `pnpm exec vitest run tests/unit/theme`: `Test Files 10 passed (10) · Tests 58 passed (58)`.
+
+### Notas
+- Sonner: además de lo de `design.md > 6`, las dos reglas excluyen `[data-swiping='true']` para no
+  pisar el `transition: none` de Sonner al arrastrar (si no, el toast iría por detrás del dedo).
+- No se tocó `[data-sonner-toast] > *` (`transition: opacity 400ms`): no supera 400 ms; queda fuera de `design.md > 6`.
+- E2E (`login-skin.spec.ts`) no corrido en esta tanda por indicación del leader.
+
+**Veredicto:** T1 y T4 hechas; supuesto de tw-animate verificado, tests de tema verdes.
+
+## Tanda — T7 (entrada de pantalla)
+
+### Archivos
+- `lib/shared/navigation/nav-module.ts` (nuevo): `navModuleKey(pathname, hrefs)` y `navItemHrefs(items)`.
+- `app/(private)/components/screen-enter.tsx` (nuevo, `'use client'`): `ScreenEnter` y `SCREEN_ENTER_MS` (420).
+- `app/(private)/components/index.ts` (modificado): exporta `ScreenEnter`.
+- `app/(private)/layout.tsx` (modificado): `<ScreenEnter hrefs={navItemHrefs(navItems)}>{children}</ScreenEnter>`
+  dentro de `SidebarInset`; los href salen de los `navItems` ya filtrados en el servidor.
+- `app/globals.css` (modificado, solo al final): `@keyframes screen-enter`, retardos 40/80/120 ms y,
+  con movimiento reducido, `animation-delay: 0ms` para los bloques.
+- `tests/unit/navegacion/nav-module.test.ts` (nuevo), `tests/unit/screen-enter.test.tsx` (nuevo).
+
+### Mapa R → test
+| R | Test |
+| --- | --- |
+| R19 | `nav-module.test.ts` (prefijo por segmentos, href más largo, ruta sin ítem, `/` ignorado); `screen-enter.test.tsx > R19: …al montar`, `> R19: …a los 420 ms`, `> R19: al cambiar de módulo el atributo vuelve` |
+| R20 | `nav-module.test.ts > R20: una pantalla de detalle pertenece al módulo del ítem`; `screen-enter.test.tsx > R20: navegar dentro del módulo… no repite la entrada` |
+
+### Salida de los comandos
+- `pnpm run typecheck`: verde.
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)`, los mismos preexistentes.
+- `pnpm exec vitest related --run` (layout, screen-enter, barrel, nav-module y los dos tests): `Test Files 15 passed (15) · Tests 261 passed (261)`; incluye `private-layout.test.tsx` sin tocar.
+- `pnpm exec vitest run guard`: `Test Files 62 passed (62) · Tests 834 passed | 15 skipped`.
+
+### Notas
+- La clave de una ruta sin ítem es `/<primer segmento>` (el design dice «el primer segmento»; se
+  le antepone `/` para que todas las claves tengan forma de ruta). Un href `/` se ignora.
+- Movimiento reducido: la regla global deja la duración en 0.01 ms pero no toca `animation-delay`;
+  sin el ajuste, los bloques 2–4+ seguirían ocultos 40–120 ms (`fill-mode: both`). El ajuste usa
+  `:nth-child(n)` para igualar especificidad con los retardos y ganar por orden.
+- `usePathname()` puede devolver `null` fuera del App Router (tests que no lo simulan): se trata como `''`.
+
+**Veredicto:** T7 hecha; tests de R19/R20 verdes y `private-layout.test.tsx` sin cambios.
+
+## T2 y T3 — primitivos, chevron y botones (frontend_dev)
+
+### Archivos
+- Modificados: `components/ui/{dialog,alert-dialog,sheet,dropdown-menu,select,popover,autocomplete,tooltip,tabs,sidebar}.tsx`,
+  `components/private/app-sidebar.tsx` (chevron), `components/ui/button.tsx`,
+  `components/shared/data-table/data-table-scroll-nav.tsx`, `app/globals.css` (tokens
+  `--button-primary-gradient` / `--button-veil-color` en `:root` y `.dark` y `@utility btn-shine` /
+  `btn-veil`, tras el bloque de `--sidebar-panel-gradient`; la zona final de T7 no se toca).
+- Tests: `tests/unit/shared-ui/motion-classes.test.tsx` (nuevo); casos nuevos en
+  `tests/unit/theme/motion-tokens.test.ts` y `tests/unit/shared/data-table-scroll.test.tsx` (sin editar los
+  existentes); `tests/unit/shared-ui/button-touch.test.tsx`: solo la cadena esperada del caso R5 del
+  defecto, con nota `ENMIENDA QC-228`.
+
+### Mapa R → test
+| R | Test |
+| --- | --- |
+| R4 | `motion-classes.test.tsx > R4: el diálogo entra…` |
+| R5 | `motion-classes.test.tsx > R5: el diálogo sale…` |
+| R6 | `motion-classes.test.tsx > R6: el panel lateral…` |
+| R7 | `motion-classes.test.tsx > R7: menús, desplegables, popover y autocompletar…` |
+| R8 | `motion-classes.test.tsx > R8: el tooltip…` |
+| R9 | `motion-classes.test.tsx > R9: el indicador de la pestaña activa…` |
+| R11 | `motion-classes.test.tsx > R11: el ancho de la barra lateral…` |
+| R12 | `motion-classes.test.tsx > R12: el chevron…` |
+| R16 | `motion-classes.test.tsx > R16: el botón primario usa el brillo…`; `motion-tokens.test.ts > R16: el degradado del primario se desplaza…`, `> R16: en claro… en oscuro se deriva de --primary`, `> R16: el texto del primario cumple 4.5:1…` |
+| R17 | `motion-classes.test.tsx > R17: el botón secundario (outline) usa el velo…`; `motion-tokens.test.ts > R17: el velo petróleo entra desde la derecha…`, `> R17: el velo es petróleo al 10 %…` |
+| R18 | `motion-classes.test.tsx > R18: primario y secundario escalan al 98 %…`; `motion-tokens.test.ts > R18: la escala al pulsar se transiciona en --dur-instant…`; `data-table-scroll.test.tsx > R18: la flecha no encoge al pulsarse…` |
+| R21 | `data-table-scroll.test.tsx > R21: con movimiento reducido la flecha desplaza al instante`, `> R21: sin movimiento reducido… suave` |
+
+### Salida de los comandos
+- `pnpm run typecheck`: verde (exit 0).
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)`, los preexistentes.
+- `pnpm exec vitest related --run <archivos de T2/T3>`: `Test Files 14 failed | 251 passed (265) · Tests 153 failed | 3795 passed | 1 skipped`.
+  Los 153: 152 de `tests/unit/paridad/*` (13 archivos, T6) y 1 de `motion-tokens.test.ts > R22` (caso de T1:
+  espera un único `@media (prefers-reduced-motion: reduce)` fuera del login y T7 añadió otro).
+- `pnpm exec vitest run tests/unit/paridad`: `13 failed | 3 passed (16) · 152 failed | 37 passed`. Diff solo de
+  atributos `class`, neto: quitadas `active:not-aria-[haspopup]:translate-y-px`, `hover:bg-primary/80`,
+  `hover:bg-muted`, `dark:hover:bg-input/50`, `hover:text-foreground`, `duration-100`, `zoom-in-95`/`zoom-out-95`
+  (diálogos); añadidas `btn-shine`, `btn-veil`, `active:not-aria-[haspopup]:scale-[0.98]`, `duration-(--dur-*)`,
+  `ease-(--ease-*)`, `data-closed:*`, `after:duration-/ease-`, `zoom-in-96`/`zoom-out-96`. Sin snapshots regenerados.
+
+### Notas
+- `transition-all` del base sale **después** de las `@utility` en la capa de utilidades (comprobado
+  compilando con `@tailwindcss/node`): las transiciones de `btn-shine`/`btn-veil` van en `&:not(:disabled)`
+  para ganar por especificidad. En v4 la escala y el desplazamiento son las propiedades `scale` y
+  `translate`, no `transform`.
+- `active:not-aria-[haspopup]:translate-y-px` sale del base y pasa a las variantes que no son `default` ni
+  `outline`, en vez de neutralizarlo con twMerge: así `buttonVariants()` y el `Button` renderizado siguen
+  dando las mismas clases (caso R5 de `button-touch`).
+- `outline` pierde también `hover:text-foreground`: con él, el texto no pasaría a `--primary` (R17). Es la
+  única clase retirada fuera de las `hover:bg-*` que lista `design.md > 8`.
+- Oscuro (P1): paradas `color-mix(in oklch, var(--primary) 85%, black)` → `--primary` → `… 85%, white`; velo
+  `color-mix(in oklch, var(--primary) 10%, transparent)`.
+
+**Veredicto:** T2 y T3 hechas; los casos nuevos pasan y solo fallan la paridad (T6) y el R22 que rompe el segundo bloque de movimiento reducido de T7.
+
+## T5 — Guardia de movimiento, y arreglo del R22 roto por T7 (frontend_dev)
+
+### Archivos
+- `app/globals.css` (modificado): la regla `[data-screen-enter] > * > :nth-child(n) { animation-delay: 0ms }`
+  pasa **dentro** del bloque global de movimiento reducido, después de la regla del kit (intacta), y se borra
+  el segundo `@media (prefers-reduced-motion: reduce)` del final. Como el bloque global va antes de los
+  retardos de entrada y tiene su misma especificidad (0,2,0), por orden perdería: gana con `!important`,
+  como el resto del bloque. No se tocó `tests/unit/theme/motion-tokens.test.ts`.
+- `tests/guards/guard-movimiento.test.ts` (nuevo): recorre `.ts/.tsx/.css` de `app/` y `components/` (sin
+  comentarios; `globals.css` sin el bloque del login). Falla con `duration-N` > 400, `duration-[...]` > 400 ms
+  o sin medida, `duration-(--x)` que no sea un `--dur-*` ≤ 400 ms, duraciones literales o `var(--dur-*)` > 400
+  en `transition`/`animation` de CSS, tokens `--dur-*` > 400, `ease-linear/in/out/in-out`, `ease-(--x)` fuera
+  de los tres tokens, `ease-[...]`, `cubic-bezier` fuera de la declaración de `--ease-*` y del login, tokens
+  `--ease-*` con Y fuera de [0, 1], `animate-bounce`, `animate-ping`, `infinite`, y `animate-*`/`animation:`/
+  `@keyframes` en `table.tsx`, `badge.tsx` y `brand-logo.tsx`. Cada detector tiene casos negativos con
+  fuentes inventadas, más un ancla de no vacuidad (≥ 50 archivos) y una prueba de que quitar los
+  delimitadores del login sí da infracciones.
+
+### Mapa R → test
+- R1 → `guard-movimiento.test.ts > R1: duration-N…`, `R1: duration-[...]…`, `R1: duration-(--x)…`,
+  `R1: duraciones literales y tokens…` y el barrido `ningún archivo declara movimiento prohibido`.
+- R2 → `guard-movimiento.test.ts > R2: ease-linear…`, `R2: ease-(--x)…`, `R2: cubic-bezier fuera…` y el barrido.
+- R23 → `guard-movimiento.test.ts > R23: una curva… con rebote`, `R23: animate-bounce y animate-ping`,
+  `R23: infinite fuera del login…`, `R23: animate-* y animaciones CSS en la tabla, el badge y el logo` y el barrido.
+
+### Hallazgos de la guardia en el código actual
+Ninguno. Las únicas apariciones de `cubic-bezier` e `infinite` son las tres declaraciones `--ease-*` y el
+bloque del login; las clases de movimiento en uso son `duration-(--dur-*)`, `ease-(--ease-*)`, `animate-in/out`,
+`animate-spin`, `animate-pulse` y `animate-none`.
+
+### Salida
+- `pnpm run typecheck` → `tsc --noEmit`, exit 0.
+- `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)` (avisos heredados en tests de pedidos y documentos).
+  Una pasada anterior dio `1 error` mientras otro subagente editaba en paralelo; la siguiente, 0.
+- `pnpm exec vitest run guard` → `Test Files 63 passed (63)`, `Tests 850 passed | 15 skipped (865)`.
+- `pnpm exec vitest run tests/unit/theme tests/unit/screen-enter.test.tsx` → `Test Files 11 passed (11)`,
+  `Tests 69 passed (69)` (incluye `motion-tokens > R22`, de nuevo verde).
+
+**Veredicto:** T5 hecha y R22 de `motion-tokens` en verde sin editar el test; la guardia no encuentra infracciones.
+
+## T8 — Indicador del ítem activo que se desliza (frontend_dev)
+
+### Archivos
+- `components/private/sidebar-active-indicator.tsx` (nuevo, `'use client'`): envuelve una lista en un
+  `div.relative`; `span aria-hidden data-slot="sidebar-active-indicator" data-variant="menu|sub"`
+  hermano de la lista. `useLayoutEffect` con `usePathname`; activo = `:scope > ul > li > [data-active]`;
+  posición sumando `offsetTop/Left` por la cadena de `offsetParent` hasta el contenedor (el `<li>` es
+  `relative`); `ResizeObserver` sobre el contenedor (recoloca sin transición). Modos en `data-motion`:
+  `slide` (misma lista), `fade` (llega de otra lista o la lista no tenía activo; fuerza reflow con
+  opacidad 0 y sin transición de posición), `none` (primera colocación y tamaño).
+- `components/private/app-sidebar.tsx`: `SidebarMenu` de cada sección (`variant="menu"`) y cada
+  `SidebarMenuSub` (`variant="sub"`) envueltos. El chevron de T2 intacto.
+- `app/globals.css`: tras la regla del submenú activo y antes de `@layer base`, sin capa: pintura del
+  indicador (`opacity: 0` inicial, mismo fondo y anillo que R11; `sub` con `--sidebar-accent` y anillo
+  al 22 %) y la regla `[data-indicator-ready] > [data-slot='sidebar-menu'] > … > [data-active]` (y la
+  del submenú) con `background: transparent; box-shadow: none`. La regla de R11 no se tocó.
+- `tests/unit/sidebar-active-indicator.test.tsx` (nuevo, 14 casos).
+
+### Mapa R → test
+| R | Test |
+| --- | --- |
+| R13 | `sidebar-active-indicator.test.tsx > R13: dentro de la misma lista se desliza…`, `R13: el deslizamiento anima transform con --dur-base y --ease-standard` |
+| R14 | `… > R14: la primera colocacion…`, `R14: si el activo llega de otra lista…`, `R14: el activo de un submenu no lo toma…`, `R14: sin item activo…` |
+| R15 | `… > R15: al cambiar de tamano…`, `R15: el indicador es decorativo…`, `R15: sin JavaScript…` (SSR con `renderToString`), `R15: la barra lateral real…`, y los 4 casos de `SidebarActiveIndicator: CSS` (opacidad 0, mismo fondo/anillo que R11, anillo del submenú, regla de listo sin capa) |
+
+### Salida de los comandos
+- `pnpm run typecheck` → `tsc --noEmit` sin errores.
+- `pnpm run lint` → `ESLint: 0 errors, 7 warnings in 2 files` (preexistentes: `confirm-catalog-import.test.ts`, `order-service.test.ts`).
+- `pnpm exec vitest related --run components/private/sidebar-active-indicator.tsx components/private/app-sidebar.tsx app/globals.css tests/unit/sidebar-active-indicator.test.tsx`
+  → `Test Files 19 passed (19)`, `Tests 339 passed (339)` (incluye `app-sidebar.test.tsx` y `sidebar-ajuste.test.tsx`, sin editar).
+- `pnpm exec vitest run tests/unit/theme tests/unit/brand/fonts.test.ts tests/unit/login-skin.test.tsx tests/unit/sidebar-desktop.test.tsx tests/unit/sidebar-mobile.test.tsx guard`
+  → `Test Files 77 passed (77)`, `Tests 971 passed | 15 skipped (986)`.
+- `pnpm exec vitest run tests/unit/paridad` → `Test Files 13 failed | 3 passed (16)`, `Tests 152 failed | 37 passed (189)`:
+  los diffs son clases de T2/T3 (`transition-all`, `scale-[0.98]`, `btn-veil`, `btn-shine`, `duration-(--dur-*)`,
+  `ease-(--ease-*)`, `fade-*`, `zoom-*`, `slide-in-*`). Ningún test de paridad renderiza `AppSidebar` y el
+  span del indicador no aparece en ningún diff (0 coincidencias de `sidebar-active-indicator`). Snapshots sin regenerar.
+
+### Notas
+- Primera pasada de `related`: rojo en `pedidos-ui/pedidos-viewport.test.tsx > R45`, que prohíbe la clase
+  `opacity-0` en cualquier elemento. Se movió la opacidad inicial a la regla CSS del indicador; verde.
+- Desvío leve de `design.md > 5`: la primera colocación de cada lista (montaje/hidratación) es inmediata y
+  sin fundido, porque el botón ya está pintado por CSS en ese sitio y un fundido produciría un parpadeo.
+  El fundido se aplica cuando el activo llega de otra lista o la lista no tenía activo. Cumple R14
+  («como mucho un fundido»).
+- El fundido usa reflow forzado en vez de esperar al frame siguiente (`requestAnimationFrame` puede correr
+  antes del cálculo de estilos del mismo frame y saltarse la transición).
+- La medición real (Chromium y WebKit) queda para `e2e/movimiento.spec.ts` (T9).
+
+**Veredicto:** T8 hecha; R13–R15 con tests verdes, `app-sidebar` y `sidebar-ajuste` verdes sin tocar, y el span no entra en los snapshots de paridad.
+
+## T9 y T10 — E2E de movimiento, notas de enmienda y trazabilidad (frontend_dev)
+
+### Archivos
+- `e2e/movimiento.spec.ts` (nuevo). Una sonda (`page.addInitScript` + `MutationObserver` sobre el
+  documento) guarda `getComputedStyle` de cada panel, diálogo, velo y toast al abrirse (montado
+  abierto o al recibir `data-open`) y al salir (`data-closed`, `data-ending-style`,
+  `data-removed="true"`), y de los dos primeros bloques al aparecer `data-screen-enter`. Dos casos,
+  cada uno con movimiento normal y con `page.emulateMedia({ reducedMotion: 'reduce' })`:
+  - R4/R5/R6/R10/R21: `Sheet` de alta de cliente (abre, guarda, cierra) → toast de Sonner (entra y
+    vence) → `Dialog` de subida de PDF del listado de fórmulas (abre y cierra con «Cerrar»). Toast:
+    `transition-duration` exacta `[300, 300, 300, 200]` ms con `--ease-enter` y salida en 150 ms con
+    `--ease-exit`; ninguna supera 400 ms. Si ganara la hoja de Sonner se leerían 400 ms y `ease`.
+  - R13/R15/R19/R20/R21: en «Clientes» el indicador cubre el ítem activo (diferencia < 1 px,
+    opacidad 1, `data-indicator-ready`); buscar (URL con `q`) no pone `data-screen-enter`; pasar a
+    «Proveedores» (misma lista) lo pone, con `screen-enter` en 300 ms/`--ease-enter` y el segundo
+    bloque a 40 ms, y el indicador pasa por `data-motion="slide"` en 200 ms/`--ease-standard` y acaba
+    sobre el nuevo activo; en modo icono y al volver a expandir sigue encima. Con movimiento reducido,
+    toda duración ≤ 0.01 ms, una iteración y retardo 0.
+  - Datos: empresa, Administrador del seed y un cliente sembrado por worker (prefijo `qc228_e2e_`
+    + `RUN_ID`); el alta de cliente es la única escritura por interfaz. `afterAll` borra por empresa.
+- `tests/guards/guard-identificador-de-request.test.ts`: solo se añaden 5 líneas al final de
+  `E2E_ESPERADOS` (comentario de alta + `'movimiento.spec.ts'`). La guardia no exige nada más del spec.
+- `specs/QC-226-tema-y-marca-base/requirements.md`: nota bajo R11 (con JS el fondo y el anillo los pinta
+  el indicador, sin cambio visual) y bajo R32 (enmendado por QC-228 D5 → R19/R21). Texto existente intacto.
+
+### Hallazgos al escribir el E2E (sin cambio de código de producción)
+- **El diálogo de baja de cliente no tiene salida animada:** `customer-row-actions.tsx` lo monta solo
+  mientras está abierto (`{deleteOpen && <DeleteCustomerDialog open … />}`), así que al cerrarse
+  (Volver o Eliminar) se desmonta en el acto, sin `data-closed`. Es un patrón del consumidor previo a
+  QC-228 y se repite en `presentation-row-actions.tsx`, `unit-row-actions.tsx`, `user-table.tsx`,
+  `work-group-table.tsx` y `order-sheet.tsx`; afecta a R5 en esos consumidores. **No se
+  arregló** (ambiguo: tocaría pantallas de otras fichas). El E2E usa el `Dialog` de subida de PDF, que no
+  se desmonta (`keepMounted`).
+- Sonner pausa el vencimiento con el puntero encima: el E2E aparta el ratón tras guardar.
+- Entorno: el cliente de Prisma del worktree se había generado antes de copiar el `.env` y no lo leía
+  (`Environment variable not found: DATABASE_URL`); se regeneró con `pnpm exec prisma generate`
+  (artefacto no versionado). Un `tsc` corrido mientras `next dev` escribía `.next/dev/types/routes.d.ts`
+  dio errores de ese archivo generado; tras terminar el E2E, verde.
+
+### Salida de los comandos
+- `pnpm run typecheck` → `tsc --noEmit`, exit 0.
+- `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)` (los preexistentes de `confirm-catalog-import.test.ts`
+  y `order-service.test.ts`).
+- `pnpm exec vitest run guard` → `Test Files 63 passed (63)`, `Tests 850 passed | 15 skipped (865)`.
+- `pnpm exec playwright test e2e/movimiento.spec.ts e2e/login-skin.spec.ts` → exit 0, `22 passed (58.4s)`:
+  - chromium: 11 pasados / 0 fallados (login-skin 7, movimiento 4).
+  - webkit: 11 pasados / 0 fallados (login-skin 7, movimiento 4).
+  ```
+  ok [chromium] movimiento.spec.ts:462 R4, R5, R6, R10, R21 … con movimiento normal (28.5s)
+  ok [chromium] movimiento.spec.ts:462 R4, R5, R6, R10, R21 … con movimiento reducido (28.1s)
+  ok [chromium] movimiento.spec.ts:583 R13, R15, R19, R20, R21 … con movimiento normal (17.9s)
+  ok [chromium] movimiento.spec.ts:583 R13, R15, R19, R20, R21 … con movimiento reducido (17.8s)
+  ok [webkit]   movimiento.spec.ts:462 R4, R5, R6, R10, R21 … con movimiento normal (18.2s)
+  ok [webkit]   movimiento.spec.ts:462 R4, R5, R6, R10, R21 … con movimiento reducido (18.0s)
+  ok [webkit]   movimiento.spec.ts:583 R13, R15, R19, R20, R21 … con movimiento normal (15.0s)
+  ok [webkit]   movimiento.spec.ts:583 R13, R15, R19, R20, R21 … con movimiento reducido (13.9s)
+  ok [chromium|webkit] login-skin.spec.ts: los 7 casos en cada motor (incl. R21, R22 y R18/R19 de QC-226)
+  22 passed (58.4s)
+  ```
+
+## Mapa R<n> -> test (consolidado)
+
+| R | Test |
+| --- | --- |
+| R1 | `tests/guards/guard-movimiento.test.ts > R1: duration-N…`, `R1: duration-[...]…`, `R1: duration-(--x)…`, `R1: duraciones literales y tokens…` y el barrido `ningún archivo declara movimiento prohibido` |
+| R2 | `guard-movimiento.test.ts > R2: ease-linear…`, `R2: ease-(--x)…`, `R2: cubic-bezier fuera…` y el barrido |
+| R3 | `tests/unit/theme/motion-tokens.test.ts > R3: las transiciones sin duracion ni curva propias…` |
+| R4 | `tests/unit/shared-ui/motion-classes.test.tsx > R4: el diálogo entra…`; `e2e/movimiento.spec.ts > R4, R5, R6, R10, R21 … con movimiento normal` |
+| R5 | `motion-classes.test.tsx > R5: el diálogo sale…`; `e2e/movimiento.spec.ts > R4, R5, R6, R10, R21 …` |
+| R6 | `motion-classes.test.tsx > R6: el panel lateral…`; `e2e/movimiento.spec.ts > R4, R5, R6, R10, R21 …` |
+| R7 | `motion-classes.test.tsx > R7: menús, desplegables, popover y autocompletar…` |
+| R8 | `motion-classes.test.tsx > R8: el tooltip…` |
+| R9 | `motion-classes.test.tsx > R9: el indicador de la pestaña activa…` |
+| R10 | `motion-tokens.test.ts > R10: toasts > *` (6 casos); `e2e/movimiento.spec.ts > R4, R5, R6, R10, R21 …` (duración calculada; Sonner no gana) |
+| R11 | `motion-classes.test.tsx > R11: el ancho de la barra lateral…` |
+| R12 | `motion-classes.test.tsx > R12: el chevron…` |
+| R13 | `tests/unit/sidebar-active-indicator.test.tsx > R13: dentro de la misma lista se desliza…`, `> R13: el deslizamiento anima transform…`; `e2e/movimiento.spec.ts > R13, R15, R19, R20, R21 …` |
+| R14 | `sidebar-active-indicator.test.tsx > R14: la primera colocacion…`, `R14: si el activo llega de otra lista…`, `R14: el activo de un submenu no lo toma…`, `R14: sin item activo…` |
+| R15 | `sidebar-active-indicator.test.tsx > R15: *` (7 casos + 4 de CSS); `e2e/movimiento.spec.ts > R13, R15, R19, R20, R21 …` (expandida, icono y de nuevo expandida) |
+| R16 | `motion-classes.test.tsx > R16: el botón primario usa el brillo…`; `motion-tokens.test.ts > R16: *` (3 casos) |
+| R17 | `motion-classes.test.tsx > R17: el botón secundario (outline) usa el velo…`; `motion-tokens.test.ts > R17: *` (2 casos) |
+| R18 | `motion-classes.test.tsx > R18: primario y secundario escalan al 98 %…`; `motion-tokens.test.ts > R18: la escala al pulsar…`; `tests/unit/shared/data-table-scroll.test.tsx > R18: la flecha no encoge al pulsarse…` |
+| R19 | `tests/unit/navegacion/nav-module.test.ts`; `tests/unit/screen-enter.test.tsx > R19: *` (3 casos); `e2e/movimiento.spec.ts > R13, R15, R19, R20, R21 …` |
+| R20 | `nav-module.test.ts > R20: una pantalla de detalle pertenece al módulo del ítem`; `screen-enter.test.tsx > R20: navegar dentro del módulo…`; `e2e/movimiento.spec.ts > R13, R15, R19, R20, R21 …` (búsqueda con `q`) |
+| R21 | `motion-tokens.test.ts > R21: *` (2 casos); `data-table-scroll.test.tsx > R21: *` (2 casos); los 4 casos `… con movimiento reducido` de `e2e/movimiento.spec.ts` |
+| R22 | `motion-tokens.test.ts > R22: la regla global no cambia el nombre de ninguna animacion…`; `tests/unit/theme/color-tokens.test.ts > R32 (ENMIENDA QC-228)`; `e2e/login-skin.spec.ts > R22 (ENMIENDA QC-226): con movimiento reducido…` |
+| R23 | `guard-movimiento.test.ts > R23: una curva… con rebote`, `R23: animate-bounce y animate-ping`, `R23: infinite fuera del login…`, `R23: animate-* y animaciones CSS en la tabla, el badge y el logo` y el barrido |
+| R24 | La suite existente, sin editar aserciones de comportamiento salvo las enmiendas de `design.md > 8`: `tests/unit/shared-ui/button-touch.test.tsx > R5 — sin touch, buttonVariants da las clases de siempre para el defecto` (solo la cadena de clases, `ENMIENDA QC-228`) y `tests/unit/theme/color-tokens.test.ts > R6` (localizador `--dur-instant:`) y `> R32 (ENMIENDA QC-228)`. Los 21 archivos de `tests/unit/paridad/*` (376 tests), regenerados en T6 solo por clases de movimiento |
+| R25 | `tests/guards/guard-dependencias-aprobadas.test.ts` (existente; verde en `vitest run guard`) |
+
+## Pendientes
+
+- **T6:** HECHA el 2026-10-09 (sección T6 al final). Texto original: pendiente de integrar `dev` con QC-232. Hoy
+  fallan 13 archivos de `tests/unit/paridad` (152 tests) solo por las clases de T2/T3 previstas en
+  `design.md > 8` (más `hover:text-foreground` de `outline`). Se regeneran con `-u` en el commit
+  `test(QC-228): paridad con las clases de movimiento` tras la integración.
+- **Salida de diálogos montados condicionalmente** (hallazgo de T9): los diálogos de baja que la fila
+  monta solo mientras están abiertos no animan su salida (R5). Decide el leader/humano si es alcance de
+  QC-228 o ficha aparte.
+
+**Veredicto:** T9 y T10 hechas; los dos E2E verdes en Chromium y WebKit (22/22), guardias verdes y R1–R25 con test.
+
+## T6 — Paridad tras integrar dev con QC-232 (implementer, 2026-10-09)
+
+### Integración
+`git fetch origin dev && git merge origin/dev` (dev en 92d514c9, PR #195 de QC-232): merge
+`7c943774` **sin conflictos**. Ningún archivo de componentes tocado por las dos ramas a la vez.
+
+### Snapshots regenerados (commit `28046e6e`, `test(QC-228): paridad con las clases de movimiento`)
+`pnpm exec vitest run tests/unit/paridad` antes de `-u`: 17 archivos y 264 tests en rojo. Tras `-u`:
+21/21 archivos y 376/376 tests en verde. El commit solo contiene los `.snap`.
+
+Comprobación mecánica del diff (`git diff -U0`, cada línea `-` emparejada con su `+`, comparadas
+quitando los atributos `class`): **724 pares, 0 diferencias fuera de `class`, 0 líneas sin pareja**.
+El árbol accesible, los textos y los atributos no cambian. Tokens de clase del diff:
+
+| Sale | Entra | Origen (`design.md > 8`) |
+|---|---|---|
+| `active:not-aria-[haspopup]:translate-y-px` (404) | `active:not-aria-[haspopup]:scale-[0.98]` (404) | escala al pulsar de `default`/`outline` (R18) |
+| `hover:bg-primary/80` (161) | `btn-shine` (161) | brillo del primario (R16) |
+| `hover:bg-muted`, `hover:text-foreground`, `dark:hover:bg-input/50` (243) | `btn-veil` (243) | velo de `outline` (R17); `hover:text-foreground` ya anotado en Pendientes |
+| `duration-100` (177), `duration-150`/`duration-200`/`ease-in-out` (45) | `duration-(--dur-*)`, `ease-(--ease-*)`, `data-closed:`/`data-ending-style:` duración y curva de salida, `after:duration/ease` de tabs | duración y curva |
+| `data-open:zoom-in-95`, `data-closed:zoom-out-95` (65) | `zoom-in-96`, `zoom-out-96` (65) | escala de entrada de diálogos |
+
+Archivos regenerados (líneas cambiadas): `confirmaciones-paridad` 336, `formularios-paridad` 348,
+`inventario-paridad` 136, `recetas-paridad` 120, `catalogo-paridad` 96, `buscadores-paridad` 90,
+`grupos-paridad` 54, `usuarios-paridad` 54, `asignacion-paridad` 44, `presentaciones-paridad` 34,
+`clientes-paridad` 30, `pedidos-paridad` 30, `unidades-paridad` 26, `proveedores-paridad` 20,
+`campos-paridad` 18, `asignacion-listas-paridad` 8, `login-paridad` 4. Motivo, en todos: solo clases
+de movimiento de T2/T3 (tabla anterior).
+
+`tests/unit/shared-ui/button-touch.test.tsx`: 63/63 verde, no se toca.
+
+### `./init.sh` (rápido) — ROJO, bloqueante pendiente de decisión
+```
+ Test Files  1 failed | 103 passed (104)
+      Tests  1 failed | 1458 passed | 35 skipped (1494)
+[test:rapido] rojos NUEVOS (fuera del baseline): tests/unit/clientes/scope.test.ts
+ FAIL tests/unit/clientes/scope.test.ts > R28 — los UNICOS E2E que nombran clientes son
+      e2e/clientes.spec.ts y la excepcion de QC-156 > ningun otro archivo de e2e/ ... nombra clientes
+AssertionError: spec E2E ajeno con marca de clientes: movimiento.spec.ts
+```
+El proyecto `ui` del mismo gate: 282/282 archivos, 4304 tests verdes. El rojo no está en
+`tests/baseline-rojos.json` y lo causa el propio E2E de QC-228 (`e2e/movimiento.spec.ts`, T9), que
+navega a «Clientes» y da de alta un cliente. Dos salidas, con precedente la primera (QC-156, QC-223):
+1. añadir `movimiento.spec.ts` a `E2E_PERMITIDOS` con su nota de por qué;
+2. reescribir el E2E sobre otro módulo (p. ej. Proveedores), cambiando `design.md` de QC-228.
+No se aplica ninguna: decide el leader/humano.
+
+**Resuelto (leader, opción 1):** `movimiento.spec.ts` entra en `E2E_PERMITIDOS` de
+`tests/unit/clientes/scope.test.ts`, con una nota del motivo que no cita fichas (`docs/conventions.md >
+Comentarios`). `scope.test.ts` y los 4 `.snap` de QC-232 regenerados en T6 se añaden a
+`tasks.md > Archivos esperados`. `archivos-en-vuelo --candidata QC-228`: solo el choque ya decidido
+con QC-223 (`guard-identificador-de-request.test.ts`). `./init.sh`:
+```
+ Test Files  282 passed (282)      Tests  4304 passed | 1 skipped (4305)
+ Test Files  104 passed (104)      Tests  1459 passed | 35 skipped (1494)
+✓ test:rapido paso
+== init OK ==
+```
+
+## Rojo de CI en PR #197: `data-table-alcance.test.ts` (2026-10-09)
+`tests/unit/shared/data-table-alcance.test.ts > la lista de specs E2E que referencian data-table es
+cerrada` fallaba porque `e2e/movimiento.spec.ts` usa `data-table-search` (búsqueda en Clientes para
+probar que navegar dentro del módulo no repite la entrada de pantalla, R20). Lista cerrada con
+precedentes (QC-156, QC-219, QC-223): entra `movimiento.spec.ts`, nota fechada sin citar fichas, el
+centinela pasa de treinta y cuatro a treinta y cinco. Añadido a `tasks.md > Archivos esperados`.
+- `vitest run tests/unit/shared tests/unit/paridad tests/unit/clientes/scope.test.ts`: 66/66 archivos, 924 tests verdes.
+- `./init.sh --completo`: 1102/1102 archivos, 16586 tests verdes, 139 omitidos; sin rojos nuevos; `init OK`.
+
+## Enmienda D11 — botones (frontend_dev)
+
+**Archivos modificados**
+- `components/ui/button.tsx`: `outline-dashed`, `secondary`, `ghost` llevan `btn-veil` y `active:not-aria-[haspopup]:scale-[0.98]`; se retiran sus `hover:bg-*`, `hover:text-*` y `dark:hover:bg-*` (se conservan `aria-expanded:*` y el resto). `destructive`: `translate-y-px` → `scale-[0.98]`, conserva su hover rojo. `link`: sin cambio.
+- `tests/unit/shared-ui/motion-classes.test.tsx`: dos casos R17 nuevos y el caso R18 reescrito («todas salvo link»).
+- `tests/unit/theme/motion-tokens.test.ts`: los ayudantes de contraste del caso R16 suben al `describe` (sin cambiar el caso R16) y entra el caso R17 de contraste del velo.
+
+**Sin cambios (revisado)**
+- `components/shared/data-table/data-table-scroll-nav.tsx`: las flechas usan `variant="outline"`, que ya escalaba; `scale-100` y `-translate-y-1/2` siguen neutralizando la pulsación y el comentario sigue siendo cierto.
+- `tests/guards/guard-movimiento.test.ts`: no vigila variantes de botón ni `translate-y-px`; no hace falta ajustarlo.
+- `tests/unit/shared-ui/button-touch.test.tsx`: pasa sin tocarlo (la cadena fija es solo la de `default`).
+- Ningún otro consumidor de `app/` ni `components/` depende de `active:not-aria-[haspopup]:translate-y-px`.
+
+**Mapa R → test**
+- R17 → `motion-classes.test.tsx > R17: outline-dashed, secondary y ghost usan el velo en lugar de su hover anterior`; `> R17: destructive y link no llevan velo; destructive conserva su hover rojo`; `motion-tokens.test.ts > R17: el texto petróleo del velo cumple 4.5:1 sobre secondary y sobre background, en claro y en oscuro` (ratios: claro 5.41 secondary / 6.13 background; oscuro 5.64 / 8.60).
+- R18 → `motion-classes.test.tsx > R18: todas las variantes salvo link escalan al 98 % al pulsar, salvo si abren un menú; link conserva su pulsación`.
+
+**Nota visual:** `btn-veil` pinta el borde a `--primary` al hover; en `secondary` y `ghost` (borde transparente) aparece un borde petróleo al hover. Es lo que dice la utilidad; si no se quiere, es otra enmienda.
+
+**Salida de los comandos**
+```
+$ pnpm typecheck
+> tsc --noEmit
+(sin errores)
+
+$ pnpm exec eslint components/ui/button.tsx tests/unit/shared-ui/motion-classes.test.tsx tests/unit/theme/motion-tokens.test.ts
+ESLint: No issues found
+
+$ pnpm exec vitest run tests/unit/shared-ui tests/unit/theme tests/guards/guard-movimiento.test.ts tests/unit/shared/data-table-scroll.test.tsx
+ Test Files  33 passed (33)
+      Tests  386 passed (386)
+```
+Paridad no corrida (la regenera el leader).
+
+**Veredicto:** enmienda D11 aplicada a los botones; typecheck, lint y tests tocados en verde.
+
+## Paridad tras la enmienda D11 (implementer, 2026-10-09)
+Commit `test(QC-228): paridad con la enmienda D11 de botones`, solo `.snap`. `vitest run tests/unit/paridad -u`:
+134 snapshots actualizados, 21/21 archivos y 376/376 tests verdes. Diff comprobado igual que en T6:
+**463 pares, 0 diferencias fuera de `class`, 0 líneas sin pareja**.
+
+| Sale | Entra | Motivo |
+|---|---|---|
+| `active:not-aria-[haspopup]:translate-y-px` (463) | `active:not-aria-[haspopup]:scale-[0.98]` (463) | R18 enmendado: pulsación al 98 % en `outline-dashed`, `secondary`, `ghost` y `destructive` (los 44 sin velo son `destructive`) |
+| `hover:bg-muted`, `hover:text-foreground` (419), `dark:hover:bg-muted/50` (374), `dark:hover:bg-input/50` (45) | `btn-veil` (419) | R17 enmendado: velo en `ghost` y `outline-dashed` (y `secondary`, sin apariciones en los snapshots) |
+
+Archivos (líneas cambiadas): `campos` 146, `formularios` 104, `confirmaciones` 64, `catalogo` 35,
+`asignacion` 21, `inventario` 19, `pedidos` 19, `recetas` 16, `clientes` 15, `usuarios` 8,
+`proveedores` 6, `grupos` 4, `unidades` 4, `presentaciones` 2 (todos `-paridad.test.tsx.snap`).
+
+### Verificación tras D11
+- `vitest run tests/unit/shared tests/unit/paridad`: 65/65 archivos, 898 tests verdes.
+- `./init.sh`, primera vuelta: un rojo, `tests/unit/inventario/adjust-batch-dialog.test.tsx > R9 — con el lote
+  sobre-reservado…` (`toastExito` llamado 0 veces). Aislado pasa 3 de 3 (30/30): es de tiempos bajo
+  carga y no lo causa el cambio, que solo toca clases.
+- `./init.sh`, segunda vuelta: `ui` 284/284 archivos (4353 tests), `node` 104/104 (1459 tests), `init OK`.
