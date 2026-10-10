@@ -18,6 +18,7 @@ import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { FORMULAS_ROUTE, newRecipeVersionRoute, recipeEditRoute } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
@@ -120,7 +121,7 @@ test.beforeAll(async () => {
   });
   companyId = company.id;
 
-  const admin = await prisma.user.create({
+  const admin = await createFixtureUser({
     data: {
       firstNames: `Qc174${RUN_ID.slice(0, 8)}`,
       lastNames: 'Versiones',

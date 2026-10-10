@@ -22,6 +22,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { INVENTORY_ROUTE, PRESENTATIONS_ROUTE } from '@/lib/shared/routes';
 
 // QC-93 (R8): el aterrizaje tras el login se deriva de los permisos del usuario en el helper unico.
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
@@ -220,7 +221,7 @@ test.beforeAll(async () => {
   productBId = empresaB.productId;
 
   // Hash real: el login tiene que pasar por bcrypt, el adaptador Prisma y la Server Action de verdad.
-  await prisma.user.create({
+  await createFixtureUser({
     data: {
       firstNames: `Qc49${RUN_ID.slice(0, 8)}`,
       lastNames: 'Aislamiento',

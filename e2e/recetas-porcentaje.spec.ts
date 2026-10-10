@@ -60,6 +60,7 @@ import {
   recipeEditRoute,
 } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
@@ -145,7 +146,7 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
     );
   }
 
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames: `Qc147${RUN_ID.slice(0, 8)}`,
       lastNames: 'Porcentaje',

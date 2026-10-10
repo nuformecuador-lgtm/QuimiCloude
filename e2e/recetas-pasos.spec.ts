@@ -42,6 +42,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { FORMULAS_ROUTE, NEW_RECIPE_ROUTE, recipeEditRoute } from '@/lib/shared/routes';
 
 // QC-93 (R8): el aterrizaje tras el login se deriva de los permisos del usuario en el helper unico.
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
@@ -94,7 +95,7 @@ async function createAdmin(user: Credentials): Promise<string> {
     );
   }
 
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames: `Qc64${RUN_ID.slice(0, 8)}`,
       lastNames: 'Pasos',

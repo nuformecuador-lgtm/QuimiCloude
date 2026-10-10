@@ -28,6 +28,7 @@ import { CUSTOMERS_ROUTE } from '@/lib/shared/routes';
 import { readSidebarOpenState, SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 import { THEME_COOKIE } from '@/lib/shared/ui/theme-state';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
 const FIXTURE_PREFIX = 'qc227_e2e_';
@@ -577,7 +578,7 @@ test.beforeAll(async () => {
   if (!role) {
     throw new Error(`falta el rol "${ROLE_ADMINISTRADOR}": siembra la base con \`pnpm run db:seed\``);
   }
-  await prisma.user.create({
+  await createFixtureUser({
     data: {
       firstNames: `Qc227${RUN_ID.slice(0, 8)}`,
       lastNames: 'Marca',

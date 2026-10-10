@@ -45,6 +45,7 @@ import { GENERIC_CREDENTIALS_ERROR } from '@/lib/modules/identity/adapters/drivi
 import { prisma } from '@/lib/shared/db/prisma';
 
 // QC-93 (R8): el aterrizaje tras el login se deriva de los permisos del usuario en el helper unico.
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand, permissionsForUsername } from './helpers/landing';
 
 /** Ruta publica del login (QC-10). No hay constante para ella en `lib/shared/routes.ts`. */
@@ -149,7 +150,7 @@ async function createTestUser(
 
   // Hash REAL: el objetivo del E2E es que bcrypt, el adaptador Prisma y la Server Action se
   // entiendan de verdad. Un hash inventado probaria otra cosa.
-  await prisma.user.create({
+  await createFixtureUser({
     data: {
       firstNames: 'Usuario',
       lastNames: 'De Prueba E2E',

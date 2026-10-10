@@ -45,6 +45,7 @@ import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
 
@@ -220,7 +221,7 @@ async function createUser(user: Credentials, roleName: string): Promise<string> 
         '`pnpm run db:seed` antes de correr `pnpm run e2e`.',
     );
   }
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames: `Qc223${RUN_ID.slice(0, 8)}`,
       lastNames: 'Entrega',

@@ -46,6 +46,7 @@ import { normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand, permissionsForUsername } from './helpers/landing';
 import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
@@ -124,7 +125,7 @@ async function createUser(user: Credentials, roleName: string, forCompanyId: str
     );
   }
 
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames: `Qc92${RUN_ID.slice(0, 8)}`,
       lastNames: 'Ajuste',
