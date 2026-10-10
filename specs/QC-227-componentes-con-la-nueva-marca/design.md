@@ -61,6 +61,7 @@ una regla sin capa en `globals.css`, y el inactivo va al lado, por la misma raz�
 | `components/ui/sidebar.tsx` (enmienda 2026-10-09) | Botón de menú en modo icono: `size-8!`/`p-2!` → `size-11!`/`p-3.5!` | R31, R32, R33, R34 |
 | `components/private/app-sidebar.tsx` (enmienda 2026-10-09) | Enlace de marca: `group-data-[collapsible=icon]:p-1.5!` | R31, R35 |
 | `components/private/nav-user.tsx` (enmienda 2026-10-09, P11) | Avatar centrado solo en modo icono | R32 |
+| `components/private/app-sidebar.tsx`, `components/ui/sidebar.tsx`, `app/(private)/components/sidebar-toggle.tsx` (enmienda 2026-10-09, D12) | Icono de abrir o cerrar según el estado; colores de la pastilla fijados en todos los estados; `SidebarTrigger` admite `children` (§16.7) | R38, R39 |
 | `app/globals.css` (enmienda 2026-10-09, P12) | Relleno del botón en modo icono a 14 px y comentario corregido | R31 |
 
 ## 3. Badges (R1–R9)
@@ -310,6 +311,7 @@ revés.
 | R30 | `tests/guards/guard-movimiento.test.ts` (llega con QC-228), en verde y sin editar |
 | R31–R36 (medido) | `e2e/marca-componentes.spec.ts`, bloque «carril colapsado» (§16.4), en Chromium y WebKit |
 | R31, R35, R36, R37 (clases) | `tests/unit/marca/sidebar-carril.test.ts` (§16.4) |
+| R38, R39 | `e2e/marca-componentes.spec.ts`, bloque «control de colapso», y `tests/unit/marca/sidebar-carril.test.ts` (§16.7) |
 | R36 | Además: `tests/unit/sidebar-ajuste.test.tsx`, `tests/unit/sidebar-desktop.test.tsx`, `tests/unit/app-sidebar.test.tsx` y `tests/unit/theme/ui-primitivas-intactas.test.ts` en verde, sin editar aserciones, salvo la de P12 |
 
 ## 12. Alternativas descartadas
@@ -515,3 +517,81 @@ depende de la estructura del contenido de cada botón. Igualar la caja de conten
 icono, como hace shadcn, no depende de eso.
 
 **Dependencias:** ninguna (R28).
+
+### 16.7 Control de colapso sin icono visible (R38, R39, D12)
+
+**Lo que hay.** Los dos controles tienen icono:
+- la pastilla del borde (`app-sidebar.tsx:194-206`) es un `Button variant="ghost" size="icon-sm"`
+  con `PanelLeftIcon className="size-3.5"`;
+- el control del encabezado (`sidebar-toggle.tsx`) es `SidebarTrigger`, que pinta
+  `PanelLeftIcon` a 16 px.
+
+**Causas probables, por lectura** (sin medir; T12 las confirma primero):
+
+1. **Pastilla con el puntero encima, en modo claro: el icono desaparece.**
+   - La variante `ghost` trae la utilidad `btn-veil` (QC-228). Su regla `:hover` pone
+     `color: var(--primary)` y `border-color: var(--primary)`.
+   - Su selector (`.btn-veil:hover:not(:disabled)`) es más específico que el
+     `hover:text-sidebar-accent-foreground` de la pastilla, y los dos están en la misma capa, así
+     que gana el de `btn-veil`.
+   - El icono queda en `--primary` (oklch L 0.44) sobre `hover:bg-sidebar-accent` (L 0.34): un
+     contraste de alrededor de 1.3:1, prácticamente invisible.
+   - Justo cuando el usuario apunta al control para buscarlo, el icono se borra. En oscuro
+     (L 0.77 sobre L 0.28) sí se ve.
+2. **Pastilla expandida: pierde los colores del panel.** `ghost` trae
+   `aria-expanded:bg-muted aria-expanded:text-foreground`, más específicos que `bg-sidebar` y
+   `text-sidebar-foreground`. Con el panel expandido (`aria-expanded="true"`), la pastilla sale
+   gris claro con el icono oscuro en modo claro. El icono se ve, pero la pastilla deja de leerse
+   como parte del panel y, con el puntero encima, cae en la causa 1.
+3. **Control del encabezado en escritorio.** Va `md:hidden` por decisión humana del 2026-09-02.
+   En escritorio no hay icono en el encabezado porque el control no se muestra (P14).
+
+**Descartado leyendo el código:**
+- **Recorte.** Ningún ancestro de la pastilla tiene `overflow` distinto de `visible`
+  (`sidebar-container`, `sidebar-inner` y el envoltorio `relative`). La pastilla sobresale 8 px
+  del contenedor fijo (`z-10`), por encima del `<main>` (`relative`, `z-index: auto`), así que no
+  queda tapada.
+- **Tamaño.** `size-3.5` es explícito y la regla `[&_svg:not([class*='size-'])]` del botón no
+  la pisa.
+
+**Cambio:**
+- **Pastilla** (`app-sidebar.tsx`):
+  - el icono pasa a `open ? PanelLeftCloseIcon : PanelLeftOpenIcon`, con el mismo `size-3.5`;
+  - en todos los estados, sus colores son los del panel y ganan a `btn-veil` y a los
+    `aria-expanded:*` de `ghost` con el modificador `!` de Tailwind. Una declaración importante
+    gana a una normal de la misma capa;
+  - las clases son `bg-sidebar! text-sidebar-foreground! hover:bg-sidebar-accent!
+    hover:text-sidebar-accent-foreground! hover:border-sidebar-ring!`, más
+    `aria-expanded:bg-sidebar! aria-expanded:text-sidebar-foreground!`, para que valgan aunque
+    `tailwind-merge` deje las dos variantes.
+  - El implementer comprueba en el E2E el color calculado en reposo y con el puntero encima.
+  - El `scale` al pulsar de QC-228 no se toca.
+- **Encabezado** (P13):
+  - `components/ui/sidebar.tsx`: `SidebarTrigger` pinta `children ?? <PanelLeftIcon />`;
+  - `app/(private)/components/sidebar-toggle.tsx` le pasa
+    `isExpanded ? <PanelLeftCloseIcon /> : <PanelLeftOpenIcon />`. Usa el mismo `isExpanded` que
+    ya calcula para `aria-expanded`, así que el icono y el estado anunciado no se pueden separar.
+  - En el encabezado el `ghost` hereda `--foreground` sobre `--background`, que ya cumple
+    (QC-226 R5). La causa 1 no aplica aquí: `btn-veil` solo actúa con `@media (hover: hover)`, y
+    este control solo se ve en viewport angosto, que en la práctica es táctil.
+- Lucide ya es dependencia aprobada; `PanelLeftOpen` y `PanelLeftClose` son de su set estándar.
+  El implementer confirma los nombres de exportación en `node_modules/lucide-react` antes de
+  escribirlos.
+
+**Pruebas:**
+
+| R | Test | Qué afirma |
+| --- | --- | --- |
+| R38 | E2E, bloque «control de colapso» de `e2e/marca-componentes.spec.ts` | Se mide en claro y oscuro, en Chromium y WebKit: pastilla en viewport ancho (expandido y colapsado, en reposo y con `hover()`), y control del encabezado en viewport angosto (panel cerrado). En cada caso: `svg` visible (`toBeVisible()`), caja de al menos 14 × 14 dentro de la del botón y de la ventana, `document.elementFromPoint` en el centro del icono devuelve el botón o un descendiente, y el contraste entre el `color` calculado del botón y el color de fondo efectivo es de al menos 4.5:1 |
+| R39 | E2E, mismo bloque | Clase `lucide-panel-left-open` con el panel colapsado o cerrado y `lucide-panel-left-close` con el panel expandido; tras pulsar el control, cambia |
+| R39 | `tests/unit/marca/sidebar-carril.test.ts` | `AppSidebar` con `defaultOpen` `true`/`false` pinta en la pastilla el icono correspondiente; `SidebarToggle` igual; `SidebarTrigger` sin `children` sigue pintando `PanelLeftIcon` |
+
+Para el color de fondo efectivo se usa el `background-color` calculado del botón. Si es
+transparente, se sube al primer ancestro que tenga uno. El contraste se calcula en el navegador
+con la misma fórmula WCAG de `tests/unit/theme/contraste.ts`, copiada al E2E porque Playwright no
+importa código de Vitest. La salida se anota.
+
+**A9 (descartada). Quitar `btn-veil` de la pastilla con otra variante.** Ninguna variante de
+`Button` está libre de `btn-veil` salvo `default`, `destructive` y `link`, y las tres traen
+colores propios que habría que pisar igual. Crear una variante `sidebar` sería tocar `button.tsx`
+para un solo uso.

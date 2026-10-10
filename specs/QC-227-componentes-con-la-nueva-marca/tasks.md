@@ -9,7 +9,7 @@ juntos en T9. Un commit por task.
 **Antes de empezar:** P7 decide cuándo arranca el código (propuesta: con QC-228 mergeada en `dev`).
 P1 decide si entra T8. Las demás preguntas tienen propuesta por defecto y no bloquean.
 
-**Enmienda 2026-10-09:** se añade T12 (R31–R37), con P10–P12 abiertas y con propuesta por
+**Enmienda 2026-10-09:** se añade T12 (R31–R39), con P10–P15 abiertas y con propuesta por
 defecto. Los archivos `components/ui/sidebar.tsx` y `components/private/app-sidebar.tsx` entran
 en «Archivos esperados». Antes quedaban fuera para no chocar con QC-228; ahora ese choque ya no
 existe, porque el código empieza con QC-228 en `dev` (T0).
@@ -77,7 +77,7 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
   - **Hecho cuando:** el test está verde, `e2e/login-skin.spec.ts` sigue verde y el aviso de LCP de
     `next dev` ya no sale (se anota en `progress/impl_QC-227.md`).
 
-- [ ] **T12 (Dep.: T0, T3). Carril colapsado centrado** (R31–R37) — ENMIENDA 2026-10-09
+- [ ] **T12 (Dep.: T0, T3). Carril colapsado centrado y control de colapso** (R31–R39) — ENMIENDA 2026-10-09
   - Depende de T3 porque las dos tocan `app/globals.css`. No es `[P]` con T3; con las demás de la
     tanda, sí.
   - **Primero medir, sin cambiar nada.** Escribir el bloque «carril colapsado» de
@@ -85,6 +85,16 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
     Debe salir rojo, con los botones a 32 px de ancho y 6 px a la izquierda del eje, y el isotipo a
     unos 16 px. Anotar las cajas medidas en `progress/impl_QC-227.md`. Si no salen esas cifras, se
     para y se reporta: el diagnóstico de `design.md > 16.1` no se sostiene.
+  - **Control de colapso, también medido primero** (R38, R39, `design.md > 16.7`):
+    - escribir el bloque «control de colapso» del mismo E2E y correrlo en rojo sobre el `dev` de
+      T0;
+    - debe salir el contraste de la pastilla con el puntero encima en modo claro (unos 1.3:1),
+      y R39 en rojo (`PanelLeftIcon` fijo);
+    - anotar las cifras en `progress/impl_QC-227.md`;
+    - si el icono falla por otra causa (recorte, tamaño, tapado), se anota y se corrige esa
+      causa, dentro de R38;
+    - si el arreglo pide tocar un archivo que no está en «Archivos esperados», se para y se
+      reporta.
   - Si `e2e/marca-componentes.spec.ts` nace en esta task, su alta en `E2E_ESPERADOS`
     (`tests/guards/guard-identificador-de-request.test.ts`) se adelanta aquí, para que las guardias
     sigan en verde. T10 añade el resto de casos al mismo archivo.
@@ -95,12 +105,18 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
       marca;
     - `components/private/nav-user.tsx`: `group-data-[collapsible=icon]:justify-center` (P11);
     - `app/globals.css`: relleno a 14 px y comentario corregido (P12).
+    - Control de colapso (`design.md > 16.7`):
+      - pastilla: `PanelLeftOpenIcon`/`PanelLeftCloseIcon` según `open`, y colores del panel con
+        `!` en reposo, con el puntero encima y con `aria-expanded`;
+      - `SidebarTrigger` admite `children` (P13);
+      - `sidebar-toggle.tsx` le pasa el icono según `isExpanded`.
   - Enmienda de `tests/unit/sidebar-ajuste.test.tsx`: solo la aserción `padding: 10px` → `14px`,
     con nota `ENMIENDA QC-227` (P12).
   - Test nuevo `tests/unit/marca/sidebar-carril.test.ts`. La lista congelada de R36 se copia del
     `dev` de T0.
   - **Hecho cuando:**
-    - el bloque «carril colapsado» del E2E está verde en Chromium y WebKit;
+    - los bloques «carril colapsado» y «control de colapso» del E2E están verdes en Chromium y
+      WebKit, en claro y en oscuro;
     - `sidebar-carril.test.ts` está verde;
     - `sidebar-ajuste.test.tsx` (con su enmienda), `sidebar-desktop.test.tsx`,
       `app-sidebar.test.tsx` y `theme/ui-primitivas-intactas.test.ts` están verdes;
@@ -157,8 +173,8 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
   - `git diff --diff-filter=A --name-only origin/dev...HEAD -- components app` no lista ningún
     `.tsx` (D2), y `git diff --name-only origin/dev...HEAD -- lib/modules db` sale vacío (D7). Las
     dos salidas se anotan en `progress/impl_QC-227.md`.
-  - Mapa `R<n> -> test` de R1–R30 en `progress/impl_QC-227.md`, y de R31–R37 (enmienda
-    2026-10-09, `design.md > 16.4`).
+  - Mapa `R<n> -> test` de R1–R30 en `progress/impl_QC-227.md`, y de R31–R39 (enmienda
+    2026-10-09, `design.md > 16.4` y `16.7`).
   - `node scripts/archivos-en-vuelo.mjs --candidata QC-227` sin `CHOCA`, y `./init.sh` en verde.
   - **Hecho cuando:** cada R tiene un test, las dos comprobaciones de diff están anotadas y el gate
     local está verde.
@@ -179,6 +195,7 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
 - `components/ui/sidebar.tsx`
 - `components/private/app-sidebar.tsx`
 - `components/private/nav-user.tsx`
+- `app/(private)/components/sidebar-toggle.tsx`
 - `tests/unit/marca/sidebar-carril.test.ts`
 - `tests/unit/sidebar-ajuste.test.tsx`
 - `components/shared/brand-logo.tsx`

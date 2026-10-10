@@ -40,7 +40,8 @@ tokens que dejó QC-226.
 > **ENMIENDA 2026-10-09 (pedida por el humano, spec ya aprobado).** Entra además la geometría de
 > la barra lateral **en modo icono**. Con el carril colapsado, los iconos, el isotipo y el
 > resaltado del ítem activo (indicador, fondo de activo y de hover) no quedan centrados, y el
-> isotipo sale diminuto. Se añaden D11 y R31–R37. Los requisitos R1–R30 no cambian. Por eso entran
+> isotipo sale diminuto. Se añaden D11 y R31–R37. En la misma enmienda entra que el control de
+> colapso no muestra icono: se añaden D12, R38 y R39. Los requisitos R1–R30 no cambian. Por eso entran
 > en el diff `components/ui/sidebar.tsx` y `components/private/app-sidebar.tsx`, que este spec
 > dejaba fuera para no chocar con QC-228. Ya no hay choque: el código empieza con QC-228 en `dev`
 > (P7, `tasks.md > T0`). Diagnóstico y diseño: `design.md > 16`.
@@ -60,6 +61,7 @@ tokens que dejó QC-226.
 | D9 | «Botón secundario» es la variante `outline` (la de los «Cancelar»); la variante `secondary` no la usa ninguna pantalla | humano, 2026-10-09 (respuesta a QC-228 P1) | — | R19 |
 | D10 | Los valores de los tokens no se tocan: la paleta «Verde Petróleo» la cerró QC-226 | humano, 2026-10-08 (QC-226 D2) | — | R2, R10, R15, R18, R20, R21, R23 |
 | D11 | Enmienda: con la barra colapsada (modo icono), los iconos, el isotipo y el indicador o fondo del ítem activo quedan centrados en el eje del carril (±1 px); el isotipo, a un tamaño legible según la guía de marca; la vista expandida no cambia | humano, 2026-10-09 (enmienda al spec aprobado) | — | R31–R37 |
+| D12 | Enmienda: los dos controles de colapso (encabezado y pastilla del borde) muestran un icono visible, sin recorte y con contraste AA sobre su fondo, en claro y oscuro y en los dos estados; el icono indica la acción (abrir si está colapsado, cerrar si está expandido), con lucide | humano, 2026-10-09 (enmienda al spec aprobado) | — | R38, R39 |
 
 ## Requisitos (EARS)
 
@@ -242,13 +244,33 @@ estar centrada en el eje del carril y entera dentro de la caja del enlace, sin r
 R19), el ancho expandido (`--sidebar-width: 17rem`) ni el margen exterior de 18 px del panel
 (QC-29 R18) (propuesta de P10).
 
+#### Control de colapso (misma enmienda, D12)
+
+«Control de colapso» es cada uno de estos dos botones:
+- la **pastilla del borde** (`private-sidebar-edge-toggle`), que solo existe en viewport ancho;
+- el **control del encabezado** (`private-sidebar-toggle`), que solo se muestra en viewport angosto
+  (decisión humana del 2026-09-02, P14).
+
+**R38.** MIENTRAS un control de colapso está visible, el sistema DEBE pintar dentro de él un icono
+con estas condiciones, en los dos modos, en reposo, con el puntero encima y en los dos estados del
+panel (expandido y colapsado, o abierto y cerrado):
+- la caja del icono mide al menos 14 × 14 px;
+- está entera dentro de la caja del botón y de la ventana;
+- ningún otro elemento la tapa;
+- tiene al menos `4.5:1` de contraste contra el fondo del botón en ese estado (P15).
+
+**R39.** MIENTRAS el panel lateral está colapsado o cerrado, el sistema DEBE pintar en el control
+de colapso el icono de **abrir** (`PanelLeftOpen` de lucide). MIENTRAS está expandido o abierto,
+DEBE pintar el icono de **cerrar** (`PanelLeftClose`). El nombre accesible y el `aria-expanded` del
+control NO DEBEN cambiar respecto a hoy.
+
 ### Cobertura de las decisiones cerradas
 
 D1→R1–R26 · D2→`tasks.md > T11` (proceso, no conducta del sistema) · D3→R1–R9 · D4→R10–R13 ·
 D5→R14–R17 · D6→R18–R25 · D7→R29, R30 y `tasks.md > T11` · D8→R28 · D9→R19 · D10→R2, R10, R15,
 R18, R20, R21, R23, R27.
 
-Enmienda 2026-10-09: D11→R31–R37.
+Enmienda 2026-10-09: D11→R31–R37 · D12→R38, R39.
 
 ## Preguntas abiertas
 
@@ -334,5 +356,23 @@ corregido. Se enmienda una sola aserción de `tests/unit/sidebar-ajuste.test.tsx
 (`padding: 10px` → `14px`), con nota `ENMIENDA QC-227`. La otra opción es borrarlas y reescribir
 ese caso para que mire las clases del primitivo. Es más limpio, pero toca más un test de otra
 ficha.
+
+**P13. Cómo cambia el icono del control del encabezado.** `SidebarTrigger`
+(`components/ui/sidebar.tsx`) pinta siempre `PanelLeftIcon`, que viene escrito dentro del
+primitivo. Desde fuera no se puede sustituir: los `children` del JSX ganan a los de las props.
+**Propuesta:** `SidebarTrigger` pinta `children` si se le pasan y, si no, `PanelLeftIcon`, como
+hoy; `SidebarToggle` le pasa el icono según el estado. La otra opción es que `SidebarToggle` deje
+el primitivo y use `Button` con `toggleSidebar()`. Se descarta porque duplica el manejador y el
+`data-slot`.
+
+**P14. Control del encabezado en escritorio.** Desde el 2026-09-02 (decisión humana) el control
+del encabezado va `md:hidden`. En escritorio el único control es la pastilla del borde, así que en
+el encabezado no hay icono que ver. **Propuesta: se mantiene** esa decisión. R38 y R39 se miden en
+la pastilla en viewport ancho y en el control del encabezado en viewport angosto. Si el humano
+quiere también el del encabezado en escritorio, tiene que revocar la decisión del 2026-09-02.
+
+**P15. Umbral de contraste del icono.** En WCAG 2.2 AA, un icono que no es texto pide `3:1`
+(1.4.11). **Propuesta: `4.5:1`**, el umbral de texto, porque los tokens del panel ya lo dan
+(`--sidebar-foreground`/`--sidebar`, QC-226 R5) y es más exigente.
 
 > 2026-10-09: el humano aprobó la enmienda del sidebar colapsado (R31–R37, T12) con los defaults de P10–P12. Quedan cerradas.
