@@ -378,7 +378,7 @@ export function WorkGroupForm({ group, onSaved, children }: WorkGroupFormProps) 
       footerWrapperClassName="flex flex-row flex-wrap items-center justify-end gap-2"
       bodyClassName="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4"
     >
-      {/* El sujeto del renombrado viaja como campo OCULTO: nadie lo escribe (R23). */}
+      {/* El sujeto del renombrado viaja como campo OCULTO: nadie lo escribe. */}
       {workGroupId === undefined ? null : (
         <input
           type="hidden"

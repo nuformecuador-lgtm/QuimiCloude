@@ -425,7 +425,7 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
 
       {/*
         Nombres y apellidos EN UNA FILA (decision humana): rejilla de 12 columnas que en angosto
-        se apila -movil primero (R45)- y en `sm` o mas ancho reparte 6+6.
+        se apila -movil primero- y en `sm` o mas ancho reparte 6+6.
       */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
         <div className="sm:col-span-6">
@@ -456,8 +456,7 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
         <div className="sm:col-span-4">
           {/*
-            `type="date"`: emite `YYYY-MM-DD`, que es exactamente lo que `z.iso.date()` espera
-            (R26).
+            `type="date"`: emite `YYYY-MM-DD`, que es exactamente lo que `z.iso.date()` espera.
           */}
           <UserTextField
             id={`${fieldId}-${USER_BIRTH_DATE_FIELD}`}
@@ -493,7 +492,7 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
       */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
         <div className="sm:col-span-4">
-          {/* R25: las opciones salen del conjunto cerrado del contrato, nunca de literales. */}
+          {/* Las opciones salen del conjunto cerrado del contrato, nunca de literales. */}
           <UserSelectField
             idPrefix={`${fieldId}-${USER_DOCUMENT_TYPE_FIELD}`}
             name={USER_DOCUMENT_TYPE_FIELD}
@@ -541,7 +540,7 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
       </div>
 
       {/*
-        R24: las opciones vienen de la consulta de roles del modulo. SI esa consulta fallo, se
+        Las opciones vienen de la consulta de roles del modulo. SI esa consulta fallo, se
         dice de forma identificable y el selector queda SIN opciones: no se inventa ninguna y no
         se aparenta tenerlas.
       */}
@@ -564,10 +563,10 @@ export function UserForm({ user, roles, rolesError, onSaved, endSessions }: User
       />
 
       {/*
-        QC-101 R7, R11, R12, R15: el cierre de todas las sesiones de la persona del panel, al pie
+        El cierre de todas las sesiones de la persona del panel, al pie
         del cuerpo. SOLO si el panel lo entrega; sin `endSessions` no se emite ni un contenedor.
         `type="button"` es OBLIGATORIO: todo el panel es un `<form>` y un boton sin tipo enviaria
-        la edicion. Pulsarlo solo abre la confirmacion; la escritura es del dialogo (R9, R10).
+        la edicion. Pulsarlo solo abre la confirmacion; la escritura es del dialogo.
       */}
       {endSessions === undefined ? null : (
         <div className="border-t pt-4">

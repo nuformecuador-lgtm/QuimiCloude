@@ -761,10 +761,10 @@ export function OrderForm({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
 
             {/*
-              Cantidad: control NUMERICO del navegador (enmienda humana del 2026-09-08 a R39). Con
-              `step="any"` para que el decimal no choque contra el paso entero por defecto, y
-              `min="0.01"` para que el navegador no ofrezca negativos ni cero -el «mayor que cero»
-              real lo sigue cerrando el esquema del contrato al enviar. El valor sigue viajando
+              Cantidad: control NUMERICO del navegador. Con `step="any"` para que el decimal no
+              choque contra el paso entero por defecto, y `min="0.01"` para que el navegador no
+              ofrezca negativos ni cero -el «mayor que cero» real lo sigue cerrando el esquema del
+              contrato al enviar. El valor sigue viajando
               como cadena en el `FormData`.
 
               Al SOLTAR EL FOCO el valor se coloca a DOS decimales y sin ceros finales (decision
@@ -802,7 +802,7 @@ export function OrderForm({
               />
             </div>
 
-            {/* R27: prioridad opcional, con el defecto del contrato PRESELECCIONADO y VISIBLE. */}
+            {/* Prioridad opcional, con el defecto del contrato PRESELECCIONADO y VISIBLE. */}
             <div className="sm:col-span-4">
               <SelectField
                 name="priority"
@@ -862,14 +862,14 @@ export function OrderForm({
       )}
 
       {/*
-        QC-102 R23 — LA SECCION DE RESPONSABLES, dentro del panel que ya existe. No hay panel
+        LA SECCION DE RESPONSABLES, dentro del panel que ya existe. No hay panel
         nuevo, ni ruta nueva, ni pantalla aparte: es una seccion mas del mismo `SheetContent`.
 
         Solo en la EDICION: sin pedido creado no hay a quien asignar, y las tres operaciones de
-        QC-87 piden un `orderId` que en el alta todavia no existe.
+        responsables piden un `orderId` que en el alta todavia no existe.
 
-        R26: lo que pinta son los responsables que **la fila ya trajo**; no se consulta nada al
-        abrir. R29: con el pedido en estado final, `isFinal` apaga los controles de escritura
+        Lo que pinta son los responsables que **la fila ya trajo**; no se consulta nada al
+        abrir. Con el pedido en estado final, `isFinal` apaga los controles de escritura
         —y la seccion no dice por que—.
       */}
       {order === undefined ? null : (

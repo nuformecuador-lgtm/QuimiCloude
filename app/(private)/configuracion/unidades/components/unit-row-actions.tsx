@@ -13,10 +13,9 @@ import { UnitSheet } from './unit-sheet';
  * Las DOS acciones de fila de una unidad: editar y borrar, en el menu de los tres puntos de la
  * fila (`RowActionsMenu`).
  *
- * **Con una unidad DE SISTEMA devuelve `null`, o sea la celda queda VACIA** (R29): sin disparador,
+ * **Con una unidad DE SISTEMA devuelve `null`, o sea la celda queda VACIA**: sin disparador,
  * sin items deshabilitados, sin etiqueta, sin insignia junto al nombre y sin ninguna explicacion.
- * Que una unidad sea de sistema es manejo interno (decision cerrada del 2026-09-08, alternativa E
- * descartada), y la ausencia de acciones es la unica senal.
+ * Que una unidad sea de sistema es manejo interno, y la ausencia de acciones es la unica senal.
  *
  * **Ocultarlas es comodidad, NO el control** (R30): quien rechaza editar o borrar una unidad de
  * sistema es el caso de uso de QC-38, con su test. Esta pantalla **no repite** la comprobacion
@@ -69,7 +68,7 @@ export function UnitRowActions({ unit, baseUnits }: UnitRowActionsProps) {
   // anterior; al cerrarse sigue montado y su salida anima.
   const [deleteSession, setDeleteSession] = useState(0);
 
-  // R29: la celda de una unidad de sistema no emite NADA. Los hooks de estado van arriba porque
+  // La celda de una unidad de sistema no emite NADA. Los hooks de estado van arriba porque
   // no pueden ir tras un `return` condicional; esta salida va inmediatamente despues.
   if (unit.isSystem) return null;
 
