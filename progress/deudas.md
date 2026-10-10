@@ -149,6 +149,125 @@
   Hoy no hay ninguna fila cifrada (las tablas llegan con QC-237), así que no bloquea.
 - **Dueño:** sin asignar.
 
+### D37 — Pedidos: la columna de acciones sin `actionsColumn()` (QC-232 → QC-223)
+- **Origen:** QC-232 (2026-10-09), `specs/QC-232-componentizacion-formularios-y-acciones/design.md > 7` (D4).
+- **Qué falta:** `app/(private)/pedidos/components/order-row-actions.tsx`, `order-columns.tsx` y
+  `order-table.tsx` son de QC-223 y QC-232 no los toca. La tabla ya usa `RowActionsMenu` (no hay
+  cambio visible pendiente); falta declarar la columna con `actionsColumn()`. Además
+  `guard-piezas-base` sigue excluyendo, con motivo que cita QC-232 (D11), `order-columns.tsx`
+  (`simbolo-borrado`, `marca-en-constante`) y `order-table.tsx` (`par-literal`).
+- **Dueño:** ficha **QC-223** (al cerrar, o quien adopte sus archivos después).
+
+### D38 — Pedidos: locales de lista, `OrderRecipeImage` y el barrel sin limpiar (QC-232 → QC-223)
+- **Origen:** QC-232 (2026-10-09), `design.md > 7` (D4).
+- **Qué falta:** `pedidos/components/order-list-section.tsx` y `pedidos/components/index.ts` son de
+  QC-223. Por eso no se borran `order-list-empty`, `order-list-error`, `order-list-skeleton` ni
+  `OrderRecipeImage` (`guard-piezas-base > LOCALES_CONSERVADOS` dice «se borran en QC-232»), ni se
+  toca `ORDER_CUSTOMER_DIALOG_TOUCH_TARGET`, ni entra la enmienda de
+  `tests/guards/guard-qc102-limites-de-la-ficha.test.ts`. `guard-piezas-base` sigue excluyendo el
+  barrel (`simbolo-borrado`) por D11.
+- **Dueño:** ficha **QC-223**.
+
+### D39 — Pedidos: `order-sheet.tsx` conserva su `TOUCH_TARGET` local (QC-232 → QC-223)
+- **Origen:** QC-232 (2026-10-09), `guard-piezas-base > ARCHIVOS_D11` y `design.md > 7` (P1).
+- **Qué falta:** `app/(private)/pedidos/components/order-sheet.tsx` adoptó `FormSheet` en QC-232, pero
+  conserva `const TOUCH_TARGET = 'min-h-11 min-w-11'` y sigue en `ARCHIVOS_D11`, con exclusión que
+  cita QC-232. Pasar a `touchTarget` y retirar la exclusión.
+- **Dueño:** ficha **QC-223** (el archivo estaba en su diff del 2026-10-08).
+
+### D40 — Pedidos: el panel de entrega no adopta `FormSheet` (QC-232 → QC-223)
+- **Origen:** QC-232 (2026-10-09), `design.md > 7`.
+- **Qué falta:** `app/(private)/pedidos/components/order-delivery-sheet.tsx` es un décimo formulario
+  en panel que no adopta `FormSheet` porque es de QC-223.
+- **Dueño:** ficha **QC-223**.
+
+### D41 — Inventario: `batch-history.tsx` conserva su constante táctil (QC-232 → QC-223)
+- **Origen:** QC-232 (2026-10-09), `design.md > 7`; deuda de QC-231 D11.
+- **Qué falta:** `app/(private)/inventario/components/batch-history.tsx` declara
+  `TOUCH_TARGET = 'min-h-11 min-w-11'`. `guard-piezas-base` lo excluye por D11 con motivo que cita
+  QC-232. Pasar a `touchTarget` y retirar la exclusión.
+- **Dueño:** ficha **QC-223**.
+
+### D42 — Asignación: `OrderDistributionFull` sin mover a shared (QC-232 → QC-217)
+- **Origen:** QC-232 (2026-10-09), `design.md > 7` (último punto de la ficha).
+- **Qué falta:** `app/(private)/asignacion/components/order-distribution-full.tsx` y el barrel
+  `asignacion/components/index.ts` son de QC-217, así que `OrderDistributionFull` no se mueve a
+  `components/shared/`. `guard-piezas-base` sigue excluyendo por D11, con motivo que cita QC-232,
+  `order-distribution-full.tsx` (`marca-en-constante`) y el barrel (`simbolo-borrado`,
+  la reexportación `MISSING_VALUE_MARK`).
+- **Dueño:** ficha **QC-217**.
+
+### D43 — Asignación: el quinto conjunto (acondicionamiento) sin parametrizar (QC-232 → QC-217)
+- **Origen:** QC-232 (2026-10-09), `design.md > 7` y `guard-piezas-base`.
+- **Qué falta:** los conjuntos `conditioning-orders-*` y `conditioned-orders-*`,
+  `assignment-view-tabs.tsx` y `asignacion/acondicionamiento/[id]/**` son de QC-217: no adoptan las
+  piezas de asignación de QC-232 (`assignment-list-parts.tsx`). Excepciones de `guard-piezas-base`
+  que siguen citando QC-232:
+  - D11: `acondicionamiento/[id]/components/conditioning-order-screen.tsx` (`par-en-constante`,
+    `compara-inesperado`), `assignment-view-tabs.tsx` (`par-en-constante`) y
+    `conditioning-orders-columns.tsx` (`simbolo-borrado`, `marca-en-constante`, `par-en-constante`);
+  - D7: `conditioning-orders-empty.tsx` (`par-literal`), en `VACIOS_Y_ESQUELETOS_D7_PENDIENTES`.
+- **Dueño:** ficha **QC-217**.
+
+### D44 — `step-document-view.tsx` conserva su `TOUCH_TARGET` local (QC-232, P5)
+- **Origen:** QC-232 (2026-10-09), `design.md > 6` y P5 (decisión del humano: pasa a deuda si obliga a
+  tocar su test).
+- **Qué falta:** `components/shared/step-reader/step-document-view.tsx` declara
+  `TOUCH_TARGET = 'min-h-11 min-w-11'`. Quitarlo obliga a enmendar la lista cerrada R18 de
+  `order-execution-screen.test.tsx`, que D9 prohíbe. `guard-piezas-base` lo sigue excluyendo
+  (`par-en-constante`, símbolo `TOUCH_TARGET`) con motivo que cita QC-232.
+- **Dueño:** sin ficha; requiere que el humano autorice enmendar la lista R18.
+
+### D45 — Selects especializados sin `SelectField` (QC-232, P4)
+- **Origen:** QC-232 (2026-10-09), requirements > Lo que NO entra y P4.
+- **Qué falta:** `RecipeVersionSelect` (`app/(private)/pedidos/components/recipe-version-select.tsx`),
+  `PresentationUnitSelect` (`components/shared/presentation-unit-select.tsx`) y
+  `MeasurementUnitSelect` (en `app/(private)/proveedores/[id]/components/catalog-line-form.tsx`) no
+  delegan en `SelectField`. Si entran, con el criterio de R17.
+- **Dueño:** sin asignar.
+
+### D46 — El nombre del grupo de trabajo sigue en línea (QC-232)
+- **Origen:** QC-232 (2026-10-09), `progress/impl_QC-232-componentizacion-formularios-y-acciones.md > T0a`.
+- **Qué falta:** el campo de nombre de `app/(private)/configuracion/usuarios/components/work-group-form.tsx`
+  no usa `TextField`: su error lleva `data-code` (sale en la paridad) y `data-issue`, y es controlado
+  con validación en vivo (`touched` en `onChange`/`onBlur`) que alimenta el `disabled` del pie.
+  Migrarlo cambia el árbol o abre la API del campo a atributos arbitrarios.
+- **Dueño:** ficha **QC-227** (según el impl de QC-232).
+
+### D47 — El vacío de la lista de empaque sigue en línea (QC-232)
+- **Origen:** QC-232 (2026-10-09), T4a.
+- **Qué falta:** `app/(private)/asignacion/components/packing-orders-list-section.tsx` pinta su vacío
+  en línea (enlace `packing-orders-first-page`) en vez de `EmptyState`, porque `EmptyState` pone el
+  `data-testid` en el envoltorio y no en el enlace. Ya no escribe el par táctil como literal: la
+  exclusión de `guard-piezas-base` se retiró en T5b.
+- **Dueño:** sin asignar.
+
+### D48 — Etiquetas de fila exportadas sin uso tras el menú (QC-232, R5)
+- **Origen:** QC-232 (2026-10-09), tanda 3.
+- **Qué falta:** `editWorkGroupLabel` y `deleteWorkGroupLabel`
+  (`app/(private)/configuracion/usuarios/components/work-group-labels.ts`, reexportadas por el barrel
+  de usuarios) y `editCustomerLabel` / `deleteCustomerLabel`
+  (`app/(private)/clientes/components/customer-row-actions.tsx`) quedan exportadas sin consumidor: el
+  menú de fila usa el verbo corto (P2). R5 obliga a conservar los exports; borrarlas es una decisión.
+- **Dueño:** sin asignar.
+
+### D49 — Barrels sin las constantes nuevas de los menús de fila (QC-232)
+- **Origen:** QC-232 (2026-10-09), tanda 3.
+- **Qué falta:** los barrels de `app/(private)/produccion/formulas/components/` y
+  `app/(private)/proveedores/[id]/components/` no exportan las constantes de
+  `recipe-row-actions.tsx` (`RECIPE_ROW_ACTIONS_TESTID`, `RECIPE_ACTION_EDIT_TESTID`,
+  `RECIPE_ACTION_DELETE_TESTID`) ni de `catalog-line-row-actions.tsx`
+  (`CATALOG_LINE_ROW_ACTIONS_TESTID`, `CATALOG_LINE_ACTION_EDIT_TESTID`,
+  `CATALOG_LINE_ACTION_DELETE_TESTID`). Los barrels no estaban en Archivos esperados.
+- **Dueño:** sin asignar.
+
+### D50 — Comentario obsoleto en `e2e/helpers/confirm-dialog.ts` (QC-232)
+- **Origen:** QC-232 (2026-10-09), al borrar `components/shared/confirm-action-dialog.tsx`.
+- **Qué falta:** la línea 1 de `e2e/helpers/confirm-dialog.ts` cita
+  `components/shared/confirm-action-dialog.tsx`, que ya no existe (hoy es `ConfirmDialog`). El archivo
+  no estaba en Archivos esperados.
+- **Dueño:** sin asignar.
+
 ## Pendientes humanos de fichas cerradas
 Rescatados de *Evaluaciones* y *Features en curso* del archivo: no estaban en *Deudas*, pero se habrían perdido al congelarlo.
 
