@@ -362,6 +362,20 @@ describe('login contra Postgres real', () => {
     expect(encontrado?.companyDeletedAt).toBeNull();
   });
 
+  // QC-116 R6 — el sello de sesiones sale de esa MISMA consulta: una llamada al adaptador lo trae
+  // ya, con el valor que tiene la fila.
+  it('QC-116 R6: la misma lectura del login trae el sessions_valid_from de la fila', TIEMPO_HOLGADO, async () => {
+    const { sessionsValidFrom } = await prisma.user.findUniqueOrThrow({
+      where: { id: usuarioId },
+      select: { sessionsValidFrom: true },
+    });
+
+    const encontrado = await findActiveByUsername(nombreDeUsuario);
+
+    expect(encontrado?.sessionsValidFrom).toBeInstanceOf(Date);
+    expect(encontrado?.sessionsValidFrom.getTime()).toBe(sessionsValidFrom.getTime());
+  });
+
   // QC-48 R2, R3 — la fila SI se devuelve cuando la empresa esta dada de baja. El adaptador no
   // lleva `AND c.deleted_at IS NULL`: el corte es del dominio (`verify-credentials.ts`), porque
   // ese camino tiene que gastar igualmente su verificacion de hash (R4). Si alguien moviera la
