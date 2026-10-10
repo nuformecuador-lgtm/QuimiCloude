@@ -57,7 +57,8 @@ const HEADER_TOGGLE_TESTID = 'private-sidebar-toggle';
 const OPEN_ICON_CLASS = 'lucide-panel-left-open';
 const CLOSE_ICON_CLASS = 'lucide-panel-left-close';
 
-const CONTENT_BUTTONS = '[data-slot="sidebar-content"] [data-slot="sidebar-menu-button"]';
+/** Por `data-sidebar`: los items con submenu llevan el `data-slot` de su disparador. */
+const CONTENT_BUTTONS = '[data-slot="sidebar-content"] [data-sidebar="menu-button"]';
 
 type Theme = 'light' | 'dark';
 const THEMES: readonly Theme[] = ['light', 'dark'];

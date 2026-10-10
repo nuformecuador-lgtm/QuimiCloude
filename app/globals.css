@@ -311,6 +311,12 @@
   min-height: 44px;
 }
 
+/* Los items con submenu pasan por un disparador que pisa el `data-slot` pero conserva
+   `data-sidebar`: sin esta regla se quedaban en los 32px del primitivo. */
+[data-sidebar='menu-button']:not([data-slot='sidebar-menu-button']) {
+  min-height: 44px;
+}
+
 /* Modo icono: las medidas las fija el primitivo (`size-11!` y `p-3.5!` en
    `components/ui/sidebar.tsx`); esta regla solo las repite como contrato. No puede ganarles:
    con `!important`, una declaracion en capa gana a una sin capa. */

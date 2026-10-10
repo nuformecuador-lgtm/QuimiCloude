@@ -572,3 +572,25 @@ vitest run tests/unit/shared tests/unit/clientes tests/unit/paridad tests/guards
 
 Observación (fuera de B1): `CONTENT_BUTTONS` de los bloques R31–R36 del E2E sigue seleccionando por
 `data-slot`, así que la medida del carril colapsado no incluye los disparadores de grupo.
+
+## Vuelta 2b — carril medido con los disparadores de grupo
+
+- `e2e/marca-componentes.spec.ts`: `CONTENT_BUTTONS` pasa a `[data-slot="sidebar-content"] [data-sidebar="menu-button"]`,
+  así que R31–R36 miden también `nav-produccion` y `nav-integraciones`.
+- **Modo icono:** los dos grupos ya estaban bien. Botón de 44 × 44 centrado en el eje (desvío 0) e
+  icono centrado (desvío 0), en los dos navegadores y modos. No hubo nada que corregir.
+- **Expandida (R36): rojo encontrado.** Los dos grupos medían 220 × **32**, frente a 44 de los
+  enlaces. La regla `[data-slot='sidebar-menu-button'] { min-height: 44px }` no los alcanzaba, por
+  la misma causa que B1. Corrección en `app/globals.css`, con una regla nueva
+  `[data-sidebar='menu-button']:not([data-slot='sidebar-menu-button']) { min-height: 44px }`.
+  La original se conserva tal cual: la congelan `theme/sidebar-panel.test.tsx` y `login-skin.test.tsx`,
+  que siguen verdes sin editar. Después de la corrección, los 11 miden 220 × 44.
+- `tests/unit/marca/sidebar-grupos.test.tsx`: caso «R36 … la regla del alto tactil de 44 px alcanza a
+  cada disparador de grupo» (expandida y modo icono). Control negativo: sin la regla nueva caen los
+  dos casos.
+
+```
+playwright marca-componentes + theme + login-skin + movimiento (chromium+webkit) -> 106 passed (1.8m)
+  (base aislada quimicloude_e2e_qc227: creada, migrada, sembrada y borrada)
+./init.sh -> == init OK ==; lint 0 errores; related 291 archivos, 4438 passed | 3 skipped; siempre 105, 1461 passed | 35 skipped
+```

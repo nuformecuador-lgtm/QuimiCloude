@@ -95,6 +95,21 @@ describe('reglas del item inactivo sobre los items con submenu', () => {
       }
     });
 
+    it(`R36 con la barra ${mode}, la regla del alto tactil de 44 px alcanza a cada disparador de grupo`, () => {
+      const selectors = [...css.matchAll(/([^{}]+)\{\s*min-height: 44px;\s*\}/g)].map((m) =>
+        m[1].replace(/\/\*[\s\S]*?\*\//g, '').trim(),
+      );
+      expect(selectors.length).toBeGreaterThan(0);
+      renderSidebar(open);
+      for (const group of GROUPS) {
+        const trigger = screen.getByTestId(group.testId);
+        expect(
+          selectors.some((selector) => trigger.matches(selector)),
+          `${group.testId} no casa con ninguna regla de 44 px: ${selectors.join(' | ')}`,
+        ).toBe(true);
+      }
+    });
+
     it(`R15 R16 con la barra ${mode}, los enlaces de primer nivel siguen casando`, () => {
       renderSidebar(open);
       for (const link of LINKS) {
