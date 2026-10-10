@@ -252,3 +252,5 @@ lotes.
 «Costo», «Duración», «Vueltas atrás», «Pasos», «Tiempo de entrega», «Medidas», «Equivalencia»,
 «Teléfono». **Propuesta: se quedan en Plex Sans** (R13). Si el humano quiere alguna en Mono, se
 añade a la lista de `design.md > 4.2` antes de implementar.
+
+> 2026-10-09: el humano aprobó el spec con los valores por defecto de P1–P9 (incluidos los dos cambios de tono de P2). Quedan cerradas.
