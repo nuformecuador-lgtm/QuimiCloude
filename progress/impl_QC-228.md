@@ -427,3 +427,24 @@ $ pnpm exec vitest run tests/unit/shared-ui tests/unit/theme tests/guards/guard-
 Paridad no corrida (la regenera el leader).
 
 **Veredicto:** enmienda D11 aplicada a los botones; typecheck, lint y tests tocados en verde.
+
+## Paridad tras la enmienda D11 (implementer, 2026-10-09)
+Commit `test(QC-228): paridad con la enmienda D11 de botones`, solo `.snap`. `vitest run tests/unit/paridad -u`:
+134 snapshots actualizados, 21/21 archivos y 376/376 tests verdes. Diff comprobado igual que en T6:
+**463 pares, 0 diferencias fuera de `class`, 0 líneas sin pareja**.
+
+| Sale | Entra | Motivo |
+|---|---|---|
+| `active:not-aria-[haspopup]:translate-y-px` (463) | `active:not-aria-[haspopup]:scale-[0.98]` (463) | R18 enmendado: pulsación al 98 % en `outline-dashed`, `secondary`, `ghost` y `destructive` (los 44 sin velo son `destructive`) |
+| `hover:bg-muted`, `hover:text-foreground` (419), `dark:hover:bg-muted/50` (374), `dark:hover:bg-input/50` (45) | `btn-veil` (419) | R17 enmendado: velo en `ghost` y `outline-dashed` (y `secondary`, sin apariciones en los snapshots) |
+
+Archivos (líneas cambiadas): `campos` 146, `formularios` 104, `confirmaciones` 64, `catalogo` 35,
+`asignacion` 21, `inventario` 19, `pedidos` 19, `recetas` 16, `clientes` 15, `usuarios` 8,
+`proveedores` 6, `grupos` 4, `unidades` 4, `presentaciones` 2 (todos `-paridad.test.tsx.snap`).
+
+### Verificación tras D11
+- `vitest run tests/unit/shared tests/unit/paridad`: 65/65 archivos, 898 tests verdes.
+- `./init.sh`, primera vuelta: un rojo, `tests/unit/inventario/adjust-batch-dialog.test.tsx > R9 — con el lote
+  sobre-reservado…` (`toastExito` llamado 0 veces). Aislado pasa 3 de 3 (30/30): es de tiempos bajo
+  carga y no lo causa el cambio, que solo toca clases.
+- `./init.sh`, segunda vuelta: `ui` 284/284 archivos (4353 tests), `node` 104/104 (1459 tests), `init OK`.
