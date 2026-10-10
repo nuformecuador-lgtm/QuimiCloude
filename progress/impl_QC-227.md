@@ -515,3 +515,25 @@ node scripts/archivos-en-vuelo.mjs --candidata QC-227
 Los CHOCA son los mismos de antes (los gestiona el leader); las dos listas nuevas de T10 no añaden choques.
 
 Veredicto: T9–T11 hechas y gate local verde; E2E 94/98 verdes en Chromium y WebKit, con R16 en foco en rojo (pinta `--sidebar-foreground`), que queda para que decida el leader.
+
+## R16 con foco — decisión humana 2026-10-10 (igualado al hover)
+
+- `app/globals.css`: regla sin capa tras la del inactivo (T3),
+  `[data-slot='sidebar-content'] :is(menu-button, menu-sub-button):not([data-active]):focus-visible { color: var(--sidebar-accent-foreground); }`.
+  No hizo falta tocar el primitivo.
+- `tests/unit/marca/sidebar-inactivo.test.ts`: caso nuevo «R16 con foco de teclado el inactivo toma el color del hover…».
+- Anotada en `requirements.md` (nota de aprobación 2026-10-10) y en `progress/features/QC-227.md > Decisiones`.
+- Mapa: R16 → `marca/sidebar-inactivo.test.ts` (R16 ×2) y E2E «R15 R16 … con hover» y «R16 un item inactivo con foco por teclado…», ahora en verde.
+
+Verificación (base aislada `quimicloude_e2e_qc227`, creada, migrada, sembrada y borrada):
+
+```
+playwright marca-componentes (chromium+webkit)          -> 68 passed (1.6m)
+  R16 foco: lab(97.766 …) = --sidebar-accent-foreground, focus-visible=true, en los 4 casos
+playwright theme + login-skin + movimiento               -> 30 passed (42.8s)
+./init.sh -> == init OK ==; typecheck y lint pasan (0 errores); related 290 archivos, 4429 passed | 3 skipped; siempre 105 archivos, 1461 passed | 35 skipped
+```
+
+Batería `vitest run tests/unit/shared tests/unit/clientes tests/unit/paridad tests/guards`: 151 archivos, 2036 passed | 19 skipped; ningún snapshot de paridad cambió.
+
+Veredicto: R16 con foco igualado al hover; E2E 98/98 en Chromium y WebKit y gate local verde.

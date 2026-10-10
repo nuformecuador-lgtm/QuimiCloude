@@ -378,3 +378,5 @@ quiere también el del encabezado en escritorio, tiene que revocar la decisión 
 > 2026-10-09: el humano aprobó la enmienda del sidebar colapsado (R31–R37, T12) con los defaults de P10–P12. Quedan cerradas.
 
 > 2026-10-09: el humano aprobó R38–R39 con los defaults de P13–P15 (en escritorio solo la pastilla del borde). Quedan cerradas.
+
+> 2026-10-10, humano: R16 con foco igualado al hover. Un ítem inactivo del menú lateral con `:focus-visible` pinta su texto en `--sidebar-accent-foreground`, igual que con el puntero encima. El «como hoy» de R16 no se cumplía para el foco: el primitivo solo pinta el anillo en `focus-visible` y el texto heredaba `--sidebar-foreground`. Se resuelve con una regla en `app/globals.css` junto a la del inactivo (T3), sin tocar el primitivo.

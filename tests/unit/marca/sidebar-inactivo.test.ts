@@ -13,6 +13,9 @@ const sidebarTsx = readFileSync(join(RAIZ, 'components', 'ui', 'sidebar.tsx'), '
 const INACTIVE_SELECTOR =
   "[data-slot='sidebar-content']\n  :is([data-slot='sidebar-menu-button'], [data-slot='sidebar-menu-sub-button']):not([data-active]):not(:hover):not(:focus-visible)";
 
+const FOCUS_SELECTOR =
+  "[data-slot='sidebar-content']\n  :is([data-slot='sidebar-menu-button'], [data-slot='sidebar-menu-sub-button']):not([data-active]):focus-visible";
+
 /** Bloques del item activo, copiados tal cual del `dev` de partida: no pueden cambiar. */
 const ACTIVE_RULE = `[data-slot='sidebar-menu-button'][data-active] {
   position: relative;
@@ -107,6 +110,15 @@ describe('item inactivo de la barra lateral', () => {
     expect(INACTIVE_SELECTOR).toContain(':not(:hover)');
     expect(INACTIVE_SELECTOR).toContain(':not(:focus-visible)');
     expect(sidebarTsx).toContain('hover:text-sidebar-accent-foreground');
+  });
+
+  it('R16 con foco de teclado el inactivo toma el color del hover, en una regla sin capa dentro de sidebar-content', () => {
+    // Decision humana 2026-10-10: el primitivo no pinta texto en focus-visible; sin esta regla
+    // el item enfocado heredaba --sidebar-foreground.
+    expect(ruleBody(FOCUS_SELECTOR)).toBe('color: var(--sidebar-accent-foreground);');
+    expect(braceDepth(css, css.indexOf(FOCUS_SELECTOR))).toBe(0);
+    expect(FOCUS_SELECTOR).toMatch(/\):not\(\[data-active\]\):focus-visible$/);
+    expect(css.indexOf(FOCUS_SELECTOR)).toBeGreaterThan(css.indexOf(INACTIVE_SELECTOR));
   });
 
   it('R17 la regla del activo, su barra ::before y su icono no cambian', () => {

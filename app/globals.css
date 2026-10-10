@@ -410,6 +410,13 @@
   color: var(--sidebar-muted-foreground);
 }
 
+/* Con foco de teclado, el inactivo toma el color del hover (R16, decision humana 2026-10-10): el
+   primitivo solo pinta el anillo en `focus-visible` y el texto heredaba `--sidebar-foreground`. */
+[data-slot='sidebar-content']
+  :is([data-slot='sidebar-menu-button'], [data-slot='sidebar-menu-sub-button']):not([data-active]):focus-visible {
+  color: var(--sidebar-accent-foreground);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring;
