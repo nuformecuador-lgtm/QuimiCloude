@@ -268,3 +268,6 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
 - `tests/unit/paridad/__snapshots__/usuarios-paridad.test.tsx.snap`
 - `e2e/marca-componentes.spec.ts`
 - `progress/impl_QC-227.md`
+- `tests/unit/pedidos-ui/order-columns.test.tsx`
+- `tests/unit/login-skin.test.tsx`
+- `tests/unit/shared-ui/motion-classes.test.tsx`

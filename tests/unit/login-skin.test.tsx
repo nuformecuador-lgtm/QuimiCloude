@@ -753,10 +753,11 @@ describe('nivel 2 · contrato del marcado de la pantalla de login', () => {
     const input = leerTexto('components', 'ui', 'input.tsx');
     const button = leerTexto('components', 'ui', 'button.tsx');
 
+    // ENMIENDA QC-227: el foco translucido de 3 px pasa a anillo opaco de 1 px en el campo y a contorno de 2 px en el boton, para que el foco sea opaco.
     expect(input).toContain('rounded-lg');
-    expect(input).toContain('focus-visible:ring-3');
+    expect(input).toContain('focus-visible:ring-1');
     expect(button).toContain('rounded-lg');
-    expect(button).toContain('focus-visible:ring-3');
+    expect(button).toContain('focus-visible:outline-2');
   });
 
   it('mide el alto de la pantalla con la unidad de viewport dinamica', () => {

@@ -367,7 +367,10 @@ describe('clases de movimiento de los botones', () => {
     for (const variant of ['destructive', 'link'] as const) {
       expect(buttonVariants({ variant }).split(' '), variant).not.toContain('btn-veil');
     }
-    expect(buttonVariants({ variant: 'destructive' }).split(' ')).toContain('hover:bg-destructive/20');
+    // ENMIENDA QC-227: destructive pasa a solido y su hover rojo a la mezcla con --foreground.
+    expect(buttonVariants({ variant: 'destructive' }).split(' ')).toContain(
+      'hover:bg-[color-mix(in_oklch,var(--destructive),var(--foreground)_10%)]',
+    );
   });
 
   it('R18: todas las variantes salvo link escalan al 98 % al pulsar, salvo si abren un menú; link conserva su pulsación', () => {
