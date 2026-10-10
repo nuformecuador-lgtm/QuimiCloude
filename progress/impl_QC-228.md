@@ -370,3 +370,15 @@ navega a «Clientes» y da de alta un cliente. Dos salidas, con precedente la pr
 1. añadir `movimiento.spec.ts` a `E2E_PERMITIDOS` con su nota de por qué;
 2. reescribir el E2E sobre otro módulo (p. ej. Proveedores), cambiando `design.md` de QC-228.
 No se aplica ninguna: decide el leader/humano.
+
+**Resuelto (leader, opción 1):** `movimiento.spec.ts` entra en `E2E_PERMITIDOS` de
+`tests/unit/clientes/scope.test.ts`, con una nota del motivo que no cita fichas (`docs/conventions.md >
+Comentarios`). `scope.test.ts` y los 4 `.snap` de QC-232 regenerados en T6 se añaden a
+`tasks.md > Archivos esperados`. `archivos-en-vuelo --candidata QC-228`: solo el choque ya decidido
+con QC-223 (`guard-identificador-de-request.test.ts`). `./init.sh`:
+```
+ Test Files  282 passed (282)      Tests  4304 passed | 1 skipped (4305)
+ Test Files  104 passed (104)      Tests  1459 passed | 35 skipped (1494)
+✓ test:rapido paso
+== init OK ==
+```

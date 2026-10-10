@@ -146,6 +146,11 @@ la fase 3 entra. Las demás preguntas tienen propuesta por defecto y no bloquean
 - `tests/unit/paridad/__snapshots__/recetas-paridad.test.tsx.snap`
 - `tests/unit/paridad/__snapshots__/unidades-paridad.test.tsx.snap`
 - `tests/unit/paridad/__snapshots__/usuarios-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/asignacion-listas-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/campos-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/confirmaciones-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/formularios-paridad.test.tsx.snap`
+- `tests/unit/clientes/scope.test.ts`
 - `e2e/movimiento.spec.ts`
 - `specs/QC-226-tema-y-marca-base/requirements.md`
 - `progress/impl_QC-228.md`
