@@ -382,3 +382,12 @@ con QC-223 (`guard-identificador-de-request.test.ts`). `./init.sh`:
 ✓ test:rapido paso
 == init OK ==
 ```
+
+## Rojo de CI en PR #197: `data-table-alcance.test.ts` (2026-10-09)
+`tests/unit/shared/data-table-alcance.test.ts > la lista de specs E2E que referencian data-table es
+cerrada` fallaba porque `e2e/movimiento.spec.ts` usa `data-table-search` (búsqueda en Clientes para
+probar que navegar dentro del módulo no repite la entrada de pantalla, R20). Lista cerrada con
+precedentes (QC-156, QC-219, QC-223): entra `movimiento.spec.ts`, nota fechada sin citar fichas, el
+centinela pasa de treinta y cuatro a treinta y cinco. Añadido a `tasks.md > Archivos esperados`.
+- `vitest run tests/unit/shared tests/unit/paridad tests/unit/clientes/scope.test.ts`: 66/66 archivos, 924 tests verdes.
+- `./init.sh --completo`: 1102/1102 archivos, 16586 tests verdes, 139 omitidos; sin rojos nuevos; `init OK`.
