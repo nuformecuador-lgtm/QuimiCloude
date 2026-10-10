@@ -14,6 +14,8 @@ import {
   firstIssuedAtAfterStamp,
   floorToSecond,
   isStampedOut,
+  issuedAtForNewSession,
+  MAX_ISSUE_LEAD_MS,
 } from '@/lib/modules/identity/domain/session-revocation';
 
 /** El sello, ya truncado al segundo: es como se guarda (`design.md > 2.3`). */
@@ -198,5 +200,85 @@ describe('el dominio de la revocacion es puro (R46)', () => {
     // Y lo mismo con las dependencias: se miran los IMPORT, no la cabecera que los prohibe.
     const imports = [...fuente.matchAll(/from '([^']+)'/g)].map((match) => match[1] as string);
     expect(imports).toEqual(['./account-status']);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// El instante de emision de una sesion nueva frente al sello: el login en el mismo segundo que el
+// sello no puede nacer revocado, y el corte de las sesiones anteriores no se afloja.
+// ---------------------------------------------------------------------------------------------
+describe('issuedAtForNewSession — el login en el mismo segundo que el sello', () => {
+  const at = (iso: string): Date => new Date(`2026-09-12T${iso}Z`);
+
+  it('R1: sello truncado y login 16 ms despues, en su mismo segundo → segundo siguiente', () => {
+    expect(issuedAtForNewSession(at('10:00:00.016'), at('10:00:00.000')).toISOString()).toBe(
+      '2026-09-12T10:00:01.000Z',
+    );
+  });
+
+  it('R1, R2: sello con fraccion de segundo (el del alta) y login en su mismo segundo → segundo siguiente', () => {
+    expect(issuedAtForNewSession(at('10:00:00.516'), at('10:00:00.500')).toISOString()).toBe(
+      '2026-09-12T10:00:01.000Z',
+    );
+  });
+
+  it('R3: un login ya en el segundo siguiente al sello se emite con el instante actual, el mismo objeto', () => {
+    const now = at('10:00:01.000');
+    expect(issuedAtForNewSession(now, at('10:00:00.000'))).toBe(now);
+  });
+
+  it('R3: un sello de ayer no toca la emision', () => {
+    const now = at('10:00:00.016');
+    expect(issuedAtForNewSession(now, new Date('2026-09-11T10:00:00.000Z'))).toBe(now);
+  });
+
+  it('R4: adelanto de exactamente MAX_ISSUE_LEAD_MS → adelanta; 1 ms mas → instante actual', () => {
+    expect(MAX_ISSUE_LEAD_MS).toBe(2_000);
+
+    // El primer instante que no invalida el sello 10:00:01 es 10:00:02; desde 10:00:00.000 son 2 000 ms.
+    const enElBorde = at('10:00:00.000');
+    expect(issuedAtForNewSession(enElBorde, at('10:00:01.000')).toISOString()).toBe(
+      '2026-09-12T10:00:02.000Z',
+    );
+
+    // Desde 09:59:59.999 son 2 001 ms: no se adelanta y la sesion nace invalida, como sin el ajuste.
+    const pasado = at('09:59:59.999');
+    const emitido = issuedAtForNewSession(pasado, at('10:00:01.000'));
+    expect(emitido).toBe(pasado);
+    expect(isStampedOut({ issuedAt: floorToSecond(emitido) }, at('10:00:01.000'))).toBe(true);
+  });
+
+  it('R7: cuando adelanta, el corte deja pasar el instante emitido y corta un milisegundo antes', () => {
+    const casos: ReadonlyArray<readonly [string, string]> = [
+      ['10:00:00.016', '10:00:00.000'],
+      ['10:00:00.516', '10:00:00.500'],
+      ['10:00:00.999', '10:00:00.999'],
+      ['10:00:00.000', '10:00:00.000'],
+      ['10:00:00.300', '10:00:00.700'],
+      ['10:00:00.000', '10:00:01.000'],
+    ];
+
+    for (const [now, sello] of casos) {
+      const emitido = issuedAtForNewSession(at(now), at(sello));
+      expect(emitido.getTime(), `${now} / ${sello}`).not.toBe(at(now).getTime());
+      expect(isStampedOut({ issuedAt: floorToSecond(emitido) }, at(sello)), `${now} / ${sello}`).toBe(false);
+      const unMsAntes = new Date(emitido.getTime() - 1);
+      expect(isStampedOut({ issuedAt: floorToSecond(unMsAntes) }, at(sello)), `${now} / ${sello}`).toBe(true);
+    }
+  });
+
+  it('R16: vive en el dominio de la revocacion sin leer ningun reloj', () => {
+    const fuente = readFileSync(
+      new URL('../../../lib/modules/identity/domain/session-revocation.ts', import.meta.url),
+      'utf8',
+    );
+    const codigo = fuente
+      .split(/\r?\n/)
+      .filter((linea) => !linea.trimStart().startsWith('*') && !linea.trimStart().startsWith('//'))
+      .join('\n');
+
+    expect(codigo).toContain('export function issuedAtForNewSession(now: Date, sessionsValidFrom: Date)');
+    expect(codigo).not.toContain('new Date()');
+    expect(codigo).not.toContain('Date.now(');
   });
 });

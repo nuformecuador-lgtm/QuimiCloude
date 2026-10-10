@@ -48,6 +48,11 @@ export type AuthenticatableUser = {
    * `AccountLockState`), y esa traduccion es del dominio, no del puerto.
    */
   readonly accountStatus: UserAccountStatus;
+  /**
+   * El sello «sesiones validas desde», crudo. Lo necesita la emision para no firmar una sesion que
+   * nace revocada cuando el login cae en el mismo segundo que el sello.
+   */
+  readonly sessionsValidFrom: Date;
 } & AccountLockState;
 
 export interface UserCredentialsReader {

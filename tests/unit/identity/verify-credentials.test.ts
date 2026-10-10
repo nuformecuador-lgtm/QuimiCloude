@@ -61,6 +61,8 @@ const USUARIO: AuthenticatableUser = {
   // QC-78 R1: el estado ALMACENADO. `active` es el unico que entra, y es el caso normal de
   // todos los fixtures de este archivo que esperan un login que funciona.
   accountStatus: 'active',
+  // Un sello muy anterior a cualquier login de este archivo: la emision no se adelanta.
+  sessionsValidFrom: new Date('2026-01-01T00:00:00.000Z'),
   ...SIN_BLOQUEO,
 };
 
@@ -1209,5 +1211,94 @@ describe('verificacion de credenciales — sin empresa (QC-161)', () => {
       ).resolves.toEqual({ ok: false });
       expect(session.startSession).not.toHaveBeenCalled();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// El instante de emision frente al sello: un login en el mismo segundo que el sello no puede
+// emitir una sesion que nace revocada. Reloj fijo inyectado; sin esperas ni temporizadores falsos.
+// ---------------------------------------------------------------------------------------------
+describe('verifyCredentials — emision frente al sello del mismo segundo', () => {
+  const OCHO_HORAS_MS = 8 * 60 * 60 * 1000;
+  const AHORA = new Date('2026-10-10T10:00:00.016Z');
+
+  function montarConReloj(sessionsValidFrom: Date, now?: () => Date) {
+    const piezas = montar([{ ...USUARIO, sessionsValidFrom }]);
+    const { users, attempts, hasher, session, ids } = piezas;
+    const verifyCredentials = createVerifyCredentials(
+      now === undefined ? { users, attempts, hasher, session, ids } : { users, attempts, hasher, session, ids, now },
+    );
+    return { ...piezas, verifyCredentials };
+  }
+
+  async function ticketEmitido(sessionsValidFrom: Date, now?: () => Date): Promise<SessionTicket> {
+    const { verifyCredentials, session, users } = montarConReloj(sessionsValidFrom, now);
+    await expect(
+      verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA }),
+    ).resolves.toEqual({ ok: true });
+    expect(users.findActiveByUsername).toHaveBeenCalledTimes(1);
+    const ticket = session.startSession.mock.calls[0]?.[0];
+    expect(ticket).toBeDefined();
+    return ticket as SessionTicket;
+  }
+
+  it('R1: sello en el mismo segundo del login → la sesion se emite en el segundo siguiente', async () => {
+    const ticket = await ticketEmitido(new Date('2026-10-10T10:00:00.000Z'), () => AHORA);
+    expect(ticket.issuedAt.toISOString()).toBe('2026-10-10T10:00:01.000Z');
+  });
+
+  it('R1: sello con fraccion de segundo en el mismo segundo → segundo siguiente', async () => {
+    const ticket = await ticketEmitido(
+      new Date('2026-10-10T10:00:00.500Z'),
+      () => new Date('2026-10-10T10:00:00.516Z'),
+    );
+    expect(ticket.issuedAt.toISOString()).toBe('2026-10-10T10:00:01.000Z');
+  });
+
+  it('R3: sello antiguo → la sesion se emite con el instante actual exacto', async () => {
+    const ticket = await ticketEmitido(new Date('2026-10-09T10:00:00.000Z'), () => AHORA);
+    expect(ticket.issuedAt.getTime()).toBe(AHORA.getTime());
+  });
+
+  it('R4: sello 5 s en el futuro → no se adelanta, se emite con el instante actual', async () => {
+    const ticket = await ticketEmitido(new Date('2026-10-10T10:00:05.000Z'), () => AHORA);
+    expect(ticket.issuedAt.getTime()).toBe(AHORA.getTime());
+  });
+
+  it('R5: la caducidad es la emision mas 8 horas exactas, con y sin adelanto', async () => {
+    const sellos = [
+      new Date('2026-10-10T10:00:00.000Z'),
+      new Date('2026-10-09T10:00:00.000Z'),
+      new Date('2026-10-10T10:00:05.000Z'),
+    ];
+    for (const sello of sellos) {
+      const ticket = await ticketEmitido(sello, () => AHORA);
+      expect(ticket.expiresAt.getTime() - ticket.issuedAt.getTime(), sello.toISOString()).toBe(
+        OCHO_HORAS_MS,
+      );
+    }
+  });
+
+  it('R6: un login correcto con sello en el mismo segundo lee la base una sola vez', async () => {
+    const { verifyCredentials, users } = montarConReloj(
+      new Date('2026-10-10T10:00:00.000Z'),
+      () => AHORA,
+    );
+    await verifyCredentials({ username: 'admin', password: CONTRASENA_CORRECTA });
+    expect(users.findActiveByUsername).toHaveBeenCalledTimes(1);
+  });
+
+  it('R15: el reloj se consulta una sola vez por intento', async () => {
+    const reloj = vi.fn(() => AHORA);
+    await ticketEmitido(new Date('2026-10-10T10:00:00.000Z'), reloj);
+    expect(reloj).toHaveBeenCalledTimes(1);
+  });
+
+  it('R15: sin reloj inyectado se usa el del sistema', async () => {
+    const antes = Date.now();
+    const ticket = await ticketEmitido(new Date('2026-01-01T00:00:00.000Z'));
+    const despues = Date.now();
+    expect(ticket.issuedAt.getTime()).toBeGreaterThanOrEqual(antes);
+    expect(ticket.issuedAt.getTime()).toBeLessThanOrEqual(despues);
   });
 });
