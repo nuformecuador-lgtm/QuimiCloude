@@ -628,8 +628,7 @@ type BajaDeFila = {
   /**
    * Si al reabrir el dialogo arranca sin el rechazo anterior. Inventario y el catalogo del
    * proveedor guardan el estado de `useActionState` en el propio dialogo, que ya estaba siempre
-   * montado en `dev` (con su disparador propio): ahi el rechazo reaparece hoy y tambien antes de
-   * esta feature. R33 no cambia nada mas, asi que ese caso no se afirma para ellos.
+   * montado: ahi el rechazo reaparece, y se afirma tal cual para que un cambio no pase en silencio.
    */
   readonly reabreSinError: boolean;
 };
@@ -830,7 +829,11 @@ describe.each(BAJAS_DE_FILA)('$pantalla: baja desde el menu de la fila (R33)', (
     await waitFor(() => expect(screen.queryByTestId(caso.dialogo)).toBeNull());
   });
 
-  it.skipIf(!caso.reabreSinError)('un rechazo anterior no reaparece al volver a abrir', async () => {
+  const tituloReapertura = caso.reabreSinError
+    ? 'un rechazo anterior no reaparece al volver a abrir'
+    : 'heredado: un rechazo anterior SI reaparece al volver a abrir';
+
+  it(tituloReapertura, async () => {
     caso.rechazar();
     const user = setupUser();
     caso.montar();
@@ -845,7 +848,12 @@ describe.each(BAJAS_DE_FILA)('$pantalla: baja desde el menu de la fila (R33)', (
     await waitFor(() => expect(screen.queryByTestId(caso.dialogo)).toBeNull());
 
     await abrir(user);
-    expect(screen.queryByTestId(caso.error)).toBeNull();
+    if (caso.reabreSinError) {
+      expect(screen.queryByTestId(caso.error)).toBeNull();
+    } else {
+      // Comportamiento heredado: el estado del intento anterior vive en el dialogo montado.
+      expect(screen.getByTestId(caso.error)).toBeInTheDocument();
+    }
   });
 });
 

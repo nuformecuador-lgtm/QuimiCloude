@@ -257,7 +257,7 @@ describe('lo que ordena lo dice la lista blanca, y solo si es columna visible (R
 });
 
 describe('las acciones de fila existen solo con permiso de escritura (R9)', () => {
-  it('con `canModify` las dos se emiten, cada una nombrando al grupo', async () => {
+  it('con `canModify` las dos se emiten en el menu de la fila, cuyo disparador nombra al grupo', async () => {
     const user = setupUser();
     render(<WorkGroupRowActions group={GRUPO} canModify />);
 
@@ -281,7 +281,7 @@ describe('las acciones de fila existen solo con permiso de escritura (R9)', () =
     expect(screen.queryByRole('button')).toBeNull();
   });
 
-  it('cada disparador avisa sobre QUE grupo se pidio actuar, y no escribe nada por su cuenta', async () => {
+  it('cada item del menu avisa sobre QUE grupo se pidio actuar, y no escribe nada por su cuenta', async () => {
     const onEdit = vi.fn();
     const onDelete = vi.fn();
     const user = setupUser();

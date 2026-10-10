@@ -365,7 +365,7 @@ describe.each(VIEWPORTS)('pantalla de presentaciones en viewport %s (%i px)', (_
   // R19, R34 — Nada detras del puntero
   // ------------------------------------------------------------------------------------------
 
-  it('editar y borrar estan en el DOM y visibles desde el primer render, sin :hover (R34)', async () => {
+  it('editar y borrar se alcanzan, visibles, desde el disparador de cada fila, sin :hover (R34)', async () => {
     const user = setupUser();
     await renderPantalla();
 

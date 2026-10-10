@@ -244,7 +244,7 @@ describe('la columna de acciones es una columna NORMAL que devuelve elementos (R
 });
 
 describe('la fila de una unidad DE EMPRESA ofrece editar y borrar (R28, R48)', () => {
-  it('los dos botones estan en el DOM desde el primer render y son botones de verdad', async () => {
+  it('al abrir el menu de la fila, editar y borrar son items de menu de verdad y habilitados', async () => {
     const view = unidad();
     const user = setupUser();
 
@@ -270,7 +270,7 @@ describe('la fila de una unidad DE EMPRESA ofrece editar y borrar (R28, R48)', (
     }
   });
 
-  it('los dos objetivos tactiles miden al menos 44x44 px (R48)', async () => {
+  it('el disparador del menu mide al menos 44x44 px y sus items 44 px de alto (R48)', async () => {
     const user = setupUser();
     pintarCelda(ACTIONS_COLUMN_ID, unidad());
     const disparador = screen.getByTestId(UNIT_ROW_ACTIONS_TESTID);
@@ -283,7 +283,7 @@ describe('la fila de una unidad DE EMPRESA ofrece editar y borrar (R28, R48)', (
     }
   });
 
-  it('nada se descubre con `:hover` ni vive dentro de un desplegable (R48)', () => {
+  it('nada se descubre con `:hover` y el menu de la fila arranca cerrado (R48)', () => {
     const { container } = pintarCelda(ACTIONS_COLUMN_ID, unidad());
 
     expect(screen.queryByRole('menu')).toBeNull();

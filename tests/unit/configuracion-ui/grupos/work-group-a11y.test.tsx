@@ -308,7 +308,7 @@ describe.each([
     expect(screen.getByTestId('data-table-search').className).toContain(FUENTE_DE_CAMPO);
   });
 
-  it('las acciones de fila estan SIEMPRE en el DOM: nada depende de `:hover`', async () => {
+  it('el disparador de las acciones de fila esta SIEMPRE en el DOM: nada depende de `:hover`', async () => {
     await renderPestanaDeGrupos();
 
     for (const grupo of GRUPOS) {

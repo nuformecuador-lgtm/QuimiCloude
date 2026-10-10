@@ -498,7 +498,7 @@ describe('pantalla de recetas — columnas', () => {
     }
   });
 
-  it('R21: las acciones van en una columna que no se puede fijar, siempre visibles y con area tactil de 44x44', async () => {
+  it('R21: las acciones van en una columna que no se puede fijar, tras un disparador siempre visible de 44x44 y con items tactiles', async () => {
     await renderPantalla();
 
     const acciones = buildRecipeColumns({ rowActions: () => null }).find(

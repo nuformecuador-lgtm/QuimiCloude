@@ -226,7 +226,7 @@ describe('la columna de acciones es una columna NORMAL que devuelve elementos (R
 });
 
 describe('cada fila ofrece editar y borrar, alcanzables por rol ARIA (R19)', () => {
-  it('los dos botones estan en el DOM desde el primer render y son botones de verdad', async () => {
+  it('al abrir el menu de la fila, editar y borrar son items de menu de verdad y habilitados', async () => {
     const user = setupUser();
     const view = presentacion();
 
@@ -256,7 +256,7 @@ describe('cada fila ofrece editar y borrar, alcanzables por rol ARIA (R19)', () 
     }
   });
 
-  it('los dos objetivos tactiles miden al menos 44x44 px (R34)', () => {
+  it('el disparador del menu de la fila mide al menos 44x44 px (R34)', () => {
     pintarCelda(ACTIONS_COLUMN_ID, presentacion());
 
     for (const testId of [PRESENTATION_ROW_ACTIONS_TESTID]) {
@@ -266,7 +266,7 @@ describe('cada fila ofrece editar y borrar, alcanzables por rol ARIA (R19)', () 
     }
   });
 
-  it('nada se descubre con `:hover` ni vive dentro de un desplegable (R19, R34)', () => {
+  it('nada se descubre con `:hover` y el menu de la fila arranca cerrado (R19, R34)', () => {
     const { container } = pintarCelda(ACTIONS_COLUMN_ID, presentacion());
 
     // Ni un menu que esconda las acciones, ni una clase que las revele al pasar el raton.
