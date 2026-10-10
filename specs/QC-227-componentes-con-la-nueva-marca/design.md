@@ -233,6 +233,16 @@ instalada solo admite `priority`, usa esa prop con el mismo nombre público `pre
 son el LCP de su página. El test afirma que el `<img>` del login no lleva `loading="lazy"` y lleva
 `fetchpriority="high"`, y que los demás usos siguen con `loading="lazy"`.
 
+**Nota de implementación (2026-10-10).** Con Next 16.3.0, `preload` quita `loading="lazy"` del
+`<img>` e inserta un `<link rel="preload" as="image">` en el `<head>`, pero **no** pone
+`fetchpriority="high"` (`get-img-props.js` solo lo pasa si se da `fetchPriority`). Y la referencia
+de `<Image>` (`node_modules/next/dist/docs/01-app/03-api-reference/02-components/image.md`,
+`#### preload`) desaconseja combinarlos: «When not to use it: […] When the `fetchPriority`
+property is used». Por eso el código no añade `fetchPriority` y el test de R26 afirma lo que sí
+ocurre: el `<img>` del login **sin** `loading="lazy"` y un `<link rel="preload">` de la imagen en
+el `<head>`; no afirma `fetchpriority`. El aviso de LCP de `next dev` solo salta con
+`loading="lazy"`, así que desaparece igual.
+
 ## 9. Tests que se enmiendan, snapshots de paridad y evidencia visual
 
 **Snapshots de paridad** (`tests/unit/paridad/__snapshots__/*.snap`, de QC-231, QC-232 y QC-233).
