@@ -219,3 +219,77 @@ Medido en `pedidos-tabla-oscuro.png`:
 - **Snapshots de paridad.** Solo cambian clases, y el `loading="lazy"` aprobado (R26).
 - **Comentarios.** Fuera de B2, los comentarios de producción añadidos explican el porqué y no
   citan fichas.
+
+## Vuelta 2 (acotada a a67eff9f..0a9ea0d0)
+
+Commits del rango:
+
+- `f292ef50`: índice de capturas (leader).
+- `cc633094`: B1 y B2.
+- `788ee8aa`: B3 y la bitácora.
+- `0a9ea0d0`: alto de 44 px de los disparadores de grupo en la barra expandida.
+
+### Verificación (revisor)
+
+| Comando | Resultado |
+| --- | --- |
+| `./init.sh` (con `../../.env`) | `== init OK ==`, exit 0. Related: 291 archivos, 4438 passed y 3 skipped. Siempre: 105 archivos, 1461 passed y 35 skipped |
+| `vitest run tests/unit/shared tests/unit/clientes tests/unit/paridad tests/guards tests/unit/marca` + `sidebar-ajuste`, `app-sidebar`, `sidebar-desktop` | 161 archivos, 2183 passed y 19 skipped, exit 0 |
+| E2E | No lo corrí. El implementer da 106/106 en Chromium y WebKit sobre una base aislada |
+
+### Hallazgos de la vuelta 1
+
+- **B1, resuelto.** Las dos reglas del inactivo seleccionan ahora por
+  `:is([data-sidebar='menu-button'], [data-sidebar='menu-sub-button'])`. El primitivo pone esos
+  valores en `components/ui/sidebar.tsx:536` y `:703`, y los disparadores los conservan (lo
+  confirma mi sonda de la vuelta 1). Lo que no cambia:
+  - el ámbito `[data-slot='sidebar-content']`;
+  - las exclusiones `[data-active]`, `:hover` y `:focus-visible`;
+  - las reglas del activo, que siguen por `data-slot`, sin tocar.
+
+  Tests:
+  - `tests/unit/marca/sidebar-grupos.test.tsx` monta `AppSidebar` con `PRIVATE_NAV_ITEMS` en los
+    dos modos. Lee el selector de `globals.css` y comprueba que cada disparador de grupo y cada
+    enlace casan con las dos reglas, y que la marca y el pie no (R17). Es un test real; la
+    bitácora anota un control negativo con el selector viejo.
+  - El E2E nuevo «R15 R16 un item con submenu…» mide el color calculado de `nav-produccion` en
+    reposo y con foco por `Tab`: expandida y en modo icono, en claro y oscuro.
+  - `sidebar-inactivo.test.ts` solo actualiza las constantes del selector.
+- **B2, resuelto.** El comentario de la regla de foco ya no cita requisito ni decisión. Las
+  líneas de producción añadidas en el rango no citan `QC-`, `R<n>`, `design.md` ni decisiones.
+- **B3, resuelto.** T0, T9, T10 y T11 están en `[x]`. T11 lleva una nota que remite el «sin
+  CHOCA» al leader (decisión ya tomada). El índice de parejas está en
+  `progress/capturas_QC-227.md` y lo enlaza `progress/features/QC-227.md > Tandas`.
+
+### Cambio nuevo del rango (`0a9ea0d0`)
+
+Con la barra expandida, los disparadores de grupo medían 32 px de alto. La regla
+`[data-slot='sidebar-menu-button'] { min-height: 44px }` no los alcanzaba, por la misma causa
+que B1.
+
+- **Corrección.** Una regla nueva sin capa,
+  `[data-sidebar='menu-button']:not([data-slot='sidebar-menu-button']) { min-height: 44px }`. La
+  original se conserva, porque la congelan `theme/sidebar-panel.test.tsx` y `login-skin.test.tsx`.
+- **R36.** Su segundo punto pide que cada botón de primer nivel mida al menos 44 px en la vista
+  expandida (QC-29 R20), y los grupos ahora lo cumplen. El caso «R36 …» de
+  `sidebar-grupos.test.tsx` y el E2E (`CONTENT_BUTTONS` pasa a `data-sidebar`, y R31–R36 miden
+  ahora también los grupos) lo cubren.
+- **Alcance de la regla nueva.** No lleva el ámbito de `sidebar-content`, así que también casa con
+  el disparador del pie (`nav-user`, que es `DropdownMenuTrigger`). Ese botón es `size="lg"`
+  (`h-12`, 48 px), así que un mínimo de 44 no lo cambia. En modo icono, el primitivo ya fija
+  44 px (`size-11!`). No veo regresión.
+
+### Menores de la vuelta 2
+
+- **m3.** `0a9ea0d0` cambia el aspecto de la barra expandida: «Producción» e «Integraciones»
+  crecen de 32 a 44 px. Corrige un incumplimiento de R36 y de QC-29 R20, así que está justificado.
+  Pero las capturas «después» del sidebar expandido (`sidebar-expandido-*`) son anteriores. El
+  leader ya anota que los pares del sidebar se rehacen. Sin esas capturas rehechas, la evidencia
+  visual de T10 queda desfasada en esas dos filas. No bloquea, porque lo miden el unitario y el E2E.
+- m1 y m2 de la vuelta 1 no cambian.
+
+### Veredicto vuelta 2: OK
+
+No quedan bloqueantes. B1, B2 y B3 están resueltos, y el cambio de `0a9ea0d0` está justificado
+por R36 y cubierto por un unitario y por el E2E. Para el merge sigue haciendo falta
+`gate-completo` en verde en CI y la decisión del leader sobre el CHOCA con QC-217 y QC-223.
