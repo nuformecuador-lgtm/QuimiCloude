@@ -537,3 +537,38 @@ playwright theme + login-skin + movimiento               -> 30 passed (42.8s)
 Batería `vitest run tests/unit/shared tests/unit/clientes tests/unit/paridad tests/guards`: 151 archivos, 2036 passed | 19 skipped; ningún snapshot de paridad cambió.
 
 Veredicto: R16 con foco igualado al hover; E2E 98/98 en Chromium y WebKit y gate local verde.
+
+## Vuelta 2 — correcciones del review (B1, B2, B3)
+
+**B1.** Las dos reglas del inactivo en `app/globals.css` seleccionan ahora por
+`:is([data-sidebar='menu-button'], [data-sidebar='menu-sub-button'])`. Medido en el navegador:
+`nav-produccion` lleva `data-slot="collapsible-trigger"` (expandida) y `"dropdown-menu-trigger"`
+(modo icono), y conserva `data-sidebar="menu-button"`. Las exclusiones (`[data-active]`, `:hover`,
+`:focus-visible`) y el ámbito `sidebar-content` no cambian.
+- Unitario nuevo `tests/unit/marca/sidebar-grupos.test.tsx`: monta `AppSidebar` con
+  `PRIVATE_NAV_ITEMS`, expandida y en modo icono, y comprueba con el selector **leído de
+  `globals.css`** que cada disparador de grupo y cada enlace casan con las dos reglas, y que la
+  marca y el pie no. Control negativo: con el selector viejo (`data-slot`) caen los 2 casos de grupos.
+- `tests/unit/marca/sidebar-inactivo.test.ts`: constantes de selector actualizadas.
+- E2E nuevo «R15 R16 un item con submenu…» (expandida y modo icono × claro y oscuro × Chromium y
+  WebKit, 8 casos): `nav-produccion` en reposo = `--sidebar-muted-foreground` (7.96 claro, 7.62
+  oscuro contra `--sidebar`), con foco por `Tab` = `--sidebar-accent-foreground` y `:focus-visible`.
+
+**B2.** El comentario de la regla de foco ya no cita requisito ni decisión.
+
+**B3.** T0, T9, T10 y T11 marcadas en `tasks.md`; T11 con nota: el «sin CHOCA» lo gestiona el
+leader. `sidebar-grupos.test.tsx` añadido a «Archivos esperados».
+
+Mapa: R15 y R16 suman `marca/sidebar-grupos.test.tsx` (casos «R15 R16 … disparador de grupo» y
+«… enlaces») y el E2E «R15 R16 un item con submenu…»; R17 suma «R17 … la marca y el pie no casan».
+
+Verificación (base aislada `quimicloude_e2e_qc227`, creada, migrada, sembrada y borrada):
+
+```
+playwright marca-componentes + theme + login-skin + movimiento (chromium+webkit) -> 106 passed (1.7m)
+./init.sh -> == init OK ==; lint 0 errores; related 291 archivos, 4436 passed | 3 skipped; siempre 105, 1461 passed | 35 skipped
+vitest run tests/unit/shared tests/unit/clientes tests/unit/paridad tests/guards -> 151 archivos, 2036 passed | 19 skipped
+```
+
+Observación (fuera de B1): `CONTENT_BUTTONS` de los bloques R31–R36 del E2E sigue seleccionando por
+`data-slot`, así que la medida del carril colapsado no incluye los disparadores de grupo.

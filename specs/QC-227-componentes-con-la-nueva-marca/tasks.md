@@ -16,7 +16,7 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
 
 ## Tanda 0 — Punto de partida (leader)
 
-- [ ] **T0. Sincronizar con `dev` y capturas «antes»** (P7; R29)
+- [x] **T0. Sincronizar con `dev` y capturas «antes»** (P7; R29)
   - Con QC-228 ya mergeada en `dev`: `git merge origin/dev` en esta rama y
     `pnpm exec vitest run tests/unit/paridad` en verde **sin regenerar**.
   - Capturas «antes» con Playwright y el seed demo (QC-230), en claro, oscuro y móvil, en
@@ -146,7 +146,7 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
 
 ## Tanda 3 — Paridad, E2E y cierre
 
-- [ ] **T9 (Dep.: T1–T8, T12). Snapshots de paridad y enmiendas** (R29)
+- [x] **T9 (Dep.: T1–T8, T12). Snapshots de paridad y enmiendas** (R29)
   - `pnpm exec vitest run tests/unit/paridad`. Para cada `.snap` que cambie, comprobar que viejo y
     nuevo son idénticos quitando los `class="…"` (`design.md > 9`). Anotar el resultado por archivo
     en `progress/impl_QC-227.md`.
@@ -156,7 +156,7 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
     con nota `ENMIENDA QC-227`, en un commit aparte.
   - **Hecho cuando:** la paridad está verde y ningún otro test cambió.
 
-- [ ] **T10 (Dep.: T9). E2E y capturas «después»** (R10, R11, R15, R16, R21, R23, R24)
+- [x] **T10 (Dep.: T9). E2E y capturas «después»** (R10, R11, R15, R16, R21, R23, R24)
   - `e2e/marca-componentes.spec.ts` (`design.md > 11`), en claro y en oscuro; alta en
     `E2E_ESPERADOS` de `tests/guards/guard-identificador-de-request.test.ts`.
   - Correr `e2e/marca-componentes.spec.ts`, `e2e/theme.spec.ts`, `e2e/login-skin.spec.ts` y el
@@ -169,7 +169,7 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
     `e2e/marca-componentes.spec.ts`. Aquí se corre con el resto. Las capturas de la barra en modo
     icono, antes y después, van en la tabla de parejas.
 
-- [ ] **T11 (Dep.: T10). Cierre y trazabilidad** (D2, D7; R28)
+- [x] **T11 (Dep.: T10). Cierre y trazabilidad** (D2, D7; R28)
   - `git diff --diff-filter=A --name-only origin/dev...HEAD -- components app` no lista ningún
     `.tsx` (D2), y `git diff --name-only origin/dev...HEAD -- lib/modules db` sale vacío (D7). Las
     dos salidas se anotan en `progress/impl_QC-227.md`.
@@ -178,6 +178,8 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
   - `node scripts/archivos-en-vuelo.mjs --candidata QC-227` sin `CHOCA`, y `./init.sh` en verde.
   - **Hecho cuando:** cada R tiene un test, las dos comprobaciones de diff están anotadas y el gate
     local está verde.
+  - Nota 2026-10-10: el «sin `CHOCA`» (QC-217 y QC-223, en archivos ya listados aquí) lo gestiona
+    el leader; el resto del «Hecho cuando» está cumplido (`progress/impl_QC-227.md > T11`).
 
 ## Archivos esperados
 
@@ -234,6 +236,7 @@ existe, porque el código empieza con QC-228 en `dev` (T0).
 - `tests/unit/marca/badges-estado.test.tsx`
 - `tests/unit/marca/tablas-marca.test.tsx`
 - `tests/unit/marca/sidebar-inactivo.test.ts`
+- `tests/unit/marca/sidebar-grupos.test.tsx`
 - `tests/unit/marca/botones-y-campos.test.tsx`
 - `tests/unit/marca/contraste-componentes.test.ts`
 - `tests/unit/theme/contraste.ts`
