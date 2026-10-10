@@ -210,3 +210,8 @@ Rescatados de *Evaluaciones* y *Features en curso* del archivo: no estaban en *D
 - **Qué falta:** en el runner de 2 vCPU las dos emisiones concurrentes a veces no llegan a encolarse tras el bloqueo (`waitForLockWaiters`). Alargar la espera no lo arregla (con 20 s choca con el `testTimeout`): hay que entender por qué no se encolan (pool de conexiones, orden de arranque, `pg_stat_activity`) y hacer el test determinista. Mientras tanto está en `tests/baseline-rojos.json`; al arreglarlo, se borra la entrada.
 - **Estado:** resuelta el 2026-10-07 en `chore/ci-velocidad-y-d34`. Causa: orden de arranque —las emisiones se lanzaban sin esperar a que el `FOR UPDATE` del bloqueo estuviera tomado; si una llegaba antes, ganaba sin esperar y no quedaba nada encolado—. Ahora se lanzan solo con el bloqueo tomado (y se afirma que atrapó 1 fila). Entrada borrada del baseline. Detalle: `progress/fix-d34-credential-setup.md`.
 - **Dueño:** sin asignar.
+
+### D35 — `guard-dobles-e2e` lee `.env.example` con una regex que cruza líneas
+- **Origen:** review de QC-234 (menor M2, 2026-10-09) y de nuevo en QC-237 (2026-10-09).
+- **Qué falta:** la regex del guard usa `\s*` después del `=`, y `\s` también casa saltos de línea. Una variable vacía al final de `.env.example` (`NOMBRE=`) se lee con el valor de la línea siguiente. QC-237 lo esquiva escribiendo `INTEGRATIONS_E2E_DOUBLES=""`. Arreglo: cambiar `\s*` por `[ \t]*` en `tests/guards/guard-dobles-e2e.test.ts` y volver a dejar las variables como `NOMBRE=`.
+- **Dueño:** sin asignar.
