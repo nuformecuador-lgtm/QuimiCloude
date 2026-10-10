@@ -445,3 +445,15 @@ Repetido tras añadir los barrels a `Archivos esperados`: mismo resultado.
   en la UI desde `527a9902`): ajeno a QC-232.
 - **Ediciones de test «+ P2» y «+ táctil»** (ver `## Ediciones de test (R4)`): van más allá del
   tipo (b) literal; las fuerza el cambio de la tanda 3. Decide el reviewer.
+
+## Review vuelta 1 (2026-10-09)
+- **H2:** sin citas `R29`/`R22`/«decision cerrada» en `unit-row-actions.tsx` y `catalog-columns.tsx`.
+- **m5:** sin citas QC-/R/D/T en las líneas añadidas o reindentadas de `order-sheet`, `order-form`,
+  `user-form` y `work-group-form` (quedan tres «(decision humana)» en `user-form`, sin clave).
+- **m1:** títulos de test al día (presentation-columns, unit-columns, unidades-viewport,
+  configuracion-viewport, work-group-columns, work-group-a11y, recipe-page).
+- **m2:** `confirm-dialog-montado` afirma en inventario y proveedores/[id] el comportamiento heredado
+  (el rechazo anterior reaparece); 29/29, ninguno saltado.
+- **m4:** dueño de D39 corregido (QC-232).
+- Salidas: typecheck exit 0; lint 0 errores (7 avisos ajenos); `vitest related` de los 6 archivos
+  108 archivos / 1955 passed, 1 skipped; tests tocados + guardias + convenciones 74 / 1115 passed.

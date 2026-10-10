@@ -168,12 +168,12 @@
   barrel (`simbolo-borrado`) por D11.
 - **Dueño:** ficha **QC-223**.
 
-### D39 — Pedidos: `order-sheet.tsx` conserva su `TOUCH_TARGET` local (QC-232 → QC-223)
+### D39 — Pedidos: `order-sheet.tsx` conserva su `TOUCH_TARGET` local (QC-232)
 - **Origen:** QC-232 (2026-10-09), `guard-piezas-base > ARCHIVOS_D11` y `design.md > 7` (P1).
 - **Qué falta:** `app/(private)/pedidos/components/order-sheet.tsx` adoptó `FormSheet` en QC-232, pero
   conserva `const TOUCH_TARGET = 'min-h-11 min-w-11'` y sigue en `ARCHIVOS_D11`, con exclusión que
   cita QC-232. Pasar a `touchTarget` y retirar la exclusión.
-- **Dueño:** ficha **QC-223** (el archivo estaba en su diff del 2026-10-08).
+- **Dueño:** **QC-232**, esta rama: tocó `order-sheet.tsx` y no lo resolvió. Al cerrar P1 el leader constató que el diff de QC-223 ya no toca este archivo, así que no es suya.
 
 ### D40 — Pedidos: el panel de entrega no adopta `FormSheet` (QC-232 → QC-223)
 - **Origen:** QC-232 (2026-10-09), `design.md > 7`.
