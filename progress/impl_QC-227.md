@@ -376,6 +376,18 @@ Los dos choques son con archivos que ya estaban en «Archivos esperados» del sp
 de QC-227 ahí son de una línea: `tabular: true` en la columna Envases y en Cantidad/Fecha de solicitud,
 y una entrada en `E2E_ESPERADOS`. Lo decide el leader.
 
+### Gate de cierre
+
+- `./init.sh` (rápido, con `../../.env`): **rojo** solo en `test:rapido`, con 288 archivos y
+  `2 failed | 4380 passed | 1 skipped`. Los dos rojos son `login-paridad.test.tsx` (R1 en reposo y
+  R1 R2 enviando), el snapshot que queda sin regenerar.
+- `pnpm exec vitest run tests/unit/shared tests/unit/clientes tests/unit/paridad tests/guards`:
+  además de `login-paridad`, salía rojo `clientes-convenciones.test.ts` («nadie importa los
+  componentes de la ruta por ruta profunda»). La causa era el import de `buildCustomerColumns` por
+  ruta profunda en `tests/unit/marca/tablas-marca.test.tsx`. Corregido con el import del barrel,
+  que ya lo reexporta. Después, `tablas-marca` y `clientes-convenciones` dan 48 passed y 3 skipped;
+  typecheck y eslint en verde.
+
 Otra desviación: `data-table-header-menu.tsx` y `data-table-types.ts` salen con el diff entero porque
 su blob en `dev` estaba en CRLF y `.gitattributes` (`* text=auto eol=lf`) lo normaliza a LF al
 editarlos. `git diff -w` muestra el cambio real (4 líneas).

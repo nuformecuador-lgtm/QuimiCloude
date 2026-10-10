@@ -7,7 +7,7 @@ import {
   buildFinishedOrdersColumns,
   PackingOrdersListSection,
 } from '@/app/(private)/asignacion/components';
-import { buildCustomerColumns } from '@/app/(private)/clientes/components/customer-columns';
+import { buildCustomerColumns } from '@/app/(private)/clientes/components';
 import { buildPresentationColumns } from '@/app/(private)/configuracion/presentaciones/components';
 import {
   buildExecutionTraceColumns,
