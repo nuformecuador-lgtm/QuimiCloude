@@ -89,6 +89,7 @@ export function buildPresentationColumns(
     {
       id: CONTENT_COLUMN_ID,
       label: 'Contenido',
+      tabular: true,
       align: 'end',
       // No ordena ni filtra: no esta en la lista blanca del catalogo para ninguna de las dos cosas.
       pinnable: false,

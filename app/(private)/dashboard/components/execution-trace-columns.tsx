@@ -99,12 +99,14 @@ export function buildExecutionTraceColumns({
     {
       id: TRACE_FIRST_AT_COLUMN_ID,
       label: 'Primera anotación',
+      tabular: true,
       align: 'start',
       cell: (row) => formatTraceInstant(row.firstAt),
     },
     {
       id: LAST_AT_COLUMN_ID,
       label: 'Última anotación',
+      tabular: true,
       align: 'start',
       filter: { kind: 'dateRange' },
       cell: (row) => formatTraceInstant(row.lastAt),

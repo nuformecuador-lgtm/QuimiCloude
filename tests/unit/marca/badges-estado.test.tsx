@@ -13,6 +13,7 @@ import {
   USER_STATUS_BADGE_TESTID,
   UserStatusBadge,
 } from '@/app/(private)/configuracion/usuarios/components';
+import { ProductBatchesPanel } from '@/app/(private)/inventario/components';
 import {
   RecipeVersionForm,
   RecipeVersionList,
@@ -162,6 +163,31 @@ describe('badges de estado con la nueva marca', () => {
       expectTone(screen.getByTestId(USER_STATUS_BADGE_TESTID), USER_TONES[status]);
       unmount();
     }
+  });
+
+  it('R7: «Sobre-reservado» del panel de lotes es un badge de tono error con su testid y su texto', () => {
+    render(
+      <ProductBatchesPanel
+        batches={[
+          {
+            id: 'b1',
+            lot: 'L-001',
+            stock: '5',
+            unitId: null,
+            purchaseDate: '2026-03-05',
+            expiryDate: null,
+            packageContent: null,
+            reserved: '8',
+            available: '0',
+            overReserved: true,
+          },
+        ]}
+      />,
+    );
+    const marca = screen.getByTestId('product-batch-over-reserved');
+    expect(marca).toHaveAttribute('data-slot', 'badge');
+    expect(marca).toHaveTextContent('Sobre-reservado');
+    expectTone(marca, 'destructive');
   });
 
   it('R8: «En revisión» se pinta con el tono de información en la lista de versiones', () => {

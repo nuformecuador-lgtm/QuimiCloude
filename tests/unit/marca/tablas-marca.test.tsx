@@ -1,7 +1,26 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PackingOrdersListSection } from '@/app/(private)/asignacion/components';
+import {
+  buildCompanyOrdersColumns,
+  buildConditioningOrdersColumns,
+  buildFinishedOrdersColumns,
+  PackingOrdersListSection,
+} from '@/app/(private)/asignacion/components';
+import { buildCustomerColumns } from '@/app/(private)/clientes/components/customer-columns';
+import { buildPresentationColumns } from '@/app/(private)/configuracion/presentaciones/components';
+import {
+  buildExecutionTraceColumns,
+  createDefaultExecutionTraceListParams,
+} from '@/app/(private)/dashboard/components';
+import {
+  buildFinishedStockColumns,
+  buildProductColumns,
+  ProductBatchesPanel,
+} from '@/app/(private)/inventario/components';
+import { buildOrderColumns, OrderIngredientsTable } from '@/app/(private)/pedidos/components';
+import { buildRecipeColumns } from '@/app/(private)/produccion/formulas/components';
+import { buildCatalogColumns } from '@/app/(private)/proveedores/[id]/components';
 import { DataTable } from '@/components/shared/data-table/data-table';
 import { createDefaultParams } from '@/components/shared/data-table/data-table-params';
 import type {
@@ -9,6 +28,7 @@ import type {
   DataTableParams,
   DataTableTexts,
 } from '@/components/shared/data-table/data-table-types';
+import type { ProductBatchView } from '@/lib/modules/inventario';
 
 const { getSessionUserMock, getSessionContextMock, listPackingOrdersMock } = vi.hoisted(() => ({
   getSessionUserMock: vi.fn<() => Promise<unknown>>(),
@@ -203,5 +223,174 @@ describe('tablas con la nueva marca', () => {
     const [numeroCell, envasesCell] = within(row).getAllByRole('cell');
     expect(envasesCell).toHaveClass('font-mono', 'tabular-nums');
     expect(numeroCell).not.toHaveClass('font-mono');
+  });
+});
+
+/** Columnas de cuerpo en Plex Mono, por archivo. Ninguna otra columna de esos archivos lo lleva. */
+type ColumnasDeArchivo = {
+  readonly archivo: string;
+  readonly construir: () => Promise<readonly { readonly label: string; readonly tabular?: boolean }[]>;
+  readonly esperadas: readonly string[];
+};
+
+const sinAcciones = () => null;
+
+const LISTA_CERRADA: readonly ColumnasDeArchivo[] = [
+  {
+    archivo: 'order-columns.tsx',
+    construir: async () =>
+      buildOrderColumns({ recipes: { items: [], totalPages: 1 }, units: [], bridge: null }),
+    esperadas: ['Cantidad', 'Fecha de solicitud'],
+  },
+  {
+    archivo: 'customer-columns.tsx',
+    construir: async () => buildCustomerColumns({ rowActions: sinAcciones }),
+    esperadas: ['Fecha de alta', 'Última modificación'],
+  },
+  {
+    archivo: 'recipe-columns.tsx',
+    construir: async () => buildRecipeColumns({ rowActions: sinAcciones }),
+    esperadas: ['Creado', 'Actualizado'],
+  },
+  {
+    archivo: 'catalog-columns.tsx',
+    construir: async () =>
+      buildCatalogColumns({
+        directories: { presentations: new Map(), units: new Map() },
+        rowActions: sinAcciones,
+      }),
+    esperadas: ['Mínimo de compra', 'Creado', 'Actualizado'],
+  },
+  {
+    archivo: 'product-columns.tsx',
+    construir: async () => buildProductColumns({ rowActions: sinAcciones }),
+    esperadas: ['Existencia', 'Alerta de cantidad', 'Reservado', 'Disponible'],
+  },
+  {
+    archivo: 'finished-stock-columns.tsx',
+    construir: async () => buildFinishedStockColumns({ onToggle: vi.fn(), lineActions: sinAcciones }),
+    esperadas: ['Existencia', 'Alerta de cantidad'],
+  },
+  {
+    archivo: 'presentation-columns.tsx',
+    construir: async () => buildPresentationColumns([]),
+    esperadas: ['Contenido'],
+  },
+  {
+    archivo: 'company-orders-columns.tsx',
+    construir: async () => buildCompanyOrdersColumns({ showFinishedAt: true }),
+    esperadas: ['Fecha de terminado'],
+  },
+  {
+    archivo: 'finished-orders-columns.tsx',
+    construir: async () => buildFinishedOrdersColumns(),
+    esperadas: ['Fecha de terminado'],
+  },
+  {
+    archivo: 'conditioning-orders-columns.tsx',
+    construir: async () => buildConditioningOrdersColumns(),
+    esperadas: ['Envases'],
+  },
+  {
+    archivo: 'packing-orders-columns.tsx',
+    // Arriba se sustituye este modulo para la seccion de empaque: aqui se mide el real.
+    construir: async () =>
+      (
+        await vi.importActual<
+          typeof import('@/app/(private)/asignacion/components/packing-orders-columns')
+        >('@/app/(private)/asignacion/components/packing-orders-columns')
+      ).buildPackingOrdersColumns(),
+    esperadas: ['Envases'],
+  },
+  {
+    archivo: 'execution-trace-columns.tsx',
+    construir: async () =>
+      buildExecutionTraceColumns({
+        personOptions: [],
+        params: createDefaultExecutionTraceListParams(),
+      }),
+    esperadas: ['Primera anotación', 'Última anotación'],
+  },
+];
+
+describe('lista cerrada de columnas en Plex Mono', () => {
+  it.each(LISTA_CERRADA)(
+    'R11, R13: en $archivo llevan tabular exactamente las columnas de la lista',
+    async ({ construir, esperadas }) => {
+      const columnas = await construir();
+      const marcadas = columnas.filter((columna) => columna.tabular === true).map((c) => c.label);
+      expect(marcadas).toEqual(esperadas);
+    },
+  );
+
+  it('R11, R13: los ingredientes del pedido pintan en Mono sus cuatro cifras y no el producto ni la cabecera', () => {
+    render(
+      <OrderIngredientsTable
+        lines={[
+          {
+            id: 'linea-1',
+            productId: 'producto-1',
+            productName: 'Hipoclorito',
+            percentage: '10.00',
+            productUnitId: null,
+            productStock: '15.0000',
+          },
+        ]}
+        units={[]}
+        quantity="200"
+        orderUnitId=""
+        bridge={null}
+        loading={false}
+        error={null}
+      />,
+    );
+    for (const testId of [
+      'order-ingredient-percentage',
+      'order-ingredient-stock',
+      'order-ingredient-required',
+      'order-ingredient-remaining',
+    ]) {
+      expect(screen.getByTestId(testId), testId).toHaveClass('font-mono', 'tabular-nums');
+    }
+    expect(screen.getByTestId('order-ingredient-product')).not.toHaveClass('font-mono');
+    for (const head of screen.getAllByRole('columnheader')) {
+      expect(head).not.toHaveClass('font-mono');
+      expect(head).not.toHaveClass('tabular-nums');
+    }
+  });
+});
+
+describe('panel de lotes con la nueva marca', () => {
+  it('R12: lote, cantidades y fechas del panel van en Mono con cifras tabulares, y sus etiquetas no', () => {
+    const lote: ProductBatchView = {
+      id: 'b1',
+      lot: 'L-001',
+      stock: '10',
+      unitId: null,
+      purchaseDate: '2026-03-05',
+      expiryDate: '2027-03-05',
+      packageContent: null,
+      reserved: '4',
+      available: '6',
+    };
+    render(<ProductBatchesPanel batches={[lote]} />);
+
+    for (const testId of [
+      'product-batch-lot',
+      'product-batch-quantity',
+      'product-batch-purchase-date',
+      'product-batch-expiry-date',
+      'product-batch-reserved',
+      'product-batch-available',
+    ]) {
+      const dd = screen.getByTestId(testId);
+      expect(dd.tagName, testId).toBe('DD');
+      expect(dd, testId).toHaveClass('font-mono', 'tabular-nums');
+    }
+    const etiquetas = screen.getByTestId('product-batches-panel').querySelectorAll('dt');
+    expect(etiquetas).toHaveLength(6);
+    for (const dt of etiquetas) {
+      expect(dt).not.toHaveClass('font-mono');
+    }
   });
 });

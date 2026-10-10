@@ -50,6 +50,7 @@ export function buildFinishedOrdersColumns(): readonly DataTableColumn<FinishedO
     {
       id: FINISHED_ORDER_DATE_COLUMN_ID,
       label: 'Fecha de terminado',
+      tabular: true,
       align: 'start',
       cell: (order) => <FinishedAtCell finishedAt={order.finishedAt} />,
     },

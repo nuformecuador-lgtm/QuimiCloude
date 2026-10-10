@@ -198,13 +198,13 @@ export function OrderIngredientsTable({
                     {line.productName ?? MISSING_PRODUCT_LABEL}
                   </TableCell>
                   <TableCell
-                    className="text-right"
+                    className="text-right font-mono tabular-nums"
                     data-testid="order-ingredient-percentage"
                   >
                     {formatPercentage(line.percentage)} %
                   </TableCell>
                   <TableCell
-                    className="text-right"
+                    className="text-right font-mono tabular-nums"
                     title={line.productStock === null ? undefined : exactDecimalTitle(line.productStock)}
                     aria-label={
                       line.productStock === null
@@ -218,7 +218,7 @@ export function OrderIngredientsTable({
                       : withUnit(formatDecimalDisplay(line.productStock), unit)}
                   </TableCell>
                   <TableCell
-                    className="text-right"
+                    className="text-right font-mono tabular-nums"
                     title={required === null ? undefined : exactDecimalTitle(required)}
                     aria-label={
                       required === null
@@ -248,7 +248,7 @@ export function OrderIngredientsTable({
                     )}
                   </TableCell>
                   <TableCell
-                    className="text-right"
+                    className="text-right font-mono tabular-nums"
                     title={remaining === null ? undefined : exactDecimalTitle(remaining)}
                     aria-label={
                       remaining === null ? undefined : withUnit(trimDecimal(remaining), unit)

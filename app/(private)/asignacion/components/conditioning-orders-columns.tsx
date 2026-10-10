@@ -72,6 +72,7 @@ export function buildConditioningOrdersColumns(): readonly DataTableColumn<Condi
     {
       id: CONDITIONING_ORDER_PACKAGES_COLUMN_ID,
       label: 'Envases',
+      tabular: true,
       align: 'start',
       cell: (order) => <OrderDistributionFull lines={order.presentationLines} />,
     },

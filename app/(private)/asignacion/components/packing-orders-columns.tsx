@@ -48,6 +48,7 @@ export function buildPackingOrdersColumns(): readonly DataTableColumn<PackingOrd
     {
       id: PACKING_ORDER_PACKAGES_COLUMN_ID,
       label: 'Envases',
+      tabular: true,
       align: 'end',
       cell: (order) =>
         order.packages ?? (

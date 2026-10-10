@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 
+import { Badge } from '@/components/ui/badge';
 import {
   PRODUCT_TYPES,
   type ProductBatchView,
@@ -195,12 +196,13 @@ export function ProductBatchesPanel({
               <dl className="flex flex-wrap gap-4 text-sm">
                 <div className="flex flex-col">
                   <dt className="text-xs text-muted-foreground">{LOT_LABEL}</dt>
-                  <dd data-testid="product-batch-lot">{batch.lot}</dd>
+                  <dd data-testid="product-batch-lot" className="font-mono tabular-nums">{batch.lot}</dd>
                 </div>
                 <div className="flex flex-col">
                   <dt className="text-xs text-muted-foreground">{QUANTITY_LABEL}</dt>
                   <dd
                     data-testid="product-batch-quantity"
+                    className="font-mono tabular-nums"
                     title={exactDecimalTitle(batch.stock)}
                     aria-label={quantityAriaLabel(batch, unitId, units)}
                   >
@@ -214,12 +216,12 @@ export function ProductBatchesPanel({
                 </div>
                 <div className="flex flex-col">
                   <dt className="text-xs text-muted-foreground">{PURCHASE_DATE_LABEL}</dt>
-                  <dd data-testid="product-batch-purchase-date">{batch.purchaseDate}</dd>
+                  <dd data-testid="product-batch-purchase-date" className="font-mono tabular-nums">{batch.purchaseDate}</dd>
                 </div>
                 {batch.expiryDate === null ? null : (
                   <div className="flex flex-col">
                     <dt className="text-xs text-muted-foreground">{EXPIRY_DATE_LABEL}</dt>
-                    <dd data-testid="product-batch-expiry-date">{batch.expiryDate}</dd>
+                    <dd data-testid="product-batch-expiry-date" className="font-mono tabular-nums">{batch.expiryDate}</dd>
                   </div>
                 )}
                 {batch.reserved === undefined ? null : (
@@ -227,6 +229,7 @@ export function ProductBatchesPanel({
                     <dt className="text-xs text-muted-foreground">{RESERVED_LABEL}</dt>
                     <dd
                       data-testid="product-batch-reserved"
+                      className="font-mono tabular-nums"
                       title={exactDecimalTitle(batch.reserved)}
                       aria-label={exactQuantity(batch.reserved, unitId, units)}
                     >
@@ -239,6 +242,7 @@ export function ProductBatchesPanel({
                     <dt className="text-xs text-muted-foreground">{AVAILABLE_LABEL}</dt>
                     <dd
                       data-testid="product-batch-available"
+                      className="font-mono tabular-nums"
                       title={exactDecimalTitle(batch.available)}
                       aria-label={exactQuantity(batch.available, unitId, units)}
                     >
@@ -248,12 +252,9 @@ export function ProductBatchesPanel({
                 )}
               </dl>
               {batch.overReserved !== true ? null : (
-                <span
-                  data-testid="product-batch-over-reserved"
-                  className="rounded-full border border-destructive/40 px-2 py-0.5 text-xs font-medium text-destructive"
-                >
+                <Badge variant="destructive" data-testid="product-batch-over-reserved">
                   {OVER_RESERVED_LABEL}
-                </span>
+                </Badge>
               )}
               {renderBatchActions === undefined ? null : <div>{renderBatchActions(batch)}</div>}
             </div>
