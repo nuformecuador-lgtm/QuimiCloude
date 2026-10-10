@@ -3,11 +3,11 @@
 Las imágenes no se versionan: viven en `_trabajo/marca/` del checkout principal. Índice del «antes» abajo, tras el del «después».
 
 
-- Base: worktree `feature/QC-227-componentes-con-la-nueva-marca` en 6c0f0594, `next dev -p 3102`.
-- Datos: base aislada `quimicloude_capturas` (quimicloude-pg17:5433), `migrate deploy` + `db:seed` + `db:seed:demo` desde el worktree. Borrada al terminar (`DROP ... WITH (FORCE)`, verificado 0 filas). Servidor detenido.
+- Base: worktree `feature/QC-227-componentes-con-la-nueva-marca` en **0a9ea0d0**, `next dev -p 3102`. Las 40 capturas son de este HEAD; la tanda previa, de 6c0f0594, quedó sobrescrita.
+- Datos: base aislada `quimicloude_capturas` (quimicloude-pg17:5433), `migrate deploy` + `db:seed` + `db:seed:demo` desde el worktree. Al terminar se borró con `DROP ... WITH (FORCE)` y se verificó que no queda. El servidor se detuvo.
 - Mismo script y emulación que el «antes»: `shots-qc227.mjs 3102 .../capturas-componentes-despues`.
-- Resultado: **40 capturas, 0 fallos** (`shots-despues.log`). Mismas dimensiones que el «antes» en los 40 pares.
-- Diferencia de píxeles por par (umbral 24/255): `diff227.mjs` en este scratchpad. Las horas y duraciones difieren siempre por la hora del seed; no es un cambio.
+- Resultado: **40 capturas, 0 fallos** (`shots-despues2.log`). Mismas dimensiones que el «antes» en los 40 pares.
+- Diferencia de píxeles por par (umbral 24/255): `diff227.mjs`, salida en `diff2.txt`. Las horas y las duraciones siempre difieren por la hora del seed; eso no cuenta como cambio.
 
 Rutas: A = `R:\job\singularis\projects\QuimiCloude\_trabajo\marca\capturas-componentes-antes\`, D = `R:\job\singularis\projects\QuimiCloude\_trabajo\marca\capturas-componentes-despues\`. Cada fila es `A\<archivo>` frente a `D\<archivo>`.
 
@@ -15,68 +15,67 @@ Rutas: A = `R:\job\singularis\projects\QuimiCloude\_trabajo\marca\capturas-compo
 
 | Archivo | Δ px | Qué cambió a la vista |
 | --- | --- | --- |
-| pedidos-tabla-claro.png | 1.35% | Cabecera de tabla con banda de fondo y rótulos atenuados; insignias de estado y prioridad pasan a tono suave (antes «En curso», «En empaque» y «Alta» eran rellenos oscuros); hojas inactivas del sidebar atenuadas; icono de la pastilla nuevo. |
-| pedidos-tabla-oscuro.png | 5.14% | Igual que claro; banda de cabecera gris oscura; insignias suaves sobre fondo oscuro; botón «Nuevo pedido» turquesa. |
+| pedidos-tabla-claro.png | 1.87% | Cabecera de tabla con banda de fondo y rótulos atenuados. Insignias de estado y prioridad en tono suave; antes «En curso», «En empaque» y «Alta» eran rellenos oscuros. Ítems inactivos del sidebar atenuados. Icono nuevo en la pastilla. |
+| pedidos-tabla-oscuro.png | 5.53% | Lo mismo que en claro. Banda de cabecera gris oscura, insignias suaves y botón «Nuevo pedido» turquesa. |
 | pedidos-tabla-movil.png | 2.30% | Banda de cabecera e insignias suaves. |
-| usuarios-tabla-claro.png | 0.84% | «Activo» pasa de relleno verde oscuro a verde suave; banda de cabecera. |
-| usuarios-tabla-oscuro.png | 4.52% | Igual; banda de cabecera. |
+| usuarios-tabla-claro.png | 1.24% | «Activo» pasa de relleno verde oscuro a verde suave. Banda de cabecera. |
+| usuarios-tabla-oscuro.png | 4.90% | Lo mismo, con banda de cabecera. |
 | usuarios-tabla-movil.png | 0.20% | Banda de cabecera. |
-| inventario-lotes-claro.png | 0.46% | Cifras del lote (cantidad, fecha, apartado, disponible) en monoespaciada tabular. |
-| inventario-lotes-oscuro.png | 0.90% | Igual. |
-| inventario-lotes-movil.png | 0.50% | Igual. |
-| dashboard-inicio-claro.png | 1.54% | Fechas «Primera/Última anotación» en monoespaciada; banda de cabecera; sidebar con hojas atenuadas. |
-| dashboard-inicio-oscuro.png | 5.30% | Igual. |
-| dashboard-inicio-movil.png | 0.18% | Mínimo (cabecera). |
-| clientes-tabla-claro.png | 0.63% | Banda de cabecera; fechas de alta/modificación. |
-| clientes-tabla-oscuro.png | 4.26% | Igual. |
-| clientes-tabla-movil.png | 0.24% | Mínimo. |
-| asignacion-inicio-claro.png | 0.47% | Banda de cabecera. |
-| asignacion-inicio-oscuro.png | 4.12% | Banda de cabecera gris; rótulos atenuados. |
-| asignacion-inicio-movil.png | 0.17% | Mínimo. |
-| formulario-campo-enfocado-claro.png | 0.39% | Prácticamente igual; anillo de foco del campo apenas distinto. |
-| formulario-campo-enfocado-oscuro.png | 1.04% | Prácticamente igual (anillo de foco). |
+| inventario-lotes-claro.png | 1.24% | Cifras del lote (cantidad, fecha, apartado, disponible) en monoespaciada tabular. |
+| inventario-lotes-oscuro.png | 1.56% | Lo mismo. |
+| inventario-lotes-movil.png | 0.50% | Lo mismo. |
+| dashboard-inicio-claro.png | 1.95% | Fechas «Primera/Última anotación» en monoespaciada. Banda de cabecera. Sidebar con ítems inactivos atenuados. |
+| dashboard-inicio-oscuro.png | 5.70% | Lo mismo. |
+| dashboard-inicio-movil.png | 0.18% | Cambio mínimo (cabecera). |
+| clientes-tabla-claro.png | 1.40% | Banda de cabecera. Cambian las fechas de alta y modificación. |
+| clientes-tabla-oscuro.png | 5.04% | Lo mismo. |
+| clientes-tabla-movil.png | 0.24% | Cambio mínimo. |
+| asignacion-inicio-claro.png | 0.87% | Banda de cabecera. |
+| asignacion-inicio-oscuro.png | 4.51% | Banda de cabecera gris con rótulos atenuados. |
+| asignacion-inicio-movil.png | 0.17% | Cambio mínimo. |
+| formulario-campo-enfocado-claro.png | 1.40% | Casi igual; el anillo de foco del campo cambia apenas. El resto viene del fondo desenfocado. |
+| formulario-campo-enfocado-oscuro.png | 1.99% | Casi igual (anillo de foco y fondo). |
 | formulario-campo-enfocado-movil.png | 0.73% | Anillo de foco. |
-| dialogo-borrar-claro.png | 0.45% | Sin cambio notable en el diálogo (fondo desenfocado cambia por la cabecera). |
-| dialogo-borrar-oscuro.png | 1.35% | Igual que antes salvo fondo. |
-| dialogo-borrar-movil.png | 3.65% | «Eliminar» pasa de rosa suave con texto rojo a **relleno rojo sólido con texto blanco** (mismo estilo que escritorio). |
+| dialogo-borrar-claro.png | 1.46% | El diálogo no cambia de forma notable; la diferencia viene del fondo desenfocado. |
+| dialogo-borrar-oscuro.png | 2.29% | Igual que antes, salvo el fondo. |
+| dialogo-borrar-movil.png | 3.65% | «Eliminar» pasa de rosa suave con texto rojo a **relleno rojo sólido con texto blanco**, como en escritorio. |
 
 ## Barra lateral
 
 | Archivo | Δ px | Qué cambió a la vista |
 | --- | --- | --- |
-| sidebar-expandido-claro.png | 1.25% | Hojas inactivas atenuadas; activo igual; icono de la pastilla nuevo. |
-| sidebar-expandido-oscuro.png | 4.95% | Igual. |
-| sidebar-colapsado-claro.png | 1.16% | **Iconos centrados en el eje del carril** (antes corridos a la izquierda); indicador del activo centrado y más ancho; **isotipo más grande y centrado**. |
-| sidebar-colapsado-oscuro.png | 5.42% | Igual. |
-| sidebar-colapsado-hover-claro.png | 1.17% | Fondo de hover sobre «Pedidos» centrado en el carril (sutil, pero visible). |
-| sidebar-colapsado-hover-oscuro.png | 5.43% | Igual. |
-| sidebar-abierto-movil.png | 0.92% | Hojas inactivas atenuadas; resto igual. |
+| sidebar-expandido-claro.png | 1.66% | Todos los ítems inactivos salen atenuados, **también «Producción» e «Integraciones»**, con la misma altura (44 px) que los demás. El activo no cambia. Icono nuevo en la pastilla. |
+| sidebar-expandido-oscuro.png | 5.35% | Lo mismo. |
+| sidebar-colapsado-claro.png | 1.19% | **Iconos centrados en el eje del carril**; antes iban corridos a la izquierda. Esto incluye «Producción» e «Integraciones». El indicador del activo sale centrado y más ancho. **El isotipo sale más grande y centrado.** |
+| sidebar-colapsado-oscuro.png | 5.45% | Lo mismo. |
+| sidebar-colapsado-hover-claro.png | 1.16% | El fondo de hover sobre «Pedidos» sale centrado en el carril; es sutil, pero se ve. |
+| sidebar-colapsado-hover-oscuro.png | 5.46% | Lo mismo. |
+| sidebar-abierto-movil.png | 2.14% | Ítems inactivos atenuados, también los plegables. El ritmo vertical es uniforme: antes los plegables medían 76 px de alto en DPR 2 y ahora miden 88 px, como el resto. |
 
 ## Control de colapso
 
 | Archivo | Δ px | Qué cambió a la vista |
 | --- | --- | --- |
-| pastilla-expandido-reposo-claro.png | 1.77% | Pastilla pasa de clara con icono oscuro a **oscura (verde marca) con icono claro** `PanelLeftClose` (flecha «<»). |
-| pastilla-expandido-reposo-oscuro.png | 1.58% | Icono `PanelLeftClose` claro sobre fondo oscuro; buen contraste. |
-| pastilla-expandido-hover-claro.png | 2.04% | Hover con aro azul claro alrededor. |
-| pastilla-expandido-hover-oscuro.png | 2.04% | Igual. |
-| pastilla-colapsado-reposo-claro.png | 1.45% | Icono `PanelLeftOpen` («>»), isotipo grande y centrado al lado. |
-| pastilla-colapsado-reposo-oscuro.png | 1.46% | Igual. |
+| pastilla-expandido-reposo-claro.png | 1.77% | La pastilla pasa de clara con icono oscuro a **oscura (verde de la marca) con icono claro** `PanelLeftClose` (flecha «<»). |
+| pastilla-expandido-reposo-oscuro.png | 1.58% | Icono claro `PanelLeftClose` sobre fondo oscuro; buen contraste. |
+| pastilla-expandido-hover-claro.png | 2.04% | El hover muestra un aro azul claro alrededor. |
+| pastilla-expandido-hover-oscuro.png | 2.04% | Lo mismo. |
+| pastilla-colapsado-reposo-claro.png | 1.45% | Icono `PanelLeftOpen` (flecha «>»), con el isotipo grande y centrado al lado. |
+| pastilla-colapsado-reposo-oscuro.png | 1.46% | Lo mismo. |
 | pastilla-colapsado-hover-claro.png | 1.96% | Aro azul de hover. |
-| pastilla-colapsado-hover-oscuro.png | 1.95% | Igual. |
-| control-encabezado-cerrado-movil.png | 0.18% | Mínimo (icono del encabezado). |
+| pastilla-colapsado-hover-oscuro.png | 1.95% | Lo mismo. |
+| control-encabezado-cerrado-movil.png | 0.18% | Cambio mínimo (icono del encabezado). |
 
 ## Observaciones (rotas o dudosas)
 
-Nada roto. Puntos a revisar:
+Nada roto. La inconsistencia de los plegables («Producción» e «Integraciones» en blanco pleno y con otra altura) que tenía 6c0f0594 **quedó resuelta en 0a9ea0d0**. Queda por revisar:
 
-1. **Sidebar: jerarquía inconsistente.** Las hojas inactivas (Asignación, Inventario, Proveedores…) ahora salen atenuadas, pero los padres plegables «Producción» e «Integraciones» siguen en blanco pleno. Se leen como si estuvieran activos o resaltados. Ocurre en escritorio y en móvil.
-2. **Cifras monoespaciadas a medias.** En el dashboard, las fechas salen en monoespaciada, pero la columna «Duración» sigue en sans. En asignación, «Cantidad» también sigue en sans. Si R pide cifras tabulares en toda cifra, falta cubrir esas columnas.
-3. **Rótulos de cabecera en oscuro.** Los rótulos atenuados sobre la banda gris tienen poco contraste («Receta», «Cliente», «Presentación»). Conviene medirlo.
-4. **Insignias suaves.** Se pierde algo de jerarquía: antes «En curso» y «Alta» destacaban con relleno. Los pares Bloqueado/Cancelado, Por empacar/Por acondicionar y En curso/En empaque comparten color, igual que antes.
-5. **Ya estaba antes, no es regresión:**
-   - Los botones flotantes de scroll horizontal tapan texto de la fila 2: el número de pedido y el cliente en pedidos y asignación.
-   - En el Sheet, «Cancelar» sale con borde discontinuo.
+1. **Monoespaciada a medias.** En el dashboard, las fechas salen en monoespaciada y «Duración» sigue en sans. En asignación, «Cantidad» también sigue en sans.
+2. **Rótulos de cabecera en oscuro.** Atenuados sobre la banda gris, se leen poco; conviene medir su contraste.
+3. **Insignias suaves.** Se pierde algo de jerarquía respecto a los rellenos de antes.
+4. **Ya estaba antes; no es regresión:**
+   - Los botones flotantes de scroll horizontal tapan texto de la fila 2.
+   - En el Sheet, «Cancelar» lleva borde discontinuo.
 
 ---
 
