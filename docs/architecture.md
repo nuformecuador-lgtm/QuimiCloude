@@ -799,16 +799,21 @@ Las del bloque de servidores MCP de `.env.example` (`ATLASSIAN_MCP_AUTH`, `CONTE
 `SUPABASE_PROJECT_REF`) no las lee la app: las lee `.mcp.json` del entorno del proceso.
 
 ## Componentes
+Todo componente nuevo o cambio visual lleva un pase de diseño aprobado antes del spec
+(`docs/perfil-agentes.md > Pase de diseño para componentes nuevos`; fuente en `docs/diseno/`).
+
 - `components/ui/`: primitivas de shadcn/ui. **Nunca crees un componente si ya existe en shadcn/ui.**
   Agregas con: `pnpm exec shadcn add <component>`.
-- `components/shared/`: compuestos construidos con primitivas ui/. Reutilizables entre features.
+- `components/shared/`: compuestos construidos con primitivas ui/. Reutilizables entre rutas.
 - `components/private/`: contienen datos sensibles. El padre (Server Component) valida permisos y
   pasa datos por props. No fetchean datos por si mismos.
 
 ### Regla: sin sobre-ingenieria
 Si un componente se usa en UN SOLO lugar y no tiene logica reutilizable, vive junto
-a la pagina que lo usa. Solo se promueve a `shared/` cuando al menos DOS features
-lo necesitan con la misma API.
+a la pagina que lo usa. Sube a `shared/` cuando la necesita una **segunda ruta** con la misma
+API (orden completo: `docs/perfil-agentes.md > Todos los agentes > Regla de decisión para
+componentes`). Lo que hay en `ui/`, `shared/`, `lib/shared/ui/` y `hooks/` está en
+`components/shared/CATALOGO.md`.
 
 ### Regla: componentes de ruta en `components/` con barrel `index.ts`
 

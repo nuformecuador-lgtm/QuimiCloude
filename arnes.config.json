@@ -25,6 +25,13 @@
     "backend": 3,
     "fullstack": 3
   },
+  "equipo": {
+    "archivos_compartidos": [
+      "tests/baseline-rojos.json",
+      "progress/deudas.md",
+      "components/shared/CATALOGO.md"
+    ]
+  },
   "perfil": {
     "max_dias_sin_revisar": 60,
     "docs": [
