@@ -223,9 +223,10 @@ test.describe('un error que no es de dominio, visto desde el navegador', () => {
 
     // --- 4. (b) El mensaje es el del CATALOGO para el codigo generico, y el codigo que la
     // pantalla pinta es `unexpected`. El texto se toma de `errorMessage`, nunca copiado a mano.
-    // Desde QC-71 (f115cb94) el error inesperado se pinta con el aviso compartido
-    // `UnexpectedErrorNotice` dentro de la region de error: el mensaje va en su parrafo y el codigo
-    // en su `data-code`, y debajo el identificador de la peticion en vez del codigo en claro.
+    // Desde QC-71 (f115cb94), y en esta pantalla desde el `ErrorState` compartido de QC-231
+    // (f3c00f62), el error inesperado se pinta con el aviso `UnexpectedErrorNotice` dentro de la
+    // region de error: el mensaje va en su parrafo, el codigo en su `data-code`, y debajo el
+    // identificador de la peticion en vez del codigo en claro.
     const errorRegion = page.getByTestId('recipe-list-error');
     await expect(errorRegion).toBeVisible({ timeout: 60_000 });
     const notice = errorRegion.getByTestId(UNEXPECTED_ERROR_NOTICE_TESTID);
