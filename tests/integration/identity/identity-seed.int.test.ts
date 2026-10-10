@@ -982,6 +982,59 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
     });
   });
 
+  // QC-223 2026-10-08: el permiso de entrega, solo del Administrador.
+  it('QC-223 R1: sobre la base ya sembrada salvo entregas.modificar, el seed crea ese permiso y solo la asignacion del Administrador; ningun otro rol lo tiene y la segunda corrida no cambia nada', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const ENTREGAR = 'entregas.modificar';
+      const OTROS_ROLES = [ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO, ROLE_ACONDICIONAMIENTO];
+      await tx.rolePermission.deleteMany({ where: { permissionCode: ENTREGAR } });
+      await tx.permission.deleteMany({ where: { code: ENTREGAR } });
+
+      const permisosAntes = await tx.permission.count();
+      const asignacionesAntes = await tx.rolePermission.count();
+      const otrosAntes = await Promise.all(OTROS_ROLES.map((rol) => codigosEnBaseDe(tx, rol)));
+
+      const repository = createInitialAccessRepository(tx);
+      const first = await seedInitialAccess({
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
+      });
+
+      expect(first.createdPermissions).toEqual([ENTREGAR]);
+      expect(first.createdRolePermissions).toBe(1);
+      expect(await tx.permission.count()).toBe(permisosAntes + 1);
+      expect(await tx.rolePermission.count()).toBe(asignacionesAntes + 1);
+      expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toEqual(codigosSembradosDe(ROLE_ADMINISTRADOR));
+      expect(await codigosEnBaseDe(tx, ROLE_ADMINISTRADOR)).toContain(ENTREGAR);
+      for (const [indice, rol] of OTROS_ROLES.entries()) {
+        const codigos = await codigosEnBaseDe(tx, rol);
+        expect(codigos, rol).toEqual(otrosAntes[indice]);
+        expect(codigos, rol).not.toContain(ENTREGAR);
+        expect(codigosSembradosDe(rol), rol).not.toContain(ENTREGAR);
+      }
+      const asignadas = await tx.rolePermission.findMany({
+        where: { permissionCode: ENTREGAR },
+        select: { role: { select: { name: true } } },
+      });
+      expect(asignadas.map((fila) => fila.role.name)).toEqual([ROLE_ADMINISTRADOR]);
+
+      const second = await seedInitialAccess({
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
+      });
+      expect(second.createdPermissions).toEqual([]);
+      expect(second.createdRolePermissions).toBe(0);
+      expect(await tx.permission.count()).toBe(permisosAntes + 1);
+      expect(await tx.rolePermission.count()).toBe(asignacionesAntes + 1);
+    });
+  });
+
   // CADA rol de `SEED_ROLES` -no solo Administrador y Operador- tiene en la base exactamente los
   // permisos que el seed le declara, ni uno mas ni uno menos.
   it('R25 — cada rol de semilla tiene en `role_permissions` exactamente los permisos que declara SEED_ROLE_PERMISSIONS', async () => {
@@ -1139,6 +1192,92 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       ).toEqual(asignacionesTrasLaPrimera);
       expect(await tx.role.findMany({ orderBy: { id: 'asc' } })).toEqual(rolesTrasLaPrimera);
       expect(await tx.permission.findMany({ orderBy: { code: 'asc' } })).toEqual(permisosTrasLaPrimera);
+    });
+  });
+
+  it('QC-221 R21, R18 — sobre base vacia, integraciones.modificar lo tiene solo el Administrador, cada rol tiene exactamente lo declarado, y la segunda corrida no cambia nada', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const CODIGO = 'integraciones.modificar';
+      await resetIdentityToEmptyState(tx);
+      const repository = createInitialAccessRepository(tx);
+      const deps = {
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
+      };
+
+      const first = await seedInitialAccess(deps);
+      expect(first.createdPermissions).toContain(CODIGO);
+
+      expect(
+        await tx.rolePermission.findMany({
+          where: { permissionCode: CODIGO },
+          select: { role: { select: { name: true } } },
+        }),
+      ).toEqual([{ role: { name: ROLE_ADMINISTRADOR } }]);
+      for (const roleName of SEED_ROLE_NAMES) {
+        expect(await codigosEnBaseDe(tx, roleName), roleName).toEqual(codigosSembradosDe(roleName));
+      }
+      expect(codigosSembradosDe(ROLE_ADMINISTRADOR)).toContain(CODIGO);
+
+      const trasLaPrimera = await fotoDeLoQueSiembra(tx);
+      const second = await seedInitialAccess(deps);
+      expect(second.createdRoles).toEqual([]);
+      expect(second.createdPermissions).toEqual([]);
+      expect(second.createdRolePermissions).toBe(0);
+      expect(await fotoDeLoQueSiembra(tx)).toEqual(trasLaPrimera);
+    });
+  });
+
+  it('QC-221 R18 — sobre la base ya sembrada salvo integraciones.modificar, el seed crea solo ese permiso y la asignacion del Administrador, deja intacto lo demas, y la segunda corrida no cambia nada', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const CODIGO = 'integraciones.modificar';
+      await tx.rolePermission.deleteMany({ where: { permissionCode: CODIGO } });
+      await tx.permission.deleteMany({ where: { code: CODIGO } });
+
+      const permisosAntes = await tx.permission.findMany({ orderBy: { code: 'asc' } });
+      const asignacionesAntes = await tx.rolePermission.findMany({
+        orderBy: [{ roleId: 'asc' }, { permissionCode: 'asc' }],
+      });
+      const rolesAntes = await tx.role.findMany({ orderBy: { id: 'asc' } });
+
+      const repository = createInitialAccessRepository(tx);
+      const deps = {
+        repository,
+        passwordHasher: identity.passwordHasher,
+        checkCredentialPolicy: identity.checkCredentialPolicy,
+        credentials: fakeCredentialsProvider,
+        maestroCredentials: fakeMaestroCredentialsProvider,
+      };
+
+      const first = await seedInitialAccess(deps);
+      expect(first.createdRoles).toEqual([]);
+      expect(first.createdPermissions).toEqual([CODIGO]);
+      expect(first.createdRolePermissions).toBe(1);
+      expect(await tx.permission.findMany({ where: { code: { not: CODIGO } }, orderBy: { code: 'asc' } })).toEqual(
+        permisosAntes,
+      );
+      expect(
+        await tx.rolePermission.findMany({
+          where: { permissionCode: { not: CODIGO } },
+          orderBy: [{ roleId: 'asc' }, { permissionCode: 'asc' }],
+        }),
+      ).toEqual(asignacionesAntes);
+      expect(await tx.role.findMany({ orderBy: { id: 'asc' } })).toEqual(rolesAntes);
+      expect(
+        await tx.rolePermission.findMany({
+          where: { permissionCode: CODIGO },
+          select: { role: { select: { name: true } } },
+        }),
+      ).toEqual([{ role: { name: ROLE_ADMINISTRADOR } }]);
+
+      const trasLaPrimera = await fotoDeLoQueSiembra(tx);
+      const second = await seedInitialAccess(deps);
+      expect(second.createdPermissions).toEqual([]);
+      expect(second.createdRolePermissions).toBe(0);
+      expect(await fotoDeLoQueSiembra(tx)).toEqual(trasLaPrimera);
     });
   });
 

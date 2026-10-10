@@ -1,21 +1,22 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useMemo, useTransition } from 'react';
+import { useMemo, useTransition, type ReactNode } from 'react';
 
 import {
   DataTable,
   type DataTableParams,
+  type DataTableStates,
   type DataTableTexts,
 } from '@/components/shared/data-table';
+import type { ErrorState as OperationError } from '@/lib/modules/errores';
 import type { ProductView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 
-import { DeleteProductDialog } from './delete-product-dialog';
 import { buildProductColumns } from './product-columns';
+import { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
 import { productListHref } from './product-list-params';
-import { ProductBatchesSheet } from './product-batches-sheet';
-import { ProductSheet } from './product-sheet';
+import { ProductRowActions } from './product-row-actions';
 import { ProductTypeTabs } from './product-type-tabs';
 
 /**
@@ -42,13 +43,12 @@ import { ProductTypeTabs } from './product-type-tabs';
  * `PRODUCT_QUERYABLE.searchable` es `true` y `listProducts` resuelve la busqueda contra la columna
  * normalizada con su indice de trigramas, asi que la caja de busqueda no miente.
  *
- * **`status` sigue siendo SIEMPRE `'idle'`**, y el «cargando» de R15 ya NO viene de remontar la
- * pantalla: la `key` del `<Suspense>` de la pagina desaparecio (2026-09-07) porque remontaba la
- * tabla entera en cada cambio de consulta y borraba el foco del campo de busqueda o de filtro que
- * se estaba escribiendo. Ahora la navegacion va en una transicion y, mientras esta en vuelo, esta
- * pantalla lo anuncia con `aria-busy` y un rotulo, y atenua la tabla, sin desmontarla. El error
- * y el vacio siguen pintandose FUERA de `<DataTable>` (R14, R16), y el `fallback` del
- * `<Suspense>` cubre la primera carga con `ProductTableSkeleton`.
+ * **El «cargando» de una navegacion no remonta la pantalla**: la `key` del `<Suspense>` de la
+ * pagina desaparecio (2026-09-07) porque remontaba la tabla entera en cada cambio de consulta y
+ * borraba el foco del campo de busqueda o de filtro que se estaba escribiendo. Ahora la navegacion
+ * va en una transicion y, mientras esta en vuelo, esta pantalla lo anuncia con `aria-busy` y un
+ * rotulo, y atenua la tabla, sin desmontarla. La primera carga, el error y el catalogo vacio los
+ * pinta la tabla compartida en lugar de toda la tabla.
  *
  * **El desbordamiento horizontal lo absorbe el primitivo** (R9): `components/ui/table.tsx`, que
  * la tabla compartida usa por dentro, envuelve la tabla en un contenedor con `overflow-x-auto`.
@@ -99,7 +99,77 @@ export type ProductTableProps = {
    * falla cerrado, como el resto de esta ruta.
    */
   readonly canAdjust?: boolean;
+  /** Defecto `'idle'`. `'loading'` es la primera carga, el `fallback` del `<Suspense>`. */
+  readonly status?: ProductTableStatus;
+  /** El error de la consulta, entero; solo se pinta con `status="error"`. */
+  readonly error?: OperationError;
+  /** El catalogo vacio, que la seccion pasa solo sin busqueda ni filtro activos. */
+  readonly empty?: ProductTableEmpty;
 };
+
+export type ProductTableStatus = 'idle' | 'loading' | 'error';
+
+export type ProductTableEmpty = {
+  /** Solo cuando la pagina pedida se quedo sin elementos tras un borrado. */
+  readonly firstPageHref?: string;
+  /** La accion de crear el primer producto. */
+  readonly action?: ReactNode;
+};
+
+/**
+ * Los estados que sustituyen a toda la tabla. Los comparte la pestana de producto terminado:
+ * las dos listas cargan y fallan igual.
+ */
+export function productTableStates({
+  pageSize,
+  error,
+  empty,
+}: {
+  readonly pageSize: number;
+  readonly error?: OperationError;
+  readonly empty?: ProductTableEmpty;
+}): DataTableStates {
+  return {
+    loading: {
+      columns: PRODUCT_SKELETON_COLUMN_COUNT,
+      rows: pageSize,
+      label: PRODUCT_TABLE_TEXTS.loading,
+      testId: 'product-table-skeleton',
+      rowTestId: 'product-row-skeleton',
+    },
+    error:
+      error === undefined
+        ? undefined
+        : {
+            error,
+            title: PRODUCT_TABLE_TEXTS.error,
+            testId: 'product-list-error',
+            messageTestId: 'product-list-error-message',
+            codeTestId: 'product-list-error-code',
+            retry: { kind: 'refresh' },
+            retryTestId: 'product-list-retry',
+          },
+    empty:
+      empty === undefined
+        ? undefined
+        : {
+            testId: 'product-list-empty',
+            message:
+              empty.firstPageHref === undefined
+                ? 'Todavía no hay productos en el catálogo.'
+                : 'Esta página ya no tiene productos.',
+            firstPage:
+              empty.firstPageHref === undefined
+                ? undefined
+                : {
+                    href: empty.firstPageHref,
+                    label: 'Volver a la primera página',
+                    testId: 'product-list-first-page',
+                  },
+            children: empty.action,
+          },
+  };
+}
 
 export function ProductTable({
   products,
@@ -107,6 +177,9 @@ export function ProductTable({
   totalPages,
   units,
   canAdjust = false,
+  status = 'idle',
+  error,
+  empty,
 }: ProductTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -118,11 +191,7 @@ export function ProductTable({
     () =>
       buildProductColumns({
         rowActions: (product) => (
-          <>
-            <ProductBatchesSheet product={product} units={units} canAdjust={canAdjust} />
-            <ProductSheet product={product} units={units} />
-            <DeleteProductDialog product={product} />
-          </>
+          <ProductRowActions product={product} units={units} canAdjust={canAdjust} />
         ),
         units,
       }),
@@ -147,6 +216,26 @@ export function ProductTable({
     });
   };
 
+  const table = (
+    <DataTable
+      tableId={PRODUCT_TABLE_ID}
+      columns={columns}
+      rows={products}
+      getRowId={(product) => product.id}
+      params={params}
+      totalPages={totalPages}
+      onParamsChange={(next) => navigate(productListHref(next))}
+      status={status}
+      texts={PRODUCT_TABLE_TEXTS}
+      states={productTableStates({ pageSize: params.pageSize, error, empty })}
+    />
+  );
+
+  // Fuera de las filas, el estado sustituye a la pantalla entera: sin pestanas ni envoltorio.
+  if (status !== 'idle' || (products.length === 0 && empty !== undefined)) {
+    return table;
+  }
+
   return (
     <div
       data-testid="product-table"
@@ -164,17 +253,7 @@ export function ProductTable({
         <p className="text-xs text-muted-foreground">{PRODUCT_TABLE_TEXTS.loading}</p>
       ) : null}
       <ProductTypeTabs params={params} onNavigate={navigate} />
-      <DataTable
-        tableId={PRODUCT_TABLE_ID}
-        columns={columns}
-        rows={products}
-        getRowId={(product) => product.id}
-        params={params}
-        totalPages={totalPages}
-        onParamsChange={(next) => navigate(productListHref(next))}
-        status="idle"
-        texts={PRODUCT_TABLE_TEXTS}
-      />
+      {table}
     </div>
   );
 }

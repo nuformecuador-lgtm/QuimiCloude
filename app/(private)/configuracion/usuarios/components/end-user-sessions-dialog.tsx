@@ -4,18 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import type { UserRow } from '@/lib/modules/identity';
 import {
   endAllSessionsAction,
@@ -60,8 +49,6 @@ export const END_USER_SESSIONS_ID_TESTID = 'end-user-sessions-id';
 /** El `id` viaja como campo OCULTO: es el unico campo que lee `endAllSessionsAction`. */
 export const END_USER_SESSIONS_ID_FIELD = 'id';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 const CONFIRM_LABEL = 'Cerrar sesiones';
 const CONFIRM_PENDING_LABEL = 'Cerrando…';
 const DISMISS_LABEL = 'Volver';
@@ -94,59 +81,37 @@ export function EndUserSessionsDialog({ user, open, onOpenChange }: EndUserSessi
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent data-testid={END_USER_SESSIONS_DIALOG_TESTID}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{endUserSessionsTitle(displayName)}</AlertDialogTitle>
-          <AlertDialogDescription data-testid={END_USER_SESSIONS_MESSAGE_TESTID}>
-            {endUserSessionsMessage(displayName)}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        {error === undefined ? null : (
-          <div
-            role="alert"
-            id={errorId}
-            className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={END_USER_SESSIONS_ERROR_TESTID}
-            data-code={error.code}
-          >
-            {error.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={error} />
-            ) : (
-              <p data-testid={END_USER_SESSIONS_ERROR_MESSAGE_TESTID}>{error.message}</p>
-            )}
-          </div>
-        )}
-
-        <form action={formAction} data-testid={END_USER_SESSIONS_FORM_TESTID}>
-          <input
-            type="hidden"
-            name={END_USER_SESSIONS_ID_FIELD}
-            defaultValue={user.id}
-            data-testid={END_USER_SESSIONS_ID_TESTID}
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              className={TOUCH_TARGET}
-              data-testid={END_USER_SESSIONS_DISMISS_TESTID}
-            >
-              {DISMISS_LABEL}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              type="submit"
-              variant="destructive"
-              className={TOUCH_TARGET}
-              disabled={isPending}
-              aria-busy={isPending}
-              aria-describedby={error === undefined ? undefined : errorId}
-              data-testid={END_USER_SESSIONS_CONFIRM_TESTID}
-            >
-              {isPending ? CONFIRM_PENDING_LABEL : CONFIRM_LABEL}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </form>
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      variant="destructive"
+      texts={{
+        title: endUserSessionsTitle(displayName),
+        description: endUserSessionsMessage(displayName),
+        dismiss: DISMISS_LABEL,
+        confirm: CONFIRM_LABEL,
+        pending: CONFIRM_PENDING_LABEL,
+      }}
+      testIds={{
+        dialog: END_USER_SESSIONS_DIALOG_TESTID,
+        message: END_USER_SESSIONS_MESSAGE_TESTID,
+        dismiss: END_USER_SESSIONS_DISMISS_TESTID,
+        confirm: END_USER_SESSIONS_CONFIRM_TESTID,
+        form: END_USER_SESSIONS_FORM_TESTID,
+        error: END_USER_SESSIONS_ERROR_TESTID,
+        errorMessage: END_USER_SESSIONS_ERROR_MESSAGE_TESTID,
+      }}
+      submit={{
+        kind: 'action',
+        action: formAction,
+        hidden: [
+          { name: END_USER_SESSIONS_ID_FIELD, value: user.id, testId: END_USER_SESSIONS_ID_TESTID },
+        ],
+      }}
+      isPending={isPending}
+      confirmDescribedBy={error === undefined ? undefined : errorId}
+      error={error}
+      errorId={errorId}
+    />
   );
 }

@@ -372,12 +372,11 @@ describe('pantalla de login', () => {
     expect(enlace).toHaveFocus();
   });
 
-  it('muestra la marca del producto como titulo de la tarjeta', async () => {
+  it('muestra la marca del producto como titulo de la tarjeta (ENMIENDA QC-226 (D21))', async () => {
     await renderLoginPage();
 
-    const titulo = document.querySelector('[data-slot="card-title"]');
-    expect(titulo).not.toBeNull();
-    expect(titulo).toHaveTextContent('QuimiCloude');
+    // El titulo es el logo vertical: el nombre accesible del h1 sale del `alt` del logo.
+    expect(screen.getByRole('heading', { level: 1, name: 'QuimiCloude' })).toBeInTheDocument();
   });
 });
 

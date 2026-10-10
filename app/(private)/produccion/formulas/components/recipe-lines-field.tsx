@@ -17,6 +17,7 @@ import {
   type RecipeLineView,
 } from '@/lib/modules/recetas';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { ProductPicker, type ProductPickerOption } from './product-picker';
 import {
@@ -36,8 +37,6 @@ import { compareWithOriginal, type VersionLineMark } from './recipe-version-diff
  * FANTASMA fuera de `lines` hasta que el usuario la toca. El porcentaje es `type="text"` porque
  * `type="number"` rechaza la coma en los navegadores con configuración regional de punto.
  */
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /**
  * La fila en blanco que se pinta cuando `lines` está vacío. Su clave es constante a propósito:
@@ -449,7 +448,7 @@ export function RecipeLinesField({
                     inputMode="decimal"
                     value={line.percentage}
                     onChange={(event) => handlePercentageChange(index, event.target.value)}
-                    className={`${TOUCH_TARGET} ${FIELD_TEXT} pr-7`}
+                    className={`${touchTarget} ${FIELD_TEXT} pr-7`}
                     aria-invalid={lineErrors?.percentage === undefined ? undefined : true}
                     aria-describedby={
                       lineErrors?.percentage === undefined ? undefined : percentageErrorId
@@ -488,7 +487,7 @@ export function RecipeLinesField({
                     tabIndex={-1}
                     aria-readonly
                     aria-label={`Cantidad estimada de la línea ${index + 1} sobre base de 1000 gramos`}
-                    className={`${TOUCH_TARGET} ${FIELD_TEXT} pr-7`}
+                    className={`${touchTarget} ${FIELD_TEXT} pr-7`}
                     data-testid={`recipe-line-amount-${index}`}
                   />
                   <span
@@ -505,7 +504,7 @@ export function RecipeLinesField({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className={TOUCH_TARGET}
+                  touch
                   aria-label={`Quitar línea ${index + 1}`}
                   data-testid={`recipe-line-remove-${index}`}
                   onClick={() => removeLine(index)}
@@ -516,7 +515,7 @@ export function RecipeLinesField({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className={TOUCH_TARGET}
+                  touch
                   aria-label={`Añadir una línea después de la ${index + 1}`}
                   data-testid={`recipe-line-add-${index}`}
                   disabled={line.productId === '' || line.productName === null}
@@ -644,7 +643,7 @@ export function RecipeLinesField({
                       onChange={(event) =>
                         updateTool(index, { quantity: sanitizeToolQuantityInput(event.target.value) })
                       }
-                      className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+                      className={`${touchTarget} ${FIELD_TEXT}`}
                       aria-invalid={rowErrors?.quantity === undefined ? undefined : true}
                       aria-describedby={rowErrors?.quantity === undefined ? undefined : quantityErrorId}
                       data-testid={`recipe-machine-quantity-${index}`}
@@ -661,7 +660,7 @@ export function RecipeLinesField({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className={TOUCH_TARGET}
+                      touch
                       aria-label={`Quitar herramienta ${index + 1}`}
                       data-testid={`recipe-machine-remove-${index}`}
                       onClick={() => removeTool(index)}
@@ -672,7 +671,7 @@ export function RecipeLinesField({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className={TOUCH_TARGET}
+                      touch
                       aria-label={`Añadir una herramienta después de la ${index + 1}`}
                       data-testid={`recipe-machine-add-${index}`}
                       disabled={tool.productId === '' || tool.productName === null}

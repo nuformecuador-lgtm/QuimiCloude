@@ -9,15 +9,14 @@ import {
   type DataTableTexts,
 } from '@/components/shared/data-table';
 import { listOrderBatchesAction } from '@/lib/modules/inventario/adapters/driving/batch-actions';
+import type { ErrorState as OperationError } from '@/lib/modules/errores';
 import type { FinishedStockProductLine, FinishedStockRow } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 
-import { DeleteProductDialog } from './delete-product-dialog';
 import { buildFinishedStockColumns, type FinishedStockTableRow } from './finished-stock-columns';
 import { productListHref } from './product-list-params';
-import { ProductBatchesSheet } from './product-batches-sheet';
-import { ProductSheet } from './product-sheet';
-import { PRODUCT_TABLE_TEXTS } from './product-table';
+import { ProductRowActions } from './product-row-actions';
+import { PRODUCT_TABLE_TEXTS, productTableStates, type ProductTableStatus } from './product-table';
 import { ProductTypeTabs } from './product-type-tabs';
 
 /** Otra clave que la del catalogo: las columnas fijadas de una tabla no son las de la otra. */
@@ -34,6 +33,8 @@ export type FinishedStockTableProps = {
   readonly totalPages: number;
   readonly units?: readonly UnitRef[];
   readonly canAdjust?: boolean;
+  readonly status?: ProductTableStatus;
+  readonly error?: OperationError;
 };
 
 function loadLineBatches(parent: FinishedStockRow, line: FinishedStockProductLine) {
@@ -53,6 +54,8 @@ export function FinishedStockTable({
   totalPages,
   units,
   canAdjust = false,
+  status = 'idle',
+  error,
 }: FinishedStockTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -69,16 +72,12 @@ export function FinishedStockTable({
             return next;
           }),
         lineActions: (parent, line) => (
-          <>
-            <ProductBatchesSheet
-              product={line.product}
-              units={units}
-              canAdjust={canAdjust}
-              loadBatches={loadLineBatches(parent, line)}
-            />
-            <ProductSheet product={line.product} units={units} />
-            <DeleteProductDialog product={line.product} />
-          </>
+          <ProductRowActions
+            product={line.product}
+            units={units}
+            canAdjust={canAdjust}
+            loadBatches={loadLineBatches(parent, line)}
+          />
         ),
         units,
       }),
@@ -102,6 +101,23 @@ export function FinishedStockTable({
     });
   };
 
+  const table = (
+    <DataTable
+      tableId={FINISHED_STOCK_TABLE_ID}
+      columns={columns}
+      rows={tableRows}
+      getRowId={rowId}
+      params={params}
+      totalPages={totalPages}
+      onParamsChange={(next) => navigate(productListHref(next))}
+      status={status}
+      texts={FINISHED_STOCK_TABLE_TEXTS}
+      states={productTableStates({ pageSize: params.pageSize, error })}
+    />
+  );
+
+  if (status !== 'idle') return table;
+
   return (
     <div
       data-testid="product-table"
@@ -112,17 +128,7 @@ export function FinishedStockTable({
         <p className="text-xs text-muted-foreground">{FINISHED_STOCK_TABLE_TEXTS.loading}</p>
       ) : null}
       <ProductTypeTabs params={params} onNavigate={navigate} />
-      <DataTable
-        tableId={FINISHED_STOCK_TABLE_ID}
-        columns={columns}
-        rows={tableRows}
-        getRowId={rowId}
-        params={params}
-        totalPages={totalPages}
-        onParamsChange={(next) => navigate(productListHref(next))}
-        status="idle"
-        texts={FINISHED_STOCK_TABLE_TEXTS}
-      />
+      {table}
     </div>
   );
 }

@@ -10,7 +10,7 @@ import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../helpers/viewp
 import { AppSidebar, SIDEBAR_EDGE_TOGGLE_LABEL, SIDEBAR_PANEL_ID } from '@/components/private/app-sidebar';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import {
-  BRAND_TAGLINE,
+  BRAND_LABEL,
   PRIVATE_NAV_ITEMS,
   groupNavItemsBySection,
   type NavItem,
@@ -155,11 +155,19 @@ describe('barra lateral: ajuste al diseno', () => {
     expect(screen.queryByTestId('nav-dos-badge')).toBeNull();
   });
 
-  it('la marca lleva simbolo y bajada ademas del nombre', () => {
+  // ENMIENDA QC-226 (D7, D19): el simbolo provisional y la bajada salen; la marca es el logo.
+  it('R12, R15: la marca es el logo horizontal, sin simbolo provisional ni bajada', () => {
     renderSidebar(NAV_MINIMA);
 
-    expect(screen.getByTestId('private-brand-mark').querySelector('svg')).not.toBeNull();
-    expect(screen.getByTestId('private-brand-tagline')).toHaveTextContent(BRAND_TAGLINE);
+    const enlace = screen.getByTestId('private-brand-link');
+    const imagenes = enlace.querySelectorAll('img');
+
+    expect(imagenes).toHaveLength(1);
+    expect(imagenes[0]).toHaveAttribute('src', '/brand/logo-horizontal-dark.svg');
+    expect(enlace.querySelector('svg')).toBeNull();
+    expect(screen.queryByTestId('private-brand-mark')).toBeNull();
+    expect(screen.queryByTestId('private-brand-tagline')).toBeNull();
+    expect(enlace).toHaveAccessibleName(BRAND_LABEL);
   });
 
   it('la pastilla del borde apunta al panel y alterna su estado', async () => {
@@ -183,21 +191,22 @@ describe('barra lateral: ajuste al diseno', () => {
     expect(SIDEBAR_EDGE_TOGGLE_LABEL).not.toBe(SIDEBAR_TOGGLE_LABEL);
   });
 
-  it('en modo icono la marca es el simbolo con las iniciales dentro, no dos elementos', () => {
+  // ENMIENDA QC-226 (D7): el simbolo con las iniciales pasa a ser el isotipo, un solo elemento.
+  it('R13: en modo icono la marca es solo el isotipo, no dos elementos', () => {
     render(
       <SidebarProvider defaultOpen={false}>
         <AppSidebar user={sessionUser()} navItems={NAV_MINIMA} />
       </SidebarProvider>,
     );
 
-    const simbolo = screen.getByTestId('private-brand-mark');
-    const iniciales = screen.getByTestId('private-brand-short');
+    const enlace = screen.getByTestId('private-brand-link');
+    const imagenes = enlace.querySelectorAll('img');
 
-    // Las iniciales van DENTRO del simbolo (R24 sigue cumpliendose), y el matraz no se
-    // dibuja: el cuadro y el texto uno al lado del otro no caben en los 44px del rail y el
-    // contenido acababa aplastado contra el padding.
-    expect(simbolo).toContainElement(iniciales);
-    expect(simbolo.querySelector('svg')).toBeNull();
+    // Isotipo y texto uno al lado del otro no caben en los 44px del rail.
+    expect(imagenes).toHaveLength(1);
+    expect(imagenes[0]).toHaveAttribute('src', '/brand/isotipo-dark.svg');
+    expect(enlace.textContent?.trim()).toBe('');
+    expect(screen.queryByTestId('private-brand-short')).toBeNull();
   });
 
   it('un item sin seccion se dibuja igual, sin titulo, y no desaparece', () => {
@@ -236,6 +245,54 @@ describe('acento del elemento activo', () => {
     expect(regla?.[0]).toContain('--sidebar-primary');
   });
 
+  it('R11: el activo lleva el degradado al 26-5 %, el anillo al 32 % y el texto blanco en 600', () => {
+    const regla = css.match(/\[data-slot='sidebar-menu-button'\]\[data-active\]\s*\{[^}]*\}/)?.[0];
+
+    expect(regla, 'no existe la regla del elemento activo').toBeDefined();
+    expect(regla).toMatch(
+      /background:\s*linear-gradient\(\s*90deg,\s*color-mix\(in oklch, var\(--sidebar-primary\) 26%, transparent\),\s*color-mix\(in oklch, var\(--sidebar-primary\) 5%, transparent\)\s*\)/,
+    );
+    expect(regla).toMatch(
+      /box-shadow:\s*inset 0 0 0 1px color-mix\(in oklch, var\(--sidebar-primary\) 32%, transparent\);/,
+    );
+    expect(regla).toMatch(/color:\s*#fff;/);
+    expect(regla).toMatch(/font-weight:\s*600;/);
+  });
+
+  it('R11: la barra de acento del borde izquierdo queda como estaba', () => {
+    const regla = css.match(
+      /\[data-slot='sidebar-menu-button'\]\[data-active\]::before\s*\{([^}]*)\}/,
+    )?.[1];
+    const declaraciones = regla
+      ?.split(';')
+      .map((declaracion) => declaracion.trim())
+      .filter(Boolean);
+
+    expect(declaraciones).toEqual([
+      "content: ''",
+      'position: absolute',
+      'top: 10px',
+      'bottom: 10px',
+      'left: 0',
+      'width: 3px',
+      'border-radius: 0 3px 3px 0',
+      'background: var(--sidebar-primary)',
+      'box-shadow: 0 0 12px var(--sidebar-primary)',
+    ]);
+  });
+
+  it('R13: en modo icono el isotipo de la marca mide 32px, sin radio de esquina', () => {
+    const regla = css.match(
+      /\[data-collapsible='icon'\] \[data-testid='private-brand-link'\] img\s*\{[^}]*\}/,
+    )?.[0];
+
+    expect(regla, 'no existe la regla del isotipo en modo icono').toBeDefined();
+    expect(regla).toMatch(/width:\s*32px;/);
+    expect(regla).toMatch(/height:\s*32px;/);
+    expect(regla).not.toContain('border-radius');
+    expect(css).not.toContain("[data-testid='private-brand-mark']");
+  });
+
   it('la barra de acento del borde izquierdo existe', () => {
     expect(css).toMatch(
       /\[data-slot='sidebar-menu-button'\]\[data-active\]::before\s*\{[^}]*--sidebar-primary/,
@@ -243,10 +300,10 @@ describe('acento del elemento activo', () => {
   });
 
   it('en modo icono el boton se fuerza a 44px con !important', () => {
-    // El primitivo aplica `size-8!` y `p-2!` cuando el panel esta colapsado, contando con su
-    // rail de 3rem. Aqui el rail mide 4.875rem, asi que hay que ganarle — y a un `!important`
-    // solo se le gana con otro: estar fuera de `@layer` NO basta. Si alguien quita el
-    // `!important` de estas reglas, el boton vuelve a 32px y el icono sale aplastado.
+    // ENMIENDA QC-227: las medidas del modo icono las fija el primitivo (`size-11!`, `p-3.5!`);
+    // esta regla sin capa no les gana -con `!important`, la declaracion en capa gana- y solo las
+    // repite como contrato. Por eso el relleno pasa de 10px a 14px, el del primitivo. El tamano
+    // calculado lo mide `e2e/marca-componentes.spec.ts`.
     const regla = css.match(
       /\[data-collapsible='icon'\] \[data-slot='sidebar-menu-button'\]\s*\{[^}]*\}/,
     );
@@ -259,7 +316,7 @@ describe('acento del elemento activo', () => {
     expect(regla?.[0], 'el width perdio el !important').toMatch(/width:\s*44px\s*!important/);
     expect(regla?.[0], 'el height perdio el !important').toMatch(/height:\s*44px\s*!important/);
     expect(regla?.[0], 'el padding perdio el !important').toMatch(
-      /padding:\s*10px\s*!important/,
+      /padding:\s*14px\s*!important/,
     );
   });
 

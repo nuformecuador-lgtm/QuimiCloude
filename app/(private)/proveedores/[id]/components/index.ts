@@ -7,7 +7,6 @@ export {
   ACTIONS_COLUMN_ID,
   CATALOG_ACTIONS_COLUMN_LABEL,
   CATALOG_IMAGE_COLUMN_LABEL,
-  EMPTY_CELL,
   IMAGE_COLUMN_ID,
   UNRESOLVED_CELL,
   buildCatalogColumns,
@@ -26,8 +25,6 @@ export {
 } from './catalog-directories';
 export { CatalogLineForm, SUPPLIER_FIELD } from './catalog-line-form';
 export { CatalogLineSheet } from './catalog-line-sheet';
-export { CATALOG_LIST_EMPTY_TESTID, CatalogListEmpty } from './catalog-list-empty';
-export { CatalogListError } from './catalog-list-error';
 export {
   CATALOG_COST_MAX_PARAM,
   CATALOG_COST_MIN_PARAM,
@@ -50,14 +47,22 @@ export {
   type CatalogPageSize,
 } from './catalog-list-params';
 export { CatalogListSection } from './catalog-list-section';
+export {
+  CATALOG_LINE_ACTION_DELETE_TESTID,
+  CATALOG_LINE_ACTION_EDIT_TESTID,
+  CATALOG_LINE_ROW_ACTIONS_TESTID,
+  CatalogLineRowActions,
+  catalogLineRowActionsLabel,
+  type CatalogLineRowActionsProps,
+} from './catalog-line-row-actions';
 export { CatalogPdfUpload, type CatalogPdfUploadProps } from './catalog-pdf-upload';
 export {
+  CATALOG_LIST_EMPTY_TESTID,
   CATALOG_TABLE_ID,
   CATALOG_TABLE_TEXTS,
   CatalogTable,
   type CatalogTableProps,
 } from './catalog-table';
-export { CatalogTableSkeleton } from './catalog-table-skeleton';
 export { DeleteCatalogLineDialog } from './delete-catalog-line-dialog';
 export { DeleteSupplierDialog } from './delete-supplier-dialog';
 export { SupplierDetailHeader } from './supplier-detail-header';

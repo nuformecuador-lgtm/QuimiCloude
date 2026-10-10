@@ -367,3 +367,11 @@ No se rellenan con supuestos (regla 6 de `CLAUDE.md`).
 | 2026-09-06 | Rutas y asserts | Rutas siempre en constantes exportadas. Los tests afirman sobre roles ARIA, `data-testid` y constantes exportadas; **nunca** sobre literales de copy. Heredado de QC-11, QC-22 y QC-44 |
 | 2026-09-06 | Multiplataforma | Se valida contra angosto y ancho con `tests/helpers/viewport.ts`. **Sin excepción de escritorio.** Heredado de QC-11 |
 | 2026-09-06 | Base heredada | shadcn/ui, Vitest, Playwright, layout privado, sidebar, `<Toaster />` y la **tabla compartida de QC-55** están montados y no se re-crean. El choque entre las features 4 y 10 ya ocurrió una vez en este repo |
+
+## Enmienda 2026-10-08 — catálogos del alta en la página (QC-180)
+
+`app/(private)/pedidos/page.tsx` carga **una sola vez** los catálogos del alta —primera página de
+recetas (**R31**), unidades y puente masa-volumen— y monta el disparador del alta junto al título.
+Entró con `897a4f91`, fuera del arnés; QC-180 lo registra aquí y amplía con esa página las listas
+cerradas de los guardianes de recetas (`scope.test.ts` y `module-contract.test.ts`). Detalle en
+[`specs/QC-180-rojos-heredados-de-alta-de-grupos/`](../QC-180-rojos-heredados-de-alta-de-grupos/).

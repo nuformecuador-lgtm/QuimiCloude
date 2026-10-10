@@ -45,6 +45,7 @@ import {
   startPackingAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { assertTransition } from '@/lib/modules/pedidos/domain/order-transitions';
+import { prisma } from '@/lib/shared/db/prisma';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
@@ -96,6 +97,7 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
     findAliveById: findAliveOrderTargetById,
     listAliveSummariesByIds: summaryReaders.listAliveSummariesByIds,
     listAliveSummariesInCompany: summaryReaders.listAliveSummariesInCompany,
+    listSummariesByIdsIncludingDeleted: summaryReaders.listSummariesByIdsIncludingDeleted,
     transitionAliveById: transitionAliveByIdReal,
     // R27: las dos escrituras REALES de empaque, mismo patron que `setStatus` arriba -las dos
     // `UPDATE` condicionales de `order-prisma.ts` sobre el proxy de la `tx` del fixture-.
@@ -157,8 +159,37 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
     // R27: Comenzar y Terminar, mismos `orders` y mismo reloj que el resto del fixture.
     startPacking: createStartPacking({ orders, ...execution, now: () => NOW }),
     finishPacking: createFinishPacking({ orders, ...execution, now: () => NOW }),
-    startConditioning: createStartConditioning({ orders, now: () => NOW }),
-    finishConditioning: createFinishConditioning({ orders, now: () => NOW }),
+    startConditioning: createStartConditioning({
+      orders,
+      people: assignmentDirectoryPrisma,
+      groups: assignmentDirectoryPrisma,
+      transaction: execution.transaction,
+      now: () => NOW,
+    }),
+    // QC-219: este archivo no da de alta lotes de producto terminado (ver `finishPackingAliveById`
+    // arriba), asi que cada linea del reparto se presenta con sus datos de lote ya escritos; se lee
+    // por el proxy de la `tx` del fixture. La
+    // regla de Terminar sin datos se prueba en `finish-conditioning-batch-data.int.test.ts`.
+    finishConditioning: createFinishConditioning({
+      orders,
+      batches: {
+        listOfOrder: async (companyId, orderId) =>
+          (
+            await prisma.orderPresentationLine.findMany({
+              where: { companyId, orderId },
+              select: { id: true, presentationId: true },
+            })
+          ).map((line) => ({
+            batchId: line.id,
+            orderPresentationLineId: line.id,
+            presentationId: line.presentationId,
+            lot: `L-${line.id}`,
+            expiryDate: '2027-03-01',
+            productionDate: '2026-03-01',
+          })),
+      },
+      now: () => NOW,
+    }),
   };
 }
 
@@ -382,7 +413,7 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
 
       // Comenzar el acondicionamiento: POR_ACONDICIONAR -> EN_ACONDICIONAMIENTO. Tampoco aparece.
-      await startConditioning(actorAcondicionador, { orderId: pedido });
+      await startConditioning(actorAcondicionador, { orderId: pedido, userIds: [operario], workGroupIds: [] });
       expect(await estadoDe()).toBe('EN_ACONDICIONAMIENTO');
       expect((await listFinishedOrders(actorEmpacador, { page: 1 })).items).toEqual([]);
 

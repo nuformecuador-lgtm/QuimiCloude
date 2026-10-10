@@ -113,6 +113,56 @@ misma rama daba **23 archivos y 32 tests en rojo** desde un shell limpio y **1 a
 con el `.env` cargado, y el rojo no decía «falta una variable» sino «Validation Error» de Prisma,
 que se lee como un fallo de código.
 
+## Datos de demostración en la base local: `pnpm db:seed:demo` (QC-230, 2026-10-08)
+
+- **Para qué:** ver pantallas con datos sin cargarlos a mano. Corre sobre la empresa del seed
+  base, así que antes va `pnpm db:seed`.
+- **Cómo:** las contraseñas de los usuarios de demo van en el entorno del comando, nunca en un
+  archivo versionado (nombres en `.env.example`):
+  `SEED_DEMO_OPERADOR_PASSWORD=... SEED_DEMO_EMPACADOR_PASSWORD=... SEED_DEMO_ACONDICIONAMIENTO_PASSWORD=... pnpm db:seed:demo`.
+  Si falta alguna, falla nombrándola. Deben cumplir la política de credenciales.
+- **Nunca en producción:** se niega con cualquier `VERCEL_ENV` no vacío distinto de `development`
+  (`production` y también `preview`, que usa la base de producción), dentro de CI (variable `CI`) y si
+  `DATABASE_URL` no apunta a `localhost`, `127.0.0.1` o un socket Unix (el parámetro `?host=`, si
+  viene, manda; repetido o vacío, se niega). Solo la regla de base local la salta la bandera
+  `--forzar` de la línea de comandos, y avisa; `VERCEL_ENV` y CI no las salta nada.
+- **Enmienda 2026-10-09 (QC-249): en preview sí, contra la base de preview.** Preview ya no usa la
+  base de producción: tiene su propio proyecto de Supabase, y el build de preview siembra la demo
+  en él (`docs/architecture.md > Previews (QC-249)`). Las reglas de la guarda
+  (`scripts/seed-demo/guard.ts`) quedan así:
+  - **`VERCEL_ENV=preview`:** se permite **solo** si `VERCEL` está definida (dentro de Vercel),
+    `PREVIEW_SUPABASE_REF` tiene valor y `DATABASE_URL` y `DIRECT_URL` lo contienen. Entonces corre
+    **sin** `--forzar`, aunque la base sea remota y aunque haya `CI`. Si algo de eso no se cumple, se
+    niega nombrando lo que falla, y `--forzar` **no** lo anula.
+  - **Cualquier otro `VERCEL_ENV` no vacío distinto de `development`** (`production` incluido): se
+    niega siempre, con o sin `--forzar`. Sin cambios.
+  - **`VERCEL_ENV` vacío o `development`:** las reglas de antes (CI, base local, `--forzar` solo
+    para la base local). Sin cambios.
+
+  QC-230 no tiene spec (`sdd: false`), así que la enmienda queda fechada aquí, en la cabecera de
+  `scripts/seed-demo/guard.ts` y en `specs/QC-249-entorno-de-preview/design.md > 8`. El texto del
+  punto anterior es el de QC-230 y se conserva como estaba; donde dice que preview usa la base de
+  producción, manda esta enmienda. Lo cubre `tests/unit/scripts/seed-demo-guard.test.ts`.
+- **Idempotente:** cada cosa se busca por su nombre antes de crearla y un pedido a medias se
+  retoma desde su estado. Una segunda corrida no crea nada.
+- **Qué crea**, todo ficticio y con el prefijo `DEMO` (lotes `DEMO-`, usuarios `demo.`):
+  - 2 unidades propias y 5 presentaciones;
+  - 8 insumos, 3 envases y 2 instrumentos, con 15 lotes y ajustes de merma, rotura y conteo;
+  - 2 proveedores con 5 líneas de catálogo y 4 clientes;
+  - 4 recetas con líneas, pasos y pasos de envasado, una con 2 versiones;
+  - 5 usuarios activos (2 Operadores, 2 Empacadores, 1 de acondicionamiento) y 2 grupos de
+    trabajo;
+  - 10 pedidos con responsables, uno por estado y con las cuatro prioridades. Los que avanzan
+    lo hacen por los casos de uso reales, así que consumen material y dan de alta producto
+    terminado.
+- **Lo que no crea, y por qué:**
+  - ningún pedido `ENTREGADO`: hoy ningún caso de uso lleva un pedido a ese estado;
+  - ningún Administrador de demo: el alta de usuarios no concede ese rol, y actúa el del seed
+    base.
+- **Por dónde pasa:** toda escritura va por los casos de uso de `lib/composition`, con su
+  permiso y sus invariantes. Prisma solo lee, para saber qué existe ya. El código está en
+  `scripts/seed-demo/`.
+
 ## Los tests de integración corren sobre una base propia y efímera (QC-77, 2026-09-12)
 
 - El gate carga `DATABASE_URL` para saber **dónde está el Postgres**, no para escribir en ella.

@@ -89,6 +89,30 @@ export function firstIssuedAtAfterStamp(sessionsValidFrom: Date): Date {
 }
 
 /**
+ * Cuanto puede adelantarse como maximo la emision de una sesion nueva frente al reloj. Un sello
+ * escrito en el mismo segundo pide como mucho 1 s; el otro cubre que el reloj de la base, que pone
+ * el sello del alta, vaya algo por delante del de la aplicacion.
+ */
+export const MAX_ISSUE_LEAD_MS = 2_000;
+
+/**
+ * Instante con el que se emite una sesion nueva frente al sello de su persona.
+ *
+ * Un login posterior al sello pero en su mismo segundo firmaria el mismo `iat` que una sesion
+ * anterior al corte, y naceria revocado. En ese caso se emite con el primer instante que el sello
+ * no invalida. Se compara contra `now` truncado porque es lo que vera el corte cuando `iat` viaje
+ * en segundos.
+ *
+ * Si el adelanto supera `MAX_ISSUE_LEAD_MS` (sello en el futuro por un salto de reloj o un dato
+ * raro) se emite con `now` y la sesion nace invalida: falla cerrado en vez de alargarla sin limite.
+ */
+export function issuedAtForNewSession(now: Date, sessionsValidFrom: Date): Date {
+  if (!isStampedOut({ issuedAt: floorToSecond(now) }, sessionsValidFrom)) return now;
+  const lifted = firstIssuedAtAfterStamp(sessionsValidFrom);
+  return lifted.getTime() - now.getTime() <= MAX_ISSUE_LEAD_MS ? lifted : now;
+}
+
+/**
  * El cambio que se le hace a una persona, en la forma minima que hace falta para decidir si le
  * corta las sesiones. Union discriminada: añadir un cuarto tipo de cambio obliga a ampliar
  * `changeRevokesSessions` o el `switch` deja de compilar.

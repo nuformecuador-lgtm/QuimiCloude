@@ -146,8 +146,6 @@ describe('contrato de la ruta de proveedores', () => {
     }
 
     for (const conservado of [
-      join(COMPONENTES_PATH, 'supplier-list-empty.tsx'),
-      join(COMPONENTES_PATH, 'supplier-list-error.tsx'),
       join(COMPONENTES_PATH, 'supplier-showcase-skeleton.tsx'),
       join(COMPONENTES_PATH, 'supplier-showcase-list.tsx'),
       join(COMPONENTES_PATH, 'supplier-showcase-section.tsx'),

@@ -399,6 +399,12 @@ lo era.
 opción, y `docs/architecture.md > Regla: sin sobre-ingeniería` pide promover cuando dos features lo
 necesitan **con la misma API**, que no es el caso. Se comparte el patrón, no el archivo.
 
+> **Enmienda 2026-10-08 (QC-233):** el párrafo anterior queda sin efecto. Desde QC-233 los seis
+> buscadores asíncronos, `ProductPicker` y `RecipePicker` incluidos, pintan su campo y su
+> desplegable a través de `components/shared/async-autocomplete.tsx`. Cada uno conserva en su
+> archivo su consulta, su regla de elección y sus piezas de campo
+> (`specs/QC-233-componentizacion-buscadores/requirements.md > R6, R18`).
+
 La primera página llega **por props** (R43): la pide una vez `OrderSheet`/la sección de servidor y
 baja al selector, igual que hace la página de receta con sus ingredientes.
 

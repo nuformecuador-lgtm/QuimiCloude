@@ -5,6 +5,7 @@ import { useEffect, useState, type RefObject } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
 /**
@@ -30,12 +31,14 @@ import { cn } from '@/lib/utils';
 export const SCROLL_LEFT_FALLBACK = 'Desplazar la tabla a la izquierda';
 export const SCROLL_RIGHT_FALLBACK = 'Desplazar la tabla a la derecha';
 
-/** Objetivo tactil minimo (44 px), mismo criterio que `data-table-header-menu.tsx` (R27). */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 /** Cuanto avanza cada pulsacion: tres cuartos del ancho visible, con un minimo para tablas angostas. */
 const SCROLL_FRACTION = 0.75;
 const SCROLL_MIN_PX = 96;
+
+function scrollBehavior(): ScrollBehavior {
+  if (typeof window.matchMedia !== 'function') return 'smooth';
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+}
 
 export type DataTableScrollNavProps = {
   /**
@@ -116,7 +119,7 @@ export function DataTableScrollNav({
     if (element === null) return;
     const delta = direction * Math.max(element.clientWidth * SCROLL_FRACTION, SCROLL_MIN_PX);
     if (typeof element.scrollBy === 'function') {
-      element.scrollBy({ left: delta, behavior: 'smooth' });
+      element.scrollBy({ left: delta, behavior: scrollBehavior() });
     } else {
       element.scrollLeft += delta;
     }
@@ -125,24 +128,22 @@ export function DataTableScrollNav({
   if (!availability.canScroll) return null;
 
   /*
-   * Sin animacion de rebote al presionar: el `Button` trae
-   * `active:not-aria-[haspopup]:translate-y-px` (efecto press con `transition-all`) y esa
-   * clase pisa el `-translate-y-1/2` del centrado: al presionar, la flecha caia media
-   * altura y volvia al soltar -y si el cursor quedaba fuera del boton al soltar, el clic
-   * se perdia (por eso solo funcionaba presionando el centro, sobre el icono)-.
+   * Sin efecto de pulsacion: si la flecha se mueve al presionar y el cursor queda fuera al
+   * soltar, el clic se pierde (solo funcionaba presionando el centro, sobre el icono).
    *
-   * Dos neutralizaciones, las dos por `twMerge` (en `cn`), porque un `active:` simple NO
-   * sirve: la variante del base es APILADA (`active:not-aria-[haspopup]:...`) y `twMerge`
-   * solo resuelve conflictos con el mismo stack de modificadores:
-   * - `active:not-aria-[haspopup]:-translate-y-1/2`: mismo stack que el base, asi que lo
-   *   expulsa y el centrado se conserva tambien presionada (la flecha no se mueve).
-   * - `transition-colors`: expulsa el `transition-all` del base, asi que aunque algun valor
-   *   cambiara al presionar, el desplazamiento no podria animarse; el fundido del `hover`
-   *   se conserva.
+   * Las neutralizaciones van por `twMerge` (en `cn`), porque un `active:` simple NO sirve:
+   * las clases de pulsacion del `Button` llevan el stack apilado
+   * (`active:not-aria-[haspopup]:...`) y `twMerge` solo resuelve conflictos con el mismo stack:
+   * - `active:not-aria-[haspopup]:-translate-y-1/2`: el centrado se conserva tambien
+   *   presionada, aunque una variante traiga su propio `translate-y` al pulsar.
+   * - `active:not-aria-[haspopup]:scale-100`: la variante `outline` encoge al presionar; la
+   *   flecha no.
+   * - `transition-colors`: expulsa el `transition-all` del base; el fundido del `hover` se
+   *   conserva.
    */
   const arrowClass = cn(
-    'pointer-events-auto sticky top-[50vh] z-20 -translate-y-1/2 rounded-full border bg-background/95 shadow-md backdrop-blur transition-colors active:not-aria-[haspopup]:-translate-y-1/2',
-    TOUCH_TARGET,
+    'pointer-events-auto sticky top-[50vh] z-20 -translate-y-1/2 rounded-full border bg-background/95 shadow-md backdrop-blur transition-colors active:not-aria-[haspopup]:-translate-y-1/2 active:not-aria-[haspopup]:scale-100',
+    touchTarget,
   );
 
   /*

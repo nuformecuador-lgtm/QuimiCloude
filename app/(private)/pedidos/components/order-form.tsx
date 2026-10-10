@@ -10,28 +10,14 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useFormStatus } from 'react-dom';
 
 import {
   PRESENTATION_UNIT_FIELD,
   PresentationUnitSelect,
 } from '@/components/shared/presentation-unit-select';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
-import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { ErrorAlert } from '@/components/shared/error-alert';
+import { FormSheet } from '@/components/shared/form-sheet';
+import { SelectField } from '@/components/shared/select-field';
 import {
   DEFAULT_ORDER_PRIORITY,
   ORDER_PRIORITY_VALUES,
@@ -43,7 +29,7 @@ import {
   createOrderAction,
   updateOrderAction,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import { getRecipeAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeQueryResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeLineView } from '@/lib/modules/recetas';
@@ -194,9 +180,6 @@ export const ORDER_FORM_SUBMIT_TESTID = 'order-form-submit';
 export const ORDER_FORM_CANCEL_TESTID = 'order-form-cancel';
 
 type OrderFieldName = (typeof ORDER_BUSINESS_FIELDS)[number] | typeof PRESENTATION_LINES_FIELD;
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-const FIELD_TEXT = 'text-base md:text-base';
 
 const CREATE_TITLE = 'Nuevo pedido';
 const EDIT_TITLE = 'Editar pedido';
@@ -669,262 +652,244 @@ export function OrderForm({
       : undefined;
 
   return (
-    /*
-      `isForm`: el panel ENTERO es el <form>, asi que el boton de guardar vive en el pie y
-      `useFormStatus()` lo sigue viendo, porque el formulario es su ancestro.
-
-      `w-full` en angosto y, a partir de `sm`, `minScreenWidth={70}`: el panel ocupa el 70% de la
-      pantalla -el minimo gana al tope `sm:max-w-md`, que sigue de suelo si alguien quita la prop-.
-      `pb-[env(safe-area-inset-bottom)]` para que el pie no quede bajo la barra de gestos de iOS
-      (R45). El desbordamiento vertical lo absorbe el CUERPO, no el panel.
-
-      `noValidate` en el `<form>`: el `min` del campo de cantidad es solo para el NAVEGADOR -que
-      la flecha del control numerico no ofrezca bajar de 0.01-, no para que el navegador decida
-      si el envio procede. Quien valida al enviar sigue siendo `createOrderSchema`/
-      `updateOrderSchema`, igual que ya hacia el resto del formulario.
-    */
-    <SheetContent
-      side="right"
+    <FormSheet
       minScreenWidth={70}
-      className="w-full pb-[env(safe-area-inset-bottom)] data-[side=right]:w-full sm:max-w-md"
-      data-testid="order-sheet"
-      isForm
-      formProps={{ action: formAction, noValidate: true, 'data-testid': ORDER_FORM_TESTID }}
-      footer={<FormActions canSave={canSave} busy={isPending} />}
-    >
-      <BlockedOrderDialog
-        open={blockedOpen}
-        message={state.status === 'wouldBlock' ? state.message : ''}
-        onConfirm={saveBlocked}
-        onDismiss={() => setClosedWarning(state)}
-      />
-      <SheetHeader>
-        <SheetTitle data-testid={ORDER_FORM_TITLE_TESTID}>
-          {describeOrder(recipeName, quantity) ?? (isEdit ? EDIT_TITLE : CREATE_TITLE)}
-        </SheetTitle>
-        <SheetDescription>
-          {isEdit
-            ? 'Cambia los datos del pedido. Se guardan todos los campos.'
-            : 'Completa los datos del pedido. La fecha y el número los pone el sistema.'}
-        </SheetDescription>
-        {/*
-          Cobertura SOLO en la edicion: el alta todavia no tiene pedido del que apartar nada.
-          `undefined` (lote caido) no pinta nada, mismo criterio que `loadResponsiblesCatalog`.
-        */}
-        {isEdit && coverage !== undefined ? (
+      formAction={formAction}
+      noValidate
+      testIds={{
+        sheet: 'order-sheet',
+        form: ORDER_FORM_TESTID,
+        cancel: ORDER_FORM_CANCEL_TESTID,
+        submit: ORDER_FORM_SUBMIT_TESTID,
+        title: ORDER_FORM_TITLE_TESTID,
+      }}
+      canSave={canSave}
+      busy={isPending}
+      saveTouch="class"
+      beforeHeader={
+        <BlockedOrderDialog
+          open={blockedOpen}
+          message={state.status === 'wouldBlock' ? state.message : ''}
+          onConfirm={saveBlocked}
+          onDismiss={() => setClosedWarning(state)}
+        />
+      }
+      title={describeOrder(recipeName, quantity) ?? (isEdit ? EDIT_TITLE : CREATE_TITLE)}
+      description={
+        isEdit
+          ? 'Cambia los datos del pedido. Se guardan todos los campos.'
+          : 'Completa los datos del pedido. La fecha y el número los pone el sistema.'
+      }
+      headerExtra={
+        isEdit && coverage !== undefined ? (
           <div data-testid={ORDER_SHEET_COVERAGE_TESTID}>
             <OrderCoverageBadge coverage={coverage} />
           </div>
-        ) : null}
-      </SheetHeader>
+        ) : null
+      }
+    >
+      {formError === undefined ? null : (
+        // Aqui van los rechazos que no senalan campo.
+        <ErrorAlert
+          error={formError}
+          id={formErrorId}
+          className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
+          testId={ORDER_FORM_ERROR_TESTID}
+          renderCatalogued={(catalogued) => (
+            <>
+              <p data-testid="order-form-error-message">{catalogued.message}</p>
+              <p className="text-xs" data-testid="order-form-error-code">
+                {catalogued.code}
+              </p>
+            </>
+          )}
+        />
+      )}
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-        {formError === undefined ? null : (
-          // Region de error del formulario (R34): aqui van los rechazos que no senalan campo.
-          //
-          // QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
-          // identificador de la peticion. El CATALOGADO se pinta como siempre y sin identificador.
-          <div
-            role="alert"
-            id={formErrorId}
-            className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={ORDER_FORM_ERROR_TESTID}
-          >
-            {formError.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={formError} />
-            ) : (
-              <>
-                <p data-testid="order-form-error-message">{formError.message}</p>
-                <p className="text-xs" data-testid="order-form-error-code">
-                  {formError.code}
-                </p>
-              </>
+      {/*
+        Rejilla de 12: la imagen ocupa 3 columnas y los campos las 9 restantes, uno al lado del
+        otro y alineados por arriba. Por debajo de `sm` la rejilla es de una sola columna -en un
+        movil, 3 de 12 no da para ninguna imagen legible-, asi que la imagen queda encima.
+
+        El hueco de la imagen esta SIEMPRE, con marcador mientras no haya receta elegida o su
+        `imageUrl` sea nula, para que la columna no cambie de ancho al elegir la primera.
+      */}
+      <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-12">
+        <div className="sm:col-span-3">
+          <OrderRecipeImage imageUrl={recipeImageUrl} name={recipeName} />
+        </div>
+
+        <div className="flex flex-col gap-4 sm:col-span-9">
+          <RecipePicker
+            initialPage={recipes}
+            onSelect={chooseRecipe}
+            defaultValue={initialValue(
+              RECIPE_FIELD,
+              order?.recipeVersion?.originalId ?? order?.recipeId ?? '',
             )}
-          </div>
-        )}
+            defaultLabel={order?.recipeVersion?.originalName ?? order?.recipeName ?? ''}
+            error={fieldErrors.recipeId}
+          />
 
-        {/*
-          Rejilla de 12: la imagen ocupa 3 columnas y los campos las 9 restantes, uno al lado del
-          otro y alineados por arriba. Por debajo de `sm` la rejilla es de una sola columna -en un
-          movil, 3 de 12 no da para ninguna imagen legible-, asi que la imagen queda encima.
+          <RecipeVersionSelect
+            key={recipeChoice}
+            recipeId={recipe?.id ?? null}
+            initialVersion={
+              recipeChoice === 0 && order !== undefined && order.recipeVersion !== null
+                ? { id: order.recipeId, name: order.recipeVersion.versionName }
+                : null
+            }
+            onChange={chooseVersion}
+            error={fieldErrors.recipeVersionId}
+          />
 
-          El hueco de la imagen esta SIEMPRE, con marcador mientras no haya receta elegida o su
-          `imageUrl` sea nula, para que la columna no cambie de ancho al elegir la primera.
-        */}
-        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-12">
-          <div className="sm:col-span-3">
-            <OrderRecipeImage imageUrl={recipeImageUrl} name={recipeName} />
-          </div>
-
-          <div className="flex flex-col gap-4 sm:col-span-9">
-            <RecipePicker
-              initialPage={recipes}
-              onSelect={chooseRecipe}
-              defaultValue={initialValue(
-                RECIPE_FIELD,
-                order?.recipeVersion?.originalId ?? order?.recipeId ?? '',
-              )}
-              defaultLabel={order?.recipeVersion?.originalName ?? order?.recipeName ?? ''}
-              error={fieldErrors.recipeId}
+          <div className="flex flex-col gap-2">
+            <label htmlFor={customerFieldId} className="text-sm font-medium">
+              {FIELD_LABELS.customer}
+            </label>
+            <OrderCustomerPicker
+              purpose="assign"
+              name={ORDER_CUSTOMER_FIELD}
+              id={customerFieldId}
+              value={customer}
+              onChange={setCustomer}
+              placeholder={CUSTOMER_PLACEHOLDER}
+              emptyMessage={CUSTOMER_EMPTY_LABEL}
             />
+          </div>
 
-            <RecipeVersionSelect
-              key={recipeChoice}
-              recipeId={recipe?.id ?? null}
-              initialVersion={
-                recipeChoice === 0 && order !== undefined && order.recipeVersion !== null
-                  ? { id: order.recipeId, name: order.recipeVersion.versionName }
-                  : null
-              }
-              onChange={chooseVersion}
-              error={fieldErrors.recipeVersionId}
-            />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
 
-            <div className="flex flex-col gap-2">
-              <label htmlFor={customerFieldId} className="text-sm font-medium">
-                {FIELD_LABELS.customer}
-              </label>
-              <OrderCustomerPicker
-                purpose="assign"
-                name={ORDER_CUSTOMER_FIELD}
-                id={customerFieldId}
-                value={customer}
-                onChange={setCustomer}
-                placeholder={CUSTOMER_PLACEHOLDER}
-                emptyMessage={CUSTOMER_EMPTY_LABEL}
+            {/*
+              Cantidad: control NUMERICO del navegador. Con `step="any"` para que el decimal no
+              choque contra el paso entero por defecto, y `min="0.01"` para que el navegador no
+              ofrezca negativos ni cero -el «mayor que cero» real lo sigue cerrando el esquema del
+              contrato al enviar. El valor sigue viajando
+              como cadena en el `FormData`.
+
+              Al SOLTAR EL FOCO el valor se coloca a DOS decimales y sin ceros finales (decision
+              humana del 2026-09-09): «25.00» y «25.0» quedan como «25», «25.3» y «25.08» conservan
+              sus decimales. El `FormData` viaja con el valor ya colocado.
+            */}
+            <div className="sm:col-span-4">
+              <OrderField
+                name="quantity"
+                label={FIELD_LABELS.quantity}
+                required
+                type="number"
+                step="any"
+                min="0.01"
+                inputMode="decimal"
+                roundDecimals={2}
+                defaultValue={initialValue('quantity', trimDecimal(order?.quantity ?? ''))}
+                onValueChange={(value) => {
+                  setQuantity(value);
+                  quote.onQuantityChange(effectiveRecipeId, value, unitId);
+                }}
+                error={fieldErrors.quantity}
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
-
-              {/*
-                Cantidad: control NUMERICO del navegador (enmienda humana del 2026-09-08 a R39). Con
-                `step="any"` para que el decimal no choque contra el paso entero por defecto, y
-                `min="0.01"` para que el navegador no ofrezca negativos ni cero -el «mayor que cero»
-                real lo sigue cerrando el esquema del contrato al enviar. El valor sigue viajando
-                como cadena en el `FormData`.
-
-                Al SOLTAR EL FOCO el valor se coloca a DOS decimales y sin ceros finales (decision
-                humana del 2026-09-09): «25.00» y «25.0» quedan como «25», «25.3» y «25.08» conservan
-                sus decimales. El `FormData` viaja con el valor ya colocado.
-              */}
-              <div className="sm:col-span-4">
-                <OrderField
-                  name="quantity"
-                  label={FIELD_LABELS.quantity}
-                  required
-                  type="number"
-                  step="any"
-                  min="0.01"
-                  inputMode="decimal"
-                  roundDecimals={2}
-                  defaultValue={initialValue('quantity', trimDecimal(order?.quantity ?? ''))}
-                  onValueChange={(value) => {
-                    setQuantity(value);
-                    quote.onQuantityChange(effectiveRecipeId, value, unitId);
-                  }}
-                  error={fieldErrors.quantity}
-                />
-              </div>
-
-              <div className="sm:col-span-4">
-                <PresentationUnitSelect
-                  units={units}
-                  value={unitId}
-                  onValueChange={(next) => {
-                    setUnitId(next);
-                    quote.onUnitChange(effectiveRecipeId, quantity, next);
-                  }}
-                  error={fieldErrors.unitId}
-                />
-              </div>
-
-              {/* R27: prioridad opcional, con el defecto del contrato PRESELECCIONADO y VISIBLE. */}
-              <div className="sm:col-span-4">
-                <SelectField
-                  name="priority"
-                  label={FIELD_LABELS.priority}
-                  defaultValue={initialValue('priority', order?.priority ?? DEFAULT_ORDER_PRIORITY)}
-                  options={ORDER_PRIORITY_VALUES.map((value) => ({
-                    value,
-                    label: ORDER_PRIORITY_LABELS[value],
-                  }))}
-                  triggerTestId={ORDER_PRIORITY_SELECT_TESTID}
-                  optionTestId={ORDER_PRIORITY_OPTION_TESTID}
-                  error={fieldErrors.priority}
-                />
-              </div>
+            <div className="sm:col-span-4">
+              <PresentationUnitSelect
+                units={units}
+                value={unitId}
+                onValueChange={(next) => {
+                  setUnitId(next);
+                  quote.onUnitChange(effectiveRecipeId, quantity, next);
+                }}
+                error={fieldErrors.unitId}
+              />
             </div>
 
-            <OrderDistributionField
-              lines={lines}
-              onLinesChange={(next) => {
-                setLines(next);
-                quote.onDistributionChange(effectiveRecipeId, quantity, unitId, next);
-              }}
-              unitId={unitId}
-              compatibleUnitIds={compatibleIds}
-              unitLabel={unitLabel}
-              quantity={quantity}
-              units={units}
-              availability={availability}
-              error={fieldErrors.presentationLines}
-              submitLines
-            />
-
-            {/* El bloque de coste: DEBAJO de la fila, no entre los campos. Fuera de la condicion
-                de receta elegida, para verse con guion sin receta. */}
-            <OrderCostQuote {...quote.state} approximate={costApproximate} />
+            {/* Prioridad opcional, con el defecto del contrato PRESELECCIONADO y VISIBLE. */}
+            <div className="sm:col-span-4">
+              <SelectField
+                name="priority"
+                label={FIELD_LABELS.priority}
+                defaultValue={initialValue('priority', order?.priority ?? DEFAULT_ORDER_PRIORITY)}
+                options={ORDER_PRIORITY_VALUES.map((value) => ({
+                  value,
+                  label: ORDER_PRIORITY_LABELS[value],
+                }))}
+                triggerTestId={ORDER_PRIORITY_SELECT_TESTID}
+                optionTestId={ORDER_PRIORITY_OPTION_TESTID}
+                optionValueAttribute
+                error={fieldErrors.priority}
+                errorTestId="order-error-priority"
+                errorAlert={false}
+              />
+            </div>
           </div>
-        </div>
 
-        {/*
-          Los ingredientes de la receta elegida: se montan solo con receta elegida -en la edicion
-          ya lo esta al abrir el panel-. El JOIN con `products` lo hace el detalle de `recetas`;
-          aqui se pinta la tabla con los datos que ya vienen resueltos.
-        */}
-        {recipeId === '' ? null : (
-          <OrderIngredientsTable
-            lines={ingredients}
-            units={units}
+          <OrderDistributionField
+            lines={lines}
+            onLinesChange={(next) => {
+              setLines(next);
+              quote.onDistributionChange(effectiveRecipeId, quantity, unitId, next);
+            }}
+            unitId={unitId}
+            compatibleUnitIds={compatibleIds}
+            unitLabel={unitLabel}
             quantity={quantity}
-            orderUnitId={unitId}
-            bridge={bridge}
-            loading={ingredientsLoading}
-            error={ingredientsError}
+            units={units}
+            availability={availability}
+            error={fieldErrors.presentationLines}
+            submitLines
           />
-        )}
 
-        {/*
-          QC-102 R23 — LA SECCION DE RESPONSABLES, dentro del panel que ya existe. No hay panel
-          nuevo, ni ruta nueva, ni pantalla aparte: es una seccion mas del mismo `SheetContent`.
-
-          Solo en la EDICION: sin pedido creado no hay a quien asignar, y las tres operaciones de
-          QC-87 piden un `orderId` que en el alta todavia no existe.
-
-          R26: lo que pinta son los responsables que **la fila ya trajo**; no se consulta nada al
-          abrir. R29: con el pedido en estado final, `isFinal` apaga los controles de escritura
-          —y la seccion no dice por que—.
-        */}
-        {order === undefined ? null : (
-          <div
-            ref={responsiblesRef}
-            tabIndex={-1}
-            data-testid={ORDER_SHEET_RESPONSIBLES_TESTID}
-            data-section={section}
-          >
-            <OrderResponsibles
-              orderId={order.id}
-              responsibles={responsibles}
-              canWrite={responsiblesCatalog.canWrite}
-              isFinal={isFinalOrderStatus(order.status)}
-              people={responsiblesCatalog.people}
-              workGroups={responsiblesCatalog.workGroups}
-            />
-          </div>
-        )}
+          {/* El bloque de coste: DEBAJO de la fila, no entre los campos. Fuera de la condicion
+              de receta elegida, para verse con guion sin receta. */}
+          <OrderCostQuote {...quote.state} approximate={costApproximate} />
+        </div>
       </div>
-    </SheetContent>
+
+      {/*
+        Los ingredientes de la receta elegida: se montan solo con receta elegida -en la edicion
+        ya lo esta al abrir el panel-. El JOIN con `products` lo hace el detalle de `recetas`;
+        aqui se pinta la tabla con los datos que ya vienen resueltos.
+      */}
+      {recipeId === '' ? null : (
+        <OrderIngredientsTable
+          lines={ingredients}
+          units={units}
+          quantity={quantity}
+          orderUnitId={unitId}
+          bridge={bridge}
+          loading={ingredientsLoading}
+          error={ingredientsError}
+        />
+      )}
+
+      {/*
+        LA SECCION DE RESPONSABLES, dentro del panel que ya existe. No hay panel
+        nuevo, ni ruta nueva, ni pantalla aparte: es una seccion mas del mismo `SheetContent`.
+
+        Solo en la EDICION: sin pedido creado no hay a quien asignar, y las tres operaciones de
+        responsables piden un `orderId` que en el alta todavia no existe.
+
+        Lo que pinta son los responsables que **la fila ya trajo**; no se consulta nada al
+        abrir. Con el pedido en estado final, `isFinal` apaga los controles de escritura
+        —y la seccion no dice por que—.
+      */}
+      {order === undefined ? null : (
+        <div
+          ref={responsiblesRef}
+          tabIndex={-1}
+          data-testid={ORDER_SHEET_RESPONSIBLES_TESTID}
+          data-section={section}
+        >
+          <OrderResponsibles
+            orderId={order.id}
+            responsibles={responsibles}
+            canWrite={responsiblesCatalog.canWrite}
+            isFinal={isFinalOrderStatus(order.status)}
+            people={responsiblesCatalog.people}
+            workGroups={responsiblesCatalog.workGroups}
+          />
+        </div>
+      )}
+    </FormSheet>
   );
 }
 
@@ -937,121 +902,4 @@ function orderUnitLabel(
   const unit = units.find((candidate) => candidate.id === unitId);
   if (unit !== undefined) return unit.symbol ?? unit.name;
   return order !== undefined && order.unitId === unitId ? order.unitLabel : null;
-}
-
-type SelectFieldProps = {
-  readonly name: string;
-  readonly label: string;
-  readonly defaultValue: string;
-  readonly options: readonly { readonly value: string; readonly label: string }[];
-  readonly triggerTestId: string;
-  readonly optionTestId: string;
-  readonly error?: string;
-};
-
-/**
- * Desplegable no controlado de un conjunto CERRADO del contrato (prioridad). El valor viaja en
- * el `FormData` por el `input` oculto que monta el primitivo; el conjunto de opciones llega ya
- * derivado del contrato, nunca escrito a mano aqui.
- */
-function SelectField({
-  name,
-  label,
-  defaultValue,
-  options,
-  triggerTestId,
-  optionTestId,
-  error,
-}: SelectFieldProps) {
-  const labelId = useId();
-  const errorId = useId();
-
-  return (
-    <div className="flex flex-col gap-2">
-      <span id={labelId} className="text-sm font-medium">
-        {label}
-      </span>
-      <Select name={name} defaultValue={defaultValue} items={[...options]}>
-        <SelectTrigger
-          aria-labelledby={labelId}
-          aria-invalid={error === undefined ? undefined : true}
-          aria-describedby={error === undefined ? undefined : errorId}
-          className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT}`}
-          data-testid={triggerTestId}
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((option) => (
-            <SelectItem
-              key={option.value}
-              value={option.value}
-              data-testid={optionTestId}
-              data-value={option.value}
-            >
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {error === undefined ? null : (
-        <p id={errorId} className="text-sm text-destructive" data-testid={`order-error-${name}`}>
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/**
- * Acciones del pie: cancelar y guardar. **Cancelar es `type="button"`** -y no un submit- porque
- * desde que el panel entero es un `<form>` cualquier boton sin tipo dentro de el lo enviaria.
- * Cierra por el primitivo (`SheetClose`), asi que no necesita saber nada del estado de apertura,
- * y al no navegar la URL conserva pagina, tamano, orden y filtros (R25).
- */
-function FormActions({ canSave, busy }: { canSave: boolean; busy: boolean }) {
-  return (
-    <>
-      <SheetClose
-        render={
-          <Button
-            type="button"
-            variant="outline-dashed"
-            className={TOUCH_TARGET}
-            data-testid={ORDER_FORM_CANCEL_TESTID}
-          />
-        }
-      >
-        Cancelar
-      </SheetClose>
-      <SaveButton canSave={canSave} busy={busy} />
-    </>
-  );
-}
-
-/**
- * Boton de envio. Componente aparte por una necesidad tecnica: `useFormStatus()` solo lee el
- * estado del `<form>` ANCESTRO, asi que dentro del componente que renderiza el `<form>`
- * devolveria siempre `pending: false` y el boton no se deshabilitaria nunca.
- *
- * Esta deshabilitado mientras no hay una receta ELEGIDA (decision humana del 2026-09-09) y
- * mientras la action esta en vuelo. Sin receta valida no tiene sentido llamar a la operacion: el
- * esquema del contrato la rechazaria igual, pero el boton le dice al usuario lo que le espera.
- */
-function SaveButton({ canSave, busy }: { canSave: boolean; busy: boolean }) {
-  // `useFormStatus` no ve el reenvio confirmado, que no sale del `<form>`.
-  const pending = useFormStatus().pending || busy;
-
-  return (
-    <Button
-      type="submit"
-      className={TOUCH_TARGET}
-      disabled={pending || !canSave}
-      aria-busy={pending}
-      data-testid={ORDER_FORM_SUBMIT_TESTID}
-    >
-      {pending ? 'Guardando…' : 'Guardar'}
-    </Button>
-  );
 }

@@ -34,6 +34,22 @@ export type OrderAssignmentTarget = {
  *  antiguedad, numero); `finished_recent_first` es el de «Terminados». */
 export type OrderSummaryOrdering = 'work_queue' | 'finished_recent_first';
 
+/** Filtro opcional por persona de un resumen paginado. Va en la consulta, no despues, para que
+ *  `total` y la paginacion describan solo lo filtrado. */
+export type OrderSummaryFilter = {
+  readonly packedBy?: string;
+  readonly conditionedBy?: string;
+};
+
+/** Lo que el historial de un pedido necesita de el, vivo o dado de baja; nada de receta,
+ *  cantidades ni reparto. */
+export type OrderHistorySummary = {
+  readonly id: string;
+  readonly number: OrderNumber;
+  readonly status: OrderStatus;
+  readonly deleted: boolean;
+};
+
 /** Lo que entro al inventario por UNA linea del reparto cuando Terminar el empaque dio de alta
  *  su lote: el nombre del producto terminado que lo recibio y cuantos envases enteros. */
 export type FinishedGoodsReceipt = {
@@ -75,6 +91,7 @@ export interface OrderCatalog {
    * terminado, con los nulos al final y, entre ellos, por numero de pedido descendente.
    *
    * `filter.packedBy` deja solo los pedidos de ese empacador; un `packedBy` nulo no entra.
+   * `filter.conditionedBy` hace lo mismo con quien acondiciona.
    */
   listAliveSummariesInCompany(
     companyId: string,
@@ -82,8 +99,22 @@ export interface OrderCatalog {
     ordering: OrderSummaryOrdering,
     page: number,
     pageSize?: number,
-    filter?: { readonly packedBy?: string },
+    filter?: OrderSummaryFilter,
   ): Promise<Page<AssignedOrderSummary>>;
+
+  /**
+   * Unico listado del catalogo que DEVUELVE los dados de baja, marcados con `deleted`. Orden fijo:
+   * numero de pedido descendente con `id` de desempate. `filter.numberContains` deja solo los
+   * pedidos cuyo numero visible lo contiene (`orderNumberContains`); el `total` cuenta lo filtrado.
+   */
+  listSummariesByIdsIncludingDeleted(
+    companyId: string,
+    ids: readonly string[],
+    statuses: readonly OrderStatus[],
+    page: number,
+    pageSize?: number,
+    filter?: { readonly numberContains?: string },
+  ): Promise<Page<OrderHistorySummary>>;
 
   /**
    * Mueve el estado de un pedido vivo de esa empresa, SOLO si `assertTransition(from, to)` lo
@@ -239,4 +270,7 @@ export type AssignedOrderSummary = {
    *  no lo tienen, los nuevos lo conservan). El identificador viaja en crudo, igual que
    *  `recipeId`; el nombre lo resuelve quien consulta con el directorio de personas. */
   readonly packedBy: string | null;
+  /** Quien acondiciona: obligatorio en `EN_ACONDICIONAMIENTO` y `TERMINADO`, opcional en
+   *  `ENTREGADO` y `null` en el resto. Viaja en crudo, como `packedBy`. */
+  readonly conditionedBy: string | null;
 };

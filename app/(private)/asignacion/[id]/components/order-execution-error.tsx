@@ -1,8 +1,9 @@
 import Link from 'next/link';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
-import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
+import { ErrorAlert } from '@/components/shared/error-alert';
+import type { ErrorState } from '@/lib/modules/errores';
 import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Los estados de error de la pantalla de ejecucion. El texto sale SIEMPRE del catalogo de
@@ -14,7 +15,6 @@ export const ORDER_EXECUTION_ERROR_TESTID = 'order-execution-error';
 export const ORDER_EXECUTION_ERROR_MESSAGE_TESTID = 'order-execution-error-message';
 export const ORDER_EXECUTION_ERROR_BACK_LINK_TESTID = 'order-execution-error-back-link';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 const TITLE = 'No se pudo abrir el pedido.';
 const BACK_LABEL = 'Volver a mis pedidos asignados';
 
@@ -25,26 +25,23 @@ type OrderExecutionErrorProps = {
 export function OrderExecutionError({ error }: OrderExecutionErrorProps) {
   return (
     <div className="flex min-h-dvh flex-col gap-4 p-4 md:p-6">
-      <div
-        role="alert"
-        data-testid={ORDER_EXECUTION_ERROR_TESTID}
+      <ErrorAlert
+        error={error}
+        testId={ORDER_EXECUTION_ERROR_TESTID}
         className="flex flex-col items-start gap-3 rounded-lg border border-destructive/40 p-4"
-      >
-        <p className="text-sm font-medium">{TITLE}</p>
-        {error.code === UNEXPECTED_ERROR_CODE ? (
-          <UnexpectedErrorNotice state={error} />
-        ) : (
+        before={<p className="text-sm font-medium">{TITLE}</p>}
+        renderCatalogued={(catalogued) => (
           <p
             className="text-sm text-muted-foreground"
             data-testid={ORDER_EXECUTION_ERROR_MESSAGE_TESTID}
           >
-            {error.message}
+            {catalogued.message}
           </p>
         )}
-      </div>
+      />
       <Link
         href={ASSIGNED_ORDERS_ROUTE}
-        className={`inline-flex w-fit items-center ${TOUCH_TARGET} text-sm font-medium underline`}
+        className={`inline-flex w-fit items-center ${touchTarget} text-sm font-medium underline`}
         data-testid={ORDER_EXECUTION_ERROR_BACK_LINK_TESTID}
       >
         {BACK_LABEL}

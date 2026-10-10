@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma migrate deploy && prisma generate && tsx scripts/seed.ts && next build",
+    "build": "node scripts/build.mjs",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
@@ -17,6 +17,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:rollback": "tsx scripts/db-rollback.ts",
     "db:seed": "tsx scripts/seed.ts",
+    "db:seed:demo": "tsx scripts/seed-demo.ts",
     "db:test": "tsx scripts/test-db.ts"
   },
   "dependencies": {

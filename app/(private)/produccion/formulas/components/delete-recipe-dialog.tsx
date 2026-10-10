@@ -2,29 +2,16 @@
 
 import { Trash2Icon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useRef, useState, useTransition } from 'react';
+import { useEffect, useEffectEvent, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { Button } from '@/components/ui/button';
-import { UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorState } from '@/lib/modules/errores';
 import {
   deleteRecipeAction,
   listRecipeVersionsAction,
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 const DELETE_SUCCESS = 'Receta borrada.';
 const DELETE_VERSION_SUCCESS = 'Versión borrada.';
@@ -42,19 +29,27 @@ function versionsNotice(count: number): string | null {
   return `También se borrarán sus ${count} versiones.`;
 }
 
+export type DeleteRecipeDialogProps = {
+  readonly recipe: { readonly id: string; readonly name: string };
+  readonly kind?: DeleteKind;
+  /** Con `open` no se monta el disparador propio: la apertura la decide quien lo pasa. */
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
+};
+
 export function DeleteRecipeDialog({
   recipe,
   kind = 'recipe',
-}: {
-  readonly recipe: { readonly id: string; readonly name: string };
-  readonly kind?: DeleteKind;
-}) {
-  const [open, setOpen] = useState(false);
-  /*
-    El error, ENTERO. QC-71 (R17): era `{ code, message }` copiado a mano, y esa copia perdia el
-    `reference` del error inesperado. Un `reference?: string` local reabriria el agujero por el
-    otro lado, asi que se guarda la union cerrada y el render estrecha por `code`.
-  */
+  open: controlledOpen,
+  onOpenChange,
+}: DeleteRecipeDialogProps) {
+  const isControlled = controlledOpen !== undefined;
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = isControlled ? controlledOpen : uncontrolledOpen;
+  // En modo controlado la apertura llega por prop y no por un evento del dialogo.
+  const [seenOpen, setSeenOpen] = useState(false);
+  // El error entero y no una copia de `{ code, message }`: la copia perdería el `reference` del
+  // error inesperado. El render estrecha por `code`.
   const [error, setError] = useState<ErrorState | null>(null);
   const [versionCount, setVersionCount] = useState<VersionCount>({ status: 'idle' });
   const [isPending, startTransition] = useTransition();
@@ -64,9 +59,21 @@ export function DeleteRecipeDialog({
 
   const isVersion = kind === 'version';
 
-  const startCount = () => {
+  const setOpen = (next: boolean) => {
+    if (!isControlled) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
+
+  if (isControlled && open !== seenOpen) {
+    setSeenOpen(open);
+    if (open) {
+      setError(null);
+      if (!isVersion) setVersionCount({ status: 'loading' });
+    }
+  }
+
+  const requestCount = () => {
     const requestId = ++countRequestRef.current;
-    setVersionCount({ status: 'loading' });
     void listRecipeVersionsAction(recipe.id).then((result) => {
       if (requestId !== countRequestRef.current) return;
       if (result.status === 'error') {
@@ -77,6 +84,17 @@ export function DeleteRecipeDialog({
       setVersionCount({ status: 'ready', count: result.data.length });
     });
   };
+
+  const startCount = () => {
+    setVersionCount({ status: 'loading' });
+    requestCount();
+  };
+
+  const requestCountOnOpen = useEffectEvent(requestCount);
+
+  useEffect(() => {
+    if (isControlled && open && !isVersion) requestCountOnOpen();
+  }, [isControlled, open, isVersion]);
 
   const handleConfirm = () => {
     startTransition(async () => {
@@ -98,35 +116,37 @@ export function DeleteRecipeDialog({
     !isVersion && versionCount.status === 'ready' ? versionsNotice(versionCount.count) : null;
 
   return (
-    <AlertDialog
+    <DeleteConfirmDialog
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (next) {
+        if (next && !isControlled) {
           setError(null);
           if (!isVersion) startCount();
-        } else {
+        } else if (!next) {
           countRequestRef.current++;
           setVersionCount({ status: 'idle' });
         }
       }}
-    >
-      <AlertDialogTrigger
-        render={
-          <Button
-            variant="ghost"
-            className={TOUCH_TARGET}
-            aria-label={`Borrar ${recipe.name}`}
-            data-testid="recipe-delete-open"
-          />
-        }
-      >
-        <Trash2Icon />
-      </AlertDialogTrigger>
-      <AlertDialogContent data-testid="delete-recipe-dialog">
-        <AlertDialogHeader>
-          <AlertDialogTitle>{isVersion ? 'Borrar versión' : 'Borrar receta'}</AlertDialogTitle>
-          <AlertDialogDescription data-testid="delete-recipe-message">
+      trigger={
+        isControlled
+          ? undefined
+          : {
+              render: (
+                <Button
+                  variant="ghost"
+                  touch
+                  aria-label={`Borrar ${recipe.name}`}
+                  data-testid="recipe-delete-open"
+                />
+              ),
+              children: <Trash2Icon />,
+            }
+      }
+      texts={{
+        title: isVersion ? 'Borrar versión' : 'Borrar receta',
+        description: (
+          <>
             {isVersion
               ? `Se va a borrar la versión «${recipe.name}». Esta acción no se puede deshacer.`
               : `Se va a borrar «${recipe.name}». Esta acción no se puede deshacer.`}
@@ -136,38 +156,24 @@ export function DeleteRecipeDialog({
                 <span data-testid="delete-recipe-versions-notice">{notice}</span>
               </>
             )}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        {/*
-          QC-71 (R17, R18): el INESPERADO lo pinta el componente compartido -que necesita un
-          contenedor de bloque-; el CATALOGADO, exactamente como siempre y sin identificador.
-        */}
-        {error === null ? null : error.code === UNEXPECTED_ERROR_CODE ? (
-          <div role="alert" className="text-sm text-destructive" data-testid="delete-recipe-error">
-            <UnexpectedErrorNotice state={error} />
-          </div>
-        ) : (
-          <p role="alert" className="text-sm text-destructive" data-testid="delete-recipe-error">
-            {error.message}
-          </p>
-        )}
-
-        <AlertDialogFooter>
-          <AlertDialogCancel className={TOUCH_TARGET} data-testid="delete-recipe-cancel">
-            Cancelar
-          </AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            className={TOUCH_TARGET}
-            disabled={isPending || countBlocksConfirm}
-            data-testid="delete-recipe-confirm"
-            onClick={handleConfirm}
-          >
-            Borrar
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </>
+        ),
+        dismiss: 'Cancelar',
+        confirm: 'Borrar',
+      }}
+      testIds={{
+        dialog: 'delete-recipe-dialog',
+        message: 'delete-recipe-message',
+        dismiss: 'delete-recipe-cancel',
+        confirm: 'delete-recipe-confirm',
+        error: 'delete-recipe-error',
+      }}
+      submit={{ kind: 'transition', onConfirm: handleConfirm }}
+      isPending={isPending}
+      announceBusy={false}
+      confirmDisabled={countBlocksConfirm}
+      error={error ?? undefined}
+      errorStyle="inline"
+    />
   );
 }

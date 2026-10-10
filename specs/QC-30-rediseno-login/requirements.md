@@ -36,6 +36,10 @@ este orden: el título de la aplicación, el campo **Usuario** con su etiqueta, 
 **Contraseña** con su etiqueta, el botón de envío, y —en el pie de la tarjeta y **fuera** del
 elemento `<form>`— el enlace de recuperación de contraseña.
 
+> **ENMIENDA DEL 2026-10-08 (QC-226).** El título de la aplicación pasa a ser el logo vertical para fondo
+> oscuro dentro de un único `h1` con nombre accesible `BRAND_LABEL`, sin título de texto visible
+> (QC-226 D9, R16). El resto de la anatomía y el enlace fuera del `<form>` siguen (QC-226 R23).
+
 **R2.** El sistema DEBE enviar las credenciales mediante un elemento `<form>` con atributo
 `action`, con los campos de usuario y contraseña **no controlados**, y NO DEBE mantener el valor
 de esos campos en estado de React, ni registrar un manejador de envío propio, ni simular el
@@ -73,6 +77,10 @@ formulario ni la verificación de credenciales.
 **translúcida y desenfocada**, con el filo de 1 px y el brillo interior superior, usando los
 valores de `design-input-login.md > 3` para el modo claro y para el modo oscuro.
 
+> **ENMIENDA DEL 2026-10-08 (QC-226).** El vidrio se recolorea: la tarjeta usa el fondo, la sombra y el
+> desenfoque de QC-226 R20, los mismos en los dos temas, porque el login se pinta siempre con los
+> tokens oscuros (QC-226 R17). Siguen el prefijo `-webkit-` (R10) y la base opaca con `--card` (R11).
+
 **R10.** El sistema DEBE declarar el desenfoque de fondo **también con el prefijo `-webkit-`**
 junto a la propiedad estándar, de modo que el motor de WebKit aplique el desenfoque y la tarjeta
 nunca quede translúcida sin desenfocar.
@@ -88,11 +96,19 @@ contraste de su texto, y NO DEBE dejarla translúcida sobre el fondo animado.
 tarjeta, con los tamaños, posiciones, duraciones (17–19 s por ciclo), derivas, escalas, retardos
 negativos y opacidades de `design-input-login.md > 4`, y con el relleno propio de cada modo.
 
+> **ENMIENDA DEL 2026-10-08 (QC-226).** Las burbujas salen. En su lugar van exactamente tres isotipos
+> decorativos («moléculas») con los tamaños, posiciones y opacidades de QC-226 R18, animados con
+> ciclos de 22, 30 y 26 s (QC-226 D10, R19). Siguen siendo decorativos (R13).
+
 **R13.** El sistema DEBE marcar la capa de burbujas como decorativa: oculta para tecnologías de
 asistencia, no alcanzable con el tabulador y sin capturar eventos de puntero.
 
 **R14.** MIENTRAS el sistema operativo indica preferencia por movimiento reducido, el sistema NO
 DEBE mostrar ninguna burbuja ni ejecutar su animación.
+
+> **ENMIENDA DEL 2026-10-08 (QC-226).** Con movimiento reducido, las moléculas se quedan **visibles y
+> quietas**, y la tarjeta entra como mucho con un fundido de 150 ms; la regla se acota al login
+> (QC-226 D10, R22).
 
 **R15.** El sistema DEBE exponer exactamente **un** elemento con rol `main` en la página de
 login.
@@ -117,15 +133,26 @@ campo, botón y tarjeta conservan intactas sus clases y variantes actuales.
 **R20.** El sistema DEBE conservar sin cambios el radio de campo y botón (10 px), el grosor de
 3 px del anillo de foco visible y la familia tipográfica actual.
 
+> **ENMIENDA DEL 2026-10-08 (QC-226).** La familia tipográfica pasa de Geist a IBM Plex Sans (QC-226 D4,
+> R7), y el radio de campo y botón pasa de 10 px a 8 px al bajar `--radius` a `0.5rem` (QC-226 D3,
+> R4).
+
 ### Los dos modos y el móvil
 
 **R21.** El sistema DEBE pintar la pantalla de login con los tokens de color definidos por QC-29
 en modo claro y en modo oscuro, y NO DEBE redefinir esos tokens ni introducir una paleta de
 tokens de color nueva; las variables propias del login derivan de los valores del insumo.
 
+> **ENMIENDA DEL 2026-10-08 (QC-226).** Los tokens de QC-29 quedan sustituidos por los de QC-226 D2. El
+> login se pinta con los tokens del **modo oscuro en los dos temas** de la app, mediante un ámbito
+> `.dark` en el `main`, y sobre el fondo petróleo de QC-226 R17 (QC-226 D10).
+
 **R22.** MIENTRAS la ventana es angosta, el sistema DEBE mostrar la tarjeta ocupando el ancho
 disponible hasta el máximo de 400 px, sin desbordar horizontalmente ni provocar barra de scroll
 lateral, y DEBE usar los valores móviles de las burbujas de `design-input-login.md > 4`.
+
+> **ENMIENDA DEL 2026-10-08 (QC-226).** Los valores móviles de las burbujas quedan sin objeto, porque las
+> burbujas salen (QC-226 R18). El ancho fluido hasta 400 px sigue (QC-226 R23, D20).
 
 **R23.** El sistema DEBE medir el alto de la pantalla con la unidad de viewport dinámica, DEBE
 presentar los campos con tamaño de letra de al menos 16 px en viewport angosto y DEBE mantener
@@ -144,6 +171,9 @@ requisitos anteriores.
 de campo y botón, el carácter decorativo de las burbujas y su ausencia bajo preferencia de
 movimiento reducido; y DEBE conservar verdes, sin editar sus aserciones de comportamiento, las
 pruebas de extremo a extremo del flujo de acceso que ya existen.
+
+> **ENMIENDA DEL 2026-10-08 (QC-226).** La comprobación de «sin burbujas con movimiento reducido» pasa a
+> «moléculas quietas y visibles» (QC-226 R22). El resto de R26 sigue.
 
 ### Cobertura de las decisiones cerradas
 
@@ -211,3 +241,15 @@ No se rellenan con supuestos (regla 6 de `CLAUDE.md`).
 | 2026-09-02 | Los dos modos | La pantalla se pinta con los tokens de **QC-29** en claro y en oscuro. No se define paleta nueva |
 | 2026-09-02 | Colisión con trabajo vivo | `app/globals.css` lo está tocando en paralelo una rama **sin ficha** (`feature/fix-ajuste-sidebar`, bloque del panel flotante, líneas 148-156). Acuerdo entre sesiones: **bloques separados, nadie reordena ni reindenta el archivo, y quien vaya a tocar líneas del otro avisa antes de escribir** |
 | 2026-09-02 | Librería nueva | **Ninguna.** Es CSS y composición de componentes que ya existen. Regla 7 de `CLAUDE.md` sin propuesta que abrir |
+
+> **ENMIENDA DEL 2026-10-08 (QC-226).** QC-226 cita estas decisiones por el número de fila de la tabla de
+> «Cobertura de las decisiones cerradas». Quedan enmendadas:
+>
+> - **D3** (anatomía): el título de texto pasa a ser el logo vertical dentro del `h1` (QC-226 D9).
+> - **D8** (tres burbujas, 17–19 s): las burbujas pasan a ser tres moléculas, 22–30 s (QC-226 D10).
+> - **D9** (burbujas decorativas que desaparecen con movimiento reducido): las moléculas siguen
+>   siendo decorativas, pero se quedan visibles y quietas (QC-226 D10).
+> - **D10** (radio 10 px, anillo 3 px, Geist): Geist pasa a Plex (QC-226 D4) y el radio a 8 px
+>   (QC-226 D3).
+> - **D12** (tokens de QC-29 en los dos modos): tokens de QC-226 D2, y el login siempre en oscuro
+>   (QC-226 D10).

@@ -6,10 +6,9 @@ import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-ac
 import { BRAND_LABEL, PRESENTATIONS_LABEL } from '@/lib/shared/navigation/private-nav';
 
 import {
-  PresentationListError,
   PresentationListSection,
-  PresentationListSkeleton,
   PresentationSheet,
+  PresentationTable,
   buildPresentationListQuery,
   parsePresentationListParams,
   type PresentationListSearchParams,
@@ -70,7 +69,7 @@ export const metadata: Metadata = {
  * con el titulo, igual que `inventario/page.tsx` y `proveedores/page.tsx`- y necesita el mismo
  * catalogo que el formulario. **A DIFERENCIA de inventario, un fallo aqui tumba la pantalla
  * entera**: la unidad es el campo `NOT NULL` del formulario, no un adorno, asi que sin catalogo no
- * se pinta ni `<h1>` ni ningun disparador -se pinta `PresentationListError` y nada mas-.
+ * se pinta ni `<h1>` ni ningun disparador -se pinta el error de la lista y nada mas-.
  */
 export default async function PresentacionesPage({
   searchParams,
@@ -87,7 +86,14 @@ export default async function PresentacionesPage({
   if (unitsResult.status === 'error') {
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-        <PresentationListError error={unitsResult} />
+        <PresentationTable
+          status="error"
+          error={unitsResult}
+          presentations={[]}
+          params={params}
+          totalPages={0}
+          units={[]}
+        />
       </div>
     );
   }
@@ -104,7 +110,15 @@ export default async function PresentacionesPage({
       </div>
       <Suspense
         key={buildPresentationListQuery(params)}
-        fallback={<PresentationListSkeleton rows={params.pageSize} />}
+        fallback={
+          <PresentationTable
+            status="loading"
+            presentations={[]}
+            params={params}
+            totalPages={0}
+            units={units}
+          />
+        }
       >
         <PresentationListSection params={params} units={units} />
       </Suspense>

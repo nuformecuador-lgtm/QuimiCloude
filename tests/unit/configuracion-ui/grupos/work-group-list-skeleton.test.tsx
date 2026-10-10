@@ -20,7 +20,7 @@ import {
   WORK_GROUP_SECTION_TESTID,
   WORK_GROUP_SKELETON_COLUMN_COUNT,
   WORK_GROUP_TABLE_TESTID,
-  WorkGroupListSkeleton,
+  WorkGroupTable,
   buildWorkGroupListQuery,
   parseWorkGroupListParams,
 } from '@/app/(private)/configuracion/usuarios/components';
@@ -118,9 +118,22 @@ afterEach(() => {
   cleanup();
 });
 
+/** La tabla de grupos SOLA, cargando, con `rows` como tamano de pagina pedido. */
+function renderEsqueleto(rows: number) {
+  return render(
+    <WorkGroupTable
+      status="loading"
+      groups={[]}
+      params={{ page: 1, pageSize: rows, sort: null, filters: {}, search: '' }}
+      totalPages={0}
+      canModify
+    />,
+  );
+}
+
 describe('el esqueleto se anuncia y dice la verdad sobre lo que se esta pidiendo (R19)', () => {
   it('tiene rol de estado, `aria-busy` y tantas filas como el tamano pedido', () => {
-    render(<WorkGroupListSkeleton rows={PAGE_SIZE_OPTIONS[1]!} />);
+    renderEsqueleto(PAGE_SIZE_OPTIONS[1]!);
 
     const esqueleto = screen.getByTestId(WORK_GROUP_LIST_SKELETON_TESTID);
     expect(esqueleto).toHaveAttribute('role', 'status');
@@ -131,7 +144,7 @@ describe('el esqueleto se anuncia y dice la verdad sobre lo que se esta pidiendo
   });
 
   it('cada fila pinta tantas celdas como columnas declara la lista', () => {
-    render(<WorkGroupListSkeleton rows={1} />);
+    renderEsqueleto(1);
 
     const fila = screen.getByTestId(WORK_GROUP_ROW_SKELETON_TESTID);
     expect(fila.querySelectorAll('td')).toHaveLength(WORK_GROUP_SKELETON_COLUMN_COUNT);

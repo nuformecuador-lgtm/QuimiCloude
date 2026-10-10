@@ -202,6 +202,10 @@ type Scenario = {
  * acepte escribir en una columna que en ese instante ya es entera.
  */
 async function seedIntegerScenario(tx: Prisma.TransactionClient): Promise<Scenario> {
+  // QC-223 2026-10-08: `20261008150100_order_deliveries` cuelga una FK compuesta de
+  // `product_batches_id_company_id_key`, que el DOWN de esta migracion suelta; sobre la base ya
+  // migrada a HEAD se retira aqui, dentro de la transaccion del caso (termina en ROLLBACK).
+  await tx.$executeRawUnsafe('ALTER TABLE "order_delivery_lines" DROP CONSTRAINT "order_delivery_lines_batch_id_fkey"')
   await tx.$executeRawUnsafe('ALTER TABLE "product_batches" ALTER COLUMN "stock" TYPE INTEGER USING "stock"::INTEGER')
   await tx.$executeRawUnsafe('ALTER TABLE "inventory_movements" ALTER COLUMN "quantity" TYPE INTEGER USING "quantity"::INTEGER')
   await tx.$executeRawUnsafe('ALTER TABLE "products" ALTER COLUMN "stock" TYPE INTEGER USING "stock"::INTEGER')

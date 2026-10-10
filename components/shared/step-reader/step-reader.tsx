@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { CountdownTimer } from '@/components/shared/countdown-timer';
 import { Button } from '@/components/ui/button';
 import type { RecipeStepDocument } from '@/lib/modules/recetas';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
 import { StepDocumentView } from './step-document-view';
@@ -35,9 +36,6 @@ import { StepDocumentView } from './step-document-view';
  * cubierta por los requisitos de esas fichas: quien la toque no encontrara un `R<n>` que la
  * ampare. Quien busque trazabilidad completa, que la pida — hoy no existe.
  */
-
-/** Objetivo tactil minimo (R26). Misma clase que ya usa el resto del repo. */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /** Objetivo tactil de la accion primaria en `'ejecucion'`: 64px minimo, texto mayor. */
 const PRIMARY_TOUCH_TARGET_EJECUCION = 'min-h-16 min-w-11 text-lg font-semibold';
@@ -327,7 +325,7 @@ export function StepReader({
     <Button
       type="button"
       variant="outline"
-      className={TOUCH_TARGET}
+      touch
       data-testid="step-reader-previous"
       disabled={isFirst}
       onClick={goPrevious}
@@ -339,7 +337,7 @@ export function StepReader({
   const primaryButton = isLast ? (
     <Button
       type="button"
-      className={isEjecucion ? PRIMARY_TOUCH_TARGET_EJECUCION : TOUCH_TARGET}
+      className={isEjecucion ? PRIMARY_TOUCH_TARGET_EJECUCION : touchTarget}
       data-testid="step-reader-finish"
       disabled={blocked || finishBusy}
       aria-busy={finishBusy || undefined}
@@ -351,7 +349,7 @@ export function StepReader({
   ) : (
     <Button
       type="button"
-      className={isEjecucion ? PRIMARY_TOUCH_TARGET_EJECUCION : TOUCH_TARGET}
+      className={isEjecucion ? PRIMARY_TOUCH_TARGET_EJECUCION : touchTarget}
       data-testid="step-reader-next"
       disabled={blocked}
       aria-describedby={describedBy}

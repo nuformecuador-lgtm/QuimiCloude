@@ -1,19 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CalendarIcon } from 'lucide-react';
 import type { DateRange } from 'react-day-picker';
 
+import { DatePicker } from '@/components/shared/date-picker';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { formatDateLocalISO, parseDateLocalISO } from '@/lib/shared/ui/date-civil';
-import { cn } from '@/lib/utils';
 
 import type { DataTableFilterValue, DataTableTexts } from './data-table-types';
-
-/** Reexportada para los consumidores que ya importan por esta ruta (tests, viewport helpers). */
-export { formatDateLocalISO };
 
 /**
  * Filtro de rango de fechas con atajos (`design.md > 6.1`, T9, R18).
@@ -25,8 +19,6 @@ export { formatDateLocalISO };
  * **Sin `date-fns`**: los tres atajos se calculan con aritmetica nativa de `Date` (ver
  * `computeDateShortcutRange`, funcion pura y exportada para poder probarla sin montar nada).
  */
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /** Ancho de viewport (px) a partir del cual el calendario pinta dos meses (`design.md > 6.1`). */
 const WIDE_CALENDAR_BREAKPOINT = 768;
@@ -149,26 +141,20 @@ export function DataTableFilterDate({ columnId, label, value, texts, onChange }:
   };
 
   return (
-    <Popover>
-      <PopoverTrigger
-        type="button"
-        className={cn(
-          'inline-flex items-center gap-1.5 rounded-lg border border-input bg-background px-2.5 text-sm hover:bg-muted',
-          TOUCH_TARGET,
-        )}
-        data-testid={`data-table-filter-date-${columnId}`}
-      >
-        <CalendarIcon className="size-4" aria-hidden="true" />
-        {label}
-      </PopoverTrigger>
-
-      <PopoverContent className="w-auto">
+    <DatePicker
+      mode="range"
+      triggerContent={label}
+      triggerTestId={`data-table-filter-date-${columnId}`}
+      numberOfMonths={numberOfMonths}
+      selected={selectedRange}
+      onSelect={(range) => onChange(toFilterValue(range))}
+      header={
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className={TOUCH_TARGET}
+            touch
             data-testid="data-table-date-last-week"
             onClick={() => applyShortcut('lastWeek')}
           >
@@ -178,7 +164,7 @@ export function DataTableFilterDate({ columnId, label, value, texts, onChange }:
             type="button"
             variant="outline"
             size="sm"
-            className={TOUCH_TARGET}
+            touch
             data-testid="data-table-date-last-month"
             onClick={() => applyShortcut('lastMonth')}
           >
@@ -188,21 +174,14 @@ export function DataTableFilterDate({ columnId, label, value, texts, onChange }:
             type="button"
             variant="outline"
             size="sm"
-            className={TOUCH_TARGET}
+            touch
             data-testid="data-table-date-last-year"
             onClick={() => applyShortcut('lastYear')}
           >
             {texts.lastYear}
           </Button>
         </div>
-
-        <Calendar
-          mode="range"
-          numberOfMonths={numberOfMonths}
-          selected={selectedRange}
-          onSelect={(range) => onChange(toFilterValue(range))}
-        />
-      </PopoverContent>
-    </Popover>
+      }
+    />
   );
 }

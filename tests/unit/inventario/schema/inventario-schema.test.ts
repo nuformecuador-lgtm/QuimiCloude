@@ -853,6 +853,8 @@ const PRODUCT_BATCH_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['updatedBy', 'updated_by'],
   // Contenido con el que se contaron los envases del lote; solo en lotes de producto terminado.
   ['packageContent', 'package_content'],
+  // 2026-10-09 (QC-219, R23/R24): dia de produccion, anulable; lo escribe el acondicionamiento.
+  ['productionDate', 'production_date'],
 ]
 
 describe('QC-80 R25/R28 — la presentacion sigue viviendo solo en product_batches', () => {
@@ -1056,5 +1058,16 @@ describe('QC-80 R25/R28 — la presentacion sigue viviendo solo en product_batch
         /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/,
       )
     }
+  })
+})
+
+describe('QC-219 R23/R24 — el dia de produccion vive en el lote del inventario', () => {
+  it('R23, R24: ProductBatch.productionDate es una fecha civil anulable, sin default', () => {
+    const productionDate = field(productBatch, 'productionDate')
+    expect(productionDate.type).toBe('DateTime')
+    expect(productionDate.isOptional, 'production_date nace anulable (R24)').toBe(true)
+    expect(productionDate.attributes).toContain('@map("production_date")')
+    expect(productionDate.attributes).toContain('@db.Date')
+    expect(productionDate.attributes).not.toMatch(/@default\(/)
   })
 })

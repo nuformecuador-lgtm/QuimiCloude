@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -28,10 +28,10 @@ import { BatchHistory } from './batch-history';
 import { productUnitLabel } from './product-columns';
 import { ProductBatchesPanel } from './product-batches-panel';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 type BatchesLoadState =
   | { readonly status: 'idle' }
+  /** Abierto desde fuera: la peticion sale en el efecto, justo despues de pintar. */
+  | { readonly status: 'queued' }
   | { readonly status: 'loading' }
   | { readonly status: 'success'; readonly data: readonly ProductBatchView[] }
   | ErrorState;
@@ -43,53 +43,77 @@ export type ProductBatchesSheetProps = {
   readonly canAdjust: boolean;
   /** Que lotes se piden. Sin el, todos los del producto. */
   readonly loadBatches?: () => Promise<ProductBatchesResult>;
+  /** Apertura controlada desde fuera. Ausente = el panel trae su propio disparador. */
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 };
 
 /**
  * Panel lateral con los lotes de un producto. Pide los lotes al abrirse por primera vez y
  * los vuelve a pedir tras un ajuste, para que la existencia nueva se vea.
+ *
+ * Sin `open` trae su propio disparador; con `open` lo abre quien lo monta (el menu de la fila) y
+ * no pinta disparador.
  */
 export function ProductBatchesSheet({
   product,
   units,
   canAdjust,
   loadBatches,
+  open,
+  onOpenChange,
 }: ProductBatchesSheetProps) {
   const [state, setState] = useState<BatchesLoadState>({ status: 'idle' });
   const displayName = productDisplayName(product.name, productUnitLabel(product, units));
 
-  function fetchBatches() {
-    setState({ status: 'loading' });
+  function requestBatches() {
     const request = loadBatches ? loadBatches() : listProductBatchesAction(product.id);
     void request.then((result) => {
       setState(result.status === 'success' ? { status: 'success', data: result.data } : result);
     });
   }
 
-  function handleOpenChange(open: boolean) {
-    if (open && state.status === 'idle') fetchBatches();
+  function fetchBatches() {
+    setState({ status: 'loading' });
+    requestBatches();
+  }
+
+  // Con apertura controlada no pasa por `handleOpenChange`: la primera apertura se detecta aqui.
+  if (open === true && state.status === 'idle') setState({ status: 'queued' });
+
+  const sendQueuedRequest = useEffectEvent(requestBatches);
+
+  useEffect(() => {
+    if (state.status === 'queued') sendQueuedRequest();
+  }, [state.status]);
+
+  function handleOpenChange(next: boolean) {
+    if (next && state.status === 'idle') fetchBatches();
+    onOpenChange?.(next);
   }
 
   return (
-    <Sheet onOpenChange={handleOpenChange}>
-      <SheetTrigger
-        render={
-          <Button
-            variant="ghost"
-            className={TOUCH_TARGET}
-            aria-label={`Lotes de ${displayName}`}
-            data-testid="product-batches-open"
-          />
-        }
-      >
-        Lotes
-      </SheetTrigger>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
+      {open === undefined ? (
+        <SheetTrigger
+          render={
+            <Button
+              variant="ghost"
+              touch
+              aria-label={`Lotes de ${displayName}`}
+              data-testid="product-batches-open"
+            />
+          }
+        >
+          Lotes
+        </SheetTrigger>
+      ) : null}
       <SheetContent data-testid="product-batches-sheet">
         <SheetHeader>
           <SheetTitle>{displayName}</SheetTitle>
         </SheetHeader>
 
-        {state.status === 'loading' ? (
+        {state.status === 'loading' || state.status === 'queued' ? (
           <p data-testid="product-batches-loading">Cargando lotes…</p>
         ) : null}
 

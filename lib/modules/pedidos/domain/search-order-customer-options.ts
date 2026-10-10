@@ -6,6 +6,7 @@ import { toOrderCustomer, type OrderCustomer, type OrderCustomerSearchPurpose } 
 import type { Page } from './page';
 
 import type { CustomerCatalog } from '@/lib/modules/clientes';
+import type { PermissionCode } from '@/lib/modules/identity';
 
 export type SearchOrderCustomersDeps = {
   readonly customerCatalog: Pick<CustomerCatalog, 'searchRefs'>;
@@ -20,13 +21,19 @@ const searchOrderCustomersSchema = z.strictObject({
   pageSize: z.number().int().min(1).optional(),
 });
 
-const purposeSchema = z.enum(['assign', 'filter']);
+const purposeSchema = z.enum(['assign', 'filter', 'deliver']);
+
+function permissionFor(purpose: OrderCustomerSearchPurpose): PermissionCode {
+  if (purpose === 'filter') return 'pedidos.consultar';
+  if (purpose === 'deliver') return 'entregas.modificar';
+  return 'pedidos.modificar';
+}
 
 /**
- * Opciones del autocompletado de cliente. Asignar pide `pedidos.modificar` y solo ofrece clientes
- * vivos; filtrar pide `pedidos.consultar` y ofrece tambien los dados de baja, porque un pedido
- * puede seguir apuntando a uno. Un `purpose` desconocido exige el permiso mas fuerte antes de
- * rechazarse.
+ * Opciones del autocompletado de cliente. Asignar pide `pedidos.modificar` y entregar
+ * `entregas.modificar`, y los dos solo ofrecen clientes vivos; filtrar pide `pedidos.consultar` y
+ * ofrece tambien los dados de baja, porque un pedido puede seguir apuntando a uno. Un `purpose`
+ * desconocido exige `pedidos.modificar` antes de rechazarse.
  */
 export function createSearchOrderCustomers(
   deps: SearchOrderCustomersDeps,
@@ -36,7 +43,7 @@ export function createSearchOrderCustomers(
   actor: Actor | null | undefined,
 ) => Promise<Page<OrderCustomer>> {
   return async function searchOrderCustomers(input, purpose, actor) {
-    requirePermission(actor, purpose === 'filter' ? 'pedidos.consultar' : 'pedidos.modificar');
+    requirePermission(actor, permissionFor(purpose));
 
     const parsedPurpose = purposeSchema.safeParse(purpose);
     const parsed = searchOrderCustomersSchema.safeParse(input);

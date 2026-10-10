@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useId, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -22,6 +22,7 @@ import {
   setOrderCustomerAction,
   type OrderMutationFormState,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { orderCustomerChoiceId, type OrderCustomerChoice } from './order-customer-label';
 import { OrderCustomerPicker } from './order-customer-picker';
@@ -32,7 +33,7 @@ export const ORDER_CUSTOMER_DIALOG_REMOVE_TESTID = 'order-customer-dialog-remove
 export const ORDER_CUSTOMER_DIALOG_DISMISS_TESTID = 'order-customer-dialog-dismiss';
 export const ORDER_CUSTOMER_DIALOG_ERROR_TESTID = 'order-customer-dialog-error';
 
-export const ORDER_CUSTOMER_DIALOG_TOUCH_TARGET = 'min-h-11 min-w-11';
+export const ORDER_CUSTOMER_DIALOG_TOUCH_TARGET = touchTarget;
 
 const LABELS = {
   title: 'Cliente',
@@ -130,18 +131,12 @@ export function OrderCustomerDialog({ order, open, onOpenChange }: OrderCustomer
           </div>
 
           {error === null ? null : (
-            <div
-              role="alert"
+            <ErrorAlert
+              error={error}
               className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-              data-testid={ORDER_CUSTOMER_DIALOG_ERROR_TESTID}
-              data-code={error.code}
-            >
-              {error.code === UNEXPECTED_ERROR_CODE ? (
-                <UnexpectedErrorNotice state={error} />
-              ) : (
-                <p>{error.message}</p>
-              )}
-            </div>
+              testId={ORDER_CUSTOMER_DIALOG_ERROR_TESTID}
+              withDataCode
+            />
           )}
 
           <DialogFooter className="pb-[max(1rem,env(safe-area-inset-bottom))]">
@@ -150,7 +145,7 @@ export function OrderCustomerDialog({ order, open, onOpenChange }: OrderCustomer
                 <Button
                   type="button"
                   variant="outline"
-                  className={ORDER_CUSTOMER_DIALOG_TOUCH_TARGET}
+                  className={touchTarget}
                   data-testid={ORDER_CUSTOMER_DIALOG_DISMISS_TESTID}
                 />
               }
@@ -160,7 +155,7 @@ export function OrderCustomerDialog({ order, open, onOpenChange }: OrderCustomer
             <Button
               type="button"
               variant="outline"
-              className={ORDER_CUSTOMER_DIALOG_TOUCH_TARGET}
+              className={touchTarget}
               disabled={isPending || order.customer === null}
               onClick={() => send(null)}
               data-testid={ORDER_CUSTOMER_DIALOG_REMOVE_TESTID}
@@ -169,7 +164,7 @@ export function OrderCustomerDialog({ order, open, onOpenChange }: OrderCustomer
             </Button>
             <Button
               type="submit"
-              className={ORDER_CUSTOMER_DIALOG_TOUCH_TARGET}
+              className={touchTarget}
               disabled={isPending}
               data-testid={ORDER_CUSTOMER_DIALOG_SUBMIT_TESTID}
             >

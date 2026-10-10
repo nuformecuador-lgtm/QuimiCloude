@@ -79,6 +79,14 @@ export const ERROR_MESSAGE_KEY = {
   order_unit_not_convertible: 'errors.order_unit_not_convertible',
   batch_stock_changed: 'errors.batch_stock_changed',
   adjustment_reason_not_allowed: 'errors.adjustment_reason_not_allowed',
+  conditioning_team_member_not_allowed: 'errors.conditioning_team_member_not_allowed',
+  conditioning_team_empty: 'errors.conditioning_team_empty',
+  batch_expiry_not_future: 'errors.batch_expiry_not_future',
+  batch_production_date_future: 'errors.batch_production_date_future',
+  conditioning_batch_data_missing: 'errors.conditioning_batch_data_missing',
+  delivery_exceeds_remaining: 'errors.delivery_exceeds_remaining',
+  delivery_batch_insufficient: 'errors.delivery_batch_insufficient',
+  integration_secret_unreadable: 'errors.integration_secret_unreadable',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -201,4 +209,16 @@ export const ERROR_MESSAGES_ES = {
     'La existencia del lote cambio mientras ajustabas: revisa la diferencia y confirma de nuevo.',
   'errors.adjustment_reason_not_allowed':
     'Un aumento de existencia solo admite los motivos conteo fisico o error de carga.',
+  'errors.conditioning_team_member_not_allowed':
+    'Esta persona no puede formar parte del equipo de acondicionamiento.',
+  'errors.conditioning_team_empty': 'El equipo de acondicionamiento necesita al menos una persona.',
+  'errors.batch_expiry_not_future': 'La fecha de vencimiento debe ser posterior a hoy.',
+  'errors.batch_production_date_future': 'El dia de produccion no puede ser posterior a hoy.',
+  'errors.conditioning_batch_data_missing': 'Faltan datos de lote en alguna linea del pedido.',
+  'errors.delivery_exceeds_remaining':
+    'La entrega supera los envases que faltan por entregar en alguna presentacion.',
+  'errors.delivery_batch_insufficient':
+    'Algun lote ya no tiene los envases elegidos: revisa los lotes y confirma de nuevo.',
+  'errors.integration_secret_unreadable':
+    'No se pudo leer una credencial guardada de la integración. Vuelve a escribirla.',
 } as const satisfies Record<ErrorMessageKey, string>;

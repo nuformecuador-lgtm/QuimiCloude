@@ -2,8 +2,7 @@
 
 import { useId } from 'react';
 
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { TextField } from '@/components/shared/text-field';
 import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 
 /**
@@ -40,20 +39,7 @@ import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
  * prohibe. Quien valida es `createOrderSchema`/`updateOrderSchema`, en el cliente y en el
  * servidor. `min` SI se declara -es del navegador, no una copia de la regex- para que el control
  * numerico no ofrezca negativos ni cero; la validacion real sigue siendo la del esquema.
- *
- * **`key={defaultValue}`** por lo mismo que en `supplier-field.tsx` y `product-field.tsx`: Base UI
- * avisa cuando el `defaultValue` de un campo no controlado cambia despues de montarse, y la clave
- * fuerza un remontaje justo en ese salto. El campo sigue sin estar controlado.
- *
- * **Fuente de 16 px y alto de 44 px en todos los anchos** (R45): por debajo de 16 px Safari en
- * iOS hace zoom sobre el campo al enfocarlo y el usuario acaba con la pantalla desencuadrada.
  */
-
-/** Objetivo tactil minimo (44x44 px) de R45. */
-const TOUCH_TARGET = 'min-h-11';
-
-/** 16 px en TODOS los anchos: el primitivo baja a 14 px en `md` y R45 no distingue por ancho. */
-const FIELD_TEXT = 'text-base md:text-base';
 
 /**
  * Redondea UN DECIMAL TEXTO a `decimals` lugares y afeita los ceros finales: «25.0», «25.00» y
@@ -123,49 +109,35 @@ export function OrderField({
 }: OrderFieldProps) {
   const fieldId = useId();
   const inputId = `${fieldId}-${name}`;
-  const errorId = `${inputId}-error`;
 
   return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={inputId}>{label}</Label>
-
-      <Input
-        key={defaultValue}
-        id={inputId}
-        name={name}
-        type={type}
-        step={type === 'number' ? step : undefined}
-        min={type === 'number' ? min : undefined}
-        inputMode={inputMode}
-        autoComplete="off"
-        required={required}
-        defaultValue={defaultValue}
-        onChange={
-          onValueChange === undefined
-            ? undefined
-            : (event) => onValueChange(event.currentTarget.value)
-        }
-        onBlur={
-          roundDecimals === undefined
-            ? undefined
-            : (event) => {
-                const rounded = roundDecimalText(event.currentTarget.value ?? '', roundDecimals);
-                if (rounded === event.currentTarget.value) return;
-                event.currentTarget.value = rounded;
-                onValueChange?.(rounded);
-              }
-        }
-        className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
-        aria-invalid={error === undefined ? undefined : true}
-        aria-describedby={error === undefined ? undefined : errorId}
-        data-testid={`order-field-${name}`}
-      />
-
-      {error === undefined ? null : (
-        <p id={errorId} className="text-sm text-destructive" data-testid={`order-error-${name}`}>
-          {error}
-        </p>
-      )}
-    </div>
+    <TextField
+      id={inputId}
+      name={name}
+      label={label}
+      type={type}
+      step={type === 'number' ? step : undefined}
+      min={type === 'number' ? min : undefined}
+      inputMode={inputMode}
+      autoComplete="off"
+      required={required}
+      defaultValue={defaultValue}
+      remountOnDefault
+      onValueChange={onValueChange}
+      onBlur={
+        roundDecimals === undefined
+          ? undefined
+          : (event) => {
+              const rounded = roundDecimalText(event.currentTarget.value ?? '', roundDecimals);
+              if (rounded === event.currentTarget.value) return;
+              event.currentTarget.value = rounded;
+              onValueChange?.(rounded);
+            }
+      }
+      error={error}
+      testId={`order-field-${name}`}
+      errorTestId={`order-error-${name}`}
+      errorAlert={false}
+    />
   );
 }

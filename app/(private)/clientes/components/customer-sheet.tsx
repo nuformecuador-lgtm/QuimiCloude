@@ -1,12 +1,10 @@
 'use client';
 
 import { PlusIcon } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
-import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
+import { useEntitySheet } from '@/hooks/use-entity-sheet';
 import type { CustomerView } from '@/lib/modules/clientes';
 
 import { CustomerForm } from './customer-form';
@@ -37,8 +35,6 @@ export const CUSTOMER_CREATE_OPEN_TESTID = 'customer-create-open';
  */
 export { CUSTOMER_SHEET_TESTID } from './customer-form';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 const CREATE_LABEL = 'Nuevo cliente';
 const CREATE_SUCCESS = 'Cliente creado.';
 const UPDATE_SUCCESS = 'Cliente actualizado.';
@@ -52,25 +48,12 @@ export type CustomerSheetProps = {
 };
 
 export function CustomerSheet({ customer, open, onOpenChange }: CustomerSheetProps) {
-  const [selfOpen, setSelfOpen] = useState(false);
-  const router = useRouter();
   const isEdit = customer !== undefined;
-  const isControlled = open !== undefined;
-  const isOpen = open ?? selfOpen;
-
-  const changeOpen = useCallback(
-    (next: boolean) => {
-      if (!isControlled) setSelfOpen(next);
-      onOpenChange?.(next);
-    },
-    [isControlled, onOpenChange],
-  );
-
-  const handleSaved = useCallback(() => {
-    changeOpen(false);
-    toast.success(isEdit ? UPDATE_SUCCESS : CREATE_SUCCESS);
-    router.refresh();
-  }, [changeOpen, isEdit, router]);
+  const { isOpen, isControlled, changeOpen, handleSaved } = useEntitySheet({
+    open,
+    onOpenChange,
+    successMessage: isEdit ? UPDATE_SUCCESS : CREATE_SUCCESS,
+  });
 
   return (
     <Sheet open={isOpen} onOpenChange={changeOpen}>
@@ -79,7 +62,7 @@ export function CustomerSheet({ customer, open, onOpenChange }: CustomerSheetPro
           render={
             <Button
               variant="default"
-              className={TOUCH_TARGET}
+              touch
               data-testid={CUSTOMER_CREATE_OPEN_TESTID}
             />
           }

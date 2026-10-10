@@ -1,5 +1,9 @@
 import type { ReactNode } from 'react';
 
+import type { EmptyStateProps } from '@/components/shared/empty-state';
+import type { ErrorStateProps } from '@/components/shared/error-state';
+import type { TableSkeletonProps } from '@/components/shared/table-skeleton';
+
 /**
  * Tipos del contrato de `components/shared/data-table` (`design.md > 3`, T3).
  *
@@ -94,6 +98,8 @@ export type DataTableColumn<TRow> = {
    * (`whitespace-normal` + `break-words`), util junto a `width`.
    */
   readonly hideText?: boolean;
+  /** Celda de lote, cantidad o fecha: Plex Mono con cifras tabulares. Solo el cuerpo. */
+  readonly tabular?: boolean;
 };
 
 /**
@@ -159,6 +165,25 @@ export type DataTableTexts = {
 };
 
 /**
+ * Las piezas compartidas que sustituyen a TODA la tabla, barras incluidas, en cada estado.
+ * Cada clave es opcional: la que falta deja ese estado con el render interno de la tabla.
+ *
+ * `error` reutiliza `ErrorStateProps` tal cual: sus props de reintento son una union, y un `Omit`
+ * la aplanaria.
+ */
+export type DataTableStates = {
+  readonly loading?: TableSkeletonProps;
+  readonly error?: ErrorStateProps;
+  /**
+   * Se pinta siempre que no haya filas, y se lleva las barras: la tabla no distingue «vacio» de
+   * «sin resultados». Pasalo sin busqueda ni filtro activos, o tambien con busqueda en la lista
+   * cuyo vacio propio ya cubria el «sin resultados». Sin la clave, sale el vacio interno de la
+   * tabla, con sus barras.
+   */
+  readonly empty?: EmptyStateProps;
+};
+
+/**
  * Props del componente compuesto (`design.md > 3.3`). `status` es un estado unico de tres
  * valores, no tres booleanos: R21 exige que los tres estados sean mutuamente excluyentes, y esa
  * exclusividad la fija el tipo, no una cadena de `if`.
@@ -191,4 +216,6 @@ export type DataTableProps<TRow> = {
    * una cadena.
    */
   readonly searchable?: boolean;
+  /** Ausente = los estados internos de siempre, para que ningun consumidor existente cambie. */
+  readonly states?: DataTableStates;
 };

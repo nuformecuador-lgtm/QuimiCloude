@@ -5,120 +5,97 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { Button } from '@/components/ui/button';
 import {
   deleteProductAction,
   type ProductMutationFormState,
 } from '@/lib/modules/inventario/adapters/driving/product-actions';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import type { ProductView } from '@/lib/modules/inventario';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 const DELETE_SUCCESS = 'Producto borrado.';
 
 const INITIAL_STATE: ProductMutationFormState = { status: 'idle' };
 
 /**
- * Confirmacion de borrado (R26, R21, `design.md > 6`).
+ * Confirmacion de borrado de un producto. Nombra el producto y dice que no se puede deshacer: el
+ * borrado es logico, pero no hay forma de restaurarlo.
  *
- * **El dialogo NOMBRA el producto** y dice que la accion no se puede deshacer. En base el borrado
- * es logico (`deletedAt`), pero el backend **no expone ninguna forma de restaurar**: para quien lo
- * usa es irreversible, y se le dice asi en vez de prometerle una vuelta atras que no existe.
+ * Con error el dialogo sigue abierto con el mensaje a la vista: cerrarlo haria creer que se borro.
  *
- * **Sin confirmar no se invoca nada**: la operacion sale del `submit` del formulario del dialogo,
- * que solo existe dentro del contenido y solo se envia al pulsar el boton de confirmar. El `id`
- * viaja en un campo oculto, que es la forma que `deleteProductAction` espera.
- *
- * Con exito se cierra, se avisa por toast y se refresca la lista (R21). Con error el dialogo
- * **sigue abierto** con el mensaje a la vista: cerrarlo dejaria al usuario creyendo que se borro.
+ * Sin `open` trae su propio disparador; con `open` lo abre quien lo monta (el menu de la fila) y
+ * no pinta disparador.
  */
-export function DeleteProductDialog({ product }: { readonly product: ProductView }) {
-  const [requestedOpen, setRequestedOpen] = useState(false);
+export function DeleteProductDialog({
+  product,
+  open: controlledOpen,
+  onOpenChange,
+}: {
+  readonly product: ProductView;
+  /** Apertura controlada desde fuera. Ausente = el dialogo trae su propio disparador. */
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
+}) {
+  const [selfOpen, setSelfOpen] = useState(false);
   const router = useRouter();
   const [state, formAction] = useActionState(deleteProductAction, INITIAL_STATE);
+  const isControlled = controlledOpen !== undefined;
+  const requestedOpen = controlledOpen ?? selfOpen;
 
-  /*
-    El dialogo abierto se DERIVA de dos cosas: lo que pidio el usuario y el resultado de la
-    operacion. Un borrado con exito lo cierra sin necesidad de un `setState` dentro de un efecto
-    -que es lo que `react-hooks/set-state-in-effect` prohibe, y con razon: es un render de mas y
-    una via facil para un bucle-.
-  */
+  // Derivado y no un `setState` en el efecto, que `react-hooks/set-state-in-effect` prohibe.
   const open = requestedOpen && state.status !== 'success';
 
   useEffect(() => {
     if (state.status !== 'success') return;
+    onOpenChange?.(false);
     toast.success(DELETE_SUCCESS);
     router.refresh();
-  }, [state, router]);
+  }, [state, onOpenChange, router]);
+
+  function changeOpen(next: boolean) {
+    if (!isControlled) setSelfOpen(next);
+    onOpenChange?.(next);
+  }
 
   return (
-    <AlertDialog open={open} onOpenChange={(next) => setRequestedOpen(next)}>
-      <AlertDialogTrigger
-        render={
-          <Button
-            variant="ghost"
-            className={TOUCH_TARGET}
-            aria-label={`Borrar ${product.name}`}
-            data-testid="product-delete-open"
-          />
-        }
-      >
-        <Trash2Icon />
-      </AlertDialogTrigger>
-      <AlertDialogContent data-testid="delete-product-dialog">
-        <AlertDialogHeader>
-          <AlertDialogTitle>Borrar producto</AlertDialogTitle>
-          <AlertDialogDescription data-testid="delete-product-message">
-            Se va a borrar «{product.name}». Esta acción no se puede deshacer.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        {/*
-          QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
-          identificador de la peticion -y necesita un contenedor de bloque, de ahi el `div`-. El
-          CATALOGADO se pinta exactamente como siempre: mismo `<p>`, mismo `data-testid`, sin
-          identificador ninguno.
-        */}
-        {state.status !== 'error' ? null : state.code === UNEXPECTED_ERROR_CODE ? (
-          <div role="alert" className="text-sm text-destructive" data-testid="delete-product-error">
-            <UnexpectedErrorNotice state={state} />
-          </div>
-        ) : (
-          <p role="alert" className="text-sm text-destructive" data-testid="delete-product-error">
-            {state.message}
-          </p>
-        )}
-
-        <form action={formAction}>
-          <input type="hidden" name="id" defaultValue={product.id} data-testid="delete-product-id" />
-          <AlertDialogFooter>
-            <AlertDialogCancel className={TOUCH_TARGET} data-testid="delete-product-cancel">
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              type="submit"
-              variant="destructive"
-              className={TOUCH_TARGET}
-              data-testid="delete-product-confirm"
-            >
-              Borrar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </form>
-      </AlertDialogContent>
-    </AlertDialog>
+    <DeleteConfirmDialog
+      open={open}
+      onOpenChange={changeOpen}
+      trigger={
+        isControlled
+          ? undefined
+          : {
+              render: (
+                <Button
+                  variant="ghost"
+                  touch
+                  aria-label={`Borrar ${product.name}`}
+                  data-testid="product-delete-open"
+                />
+              ),
+              children: <Trash2Icon />,
+            }
+      }
+      texts={{
+        title: 'Borrar producto',
+        description: <>Se va a borrar «{product.name}». Esta acción no se puede deshacer.</>,
+        dismiss: 'Cancelar',
+        confirm: 'Borrar',
+      }}
+      testIds={{
+        dialog: 'delete-product-dialog',
+        message: 'delete-product-message',
+        dismiss: 'delete-product-cancel',
+        confirm: 'delete-product-confirm',
+        error: 'delete-product-error',
+      }}
+      submit={{
+        kind: 'action',
+        action: formAction,
+        hidden: [{ name: 'id', value: product.id, testId: 'delete-product-id' }],
+      }}
+      error={state.status === 'error' ? state : undefined}
+      errorStyle="inline"
+    />
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import type { DataTableColumn } from '@/components/shared/data-table';
+import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
 import type { PresentationView } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { trimDecimal } from '@/lib/shared/ui/decimal-display';
@@ -16,10 +16,8 @@ import { PresentationRowActions } from './presentation-row-actions';
  * frontera servidor->cliente. Por eso `PresentationListSection` (servidor) baja solo datos
  * serializables y es `presentation-table.tsx` quien monta `<DataTable>`.
  *
- * **La columna de acciones es una columna NORMAL** (alternativa descartada: una prop
- * `renderRowActions` en el componente compartido, que seria una segunda manera de hacer lo que
- * `cell` ya hace y obligaria a abrir `components/shared/data-table/`). `DataTableColumn.cell` ya
- * devuelve `ReactNode` y `DataTable` lo pinta directamente.
+ * **La columna de acciones se declara con `actionsColumn()`**, la de todas las tablas: su celda
+ * devuelve el menu de la fila como `ReactNode` y `DataTable` lo pinta directamente.
  *
  * Aqui **no** se pinta el identificador tecnico, ni `nameNormalized` —lo deriva el dominio—, ni
  * `createdAt`/`updatedAt`, ni autoria.
@@ -91,19 +89,17 @@ export function buildPresentationColumns(
     {
       id: CONTENT_COLUMN_ID,
       label: 'Contenido',
+      tabular: true,
       align: 'end',
       // No ordena ni filtra: no esta en la lista blanca del catalogo para ninguna de las dos cosas.
       pinnable: false,
       cell: (presentation) => contentCell(presentation, units),
     },
-    {
+    // No ordena, no filtra y no se puede fijar: asi no tapa la columna del nombre.
+    actionsColumn({
       id: ACTIONS_COLUMN_ID,
       label: 'Acciones',
-      align: 'end',
-      // Sin `sortable` (no ordena) y sin `filter` (no aparece en la barra de filtros).
-      // `pinnable: false` para que el usuario no pueda fijarla y tapar la del nombre.
-      pinnable: false,
       cell: (presentation) => <PresentationRowActions presentation={presentation} units={units} />,
-    },
+    }),
   ];
 }

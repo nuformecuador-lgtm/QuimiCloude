@@ -90,7 +90,9 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { CUSTOMERS_ROUTE } from '@/lib/shared/routes';
 
 // La entrada y su aterrizaje, derivado de los permisos del usuario en la base.
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
+import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc155_e2e_';
@@ -127,6 +129,7 @@ const SEARCH_BOX_TESTID = 'data-table-search';
 const NO_MATCHES_TESTID = 'customer-list-no-matches';
 const LAST_NAMES_CELL_TESTID = 'data-table-cell-lastNames';
 const CITY_CELL_TESTID = 'data-table-cell-city';
+const ROW_ACTIONS_TESTID = 'customer-row-actions';
 const ACTION_EDIT_TESTID = 'customer-action-edit';
 const ACTION_DELETE_TESTID = 'customer-action-delete';
 const DELETE_DIALOG_TESTID = 'delete-customer-dialog';
@@ -192,7 +195,7 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
 
   // Hash REAL: el objetivo es que bcrypt, el adaptador Prisma y la Server Action de login se
   // entiendan de verdad. Un hash inventado probaria otra cosa.
-  await prisma.user.create({
+  await createFixtureUser({
     data: {
       firstNames: `Qc155${RUN_ID.slice(0, 8)}`,
       lastNames: 'Clientes',
@@ -367,7 +370,9 @@ test.describe('pantalla de clientes', () => {
 
     // --- 10. Editar: precarga los seis valores actuales, aqui se cambia SOLO la ciudad y
     // se envia el reemplazo completo.
-    await rowLocator.getByTestId(ACTION_EDIT_TESTID).click();
+    await (
+      await openRowActionsMenuItem(page, rowLocator.getByTestId(ROW_ACTIONS_TESTID), ACTION_EDIT_TESTID)
+    ).click();
     await expect(page.getByTestId(SHEET_TESTID)).toBeVisible({ timeout: 60_000 });
     await page.getByTestId(FIELD_CITY_TESTID).fill(CIUDAD_EDITADA);
     await page.getByTestId(FORM_SUBMIT_TESTID).click();
@@ -380,7 +385,9 @@ test.describe('pantalla de clientes', () => {
     });
 
     // --- 12. Dar de baja: el dialogo NOMBRA al cliente por su nombre completo.
-    await rowLocator.getByTestId(ACTION_DELETE_TESTID).click();
+    await (
+      await openRowActionsMenuItem(page, rowLocator.getByTestId(ROW_ACTIONS_TESTID), ACTION_DELETE_TESTID)
+    ).click();
     await expect(page.getByTestId(DELETE_DIALOG_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(DELETE_MESSAGE_TESTID)).toContainText(
       `${nuevoCliente.firstNames} ${nuevoCliente.lastNames}`,

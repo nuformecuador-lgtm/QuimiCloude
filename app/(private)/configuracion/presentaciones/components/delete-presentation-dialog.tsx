@@ -4,18 +4,9 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode } from '@/lib/modules/errores';
+import { ConfirmDialogFrame } from '@/components/shared/confirm-dialog';
+import { DeleteConfirmDialogBody } from '@/components/shared/delete-confirm-dialog';
+import type { ErrorCode } from '@/lib/modules/errores';
 import type { PresentationView } from '@/lib/modules/inventario';
 import {
   deletePresentationAction,
@@ -44,7 +35,9 @@ import {
  * ya monta -**no se monta otro** (R26)- y `router.refresh()` con la MISMA URL, que conserva pagina,
  * orden y filtros.
  *
- * **Apertura CONTROLADA**: quien dispara es la fila. Aqui no hay disparador propio.
+ * **Apertura controlada**: quien dispara es la fila, que lo deja montado tras la primera apertura
+ * para que el cierre anime su salida. El cuerpo se monta solo mientras el popup esta abierto, asi
+ * que cada apertura arranca sin el rechazo de la anterior.
  */
 
 export const DELETE_PRESENTATION_DIALOG_TESTID = 'delete-presentation-dialog';
@@ -71,11 +64,7 @@ export const DELETE_PRESENTATION_ID_FIELD = 'id';
 // tipo ancho arrastraria el codigo generico, que desde esta ficha exige `reference`.
 export const PRESENTATION_IN_USE_CODE = 'presentation_in_use' satisfies ErrorCode;
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 const TITLE = 'Eliminar la presentación';
-const CONFIRM_LABEL = 'Eliminar';
-const CONFIRM_PENDING_LABEL = 'Eliminando…';
 const DISMISS_LABEL = 'Volver';
 const DELETE_SUCCESS = 'Presentación eliminada.';
 
@@ -93,6 +82,22 @@ export function DeletePresentationDialog({
   open,
   onOpenChange,
 }: DeletePresentationDialogProps) {
+  return (
+    <ConfirmDialogFrame
+      open={open}
+      onOpenChange={onOpenChange}
+      testId={DELETE_PRESENTATION_DIALOG_TESTID}
+    >
+      <DeletePresentationDialogBody presentation={presentation} onOpenChange={onOpenChange} />
+    </ConfirmDialogFrame>
+  );
+}
+
+/** Se monta con el popup: cada apertura arranca sin el rechazo de la anterior. */
+function DeletePresentationDialogBody({
+  presentation,
+  onOpenChange,
+}: Omit<DeletePresentationDialogProps, 'open'>) {
   const fieldId = useId();
   const errorId = `${fieldId}-error`;
   const router = useRouter();
@@ -100,7 +105,7 @@ export function DeletePresentationDialog({
 
   useEffect(() => {
     if (state.status !== 'success') return;
-    // R25, en este orden: cerrar, avisar y poner la lista al dia sin recargar la pantalla.
+    // En este orden: cerrar, avisar y poner la lista al dia sin recargar la pantalla.
     onOpenChange(false);
     toast.success(DELETE_SUCCESS);
     router.refresh();
@@ -109,63 +114,39 @@ export function DeletePresentationDialog({
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent data-testid={DELETE_PRESENTATION_DIALOG_TESTID}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{TITLE}</AlertDialogTitle>
-          <AlertDialogDescription data-testid={DELETE_PRESENTATION_MESSAGE_TESTID}>
+    <DeleteConfirmDialogBody
+      onOpenChange={onOpenChange}
+      texts={{
+        title: TITLE,
+        description: (
+          <>
             Se va a eliminar la presentación {presentation.name}. Esta acción no se puede deshacer.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        {error === undefined ? null : (
-          <div
-            role="alert"
-            id={errorId}
-            className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={DELETE_PRESENTATION_ERROR_TESTID}
-            data-code={error.code}
-          >
-            {/*
-              QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
-              identificador de la peticion. El CATALOGADO -`presentation_in_use` entre otros- se
-              pinta como siempre y sin identificador.
-            */}
-            {error.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={error} />
-            ) : (
-              <p data-testid={DELETE_PRESENTATION_ERROR_MESSAGE_TESTID}>{error.message}</p>
-            )}
-          </div>
-        )}
-
-        <form action={formAction} data-testid={DELETE_PRESENTATION_FORM_TESTID}>
-          <input
-            type="hidden"
-            name={DELETE_PRESENTATION_ID_FIELD}
-            defaultValue={presentation.id}
-            data-testid={DELETE_PRESENTATION_ID_TESTID}
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              className={TOUCH_TARGET}
-              data-testid={DELETE_PRESENTATION_DISMISS_TESTID}
-            >
-              {DISMISS_LABEL}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              type="submit"
-              variant="destructive"
-              className={TOUCH_TARGET}
-              disabled={isPending}
-              aria-busy={isPending}
-              data-testid={DELETE_PRESENTATION_CONFIRM_TESTID}
-            >
-              {isPending ? CONFIRM_PENDING_LABEL : CONFIRM_LABEL}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </form>
-      </AlertDialogContent>
-    </AlertDialog>
+          </>
+        ),
+        dismiss: DISMISS_LABEL,
+      }}
+      testIds={{
+        message: DELETE_PRESENTATION_MESSAGE_TESTID,
+        dismiss: DELETE_PRESENTATION_DISMISS_TESTID,
+        confirm: DELETE_PRESENTATION_CONFIRM_TESTID,
+        form: DELETE_PRESENTATION_FORM_TESTID,
+        error: DELETE_PRESENTATION_ERROR_TESTID,
+        errorMessage: DELETE_PRESENTATION_ERROR_MESSAGE_TESTID,
+      }}
+      submit={{
+        kind: 'action',
+        action: formAction,
+        hidden: [
+          {
+            name: DELETE_PRESENTATION_ID_FIELD,
+            value: presentation.id,
+            testId: DELETE_PRESENTATION_ID_TESTID,
+          },
+        ],
+      }}
+      isPending={isPending}
+      error={error}
+      errorId={errorId}
+    />
   );
 }

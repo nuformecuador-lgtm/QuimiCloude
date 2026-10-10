@@ -1,7 +1,7 @@
 import { SupplierSheet } from '@/components/shared/supplier';
 import type { SupplierView } from '@/lib/modules/proveedores';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
-import { EMPTY_CELL } from './catalog-columns';
 import { DeleteSupplierDialog } from './delete-supplier-dialog';
 
 /**
@@ -27,11 +27,11 @@ export function SupplierDetailHeader({ supplier }: { readonly supplier: Supplier
       <dl className="flex flex-wrap gap-x-8 gap-y-1 text-sm text-muted-foreground">
         <div className="flex gap-2">
           <dt>Teléfono</dt>
-          <dd data-testid="supplier-detail-phone">{supplier.phone ?? EMPTY_CELL}</dd>
+          <dd data-testid="supplier-detail-phone">{supplier.phone ?? EMPTY_MARK}</dd>
         </div>
         <div className="flex gap-2">
           <dt>Correo electrónico</dt>
-          <dd data-testid="supplier-detail-email">{supplier.email ?? EMPTY_CELL}</dd>
+          <dd data-testid="supplier-detail-email">{supplier.email ?? EMPTY_MARK}</dd>
         </div>
       </dl>
     </header>

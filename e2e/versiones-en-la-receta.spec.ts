@@ -18,7 +18,9 @@ import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { FORMULAS_ROUTE, newRecipeVersionRoute, recipeEditRoute } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
+import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 const FIXTURE_PREFIX = 'qc174_e2e_';
 
@@ -119,7 +121,7 @@ test.beforeAll(async () => {
   });
   companyId = company.id;
 
-  const admin = await prisma.user.create({
+  const admin = await createFixtureUser({
     data: {
       firstNames: `Qc174${RUN_ID.slice(0, 8)}`,
       lastNames: 'Versiones',
@@ -308,10 +310,12 @@ test.describe('versiones en la ficha de la receta', () => {
     await expect(page.getByTestId('recipes-title')).toBeVisible({ timeout: 60_000 });
     const table = page.getByTestId('recipe-table');
     await expect(table).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByTestId('recipe-edit-open')).toHaveCount(1);
-    await expect(page.getByTestId('recipe-edit-open')).toHaveAttribute(
-      'aria-label',
-      `Editar ${ORIGINAL_NAME}`,
+    const rowActions = page.getByTestId('recipe-row-actions');
+    await expect(rowActions).toHaveCount(1);
+    await expect(rowActions).toHaveAttribute('aria-label', `Acciones de ${ORIGINAL_NAME}`);
+    await expect(await openRowActionsMenuItem(page, rowActions, 'recipe-edit-open')).toHaveAttribute(
+      'href',
+      originalRoute,
     );
     await expect(table).not.toContainText(COPY_NAME);
     await expect(table).not.toContainText(CHANGED_NAME);

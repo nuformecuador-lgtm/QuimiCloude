@@ -11,7 +11,10 @@ evidencia) vive en `docs/verification.md` del proyecto.
 | --- | --- | --- |
 | Cerrar tanda, cerrar feature, antes de abrir el PR | `./init.sh` (rápido, el **default**) | local |
 | PR hacia la rama de integración (`ramas.integracion`, p. ej. `dev`) | `./init.sh --completo` | CI (`.github/workflows/gate.yml`), check `gate-completo` |
-| PR integración → producción (p. ej. `dev` → `main`, despliegue) | `./init.sh --completo` + E2E (Playwright) | CI, check `gate-completo` + E2E |
+| PR integración → producción (`ramas.produccion`, p. ej. `dev` → `main`, despliegue) | `./init.sh --completo` + E2E (Playwright) | CI, check `gate-completo` + E2E |
+
+- **Los nombres de rama salen de `arnes.config.json > ramas`.** `gate.yml` los lleva escritos
+  (GitHub no lee el JSON) y `./init.sh` falla si no coinciden (`scripts/check-perfil.mjs`).
 
 - **En local corre siempre el rápido**: typecheck + lint + los tests que el grafo de imports
   (`vitest related`) relaciona con tu diff + **todas** las guardias (~1 min).
@@ -30,6 +33,13 @@ evidencia) vive en `docs/verification.md` del proyecto.
 - Toda comprobación cuyo objeto **no se importa** (un censo en JSON, la configuración, un
   `.spec.ts`, el árbol de archivos) va en las guardias: fuera de ellas nadie la ejecutaría en
   modo rápido.
+- **Además de `guard`, el rápido corre siempre los patrones de `arnes.config.json > gate.siempre`**
+  (por defecto `["guard"]`). Ahí se declaran los tests del proyecto que recorren el árbol sin
+  llamarse `guard*`: contratos de módulo, de ruta… Cada patrón cuesta tiempo de gate: mídelo
+  antes de añadirlo.
+- `./init.sh` **avisa** (no falla) de los tests que recorren `app/`, `lib/` o `components/` y no
+  casan con ningún patrón (`scripts/tests-de-arbol.mjs`). Un test sale del aviso con
+  `// gate: related` y su motivo.
 
 ### Lo que `--rapido` NO cubre — no te engañes
 
@@ -82,6 +92,13 @@ importan lo que vigilan**: recorren el árbol de archivos (censo de tablas, colu
 módulos puros, emisores de una categoría). **Ningún grafo de imports las selecciona**, así que
 serían justo lo que se pierde. Cuestan ~8 s.
 
+**`gate.siempre`.** El 2026-10-08, QC-230 pasó `./init.sh` en verde y el CI completo salió rojo por
+tres `module-contract.test.ts`: recorren el árbol de código, no se llamaban `guard` y nadie los
+corría en modo rápido. En QuimiCloude, los cuatro patrones (`guard`, `module-contract`,
+`route-contract`, `scope.test`) suman unos 13 s. Ampliarlo a todo lo que recorre el árbol subía el
+rápido de ~35 s a ~145 s; por eso el resto solo **avisa**, y el número queda a la vista para la
+revisión del perfil.
+
 **Por qué el completo es un check de CI y no una disciplina.** La lección viene de dos PRs de un
 proyecto con este arnés: se mergeó mirando el estado del PR —que era un build y **no corría
 tests**— y entró un guard rojo en la rama de integración.
@@ -101,6 +118,9 @@ rojo que no estuviera ya en `tests/baseline-rojos.json`** (lo compara
 `scripts/comparar-baseline-rojos.mjs`).
 
 - **La comparación es por archivo, no por conteo.**
+- **El rápido aplica la misma regla** (`scripts/test-rapido.mjs`): lee el informe JSON de su
+  corrida y solo da por bueno un rojo si todos sus archivos rojos están en el baseline. No se
+  apoya en `--exclude`, porque `vitest related` lo ignora.
 - **Cada entrada del baseline necesita `motivo` y `desde`**; el comparador falla si faltan.
 - **Un archivo del baseline que ya pasa** genera aviso, no rojo, y **solo si esa corrida lo
   ejecutó**. Nunca se calcula como `baseline − rojos`.

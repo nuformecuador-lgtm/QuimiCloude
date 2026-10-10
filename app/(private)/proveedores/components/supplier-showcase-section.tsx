@@ -1,12 +1,12 @@
 import Link from 'next/link';
 
+import { EmptyState } from '@/components/shared/empty-state';
+import { ErrorState } from '@/components/shared/error-state';
 import { SupplierSheet } from '@/components/shared/supplier';
 import { buttonVariants } from '@/components/ui/button';
 import { listSupplierShowcaseAction } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
 import { cn } from '@/lib/utils';
 
-import { SupplierListEmpty } from './supplier-list-empty';
-import { SupplierListError } from './supplier-list-error';
 import { EMPTY_SHOWCASE_FILTERS, showcaseHref, type ShowcaseFilters } from './supplier-showcase-params';
 import { SupplierShowcaseList } from './supplier-showcase-list';
 
@@ -32,7 +32,17 @@ export async function SupplierShowcaseSection({ filters }: SupplierShowcaseSecti
   });
 
   if (result.status === 'error') {
-    return <SupplierListError error={result} />;
+    return (
+      <ErrorState
+        error={result}
+        title="No se pudo cargar la lista de proveedores."
+        testId="supplier-list-error"
+        messageTestId="supplier-list-error-message"
+        codeTestId="supplier-list-error-code"
+        retry={{ kind: 'refresh' }}
+        retryTestId="supplier-list-retry"
+      />
+    );
   }
 
   const { items, hasMore } = result.data;
@@ -40,9 +50,9 @@ export async function SupplierShowcaseSection({ filters }: SupplierShowcaseSecti
 
   if (items.length === 0 && !activo) {
     return (
-      <SupplierListEmpty>
+      <EmptyState testId="supplier-list-empty" message="Todavía no hay proveedores dados de alta.">
         <SupplierSheet />
-      </SupplierListEmpty>
+      </EmptyState>
     );
   }
 
@@ -59,7 +69,7 @@ export async function SupplierShowcaseSection({ filters }: SupplierShowcaseSecti
           href={showcaseHref(EMPTY_SHOWCASE_FILTERS)}
           data-slot="button"
           data-testid="supplier-showcase-clear-filters"
-          className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11 min-w-11')}
+          className={cn(buttonVariants({ variant: 'outline', touch: true }))}
         >
           Limpiar filtros
         </Link>

@@ -93,7 +93,9 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { USERS_ROUTE } from '@/lib/shared/routes';
 
 // QC-93: la entrada y su aterrizaje, derivado de los permisos del usuario en la base.
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
+import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc85_e2e_';
@@ -129,6 +131,7 @@ const GROUP_LIST_TESTID = 'work-group-list';
 const GROUP_LIST_EMPTY_TESTID = 'work-group-list-empty';
 const GROUP_CREATE_OPEN_TESTID = 'work-group-create-open';
 const GROUP_NAME_CELL_TESTID = 'data-table-cell-name';
+const GROUP_ROW_ACTIONS_TESTID = 'work-group-row-actions';
 const GROUP_ACTION_EDIT_TESTID = 'work-group-action-edit';
 const GROUP_ACTION_DELETE_TESTID = 'work-group-action-delete';
 
@@ -149,8 +152,9 @@ const MEMBER_ROW_TESTID = 'work-group-member-row';
 const MEMBER_NAME_TESTID = 'work-group-member-name';
 const MEMBER_REMOVE_TESTID = 'work-group-member-remove';
 const MEMBERS_POSITION_TESTID = 'work-group-members-position';
-const MEMBER_SEARCH_TESTID = 'work-group-member-search';
-const CANDIDATE_TESTID = 'work-group-candidate';
+/** El buscador y las filas del `DataTable` compartido que monta el selector de personas. */
+const PICKER_SEARCH_TESTID = 'data-table-search';
+const PICKER_ROW_SELECTOR = '[data-testid^="data-table-row-"]';
 const ADD_ERROR_TESTID = 'work-group-add-error';
 const REMOVE_ERROR_TESTID = 'work-group-remove-error';
 
@@ -218,7 +222,7 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
 
   // Hash REAL: el objetivo es que bcrypt, el adaptador Prisma y la Server Action de login se
   // entiendan de verdad. Un hash inventado probaria otra cosa.
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames: isMember ? memberFirstNames : `Qc85${RUN_ID.slice(0, 8)}`,
       lastNames: isMember ? memberLastNames : 'Fixture',
@@ -442,7 +446,13 @@ test.describe('pestana de grupos de trabajo', () => {
 
     // --- 5. RENOMBRARLO. La misma fila, su accion de abrir, y el panel llega precargado con el
     // nombre que la lista muestra (R20, R23).
-    await row.getByTestId(GROUP_ACTION_EDIT_TESTID).click();
+    await (
+      await openRowActionsMenuItem(
+        page,
+        row.getByTestId(GROUP_ROW_ACTIONS_TESTID),
+        GROUP_ACTION_EDIT_TESTID,
+      )
+    ).click();
     await expect(sheet).toBeVisible({ timeout: 60_000 });
     await expect(sheet).toHaveAttribute('data-mode', 'edit');
     await expect(sheet).toHaveAttribute('data-work-group-id', created.id);
@@ -469,7 +479,13 @@ test.describe('pestana de grupos de trabajo', () => {
     // --- 6. METER A UNA PERSONA. Se abre el panel otra vez sobre el grupo ya creado: ahi es donde
     // se gestionan los miembros (decision cerrada 4). El grupo todavia no tiene ninguno, y el
     // renombrado no le ha tocado los miembros (R23).
-    await row.getByTestId(GROUP_ACTION_EDIT_TESTID).click();
+    await (
+      await openRowActionsMenuItem(
+        page,
+        row.getByTestId(GROUP_ROW_ACTIONS_TESTID),
+        GROUP_ACTION_EDIT_TESTID,
+      )
+    ).click();
     await expect(sheet).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(MEMBERS_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(MEMBERS_ERROR_TESTID)).toHaveCount(0);
@@ -477,12 +493,16 @@ test.describe('pestana de grupos de trabajo', () => {
 
     // El buscador de personas consulta al SERVIDOR sobre el conjunto entero (R28). El actor NO
     // aparece entre los candidatos —`listUsers` lo excluye (QC-66 dec. 12)— y por eso el recorrido
-    // busca a OTRA persona, la del fixture.
-    await page.getByTestId(MEMBER_SEARCH_TESTID).fill(memberUser.username);
-    const candidate = byTestIdAndUserId(page, CANDIDATE_TESTID, memberId);
+    // busca a OTRA persona, la del fixture. Desde 897a4f91 y 527a9902 (QC-180) el buscador es
+    // `WorkGroupMemberPicker`, montado sobre el `DataTable` compartido dentro del bloque de
+    // miembros: cada candidato es una fila localizada por el id de la persona, y su accion es un
+    // boton «Agregar: <nombre>».
+    const members = page.getByTestId(MEMBERS_TESTID);
+    await members.getByTestId(PICKER_SEARCH_TESTID).fill(memberUser.username);
+    const candidate = members.getByTestId(`data-table-row-${memberId}`);
     await expect(candidate).toHaveCount(1, { timeout: 60_000 });
-    await expect(page.getByTestId(CANDIDATE_TESTID)).toHaveCount(1);
-    await candidate.click();
+    await expect(members.locator(PICKER_ROW_SELECTOR)).toHaveCount(1);
+    await candidate.getByRole('button', { name: `Agregar: ${memberDisplayName}` }).click();
 
     // Se mete **de a una** y sin error: el panel sigue abierto y la lista se vuelve a pedir al
     // servidor (R30). La persona aparece **porque su cuenta esta `active`**: con `pending` la
@@ -525,7 +545,13 @@ test.describe('pestana de grupos de trabajo', () => {
     // --- 8. BORRAR EL GRUPO. Se pide confirmacion en un dialogo que NOMBRA a ese grupo (R33): el
     // sujeto se afirma por el campo oculto que viaja en el envio —identificador, no copy— y el
     // mensaje contiene el nombre del fixture. Mientras no se confirme, no se invoca el borrado.
-    await row.getByTestId(GROUP_ACTION_DELETE_TESTID).click();
+    await (
+      await openRowActionsMenuItem(
+        page,
+        row.getByTestId(GROUP_ROW_ACTIONS_TESTID),
+        GROUP_ACTION_DELETE_TESTID,
+      )
+    ).click();
     const dialog = page.getByTestId(DELETE_DIALOG_TESTID);
     await expect(dialog).toBeVisible({ timeout: 60_000 });
     await expect(dialog.getByTestId(DELETE_ID_TESTID)).toHaveValue(created.id);

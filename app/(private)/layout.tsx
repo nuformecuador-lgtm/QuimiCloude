@@ -3,17 +3,20 @@ import { redirect } from 'next/navigation';
 import type { CSSProperties, ReactNode } from 'react';
 
 import { AppSidebar } from '@/components/private/app-sidebar';
+import { BrandLogo } from '@/components/shared/brand-logo';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { Toaster } from '@/components/ui/sonner';
 import { identity } from '@/lib/composition';
+import { navItemHrefs } from '@/lib/shared/navigation/nav-module';
 import {
+  BRAND_LABEL,
   filterNavItemsByPermissions,
   PRIVATE_NAV_ITEMS,
 } from '@/lib/shared/navigation/private-nav';
 import { LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
 import { readSidebarOpenState, SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
-import { LogoutButton, SidebarToggle, ThemeToggle } from './components';
+import { LogoutButton, ScreenEnter, SidebarToggle, ThemeToggle } from './components';
 
 /**
  * Layout compartido por toda la zona privada (R1, `design.md > 5.2`).
@@ -120,8 +123,9 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
             QC-11 quedaria sin cumplir. Se oculta por CSS, asi que sigue en el DOM y los tests
             de QC-11 que lo dan por presente siguen siendo validos.
           */}
-          <div className="md:hidden">
+          <div className="flex items-center gap-2 md:hidden">
             <SidebarToggle />
+            <BrandLogo variant="isotipo" tone="auto" height={28} alt={BRAND_LABEL} />
           </div>
           {/* `ml-auto` y no solo el `justify-between` del header: en escritorio el control de
               la izquierda esta oculto y no ocupa espacio, asi que sin esto los de la derecha se
@@ -136,7 +140,7 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
             <LogoutButton />
           </div>
         </header>
-        {children}
+        <ScreenEnter hrefs={navItemHrefs(navItems)}>{children}</ScreenEnter>
       </SidebarInset>
       {/* R22 de QC-22 (decision humana del 2026-09-03, supera a R36/D9 de QC-11): region de
           avisos de la zona privada, hermana del contenido para que ningun toast quede dentro

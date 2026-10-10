@@ -28,10 +28,7 @@ export {
 export { PRESENTATION_FIELD, PresentationSelect } from '@/components/shared/presentation-select';
 export {
   ACTIONS_COLUMN_ID,
-  ACTIONS_COLUMN_LABEL,
-  EMPTY_CELL,
   IMAGE_COLUMN_ID,
-  IMAGE_COLUMN_LABEL,
   buildProductColumns,
   productUnitLabel,
   type ProductColumn,
@@ -39,6 +36,15 @@ export {
   type ProductColumnsDeps,
 } from './product-columns';
 export { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
+export {
+  PRODUCT_ACTION_BATCHES_TESTID,
+  PRODUCT_ACTION_DELETE_TESTID,
+  PRODUCT_ACTION_EDIT_TESTID,
+  PRODUCT_ROW_ACTIONS_TESTID,
+  ProductRowActions,
+  productRowActionsLabel,
+  type ProductRowActionsProps,
+} from './product-row-actions';
 export {
   COST_INPUT_SCALE,
   divideCost,
@@ -65,8 +71,6 @@ export {
   ProductNamePicker,
   type ProductNameOption,
 } from './product-name-picker';
-export { ProductListEmpty } from './product-list-empty';
-export { ProductListError } from './product-list-error';
 export {
   FIRST_PAGE,
   PAGE_PARAM,
@@ -99,4 +103,3 @@ export {
   ProductTable,
   type ProductTableProps,
 } from './product-table';
-export { ProductTableSkeleton } from './product-table-skeleton';

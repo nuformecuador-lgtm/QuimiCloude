@@ -55,6 +55,23 @@ export function hallazgosDeVersionDeNext(
 // Lista cerrada y no un rango de git: `git diff origin/dev...HEAD` esta vacio en `dev` y la guardia
 // fallaria alli. Un `.spec.ts` nuevo se nombra aqui a mano.
 export const E2E_ESPERADOS = [
+  // Alta el 2026-10-08 por el MISMO motivo y en el MISMO sitio que las demas: la lista es CERRADA
+  // y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el archivo
+  // se nombra, uno a uno-. Lo que ejercita: el Administrador de acondicionamiento ve en
+  // `/asignacion` la pestana «Por acondicionar» con sus pedidos, abre el detalle de solo lectura y
+  // en «Terminados» ve solo lo que acondiciono el; Administrador, Operador y Empacador no ven la
+  // pestana, ni pidiendola por la direccion, y el detalle les responde 404. NO ejercita el cruce
+  // borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
+  // identificador ni sobre `reference`, asi que ese diferimiento sigue INTACTO.
+  'acondicionamiento.spec.ts',
+  // Alta el 2026-10-09 por el MISMO motivo y en el MISMO sitio que las demas: la lista es CERRADA
+  // y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el archivo
+  // se nombra, uno a uno-. Lo que ejercita: el acondicionador comienza desde el detalle con una
+  // persona y un grupo tras la espera de 5 s, otro acondicionador no puede tocar el pedido, y el
+  // primero lo termina y lo encuentra en «Terminados». NO ejercita el cruce borde -> accion del
+  // identificador de peticion: el spec no lee ni afirma nada sobre el identificador ni sobre
+  // `reference`, asi que ese diferimiento sigue INTACTO.
+  'acondicionar-con-equipo.spec.ts',
   'aislamiento-inventario.spec.ts',
   // Alta por el MISMO motivo y en el MISMO sitio que las demas: esta lista es CERRADA y su punto
   // de extension por diseno es darse de alta en ella. El ancla NO se relaja -el archivo se nombra,
@@ -99,6 +116,10 @@ export const E2E_ESPERADOS = [
   // afirma nada sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71
   // R21 sigue INTACTO.
   'ajuste-de-inventario.spec.ts',
+  // Alta el 2026-10-08 (QC-226) por el MISMO motivo que las demas. Lo que ejercita: sin sesion,
+  // el manifest, los iconos y la imagen OG responden 2xx sin redirigir, y el <head> de /login los
+  // enlaza. No lee ni afirma nada sobre el identificador de peticion.
+  'brand-assets.spec.ts',
   // QC-101 T10 / R17: la E2E del cierre de TODAS las sesiones de otra persona desde la pantalla.
   // Alta por el MISMO motivo y en el MISMO sitio que las de QC-49, QC-67, QC-79, QC-85 y QC-102:
   // esta lista es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO
@@ -138,6 +159,14 @@ export const E2E_ESPERADOS = [
   // lee ni afirma nada sobre el identificador ni sobre `reference`, asi que ese diferimiento
   // sigue INTACTO.
   'clientes.spec.ts',
+  // Alta el 2026-10-09 (QC-219) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
+  // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
+  // archivo se nombra, uno a uno-. Lo que ejercita: el acondicionador ve Terminar bloqueado, la
+  // base rechaza vencimiento de hoy, produccion de manana y un lote que choca, guarda datos validos
+  // y termina; el Administrador ve lote y vencimiento en `/inventario`. NO ejercita el cruce
+  // borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
+  // identificador ni sobre `reference`, asi que ese diferimiento sigue INTACTO.
+  'datos-de-lote-en-acondicionamiento.spec.ts',
   // Sube tres PDFs desde el detalle de un proveedor y ve cambiar el estado de cada uno, con el
   // almacenamiento, la cola y la IA doblados. No afirma nada sobre el identificador de peticion.
   'documentos.spec.ts',
@@ -164,6 +193,16 @@ export const E2E_ESPERADOS = [
   // sigue INTACTO.
   'formula-desde-pdf.spec.ts',
   'grupos-de-trabajo.spec.ts',
+  // Alta el 2026-10-08 (QC-222 R21) por el MISMO motivo y en el MISMO sitio que las demas: la
+  // lista es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se
+  // relaja -el archivo se nombra, uno a uno-. Lo que ejercita: el Administrador ve el grupo
+  // «Integraciones» del menu privado, lo despliega, abre cada una de sus tres paginas con su
+  // titulo y su estado vacio, y cada ruta pedida por URL responde 200; cada rol del seed sin
+  // `integraciones.modificar` no recibe el grupo ni sus hijos en el HTML y cada ruta por URL
+  // responde 404 con la pantalla de no encontrado y la salida presente. NO ejercita el cruce
+  // borde -> accion del identificador de peticion: el spec no lee ni afirma nada sobre el
+  // identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
+  'integraciones.spec.ts',
   'inventario.spec.ts',
   'login-skin.spec.ts',
   'login.spec.ts',
@@ -200,6 +239,16 @@ export const E2E_ESPERADOS = [
   'pedidos-responsables.spec.ts',
   'permisos.spec.ts',
   'pedidos-asignados.spec.ts',
+  // Alta el 2026-10-08 (QC-167) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja
+  // -el archivo se nombra, uno a uno-. Lo que ejercita: el Administrador ve en el dashboard el
+  // recorrido de ejecucion de los pedidos de su empresa (no el de otra), lo filtra por persona y
+  // por parte del numero, abre el detalle con la vuelta atras marcada y vuelve con los mismos
+  // filtros; un pedido dado de baja sale marcado; el Operador y el pedido ajeno dan 404. NO
+  // ejercita el cruce borde -> accion del identificador de peticion: el spec no lee ni afirma nada
+  // sobre el identificador ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue
+  // INTACTO.
+  'recorrido-ejecucion.spec.ts',
   // Alta el 2026-09-23 por el MISMO motivo y en el MISMO sitio que las demas: la lista
   // es CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se
   // relaja -el archivo se nombra, uno a uno-. Lo que ejercita: el bloque de coste del panel de
@@ -288,6 +337,20 @@ export const E2E_ESPERADOS = [
   // y cancelar con motivo desde la ejecucion. No lee ni afirma nada sobre el identificador de
   // peticion.
   'registro-ejecucion.spec.ts',
+  // Alta el 2026-10-08 (QC-223) por el mismo motivo que las demas. Recorre la entrega de un pedido
+  // terminado desde el menu de fila: borrador que sobrevive a la recarga, entrega parcial a otro
+  // cliente, entrega que completa y usuario sin permiso. No lee ni afirma nada sobre el
+  // identificador de peticion ni sobre `reference`.
+  'entregar-producto-terminado.spec.ts',
+  // Alta el 2026-10-09 (QC-228) por el mismo motivo que las demas. Mide en navegador real las
+  // duraciones y curvas calculadas de un panel, un dialogo y un toast, el indicador del item activo
+  // y la entrada de pantalla, tambien con movimiento reducido. No lee ni afirma nada sobre el
+  // identificador de peticion ni sobre `reference`.
+  'movimiento.spec.ts',
+  // Alta el 2026-10-09 (QC-227, enmienda permitida: es el punto de extension de la lista). Mide en
+  // navegador real las cajas del carril colapsado y el icono de los controles de colapso. No lee
+  // ni afirma nada sobre el identificador de peticion ni sobre `reference`.
+  'marca-componentes.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -474,6 +537,17 @@ export const MIGRACIONES_ESPERADAS = [
   '20261007120000_order_conditioning_states',
   // El indice de pedidos terminados; no toca el identificador.
   '20261007120100_order_terminated_finished_index',
+  // El permiso integraciones.modificar y su asignacion al Administrador; no toca el identificador.
+  '20261008120843_integrations_permission',
+  // El equipo de acondicionamiento; no toca el identificador.
+  '20261008150000_order_conditioning_team',
+  // QC-223 2026-10-08: la entrega de producto terminado (valor de enum, tablas y permiso); ninguna
+  // toca el identificador.
+  '20261008150050_inventory_movement_kind_delivery',
+  '20261008150100_order_deliveries',
+  '20261008150200_delivery_permission',
+  // El dia de produccion del lote; no toca el identificador.
+  '20261009120000_product_batches_production_date',
 ] as const
 
 export function hallazgosDeMigraciones(

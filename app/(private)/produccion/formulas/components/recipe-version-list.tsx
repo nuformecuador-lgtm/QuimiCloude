@@ -7,11 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import type { RecipeVersionSummary } from '@/lib/modules/recetas';
 import { newRecipeVersionRoute, recipeVersionRoute } from '@/lib/shared/routes';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
 import { DeleteRecipeDialog } from './delete-recipe-dialog';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 export type RecipeVersionListProps = {
   readonly originalId: string;
@@ -33,7 +32,7 @@ export function RecipeVersionList({ originalId, versions }: RecipeVersionListPro
         </h2>
         <Link
           href={newRecipeVersionRoute(originalId)}
-          className={cn(buttonVariants({ variant: 'outline' }), TOUCH_TARGET)}
+          className={cn(buttonVariants({ variant: 'outline', touch: true }))}
           data-testid="recipe-version-new"
         >
           Nueva versión
@@ -56,14 +55,14 @@ export function RecipeVersionList({ originalId, versions }: RecipeVersionListPro
                 href={recipeVersionRoute(originalId, version.id)}
                 className={cn(
                   'inline-flex flex-1 items-center rounded-md underline-offset-4 focus-visible:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  TOUCH_TARGET,
+                  touchTarget,
                 )}
                 data-testid="recipe-version-link"
               >
                 {version.name}
               </Link>
               {version.isUnderReview ? (
-                <Badge variant="outline" data-testid="recipe-version-under-review">
+                <Badge variant="info" data-testid="recipe-version-under-review">
                   Por revisar
                 </Badge>
               ) : null}

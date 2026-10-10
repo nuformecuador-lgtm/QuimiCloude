@@ -280,6 +280,26 @@ export class OrderNotConditionableError extends AsignacionesError {
   }
 }
 
+/** Una persona marcada suelta para el equipo de acondicionamiento tiene la cuenta activa pero
+ *  supervisa los pedidos de toda la empresa. Codigo propio porque el equipo no es responsable. */
+export class ConditioningTeamMemberNotAllowedError extends AsignacionesError {
+  readonly code = 'conditioning_team_member_not_allowed';
+
+  constructor(diagnostic?: string) {
+    super('conditioning_team_member_not_allowed', diagnostic);
+  }
+}
+
+/** Tras omitir a quien no es elegible en los grupos, el equipo de acondicionamiento no tiene a
+ *  nadie. */
+export class ConditioningTeamEmptyError extends AsignacionesError {
+  readonly code = 'conditioning_team_empty';
+
+  constructor(diagnostic?: string) {
+    super('conditioning_team_empty', diagnostic);
+  }
+}
+
 /** El pedido esta `POR_EMPACAR` o `EN_EMPAQUE`: sus responsables se congelan igual que en
  *  `ENTREGADO`, con un codigo propio porque la frase que corresponde es otra. */
 export class OrderProducedFrozenError extends AsignacionesError {
@@ -327,5 +347,66 @@ export class OrderWithoutDistributionError extends AsignacionesError {
 
   constructor(diagnostic?: string) {
     super('order_without_distribution', diagnostic);
+  }
+}
+
+/** El vencimiento de alguna linea no es posterior a hoy. `batchId` es el lote de la primera linea
+ *  culpable, para que la pantalla la marque; va tambien como diagnostico. */
+export class BatchExpiryNotFutureError extends AsignacionesError {
+  readonly code = 'batch_expiry_not_future';
+  readonly batchId?: string;
+
+  constructor(batchId?: string) {
+    super('batch_expiry_not_future', batchId);
+    this.batchId = batchId;
+  }
+}
+
+/** El dia de produccion de alguna linea es posterior a hoy. `batchId` como en
+ *  `BatchExpiryNotFutureError`. */
+export class BatchProductionDateFutureError extends AsignacionesError {
+  readonly code = 'batch_production_date_future';
+  readonly batchId?: string;
+
+  constructor(batchId?: string) {
+    super('batch_production_date_future', batchId);
+    this.batchId = batchId;
+  }
+}
+
+/** Terminar con alguna linea del pedido sin datos de lote. Codigo propio y no
+ *  `order_not_conditionable`: el pedido si se puede terminar, solo faltan datos. */
+export class ConditioningBatchDataMissingError extends AsignacionesError {
+  readonly code = 'conditioning_batch_data_missing';
+  readonly batchId?: string;
+
+  constructor(batchId?: string) {
+    super('conditioning_batch_data_missing', batchId);
+    this.batchId = batchId;
+  }
+}
+
+/** El lote ya es el de otro lote de la empresa, o se repite en la entrada. Mismo `code` que
+ *  `BatchDuplicateLotError` de `inventario`. Sin `batchId` cuando el choque lo detecto el indice
+ *  unico en carrera y no se sabe que linea lo causo. */
+export class ConditioningBatchDuplicateLotError extends AsignacionesError {
+  readonly code = 'batch_duplicate_lot';
+  readonly batchId?: string;
+
+  constructor(batchId?: string) {
+    super('batch_duplicate_lot', batchId);
+    this.batchId = batchId;
+  }
+}
+
+/** El lote no es el de una linea de ese pedido. Mismo `code` que `BatchNotFoundError` de
+ *  `inventario`. */
+export class ConditioningBatchNotFoundError extends AsignacionesError {
+  readonly code = 'batch_not_found';
+  readonly batchId?: string;
+
+  constructor(batchId?: string) {
+    super('batch_not_found', batchId);
+    this.batchId = batchId;
   }
 }

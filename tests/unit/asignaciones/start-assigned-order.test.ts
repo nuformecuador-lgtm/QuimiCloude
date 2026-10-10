@@ -62,6 +62,7 @@ function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummar
     unitId: null,
     finishedAt: null,
     packedBy: null,
+    conditionedBy: null,
     ...overrides,
   };
 }
@@ -123,7 +124,13 @@ function montar(options?: {
     anotaciones.push({ entry, dentroDeRun });
   });
   const findLastStepPosition = vi.fn(async () => options?.ultimaPosicion ?? null);
-  const log: ExecutionLogRepository = { append, findLastStepPosition };
+  const log: ExecutionLogRepository = {
+    append,
+    findLastStepPosition,
+    listExecutedOrderIds: vi.fn(async () => []),
+    listEntriesForOrders: vi.fn(async () => []),
+    listUserIdsWithEntries: vi.fn(async () => []),
+  };
   const writers = {
     orders: { transitionAliveById, cancelAliveById: vi.fn() },
     packing: { startPackingAliveById: vi.fn(), finishPackingAliveById: vi.fn() },

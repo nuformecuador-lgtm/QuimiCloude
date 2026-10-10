@@ -1,4 +1,5 @@
 import type { UnitRef, UnitView } from '@/lib/modules/unidades';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
 /**
  * La frase de equivalencia de una fila (R17; `design.md > 4`).
@@ -22,7 +23,7 @@ import type { UnitRef, UnitView } from '@/lib/modules/unidades';
  * de romperse (R17). Es constante exportada y no un literal suelto para que los tests puedan
  * afirmar sobre ella sin escribir copy (R49).
  */
-export const NO_EQUIVALENCE_LABEL = '—';
+export const NO_EQUIVALENCE_LABEL = EMPTY_MARK;
 
 /**
  * Quita los ceros de relleno a la derecha de un decimal en texto: `'1000.0000'` -> `'1000'`,

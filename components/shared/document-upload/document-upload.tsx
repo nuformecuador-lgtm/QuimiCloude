@@ -8,6 +8,7 @@ import { MAX_FILES_PER_BATCH, type PdfStrategy } from '@/lib/modules/documentos'
 import { enqueueBatchAction } from '@/lib/modules/documentos/adapters/driving/document-batch-actions';
 import { issueUploadLinksAction } from '@/lib/modules/documentos/adapters/driving/document-upload-actions';
 import type { ErrorState } from '@/lib/modules/errores';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { DocumentUploadRow } from './document-upload-row';
 import {
@@ -32,9 +33,6 @@ export const DOCUMENT_UPLOAD_ERROR_TESTID = 'document-upload-error';
 export const DOCUMENT_UPLOAD_RESUME_TESTID = 'document-upload-resume';
 export const DOCUMENT_UPLOAD_MISSING_TESTID = 'document-upload-missing';
 export const DOCUMENT_UPLOAD_LIST_TESTID = 'document-upload-list';
-
-/** Objetivo tactil minimo, en las clases con las que este repo lo escribe. */
-const TOUCH_TARGET = 'min-h-11 min-w-11 text-base';
 
 export type DocumentUploadProps = {
   /** La estrategia de TODA la tanda. */
@@ -169,7 +167,12 @@ export function DocumentUpload({ strategy, reviewHrefFor }: DocumentUploadProps)
         <label
           htmlFor={inputId}
           data-testid={DOCUMENT_UPLOAD_TRIGGER_TESTID}
-          className={cn(buttonVariants({ variant: 'outline' }), TOUCH_TARGET, 'cursor-pointer')}
+          className={cn(
+            buttonVariants({ variant: 'outline' }),
+            touchTarget,
+            'text-base',
+            'cursor-pointer',
+          )}
         >
           {SELECTION_TRIGGER_LABEL}
         </label>
@@ -177,7 +180,8 @@ export function DocumentUpload({ strategy, reviewHrefFor }: DocumentUploadProps)
         <Button
           type="button"
           data-testid={DOCUMENT_UPLOAD_SUBMIT_TESTID}
-          className={TOUCH_TARGET}
+          touch
+          className="text-base"
           disabled={files.length === 0 || busy}
           onClick={() => {
             void submit();
@@ -191,7 +195,8 @@ export function DocumentUpload({ strategy, reviewHrefFor }: DocumentUploadProps)
             type="button"
             variant="ghost"
             data-testid={DOCUMENT_UPLOAD_CLEAR_TESTID}
-            className={TOUCH_TARGET}
+            touch
+            className="text-base"
             onClick={clearSelection}
           >
             {CLEAR_LABEL}
@@ -221,7 +226,8 @@ export function DocumentUpload({ strategy, reviewHrefFor }: DocumentUploadProps)
           type="button"
           variant="outline"
           data-testid={DOCUMENT_UPLOAD_RESUME_TESTID}
-          className={TOUCH_TARGET}
+          touch
+          className="text-base"
           onClick={resume}
         >
           {RESUME_LABEL}

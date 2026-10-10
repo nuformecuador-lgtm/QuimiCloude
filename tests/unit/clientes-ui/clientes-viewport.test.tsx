@@ -17,7 +17,7 @@
 //
 // Ningun assert sobre copy: todo se localiza por `data-testid` o por rol accesible.
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -37,6 +37,7 @@ import type { CustomerView } from '@/lib/modules/clientes';
 import { PERMISSIONS } from '@/lib/modules/identity';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 
+import { openRowActionsMenu } from '../../helpers/row-actions-menu';
 import { setupUser } from '../../helpers/user-event';
 import { NARROW_VIEWPORT, WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
@@ -197,9 +198,9 @@ describe.each(VIEWPORTS)('pantalla de clientes en viewport %s (%i px)', (_nombre
 
     // En el DOM: las dos acciones de fila y el disparador del alta ya estan visibles, sin pasar
     // el puntero por encima. En tactil no hay puntero que pasar.
-    const fila = screen.getByTestId(CUSTOMER_ROW_ACTIONS_TESTID);
+    const fila = await openRowActionsMenu(setupUser(), screen.getByTestId(CUSTOMER_ROW_ACTIONS_TESTID));
     for (const accion of [CUSTOMER_ACTION_EDIT_TESTID, CUSTOMER_ACTION_DELETE_TESTID]) {
-      expect(fila.querySelector(`[data-testid="${accion}"]`)).not.toBeNull();
+      expect(within(fila).queryByTestId(accion)).not.toBeNull();
       expect(screen.getByTestId(accion)).toBeVisible();
     }
     expect(screen.getByTestId(CUSTOMER_CREATE_OPEN_TESTID)).toBeVisible();
@@ -223,19 +224,20 @@ describe.each(VIEWPORTS)('pantalla de clientes en viewport %s (%i px)', (_nombre
   it('las acciones de fila y el disparador de alta miden al menos 44x44 px (R39)', async () => {
     await renderPantalla();
 
-    const fila = screen.getByTestId(CUSTOMER_ROW_ACTIONS_TESTID);
-    const controles = [
-      ...[CUSTOMER_ACTION_EDIT_TESTID, CUSTOMER_ACTION_DELETE_TESTID].map(
-        (accion) => fila.querySelector(`[data-testid="${accion}"]`) as HTMLElement,
-      ),
-      screen.getByTestId(CUSTOMER_CREATE_OPEN_TESTID),
-    ];
-
-    for (const control of controles) {
-      expect(control, 'el control deberia existir en el DOM').not.toBeNull();
+    // Disparador del menu de fila y alta: 44x44 (min-h-11 + min-w-11). Los items del menu
+    // compartido son anchos (el menu mide >= 200 px), asi que solo llevan min-h-11 (design.md > 11).
+    const disparador = screen.getByTestId(CUSTOMER_ROW_ACTIONS_TESTID);
+    for (const control of [disparador, screen.getByTestId(CUSTOMER_CREATE_OPEN_TESTID)]) {
       for (const token of AREA_TACTIL) {
         expect(control.className, `${control.getAttribute('data-testid')} a ${ancho}px`).toContain(token);
       }
+    }
+
+    const fila = await openRowActionsMenu(setupUser(), disparador);
+    for (const accion of [CUSTOMER_ACTION_EDIT_TESTID, CUSTOMER_ACTION_DELETE_TESTID]) {
+      const item = within(fila).queryByTestId(accion);
+      expect(item, `${accion} deberia existir en el DOM`).not.toBeNull();
+      expect(item?.className, `${accion} a ${ancho}px`).toContain('min-h-11');
     }
   });
 

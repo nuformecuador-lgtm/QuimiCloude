@@ -67,6 +67,7 @@ import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/secur
 import { prisma } from '@/lib/shared/db/prisma';
 import { SUPPLIERS_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
@@ -118,10 +119,13 @@ const supplierPhone = '+573000000000';
 
 /**
  * Costo de la linea. Cadena decimal con cuatro decimales a proposito (R41): el importe viaja como
- * texto de punta a punta y la celda lo pinta tal cual, asi que el assert compara la MISMA cadena
- * que se tecleo. Un `type="number"` o un `toFixed` por el camino lo delataria aqui.
+ * texto de punta a punta, asi que el `title` de la celda conserva la MISMA cadena que se tecleo.
+ * Un `type="number"` o un `toFixed` por el camino lo delataria aqui. Desde 682d3e3b (2026-09-17)
+ * la celda pinta el valor redondeado a dos decimales para leer, y el exacto queda en su `title`.
  */
 const catalogLineCost = '12.3456';
+/** Lo que la celda pinta para `catalogLineCost`: dos decimales, redondeado. */
+const catalogLineCostDisplay = '12.35';
 
 /**
  * Nombre de una presentacion ya existente y NO fixture de otro E2E, o `null` si la base no tiene
@@ -143,7 +147,7 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
 
   // Hash REAL: el objetivo es que bcrypt, el adaptador Prisma y la Server Action de login se
   // entiendan de verdad. Un hash inventado probaria otra cosa.
-  await prisma.user.create({
+  await createFixtureUser({
     data: {
       firstNames: `Qc44${RUN_ID.slice(0, 8)}`,
       lastNames: 'Proveedores',
@@ -434,15 +438,16 @@ test.describe('proveedores', () => {
     await expect(page.getByTestId('catalog-line-sheet')).toHaveCount(0, { timeout: 60_000 });
     await expect(page.locator('[data-sonner-toast]').first()).toBeVisible({ timeout: 60_000 });
 
-    // --- 10. Y la linea esta en la lista del catalogo, con el importe TAL CUAL se tecleo (R41).
+    // --- 10. Y la linea esta en la lista del catalogo, con el importe redondeado a la vista y TAL
+    // CUAL se tecleo en su `title` (R41).
     const catalogRow = await findCatalogRow(page, catalogLineName);
     await expect(catalogRow.first()).toBeVisible({ timeout: 60_000 });
     await expect(catalogRow.first().getByTestId('data-table-cell-name')).toHaveText(
       catalogLineName,
     );
-    await expect(catalogRow.first().getByTestId('data-table-cell-cost')).toHaveText(
-      catalogLineCost,
-    );
+    const costCell = catalogRow.first().getByTestId('data-table-cell-cost');
+    await expect(costCell).toHaveText(catalogLineCostDisplay);
+    await expect(costCell.locator('[title]')).toHaveAttribute('title', catalogLineCost);
 
     // Lo guardo el backend de verdad, no solo lo pinto la pantalla.
     expect(

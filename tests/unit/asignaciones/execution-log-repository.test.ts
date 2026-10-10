@@ -14,6 +14,7 @@ import {
   ExecutionAbortedError,
   isExecutionSuccess,
   type ExecutionAction,
+  type ExecutionEntryRecord,
   type NewExecutionEntry,
 } from '@/lib/modules/asignaciones/domain/execution-entry'
 import { AsignacionesError, NotCancellableError } from '@/lib/modules/asignaciones/domain/errors'
@@ -44,6 +45,18 @@ class RegistroDoble implements ExecutionLogRepository {
 
   findLastStepPosition(companyId: string, orderId: string): Promise<number | null> {
     return Promise.resolve(companyId === COMPANY && orderId === ORDER ? null : -1)
+  }
+
+  listExecutedOrderIds(): Promise<readonly string[]> {
+    return Promise.resolve([])
+  }
+
+  listEntriesForOrders(): Promise<readonly ExecutionEntryRecord[]> {
+    return Promise.resolve([])
+  }
+
+  listUserIdsWithEntries(): Promise<readonly string[]> {
+    return Promise.resolve([])
   }
 }
 
@@ -142,18 +155,26 @@ describe('ExecutionAction: total sobre las ocho del enum (R1)', () => {
 })
 
 describe('ExecutionLogRepository: solo anexar (R31)', () => {
-  it('R31: el puerto declara exactamente `append` y `findLastStepPosition`', () => {
+  // Enmendado el 2026-10-07: el puerto gana tres lecturas para el recorrido del dashboard; sigue sin
+  // nada que modifique o borre.
+  it('R31 / R22: el puerto declara `append`, `findLastStepPosition` y tres lecturas, y nada mas', () => {
     const fuente = readFileSync(PUERTO_REGISTRO_ABS, 'utf8')
     const metodos = [...fuente.matchAll(/^\s+(\w+)\(/gm)].map((m) => m[1])
-    expect(metodos).toEqual(['append', 'findLastStepPosition'])
+    expect(metodos).toEqual([
+      'append',
+      'findLastStepPosition',
+      'listExecutedOrderIds',
+      'listEntriesForOrders',
+      'listUserIdsWithEntries',
+    ])
   })
 
-  it('R31: el puerto no declara nada que modifique ni borre una anotacion', () => {
+  it('R31 / R22: el puerto no declara nada que modifique ni borre una anotacion', () => {
     const fuente = readFileSync(PUERTO_REGISTRO_ABS, 'utf8')
     expect(fuente).not.toMatch(/\b(update|upsert|delete|remove|patch|replace|edit)\w*\s*\(/i)
   })
 
-  it('R31: un doble con solo los dos metodos satisface el puerto', async () => {
+  it('R31: un doble con solo esos cinco metodos satisface el puerto', async () => {
     const registro = new RegistroDoble()
     await registro.append({ ...base, action: 'start', stepPosition: 1 })
     expect(registro.anotadas).toHaveLength(1)
@@ -169,7 +190,7 @@ describe('ExecutionLogRepository: solo anexar (R31)', () => {
 })
 
 describe('ExecutionTransaction: los escritores que recibe el trabajo (R24)', () => {
-  it('R24: `run` entrega exactamente `orders`, `packing` y `log`, y devuelve lo que devuelve `work`', async () => {
+  it('R24: `run` entrega exactamente `orders`, `packing`, `log`, `conditioning` y `team`, y devuelve lo que devuelve `work`', async () => {
     const writers: ExecutionWriters = {
       orders: {
         transitionAliveById: () => Promise.resolve('ok'),
@@ -180,11 +201,13 @@ describe('ExecutionTransaction: los escritores que recibe el trabajo (R24)', () 
         finishPackingAliveById: () => Promise.resolve({ kind: 'ok', finishedGoods: [] }),
       },
       log: new RegistroDoble(),
+      conditioning: { startConditioningAliveById: () => Promise.resolve('ok') },
+      team: { insertAll: () => Promise.resolve(0), listByOrderInCompany: () => Promise.resolve([]) },
     }
     const transaccion: ExecutionTransaction = { run: (work) => work(writers) }
 
     const claves = await transaccion.run((w) => Promise.resolve(Object.keys(w).sort()))
-    expect(claves).toEqual(['log', 'orders', 'packing'])
+    expect(claves).toEqual(['conditioning', 'log', 'orders', 'packing', 'team'])
   })
 })
 

@@ -9,7 +9,7 @@ import { BRAND_LABEL, CUSTOMERS_LABEL } from '@/lib/shared/navigation/private-na
 import {
   CUSTOMERS_TITLE_TESTID,
   CustomerListSection,
-  CustomerListSkeleton,
+  CustomerTable,
   parseCustomerListParams,
   type CustomerListSearchParams,
 } from './components';
@@ -90,7 +90,17 @@ export default async function ClientesPage({
           {CUSTOMERS_LABEL}
         </h1>
       </div>
-      <Suspense fallback={<CustomerListSkeleton rows={params.pageSize} />}>
+      <Suspense
+        fallback={
+          <CustomerTable
+            status="loading"
+            customers={[]}
+            params={params}
+            totalPages={0}
+            canModify={canModify}
+          />
+        }
+      >
         <CustomerListSection params={params} canModify={canModify} />
       </Suspense>
     </div>

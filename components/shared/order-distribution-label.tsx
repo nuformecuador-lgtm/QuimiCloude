@@ -8,6 +8,8 @@
  * pedido, no un fallo de carga. El nombre `null` de una linea si es un fallo de carga y lleva «—».
  */
 
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
+
 export type OrderDistributionLabelLine = {
   readonly presentationName: string | null;
   /** `null` en una linea antigua, que se pinta con el nombre de su presentacion. */
@@ -21,10 +23,9 @@ export type OrderDistributionLabelProps = {
 };
 
 const EMPTY_TEXT = 'Sin presentación';
-const MISSING_NAME_MARK = '—';
 
 function lineText(line: OrderDistributionLabelLine): string {
-  return `${line.packages} × ${line.packagingName ?? line.presentationName ?? MISSING_NAME_MARK}`;
+  return `${line.packages} × ${line.packagingName ?? line.presentationName ?? EMPTY_MARK}`;
 }
 
 export function OrderDistributionLabel({ lines }: OrderDistributionLabelProps) {

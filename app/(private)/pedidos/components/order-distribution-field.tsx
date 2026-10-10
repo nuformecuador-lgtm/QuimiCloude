@@ -3,10 +3,9 @@
 import { CircleAlertIcon, PlusIcon, TrashIcon } from 'lucide-react';
 import { useId, useState } from 'react';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import type { UnitConversion } from '@/lib/modules/unidades';
 import {
   ORDER_DISTRIBUTION_PACKAGES_FIELD,
@@ -14,8 +13,9 @@ import {
   ORDER_DISTRIBUTION_PRESENTATION_FIELD,
 } from '@/lib/modules/pedidos';
 import { formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
-import { MISSING_VALUE_MARK } from './order-columns';
 import { lineCoverage, type LineCoverage } from './order-distribution-coverage';
 import { PackagingSelect, type PackagingOption } from './packaging-select';
 import {
@@ -47,7 +47,6 @@ export const ORDER_DISTRIBUTION_WARNING_TESTID = 'order-distribution-warning';
 export const ORDER_DISTRIBUTION_WITHOUT_UNIT_TESTID = 'order-distribution-without-unit';
 export const ORDER_DISTRIBUTION_ERROR_TESTID = 'order-distribution-error';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base md:text-base';
 
 /** Cuatro decimales: la conversion entre unidades puede dejar fracciones que dos esconderian. */
@@ -226,7 +225,7 @@ export function OrderDistributionField({
             const problem = lineProblem(availability, line);
             const legacy = isLegacyLine(line);
             const name =
-              (legacy ? line.presentationName : line.packagingName) ?? MISSING_VALUE_MARK;
+              (legacy ? line.presentationName : line.packagingName) ?? EMPTY_MARK;
             const legacyNoteId = `${titleId}-legacy-${index}`;
             const coverage = withoutUnit
               ? null
@@ -265,7 +264,7 @@ export function OrderDistributionField({
                         className="truncate text-sm text-muted-foreground"
                         data-testid={ORDER_DISTRIBUTION_LINE_PRESENTATION_TESTID}
                       >
-                        {line.presentationName ?? MISSING_VALUE_MARK}
+                        {line.presentationName ?? EMPTY_MARK}
                         {line.available == null
                           ? null
                           : ` · ${LABELS.lineAvailable(trimDecimal(line.available))}`}
@@ -285,14 +284,14 @@ export function OrderDistributionField({
                     aria-invalid={
                       problem !== null || !POSITIVE_INTEGER.test(line.packages) ? true : undefined
                     }
-                    className={`w-24 ${TOUCH_TARGET} ${FIELD_TEXT}`}
+                    className={`w-24 ${touchTarget} ${FIELD_TEXT}`}
                     data-testid={ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID}
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className={TOUCH_TARGET}
+                    className={touchTarget}
                     aria-label={`${LABELS.remove} · ${name}`}
                     onClick={() => removeLine(index)}
                     data-testid={ORDER_DISTRIBUTION_LINE_REMOVE_TESTID}
@@ -375,13 +374,13 @@ export function OrderDistributionField({
               value={pendingPackages}
               onChange={(event) => setPendingPackages(event.target.value)}
               aria-label={LABELS.packages}
-              className={`w-24 ${TOUCH_TARGET} ${FIELD_TEXT}`}
+              className={`w-24 ${touchTarget} ${FIELD_TEXT}`}
               data-testid={ORDER_DISTRIBUTION_ADD_PACKAGES_TESTID}
             />
             <Button
               type="button"
               variant="outline"
-              className={TOUCH_TARGET}
+              className={touchTarget}
               disabled={!canAdd}
               onClick={addLine}
               data-testid={ORDER_DISTRIBUTION_ADD_TESTID}
@@ -437,7 +436,7 @@ function DistributionAvailable({
           {availability.status === 'quoting'
             ? LABELS.quoting
             : available === null
-              ? MISSING_VALUE_MARK
+              ? EMPTY_MARK
               : `${formatAvailable(available)}${unitLabel === null ? '' : ` ${unitLabel}`}`}
         </span>
       </div>
@@ -453,13 +452,11 @@ function AvailabilityWarning({
 }) {
   if (availability.status === 'error') {
     return (
-      <div role="alert" className="text-destructive" data-testid={ORDER_DISTRIBUTION_WARNING_TESTID}>
-        {availability.error.code === UNEXPECTED_ERROR_CODE ? (
-          <UnexpectedErrorNotice state={availability.error} />
-        ) : (
-          <p>{availability.error.message}</p>
-        )}
-      </div>
+      <ErrorAlert
+        error={availability.error}
+        className="text-destructive"
+        testId={ORDER_DISTRIBUTION_WARNING_TESTID}
+      />
     );
   }
   if (availability.status !== 'ready') return null;

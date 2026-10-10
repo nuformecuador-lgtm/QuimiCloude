@@ -2,8 +2,6 @@
 
 import { Button } from '@/components/ui/button';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 type FormulaNameClashProps = {
   readonly recipeName: string;
   readonly onReplace: () => void;
@@ -26,13 +24,13 @@ export function FormulaNameClash({ recipeName, onReplace, onRename }: FormulaNam
         {`Ya existe la fórmula «${recipeName}». Reemplazarla cambia sus ingredientes, pasos y descripción; los pedidos que la usan no cambian su coste guardado.`}
       </p>
       <div className="flex flex-wrap gap-2">
-        <Button type="button" className={TOUCH_TARGET} onClick={onReplace} data-testid="formula-import-clash-replace">
+        <Button type="button" touch onClick={onReplace} data-testid="formula-import-clash-replace">
           Reemplazar
         </Button>
         <Button
           type="button"
           variant="outline"
-          className={TOUCH_TARGET}
+          touch
           onClick={onRename}
           data-testid="formula-import-clash-rename"
         >

@@ -1,26 +1,20 @@
 'use client';
 
 import type { DataTableColumn } from '@/components/shared/data-table';
-import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
-import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import type { AssignedOrderView } from '@/lib/modules/asignaciones';
 import type { OrderPriority } from '@/lib/modules/pedidos';
 
 import { AssignedOrderEnterTrigger } from './assigned-order-enter-trigger';
+import {
+  orderNumberColumn,
+  presentationColumn,
+  quantityColumn,
+  recipeColumn,
+  responsiblesColumn,
+} from './assignment-list-parts';
 
-/**
- * Mismo glifo que el marcador de `/pedidos`, pero declarado aqui: son rutas distintas y esta no
- * importa por ruta profunda desde la otra.
- */
-export const MISSING_VALUE_MARK = '—';
-
-function MissingValue({ field }: { readonly field: string }) {
-  return (
-    <span aria-label="Sin dato" data-testid={`assigned-order-missing-${field}`}>
-      {MISSING_VALUE_MARK}
-    </span>
-  );
-}
+// El barrel de la ruta sigue exportando este nombre.
+export { EMPTY_MARK as MISSING_VALUE_MARK } from '@/lib/shared/ui/empty-mark';
 
 export const ASSIGNED_ORDER_STATUS_LABELS: Readonly<Record<AssignedOrderView['status'], string>> =
   {
@@ -54,34 +48,10 @@ export function buildAssignedOrdersColumns({
   canExecute,
 }: AssignedOrdersColumnsOptions): readonly DataTableColumn<AssignedOrderView>[] {
   const columns: DataTableColumn<AssignedOrderView>[] = [
-    {
-      id: ASSIGNED_ORDER_NUMBER_COLUMN_ID,
-      label: 'Nº de pedido',
-      align: 'start',
-      // Nace fijada: es un defecto, con preferencia guardada gana la del usuario.
-      defaultPinned: 'left',
-      cell: (order) => order.numberText,
-    },
-    {
-      id: ASSIGNED_ORDER_RECIPE_NAME_COLUMN_ID,
-      label: 'Receta',
-      align: 'start',
-      cell: (order) =>
-        order.recipeName ?? <MissingValue field={ASSIGNED_ORDER_RECIPE_NAME_COLUMN_ID} />,
-    },
-    {
-      id: ASSIGNED_ORDER_QUANTITY_COLUMN_ID,
-      label: 'Cantidad',
-      align: 'end',
-      cell: (order) =>
-        order.unitLabel === null ? order.quantity : `${order.quantity} ${order.unitLabel}`,
-    },
-    {
-      id: ASSIGNED_ORDER_PRESENTATION_COLUMN_ID,
-      label: 'Presentación',
-      align: 'start',
-      cell: (order) => <OrderDistributionLabel lines={order.presentationLines} />,
-    },
+    orderNumberColumn(ASSIGNED_ORDER_NUMBER_COLUMN_ID),
+    recipeColumn(ASSIGNED_ORDER_RECIPE_NAME_COLUMN_ID, 'assigned-order'),
+    quantityColumn(ASSIGNED_ORDER_QUANTITY_COLUMN_ID, (quantity) => quantity),
+    presentationColumn(ASSIGNED_ORDER_PRESENTATION_COLUMN_ID),
     {
       id: ASSIGNED_ORDER_PRIORITY_COLUMN_ID,
       label: 'Prioridad',
@@ -102,13 +72,7 @@ export function buildAssignedOrdersColumns({
         </span>
       ),
     },
-    {
-      id: ASSIGNED_ORDER_RESPONSIBLES_COLUMN_ID,
-      label: 'Responsables',
-      align: 'start',
-      // Sin `onShowAll`: esta pantalla no tiene panel de edicion donde desplegar el resto.
-      cell: (order) => <ResponsibleAvatars responsibles={order.otherResponsibles} />,
-    },
+    responsiblesColumn(ASSIGNED_ORDER_RESPONSIBLES_COLUMN_ID, (order) => order.otherResponsibles),
   ];
 
   if (canExecute) {

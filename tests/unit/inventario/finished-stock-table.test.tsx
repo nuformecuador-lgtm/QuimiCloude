@@ -2,7 +2,6 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  EMPTY_CELL,
   FinishedStockTable,
   packagedStockLabel,
 } from '@/app/(private)/inventario/components';
@@ -14,7 +13,9 @@ import {
   type ProductView,
 } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
-import { esperarInteractiva, setupUser } from '../../helpers/user-event';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
+import { clickRowAction, openRowActionsMenu } from '../../helpers/row-actions-menu';
+import { setupUser } from '../../helpers/user-event';
 
 /**
  * Pestana «Producto terminado» agrupada por pedido: la fila es el pedido (o «Sin pedido») y se
@@ -199,7 +200,7 @@ describe('fila de pedido', () => {
     expect(within(fila).getByTestId('finished-stock-order-number')).toHaveTextContent(
       /^2026-0007$/,
     );
-    expect(within(fila).getByTestId('finished-stock-name')).toHaveTextContent(EMPTY_CELL);
+    expect(within(fila).getByTestId('finished-stock-name')).toHaveTextContent(EMPTY_MARK);
   });
 
   it('la columna «# Pedido» va entre la imagen y «Nombre» y queda vacia en las sub-filas', async () => {
@@ -221,7 +222,7 @@ describe('fila de pedido', () => {
     montar([pedido({ packagedStock: null })]);
     const fila = filaDeGrupo('order-1');
     expect(within(fila).queryByTestId('finished-stock-packaged')).toBeNull();
-    expect(within(fila).getByTestId('data-table-cell-stock')).toHaveTextContent(EMPTY_CELL);
+    expect(within(fila).getByTestId('data-table-cell-stock')).toHaveTextContent(EMPTY_MARK);
   });
 
   it('no ofrece acciones de producto, solo el control de desplegar', () => {
@@ -255,9 +256,11 @@ describe('desplegar', () => {
     expect(existencia).toHaveAttribute('aria-label', '6 × Botella 250 ml');
     expect(existencia).toHaveAttribute('title', '6 × Botella 250 ml');
     expect(within(sub).getByTestId('product-qty-alert')).toHaveTextContent('3');
-    expect(within(sub).getByTestId('product-batches-open')).toBeInTheDocument();
-    expect(within(sub).getByTestId('product-edit-open')).toBeInTheDocument();
-    expect(within(sub).getByTestId('product-delete-open')).toBeInTheDocument();
+    const menu = await openRowActionsMenu(user, within(sub).getByTestId('product-row-actions'));
+    expect(within(menu).getByTestId('product-batches-open')).toBeInTheDocument();
+    expect(within(menu).getByTestId('product-edit-open')).toBeInTheDocument();
+    expect(within(menu).getByTestId('product-delete-open')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
 
     await user.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -280,7 +283,7 @@ describe('desplegar', () => {
     await user.click(screen.getByTestId('finished-stock-toggle'));
 
     const sub = screen.getByTestId('data-table-row-order-1--product-1');
-    await user.click(await esperarInteractiva(within(sub).getByTestId('product-batches-open')));
+    await clickRowAction(user, within(sub).getByTestId('product-row-actions'), 'product-batches-open');
 
     expect(await screen.findByTestId('product-batches-sheet')).toBeInTheDocument();
     expect(listOrderBatchesActionMock).toHaveBeenCalledWith('order-1', 'product-1');
@@ -293,7 +296,7 @@ describe('desplegar', () => {
     await user.click(screen.getByTestId('finished-stock-toggle'));
 
     const sub = screen.getByTestId('data-table-row-order-1--product-1');
-    await user.click(await esperarInteractiva(within(sub).getByTestId('product-delete-open')));
+    await clickRowAction(user, within(sub).getByTestId('product-row-actions'), 'product-delete-open');
     expect(await screen.findByTestId('delete-product-dialog')).toBeInTheDocument();
   });
 
@@ -303,7 +306,7 @@ describe('desplegar', () => {
     await user.click(screen.getByTestId('finished-stock-toggle'));
 
     const sub = screen.getByTestId('data-table-row-order-1--product-1');
-    await user.click(await esperarInteractiva(within(sub).getByTestId('product-edit-open')));
+    await clickRowAction(user, within(sub).getByTestId('product-row-actions'), 'product-edit-open');
     expect(await screen.findByTestId('product-field-type-readonly')).toBeInTheDocument();
   });
 });
@@ -331,8 +334,8 @@ describe('fila «Sin pedido»', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
     const sub = screen.getByTestId('data-table-row-without-product-2--product-2');
-    expect(within(sub).getByTestId('data-table-cell-qtyAlert')).toHaveTextContent(EMPTY_CELL);
-    await user.click(await esperarInteractiva(within(sub).getByTestId('product-batches-open')));
+    expect(within(sub).getByTestId('data-table-cell-qtyAlert')).toHaveTextContent(EMPTY_MARK);
+    await clickRowAction(user, within(sub).getByTestId('product-row-actions'), 'product-batches-open');
 
     expect(await screen.findByTestId('product-batches-sheet')).toBeInTheDocument();
     expect(listOrderBatchesActionMock).toHaveBeenCalledWith(null, 'product-2');

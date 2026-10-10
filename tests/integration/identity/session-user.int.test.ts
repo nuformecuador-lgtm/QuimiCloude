@@ -42,7 +42,10 @@ import {
   DOCUMENT_TYPE_CC,
   normalizeCompanyName,
   ROLE_ACONDICIONAMIENTO,
+  ROLE_ADMINISTRADOR,
+  ROLE_EMPACADOR,
   ROLE_MAESTRO,
+  ROLE_OPERADOR,
   SEED_ROLE_PERMISSIONS,
 } from '@/lib/modules/identity';
 import { createResolveSession } from '@/lib/modules/identity/domain/resolve-session';
@@ -498,6 +501,77 @@ describe('findActiveSessionUserById con el rol de acondicionamiento', () => {
       );
     } finally {
       await prisma.user.deleteMany({ where: { id: usuario.id } });
+    }
+  });
+});
+
+describe('findActiveSessionUserById y el permiso integraciones.modificar', () => {
+  const CODIGO = 'integraciones.modificar';
+
+  async function permisosDeLaSesionDe(roleName: string): Promise<readonly string[]> {
+    const marca = randomUUID();
+    const { id: roleId } = await prisma.role.findUniqueOrThrow({
+      where: { name: roleName },
+      select: { id: true },
+    });
+    const { id } = await prisma.user.create({
+      data: {
+        firstNames: 'Integraciones',
+        lastNames: 'De Prueba',
+        birthDate: new Date('1990-01-01T00:00:00.000Z'),
+        email: `qc221.session.${marca}@example.test`,
+        phone: '+57 300 000 0000',
+        documentTypeCode: DOCUMENT_TYPE_CC,
+        documentNumber: `66${marca.replaceAll('-', '').slice(0, 18)}`,
+        username: `qc221_session_${marca}`,
+        passwordHash: 'no-se-usa-en-este-test',
+        roleId,
+        companyId: empresaId,
+        accountStatus: 'active',
+      },
+      select: { id: true },
+    });
+
+    try {
+      const ahora = new Date();
+      const resolveSession = createResolveSession({
+        session: {
+          readClaims: async () => ({
+            sub: id,
+            roleName,
+            companyId: empresaId,
+            sessionId: SID_SIN_CERRAR,
+            issuedAt: new Date(ahora.getTime() + 60_000),
+            expiresAt: new Date(ahora.getTime() + 3_600_000),
+          }),
+        },
+        users: { findActiveById: findActiveSessionUserById },
+        log: { log: () => undefined },
+      });
+
+      const resuelta = await resolveSession(new Date(ahora.getTime() + 120_000));
+      expect(resuelta?.user.id).toBe(id);
+      expect(resuelta?.user.roleName).toBe(roleName);
+      return [...(resuelta?.user.permissions ?? [])].sort();
+    } finally {
+      await prisma.user.deleteMany({ where: { id } });
+    }
+  }
+
+  it('R7: la sesion de un Administrador incluye integraciones.modificar y es exactamente su conjunto sembrado', async () => {
+    const permisos = await permisosDeLaSesionDe(ROLE_ADMINISTRADOR);
+
+    expect(permisos).toContain(CODIGO);
+    expect(permisos).toEqual([...(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? [])].sort());
+  });
+
+  it('R7: la sesion de un Operador, un Empacador o un Administrador de acondicionamiento no incluye integraciones.modificar', async () => {
+    for (const roleName of [ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_ACONDICIONAMIENTO]) {
+      const permisos = await permisosDeLaSesionDe(roleName);
+
+      expect(permisos.length, roleName).toBeGreaterThan(0);
+      expect(permisos, roleName).not.toContain(CODIGO);
+      expect(permisos, roleName).toEqual([...(SEED_ROLE_PERMISSIONS[roleName] ?? [])].sort());
     }
   });
 });

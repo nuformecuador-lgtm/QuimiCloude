@@ -4,18 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect } from 'react';
 import { toast } from 'sonner';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
+import { ConfirmDialogFrame } from '@/components/shared/confirm-dialog';
+import { DeleteConfirmDialogBody } from '@/components/shared/delete-confirm-dialog';
 import type { WorkGroupRow } from '@/lib/modules/identity';
 import {
   deleteWorkGroupAction,
@@ -35,8 +25,8 @@ import { WORK_GROUP_ID_FIELD } from './work-group-form';
  * confirmar. **Abrir el dialogo no escribe nada.**
  *
  * **Un rechazo se pinta DENTRO del dialogo, por su `code` y nunca por su texto** (R34), el dialogo
- * **sigue abierto** y **la fila no se retira**. El dialogo se monta solo mientras esta abierto,
- * asi que un rechazo anterior no reaparece.
+ * **sigue abierto** y **la fila no se retira**. El cuerpo se monta solo mientras el popup esta
+ * abierto, asi que un rechazo anterior no reaparece.
  *
  * Con exito se aplica R35: cerrar, avisar por toast —sobre el `<Toaster />` del layout privado, no
  * uno propio— y `router.refresh()`, que reejecuta la lista con la MISMA URL y por tanto conserva
@@ -55,11 +45,7 @@ export const DELETE_WORK_GROUP_ERROR_MESSAGE_TESTID = 'delete-work-group-error-m
 export const DELETE_WORK_GROUP_FORM_TESTID = 'delete-work-group-form';
 export const DELETE_WORK_GROUP_ID_TESTID = 'delete-work-group-id';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 const TITLE = 'Eliminar el grupo';
-const CONFIRM_LABEL = 'Eliminar';
-const CONFIRM_PENDING_LABEL = 'Eliminando…';
 const DISMISS_LABEL = 'Volver';
 const DELETE_SUCCESS = 'Grupo eliminado.';
 
@@ -73,6 +59,22 @@ export type DeleteWorkGroupDialogProps = {
 };
 
 export function DeleteWorkGroupDialog({ group, open, onOpenChange }: DeleteWorkGroupDialogProps) {
+  return (
+    <ConfirmDialogFrame
+      open={open}
+      onOpenChange={onOpenChange}
+      testId={DELETE_WORK_GROUP_DIALOG_TESTID}
+    >
+      <DeleteWorkGroupDialogBody group={group} onOpenChange={onOpenChange} />
+    </ConfirmDialogFrame>
+  );
+}
+
+/** Se monta con el popup: cada apertura arranca sin el rechazo de la anterior. */
+function DeleteWorkGroupDialogBody({
+  group,
+  onOpenChange,
+}: Omit<DeleteWorkGroupDialogProps, 'open'>) {
   const router = useRouter();
   const [state, formAction, isPending] = useActionState(deleteWorkGroupAction, INITIAL_STATE);
 
@@ -87,57 +89,30 @@ export function DeleteWorkGroupDialog({ group, open, onOpenChange }: DeleteWorkG
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent data-testid={DELETE_WORK_GROUP_DIALOG_TESTID}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{TITLE}</AlertDialogTitle>
-          <AlertDialogDescription data-testid={DELETE_WORK_GROUP_MESSAGE_TESTID}>
-            Se va a eliminar el grupo {group.name}. Esta acción no se puede deshacer.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        {error === undefined ? null : (
-          <div
-            role="alert"
-            className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={DELETE_WORK_GROUP_ERROR_TESTID}
-            data-code={error.code}
-          >
-            {error.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={error} />
-            ) : (
-              <p data-testid={DELETE_WORK_GROUP_ERROR_MESSAGE_TESTID}>{error.message}</p>
-            )}
-          </div>
-        )}
-
-        <form action={formAction} data-testid={DELETE_WORK_GROUP_FORM_TESTID}>
-          <input
-            type="hidden"
-            name={WORK_GROUP_ID_FIELD}
-            defaultValue={group.id}
-            data-testid={DELETE_WORK_GROUP_ID_TESTID}
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              className={TOUCH_TARGET}
-              data-testid={DELETE_WORK_GROUP_DISMISS_TESTID}
-            >
-              {DISMISS_LABEL}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              type="submit"
-              variant="destructive"
-              className={TOUCH_TARGET}
-              disabled={isPending}
-              aria-busy={isPending}
-              data-testid={DELETE_WORK_GROUP_CONFIRM_TESTID}
-            >
-              {isPending ? CONFIRM_PENDING_LABEL : CONFIRM_LABEL}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </form>
-      </AlertDialogContent>
-    </AlertDialog>
+    <DeleteConfirmDialogBody
+      onOpenChange={onOpenChange}
+      texts={{
+        title: TITLE,
+        description: <>Se va a eliminar el grupo {group.name}. Esta acción no se puede deshacer.</>,
+        dismiss: DISMISS_LABEL,
+      }}
+      testIds={{
+        message: DELETE_WORK_GROUP_MESSAGE_TESTID,
+        dismiss: DELETE_WORK_GROUP_DISMISS_TESTID,
+        confirm: DELETE_WORK_GROUP_CONFIRM_TESTID,
+        form: DELETE_WORK_GROUP_FORM_TESTID,
+        error: DELETE_WORK_GROUP_ERROR_TESTID,
+        errorMessage: DELETE_WORK_GROUP_ERROR_MESSAGE_TESTID,
+      }}
+      submit={{
+        kind: 'action',
+        action: formAction,
+        hidden: [
+          { name: WORK_GROUP_ID_FIELD, value: group.id, testId: DELETE_WORK_GROUP_ID_TESTID },
+        ],
+      }}
+      isPending={isPending}
+      error={error}
+    />
   );
 }

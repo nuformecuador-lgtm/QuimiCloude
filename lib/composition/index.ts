@@ -120,6 +120,9 @@ import {
   createReservationQueries,
 } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
+import { createFinishedBatchLabels } from '@/lib/modules/inventario/adapters/driven/persistence/finished-batch-labels-prisma';
+import { createFinishedGoodsDispatch } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-dispatch-prisma';
+import { findDeliverableBatches } from '@/lib/modules/inventario/adapters/driven/persistence/deliverable-batches-prisma';
 import { listStockGroups } from '@/lib/modules/inventario/adapters/driven/persistence/finished-stock-prisma';
 import {
   claimImport,
@@ -142,6 +145,7 @@ import type { OrderNumberFormatter } from '@/lib/modules/inventario/ports/order-
 import type { PresentationRepository } from '@/lib/modules/inventario/ports/presentation-repository';
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 import type {
+  FinishedBatchCatalog,
   OrderNumberDirectory,
   PackagingCatalog,
   PresentationCatalog,
@@ -257,14 +261,17 @@ import {
   createCancelOrder,
   createCreateOrder,
   createDeleteOrder,
+  createDeliverOrder,
   createExpireStaleOrders,
   createFindCoverage,
   createFinishConditioning,
   createFinishPacking,
   createGetOrder,
   createGetOrderCustomerFilterOption,
+  createGetOrderDelivery,
   createListAliveSummariesByIds,
   createListAliveSummariesInCompany,
+  createListSummariesByIdsIncludingDeleted,
   createListOrders,
   createQuoteOrderCost,
   createQuoteOrderPresentationAvailability,
@@ -288,8 +295,10 @@ import {
   startConditioningAliveOrder,
   startPackingAliveOrder,
   createOrderPackingRepository,
+  createOrderConditioningRepository,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
+import { createOrderDeliveryRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma';
 import {
   withOrderTransaction,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
@@ -299,6 +308,7 @@ import type { OrderConditioningRepository } from '@/lib/modules/pedidos/ports/or
 import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-packing-repository';
 import type { OrderSummaryReader } from '@/lib/modules/pedidos/ports/order-summary-reader';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
+import type { OrderDeliveryUnitOfWork } from '@/lib/modules/pedidos/ports/order-delivery-unit-of-work';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import {
   createRecipeExecutionReader,
@@ -342,6 +352,7 @@ import { readMailTransportFromEnv } from '@/lib/modules/identity/adapters/driven
 import { sendCredentialSetupLink as sendCredentialSetupLinkToOutbox } from '@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-outbox';
 import { sendCredentialSetupLink as sendCredentialSetupLinkWithResend } from '@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-resend';
 import { sendCredentialSetupLink as sendCredentialSetupLinkWithSmtp } from '@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-smtp';
+import { sendCredentialSetupLink as sendCredentialSetupLinkDisabled } from '@/lib/modules/identity/adapters/driven/mail/credential-setup-mailer-desactivado';
 import {
   applyCredentialAndActivate,
   issueForPendingUser,
@@ -408,9 +419,18 @@ import {
   createUnassignResponsible,
   createCancelAssignedOrder,
   createRecordStepMove,
+  createListExecutionTraces,
+  createGetExecutionTrace,
   createStartConditioning as createStartConditioningOrder,
   createFinishConditioning as createFinishConditioningOrder,
+  createListConditioningOrders,
+  createListConditionedOrders,
+  createGetConditioningOrder,
+  createListConditioningTeamCandidates,
+  createListDeliveredConditionedOrders,
+  createSaveConditioningBatchData,
 } from '@/lib/modules/asignaciones';
+import { createConditioningTeamRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/conditioning-team-prisma';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
 import { createExecutionLogRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/execution-log-prisma';
@@ -421,6 +441,8 @@ import {
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
   listAliveOrderSummariesInCompany,
+  listOrderHistoryByIdsIncludingDeleted,
+  listOrderNumbersByIdsIncludingDeleted,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
@@ -677,6 +699,8 @@ const credentialSetupMailer: CredentialSetupMailer = {
         return sendCredentialSetupLinkWithSmtp(input);
       case 'resend':
         return sendCredentialSetupLinkWithResend(input);
+      case 'desactivado':
+        return sendCredentialSetupLinkDisabled(input);
     }
   },
 };
@@ -1361,6 +1385,20 @@ const reviewBlockedOrders = createReviewBlockedOrders({
  */
 const customerCatalog = buildCustomerCatalog();
 
+const finishedBatchCatalog: FinishedBatchCatalog = { findDeliverableBatches };
+
+/** La entrega, la salida de `inventario` y el estado del pedido confirman o se deshacen juntos. */
+const orderDeliveryUnitOfWork: OrderDeliveryUnitOfWork = {
+  run: (work) =>
+    withOrderTransaction((tx) =>
+      work({
+        orders: createOrderWriteRepository(tx),
+        deliveries: createOrderDeliveryRepository(tx),
+        finishedGoods: createFinishedGoodsDispatch(tx),
+      }),
+    ),
+};
+
 export const pedidos = {
   createOrder: createCreateOrder({
     recipes: recipeCatalog,
@@ -1439,6 +1477,20 @@ export const pedidos = {
   }),
   searchOrderCustomers: createSearchOrderCustomers({ customerCatalog }),
   getOrderCustomerFilterOption: createGetOrderCustomerFilterOption({ customerCatalog }),
+  getOrderDelivery: createGetOrderDelivery({
+    orders: orderRepository,
+    deliveries: createOrderDeliveryRepository(),
+    lines: createOrderWriteRepository(),
+    presentations: presentationCatalog,
+    finishedBatches: finishedBatchCatalog,
+    customerCatalog,
+  }),
+  deliverOrder: createDeliverOrder({
+    customerCatalog,
+    unitOfWork: orderDeliveryUnitOfWork,
+    deliveries: createOrderDeliveryRepository(),
+    orders: orderRepository,
+  }),
 } as const;
 
 // ---------------------------------------------------------------------------------------
@@ -1500,6 +1552,8 @@ const orderConditioningRepository: OrderConditioningRepository = {
 const orderSummaryReader: OrderSummaryReader = {
   listAliveByIds: listAliveOrderSummariesByIds,
   listAliveInCompany: listAliveOrderSummariesInCompany,
+  listNumbersByIdsIncludingDeleted: listOrderNumbersByIdsIncludingDeleted,
+  listHistoryByIdsIncludingDeleted: listOrderHistoryByIdsIncludingDeleted,
 };
 
 const orderCatalog: OrderCatalog = {
@@ -1509,6 +1563,7 @@ const orderCatalog: OrderCatalog = {
     summaries: orderSummaryReader,
     packaging: packagingCatalog,
   }),
+  listSummariesByIdsIncludingDeleted: createListSummariesByIdsIncludingDeleted({ summaries: orderSummaryReader }),
   // Finalizar ya no da de alta ningun lote, asi que `createTransitionOrder`
   // ya no necesita `recipeCatalog`/`productCatalog`/`unitCatalog` -esos catalogos siguen
   // cableados mas abajo para quien todavia los usa-.
@@ -1588,6 +1643,10 @@ const executionTransaction: ExecutionTransaction = {
           }),
         },
         log: createExecutionLogRepository(tx),
+        conditioning: {
+          startConditioningAliveById: createStartConditioning({ conditioning: createOrderConditioningRepository(tx) }),
+        },
+        team: createConditioningTeamRepository(tx),
       }),
     ),
 };
@@ -1759,12 +1818,74 @@ export const asignaciones = {
     log: executionLogRepository,
     now: () => new Date(),
   }),
+  listExecutionTraces: createListExecutionTraces({
+    log: executionLogRepository,
+    orders: orderCatalog,
+    people: peopleDirectory,
+  }),
+  getExecutionTrace: createGetExecutionTrace({
+    log: executionLogRepository,
+    orders: orderCatalog,
+    people: peopleDirectory,
+  }),
   startConditioning: createStartConditioningOrder({
     orders: orderCatalog,
+    people: peopleDirectory,
+    groups: workGroupDirectory,
+    transaction: executionTransaction,
     now: () => new Date(),
   }),
   finishConditioning: createFinishConditioningOrder({
     orders: orderCatalog,
+    batches: createFinishedBatchLabels(),
+    now: () => new Date(),
+  }),
+  listConditioningOrders: createListConditioningOrders({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    recipes: recipeCatalog,
+    people: peopleDirectory,
+    presentations: presentationCatalog,
+    units: unitCatalog,
+    now: () => new Date(),
+  }),
+  listConditionedOrders: createListConditionedOrders({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    recipes: recipeCatalog,
+    people: peopleDirectory,
+    presentations: presentationCatalog,
+    units: unitCatalog,
+    now: () => new Date(),
+  }),
+  getConditioningOrder: createGetConditioningOrder({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    recipes: recipeCatalog,
+    people: peopleDirectory,
+    presentations: presentationCatalog,
+    units: unitCatalog,
+    team: createConditioningTeamRepository(),
+    batches: createFinishedBatchLabels(),
+    now: () => new Date(),
+  }),
+  listConditioningTeamCandidates: createListConditioningTeamCandidates({
+    people: peopleDirectory,
+    groups: workGroupDirectory,
+    now: () => new Date(),
+  }),
+  listDeliveredConditionedOrders: createListDeliveredConditionedOrders({
+    orders: orderCatalog,
+    assignments: orderAssignmentRepository,
+    recipes: recipeCatalog,
+    people: peopleDirectory,
+    presentations: presentationCatalog,
+    units: unitCatalog,
+    now: () => new Date(),
+  }),
+  saveConditioningBatchData: createSaveConditioningBatchData({
+    orders: orderCatalog,
+    batches: createFinishedBatchLabels(),
     now: () => new Date(),
   }),
 } as const;
@@ -2104,3 +2225,20 @@ function buildCustomerCatalog(): CustomerCatalog {
     searchRefs: (query, companyId) => searchCustomerRefs(query, { companyId }),
   };
 }
+
+// ---------------------------------------------------------------------------------------
+// `integraciones`. Bloque nuevo al final, con sus imports: no reordena ni reformatea nada de
+// lo de arriba.
+// ---------------------------------------------------------------------------------------
+
+import { secretCipherAesGcm } from '@/lib/modules/integraciones/adapters/driven/security/secret-cipher-aes-gcm';
+import { secretDigestSha256 } from '@/lib/modules/integraciones/adapters/driven/security/secret-digest-sha256';
+import type { SecretCipher } from '@/lib/modules/integraciones/ports/secret-cipher';
+import type { SecretDigest } from '@/lib/modules/integraciones/ports/secret-digest';
+
+/** Importarlo no lee ninguna variable: las claves se leen dentro de cada `encrypt`/`decrypt`. */
+const secretCipher: SecretCipher = secretCipherAesGcm;
+const secretDigest: SecretDigest = secretDigestSha256;
+
+/** Cifrador y resumidor de las credenciales de integraciones, vistos por sus puertos. */
+export const integraciones = { secretCipher, secretDigest } as const;

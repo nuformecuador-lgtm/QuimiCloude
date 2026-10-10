@@ -1,7 +1,7 @@
 // El Administrador de acondicionamiento se autoriza como cualquier otro conjunto de permisos: con
 // el que le declara el seed no ve ningun pedido de «Mis asignados», rechaza en todo caso de uso de
 // pedidos, terminados, empaque, ejecucion, asignacion e inventario sin tocar un puerto, y en
-// `/asignacion` solo se le ofrece la vista de reserva.
+// `/asignacion` se le ofrecen exactamente sus dos vistas.
 //
 // El actor sale de `SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO]`, nunca de una lista a mano.
 
@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ROLE_ACONDICIONAMIENTO, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity';
 
-import { resolveAssignmentViews } from '@/lib/modules/asignaciones/domain/assignment-views';
+import { resolveAssignmentView, resolveAssignmentViews } from '@/lib/modules/asignaciones/domain/assignment-views';
 import {
   createAssignResponsibles,
   type AssignResponsiblesDeps,
@@ -342,16 +342,27 @@ describe('R15 — sensibilidad: el puerto falso si registra a quien lo toca', ()
   });
 });
 
-describe('R16 — en /asignacion el rol solo recibe la vista de reserva', () => {
-  it("R16: resolveAssignmentViews con los permisos del rol devuelve exactamente ['asignados']", () => {
-    expect(resolveAssignmentViews(ACTOR_ASIGNACIONES)).toEqual(['asignados']);
+describe('R2 — en /asignacion el rol recibe exactamente sus vistas (enmienda la vista de reserva)', () => {
+  it("R2, QC-219 R20: resolveAssignmentViews con los permisos del rol devuelve exactamente ['por_acondicionar', 'acondicionados', 'acondicionados_entregados']", () => {
+    expect(resolveAssignmentViews(ACTOR_ASIGNACIONES)).toEqual([
+      'por_acondicionar',
+      'acondicionados',
+      'acondicionados_entregados',
+    ]);
   });
 
-  it('R16: no incluye todos, terminados ni por_empacar', () => {
+  it('R2: no incluye asignados, todos, terminados ni por_empacar', () => {
     const vistas = resolveAssignmentViews(ACTOR_ASIGNACIONES);
 
+    expect(vistas).not.toContain('asignados');
     expect(vistas).not.toContain('todos');
     expect(vistas).not.toContain('terminados');
     expect(vistas).not.toContain('por_empacar');
+  });
+
+  it('R2: la vista por defecto del rol es `por_acondicionar`', () => {
+    const vistas = resolveAssignmentViews(ACTOR_ASIGNACIONES);
+    expect(resolveAssignmentView(undefined, vistas)).toBe('por_acondicionar');
+    expect(resolveAssignmentView('asignados', vistas)).toBe('por_acondicionar');
   });
 });

@@ -1,12 +1,18 @@
 // T15 — Test estatico del enganche al despliegue (QC-6).
 //
-// Cubre R19 (el seed corre automaticamente en cada despliegue, encadenado en el `build`),
-// R20 (si el seed falla, el despliegue falla de forma visible: `&&`, nunca `;` ni `||`),
+// Cubre R19 (el seed corre automaticamente en cada despliegue de produccion, como paso del
+// `build`), R20 (si el seed falla, el despliegue falla de forma visible),
 // R21 (el seed no anade ninguna dependencia nueva a `package.json`) y R6 (las tres
 // `SEED_ADMIN_*` estan en `.env.example` sin ningun valor).
 //
 // Lee package.json como texto/JSON y recorre el arbol de archivos del seed; no ejecuta nada
 // (eso es T16, a mano, contra una base real).
+//
+// R19/R20 cambiaron de mecanismo, no de intencion (enmienda del 2026-10-08 en
+// specs/QC-6-seed-roles-y-usuario-inicial/requirements.md): `scripts.build` ya no es una cadena
+// de `&&`, delega en `scripts/build.mjs`. El orden de los pasos vive en `pasosDelBuild` y el corte
+// al primer fallo en `ejecutarBuild`; aqui se fija lo que R19/R20 exigen de ambos. El detalle de
+// cada entorno de Vercel esta en tests/unit/scripts/build.test.ts.
 
 import { builtinModules } from 'node:module'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
@@ -14,6 +20,8 @@ import { dirname, extname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
+
+import { ejecutarBuild, pasosDelBuild } from '@/scripts/build.mjs'
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
@@ -39,47 +47,45 @@ const packageJson = JSON.parse(packageJsonText) as {
   devDependencies?: Record<string, string>
 }
 
-describe('package.json — el build encadena el seed (R19, R20)', () => {
+describe('package.json + scripts/build.mjs — el build corre el seed (R19, R20)', () => {
   it('existe scripts.build', () => {
     expect(packageJson.scripts).toBeDefined()
     expect(packageJson.scripts?.build).toBeDefined()
     expect(typeof packageJson.scripts?.build).toBe('string')
   })
 
-  const build = packageJson.scripts?.build ?? ''
+  it('scripts.build delega en scripts/build.mjs', () => {
+    expect(packageJson.scripts?.build).toBe('node scripts/build.mjs')
+  })
 
   // El build lleva `prisma generate` entre la migracion y el seed (b79a43c4; decision del
   // 2026-10-08 en specs/QC-6-seed-roles-y-usuario-inicial/requirements.md): el seed necesita
   // el cliente generado y Vercel cachea node_modules, asi que sin generar quedaria uno viejo.
-  it('scripts.build contiene los cuatro comandos, en orden: migrar, generar, sembrar, compilar', () => {
-    const posMigrate = build.indexOf('prisma migrate deploy')
-    const posGenerate = build.indexOf('prisma generate')
-    const posSeed = build.indexOf('scripts/seed.ts')
-    const posBuild = build.indexOf('next build')
+  const CUATRO = ['prisma migrate deploy', 'prisma generate', 'tsx scripts/seed.ts', 'next build']
 
-    expect(posMigrate, `"prisma migrate deploy" no aparece en scripts.build: ${build}`).toBeGreaterThanOrEqual(0)
-    expect(posGenerate, `"prisma generate" no aparece en scripts.build: ${build}`).toBeGreaterThanOrEqual(0)
-    expect(posSeed, `"scripts/seed.ts" no aparece en scripts.build: ${build}`).toBeGreaterThanOrEqual(0)
-    expect(posBuild, `"next build" no aparece en scripts.build: ${build}`).toBeGreaterThanOrEqual(0)
-
-    expect(posMigrate, 'la migracion debe ir antes de generar el cliente').toBeLessThan(posGenerate)
-    expect(posGenerate, 'el cliente debe generarse antes del seed').toBeLessThan(posSeed)
-    expect(posSeed, 'el seed debe ir antes de next build').toBeLessThan(posBuild)
+  it.each([
+    ['fuera de Vercel', {}],
+    ['en Vercel production', { VERCEL: '1', VERCEL_ENV: 'production' }],
+  ])('%s: los cuatro pasos, en orden: migrar, generar, sembrar, compilar (R19)', (_nombre, env) => {
+    const { pasos } = pasosDelBuild(env)
+    expect(pasos).toEqual(CUATRO)
+    expect(pasos.indexOf('tsx scripts/seed.ts'), 'el seed debe ir antes de next build').toBeLessThan(
+      pasos.indexOf('next build'),
+    )
   })
 
-  it('los cuatro comandos van unidos por && y no por ; ni ||, en ese orden', () => {
-    const tramos = build.split('&&').map((tramo) => tramo.trim())
-
-    expect(tramos, `scripts.build partido por && deberia tener cuatro tramos: ${build}`).toHaveLength(4)
-    expect(tramos[0]).toContain('prisma migrate deploy')
-    expect(tramos[1]).toContain('prisma generate')
-    expect(tramos[2]).toContain('scripts/seed.ts')
-    expect(tramos[3]).toContain('next build')
-  })
-
-  it('scripts.build no usa ; ni || como separador entre los comandos (no cortarian ante un fallo)', () => {
-    expect(build, `scripts.build no debe contener ";": ${build}`).not.toContain(';')
-    expect(build, `scripts.build no debe contener "||": ${build}`).not.toContain('||')
+  it('si el seed falla, el build sale con su codigo distinto de 0 y next build no corre (R20)', () => {
+    const llamados: string[] = []
+    const codigo = ejecutarBuild(
+      { VERCEL: '1', VERCEL_ENV: 'production' },
+      (comando: string) => {
+        llamados.push(comando)
+        return { status: comando === 'tsx scripts/seed.ts' ? 1 : 0 }
+      },
+      { log: () => {}, error: () => {} },
+    )
+    expect(codigo).not.toBe(0)
+    expect(llamados).not.toContain('next build')
   })
 
   it('existe scripts["db:seed"] y ejecuta scripts/seed.ts', () => {

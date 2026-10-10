@@ -10,8 +10,6 @@ export {
   type RecipeColumnId,
 } from './recipe-columns';
 export { RECIPE_SKELETON_COLUMN_COUNT } from './recipe-columns-skeleton';
-export { RecipeListEmpty } from './recipe-list-empty';
-export { RecipeListError } from './recipe-list-error';
 export {
   CREATED_AT_COLUMN_ID,
   CREATED_FROM_PARAM,
@@ -32,13 +30,20 @@ export {
 } from './recipe-list-params';
 export { RecipeListSection } from './recipe-list-section';
 export {
+  RECIPE_ACTION_DELETE_TESTID,
+  RECIPE_ACTION_EDIT_TESTID,
+  RECIPE_ROW_ACTIONS_TESTID,
+  RecipeRowActions,
+  recipeRowActionsLabel,
+  type RecipeRowActionsProps,
+} from './recipe-row-actions';
+export {
   RECIPE_NO_RESULTS_TEXT,
   RECIPE_TABLE_ID,
   RECIPE_TABLE_TEXTS,
   RecipeTable,
   type RecipeTableProps,
 } from './recipe-table';
-export { RecipeTableSkeleton } from './recipe-table-skeleton';
 
 export {
   buildRecipePayload,

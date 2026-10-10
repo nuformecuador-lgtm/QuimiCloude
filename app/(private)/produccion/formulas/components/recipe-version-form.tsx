@@ -8,12 +8,12 @@ import { toast } from 'sonner';
 // El barrel de step-reader solo expone el asistente paso a paso, y esa carpeta no se puede tocar
 // desde esta ficha; aqui hace falta la vista sin estado del documento.
 import { StepDocumentView } from '@/components/shared/step-reader/step-document-view';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ErrorAlert } from '@/components/shared/error-alert';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import {
   createRecipeVersionSchema,
   sumPercentages,
@@ -28,6 +28,7 @@ import {
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { recipeEditRoute } from '@/lib/shared/routes';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
 import type { RecipeFormProductPage } from './recipe-form';
@@ -46,7 +47,6 @@ import {
   type RecipeVersionFormState,
 } from './recipe-form-state';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base';
 
 const SAVE_SUCCESS_CREATE = 'Versión creada.';
@@ -253,28 +253,25 @@ export function RecipeVersionForm(props: RecipeVersionFormProps) {
       }}
     >
       {props.mode === 'edit' && props.version.isUnderReview ? (
-        <Badge variant="outline" className="self-start" data-testid="recipe-version-form-under-review">
+        <Badge variant="info" className="self-start" data-testid="recipe-version-form-under-review">
           Por revisar
         </Badge>
       ) : null}
 
       {saveError === null ? null : (
-        <div
-          role="alert"
+        <ErrorAlert
+          error={saveError}
           className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-          data-testid="recipe-version-form-error"
-        >
-          {saveError.code === UNEXPECTED_ERROR_CODE ? (
-            <UnexpectedErrorNotice state={saveError} />
-          ) : (
+          testId="recipe-version-form-error"
+          renderCatalogued={(catalogued) => (
             <>
-              <p data-testid="recipe-version-form-error-message">{saveError.message}</p>
+              <p data-testid="recipe-version-form-error-message">{catalogued.message}</p>
               <p className="text-xs" data-testid="recipe-version-form-error-code">
-                {saveError.code}
+                {catalogued.code}
               </p>
             </>
           )}
-        </div>
+        />
       )}
 
       <div className="flex flex-col gap-1">
@@ -284,7 +281,7 @@ export function RecipeVersionForm(props: RecipeVersionFormProps) {
           type="text"
           value={state.name}
           onChange={(event) => setState((previous) => ({ ...previous, name: event.target.value }))}
-          className={`${TOUCH_TARGET} ${FIELD_TEXT}`}
+          className={`${touchTarget} ${FIELD_TEXT}`}
           aria-invalid={fieldErrors.name === undefined ? undefined : true}
           aria-describedby={fieldErrors.name === undefined ? undefined : 'recipe-version-error-name'}
           data-testid="recipe-version-field-name"
@@ -322,13 +319,13 @@ export function RecipeVersionForm(props: RecipeVersionFormProps) {
           href={originalRoute}
           data-slot="button"
           data-testid="recipe-version-form-cancel"
-          className={cn(buttonVariants({ variant: 'outline' }), TOUCH_TARGET)}
+          className={cn(buttonVariants({ variant: 'outline', touch: true }))}
         >
           Cancelar
         </Link>
         <Button
           type="submit"
-          className={TOUCH_TARGET}
+          touch
           disabled={isPending || !canSubmit}
           aria-busy={isPending}
           data-testid="recipe-version-form-submit"

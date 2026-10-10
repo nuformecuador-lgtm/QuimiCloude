@@ -6,8 +6,6 @@ import type { UnitRef } from '@/lib/modules/unidades';
 
 import { FinishedStockListSection } from './finished-stock-list-section';
 import { FIRST_PAGE, productListHref, STOCK_COLUMN_ID, QTY_ALERT_COLUMN_ID, TYPE_COLUMN_ID } from './product-list-params';
-import { ProductListEmpty } from './product-list-empty';
-import { ProductListError } from './product-list-error';
 import { ProductSheet } from './product-sheet';
 import { ProductTable } from './product-table';
 
@@ -56,7 +54,16 @@ export async function ProductListSection({ params, units, formUnits }: ProductLi
   const result = await listProductsAction(params);
 
   if (result.status === 'error') {
-    return <ProductListError error={result} />;
+    return (
+      <ProductTable
+        status="error"
+        error={result}
+        products={[]}
+        params={params}
+        totalPages={0}
+        units={units}
+      />
+    );
   }
 
   const { items, page: currentPage, totalPages } = result.data;
@@ -73,20 +80,23 @@ export async function ProductListSection({ params, units, formUnits }: ProductLi
     (params.filters[QTY_ALERT_COLUMN_ID]?.kind === 'numberRange' &&
       (params.filters[QTY_ALERT_COLUMN_ID].min !== null || params.filters[QTY_ALERT_COLUMN_ID].max !== null));
 
-  // Si no hay items:
-  // - Sin filtros -> catalogo vacio: muestra estado vacio completo con formulario de alta
-  // - Con filtros -> resultado vacio filtrado: muestra la tabla con su estado vacio ("No hay productos que mostrar.")
+  // Con filtros activos, la lista vacia es un «sin resultados» y se queda dentro de la tabla.
   if (items.length === 0 && !hasActiveFilters) {
     return (
-      <ProductListEmpty
-        firstPageHref={
-          currentPage > FIRST_PAGE
-            ? productListHref({ ...params, page: FIRST_PAGE })
-            : undefined
-        }
-      >
-        <ProductSheet units={units} formUnits={formUnits} />
-      </ProductListEmpty>
+      <ProductTable
+        products={items}
+        params={{ ...params, page: currentPage }}
+        totalPages={totalPages}
+        units={units}
+        canAdjust={canAdjust}
+        empty={{
+          firstPageHref:
+            currentPage > FIRST_PAGE
+              ? productListHref({ ...params, page: FIRST_PAGE })
+              : undefined,
+          action: <ProductSheet units={units} formUnits={formUnits} />,
+        }}
+      />
     );
   }
 

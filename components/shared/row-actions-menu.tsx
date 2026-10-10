@@ -3,6 +3,7 @@
 import type { ComponentType } from 'react';
 
 import { MoreVerticalIcon } from 'lucide-react';
+import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -11,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /**
  * Menu "de los 3 puntos" para las acciones de una fila: UN disparador siempre presente en el DOM
@@ -29,9 +31,6 @@ import {
  * tactil, igual que cualquier otro boton de accion del repo.
  */
 
-/** Objetivo tactil minimo (44x44 px). Los primitivos miden 32 px de alto por defecto. */
-const TRIGGER_TOUCH_TARGET = 'min-h-11 min-w-11';
-
 /** El primitivo trae `px-1.5 py-1 gap-1.5` (~28 px): demasiado justo para tocar con el dedo. */
 const ITEM_TOUCH_TARGET = 'min-h-11 gap-2.5 px-3 py-2.5';
 
@@ -43,12 +42,15 @@ export type RowActionMenuItem = {
   readonly label: string;
   /** Componente de icono de lucide-react, p. ej. `PencilIcon`. */
   readonly icon: ComponentType<{ 'aria-hidden'?: boolean | 'true' | 'false' }>;
-  readonly onSelect: () => void;
   readonly disabled?: boolean;
   readonly destructive?: boolean;
   /** `data-testid` de ESTE item del menu. Sin valor, no lleva ninguno. */
   readonly testId?: string;
-};
+} & (
+  | { readonly onSelect: () => void; readonly href?: undefined }
+  /** Item enlace: se pinta como `<a href>` y navega a esa ruta. */
+  | { readonly href: string; readonly onSelect?: () => void }
+);
 
 export type RowActionsMenuProps = {
   readonly items: readonly RowActionMenuItem[];
@@ -80,7 +82,7 @@ export function RowActionsMenu({
             type="button"
             variant="ghost"
             size="icon"
-            className={TRIGGER_TOUCH_TARGET}
+            className={touchTarget}
             aria-label={triggerLabel}
             data-testid={triggerTestId}
             {...triggerDataAttributes}
@@ -100,6 +102,7 @@ export function RowActionsMenu({
               disabled={item.disabled}
               data-testid={item.testId}
               className={ITEM_TOUCH_TARGET}
+              render={item.href === undefined ? undefined : <Link href={item.href} />}
               // El primitivo de Base UI (`components/ui/dropdown-menu.tsx`) expone `onClick`, no
               // `onSelect`: aqui se traduce el callback semantico del item a ese evento.
               onClick={item.onSelect}

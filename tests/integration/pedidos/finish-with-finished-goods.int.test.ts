@@ -149,12 +149,21 @@ const orderCatalog: OrderCatalog = {
         listAliveInCompany: async () => {
           throw new Error('este archivo no ejercita listAliveSummariesInCompany');
         },
+        listNumbersByIdsIncludingDeleted: async () => {
+          throw new Error('este archivo no ejercita listSummariesByIdsIncludingDeleted');
+        },
+        listHistoryByIdsIncludingDeleted: async () => {
+          throw new Error('este archivo no ejercita listSummariesByIdsIncludingDeleted');
+        },
       },
       packaging: packagingCatalog,
     })(companyId, ids, statuses, page, pageSize);
   },
   listAliveSummariesInCompany: async () => {
     throw new Error('este archivo no ejercita listAliveSummariesInCompany');
+  },
+  listSummariesByIdsIncludingDeleted: async () => {
+    throw new Error('este archivo no ejercita listSummariesByIdsIncludingDeleted');
   },
   // R15, R16: Finalizar ya no da de alta ningun lote -eso se traslada a Terminar (T14)-.
   transitionAliveById: createTransitionOrder({ unitOfWork }),

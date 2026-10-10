@@ -4,19 +4,9 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId, useState } from 'react';
 import { toast } from 'sonner';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { ConfirmDialogBody, ConfirmDialogFrame } from '@/components/shared/confirm-dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode } from '@/lib/modules/errores';
+import type { ErrorCode } from '@/lib/modules/errores';
 import { cancelOrderSchema, formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import {
   cancelOrderAction,
@@ -54,10 +44,9 @@ import {
  * privado ya monta -**no se monta otro** (R36)- y se refresca la lista con `router.refresh()`,
  * que reejecuta el Server Component con la MISMA URL y conserva pagina, orden y filtros.
  *
- * **Apertura CONTROLADA y montaje bajo demanda.** Quien dispara es `OrderRowActions`, en la fila,
- * asi que aqui no hay disparador propio. Quien compone monta el dialogo solo mientras esta
- * abierto: asi cada apertura arranca con el estado de accion limpio y un intento anterior no deja
- * restos.
+ * **Apertura CONTROLADA.** Quien dispara es `OrderRowActions`, en la fila, asi que aqui no hay
+ * disparador propio. El cuerpo se monta solo mientras el popup esta abierto: cada apertura arranca
+ * con el estado de accion limpio y un intento anterior no deja restos.
  */
 
 export const CANCEL_ORDER_DIALOG_TESTID = 'cancel-order-dialog';
@@ -71,7 +60,6 @@ export const CANCEL_ORDER_ID_TESTID = 'cancel-order-id';
 export const CANCEL_ORDER_ID_FIELD = 'id';
 export const CANCEL_ORDER_REASON_FIELD = 'reason';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 /** 16 px en TODOS los anchos: por debajo, Safari en iOS hace zoom al enfocar el campo (R45). */
 const FIELD_TEXT = 'text-base md:text-base';
 
@@ -113,6 +101,19 @@ export type CancelOrderDialogProps = {
 
 export function CancelOrderDialog({ order, open, onOpenChange }: CancelOrderDialogProps) {
   const fieldId = useId();
+  return (
+    <ConfirmDialogFrame open={open} onOpenChange={onOpenChange} testId={CANCEL_ORDER_DIALOG_TESTID}>
+      <CancelOrderDialogBody order={order} onOpenChange={onOpenChange} fieldId={fieldId} />
+    </ConfirmDialogFrame>
+  );
+}
+
+type CancelOrderDialogBodyProps = Omit<CancelOrderDialogProps, 'open'> & {
+  readonly fieldId: string;
+};
+
+/** Se monta con el popup: cada apertura arranca sin el motivo ni el rechazo de la anterior. */
+function CancelOrderDialogBody({ order, onOpenChange, fieldId }: CancelOrderDialogBodyProps) {
   const reasonId = `${fieldId}-reason`;
   const errorId = `${fieldId}-error`;
   const router = useRouter();
@@ -152,80 +153,56 @@ export function CancelOrderDialog({ order, open, onOpenChange }: CancelOrderDial
   const isEmpty = reason.trim() === '';
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent data-testid={CANCEL_ORDER_DIALOG_TESTID}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{TITLE}</AlertDialogTitle>
-          <AlertDialogDescription data-testid="cancel-order-message">
-            {/* El pedido se nombra por su CORRELATIVO, nunca por el uuid (R10). */}
+    <ConfirmDialogBody
+      onOpenChange={onOpenChange}
+      variant="destructive"
+      texts={{
+        title: TITLE,
+        description: (
+          <>
             Se va a cancelar el pedido {formatOrderNumber(order.number)}. Un pedido cancelado ya no
             se puede editar.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        <form action={formAction} className="flex flex-col gap-3" data-testid="cancel-order-form">
-          <input
-            type="hidden"
-            name={CANCEL_ORDER_ID_FIELD}
-            defaultValue={order.id}
-            data-testid={CANCEL_ORDER_ID_TESTID}
-          />
-
-          <div className="flex flex-col gap-2">
-            <label htmlFor={reasonId} className="text-sm font-medium">
-              {REASON_LABEL}
-            </label>
-            <Textarea
-              id={reasonId}
-              name={CANCEL_ORDER_REASON_FIELD}
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-              className={FIELD_TEXT}
-              aria-invalid={error === undefined ? undefined : true}
-              aria-describedby={error === undefined ? undefined : errorId}
-              data-testid={CANCEL_ORDER_REASON_TESTID}
-            />
-          </div>
-
-          {/* Region de error del DIALOGO (`design.md > 8`): aqui aterriza `not_cancellable`. */}
-          {error === undefined ? null : (
-            <div
-              role="alert"
-              id={errorId}
-              className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-              data-testid={CANCEL_ORDER_ERROR_TESTID}
-              data-code={error.code}
-            >
-              {/*
-                QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade
-                el identificador de la peticion. El CATALOGADO -`not_cancellable` entre otros- se
-                pinta como siempre y sin identificador.
-              */}
-              {error.code === UNEXPECTED_ERROR_CODE ? (
-                <UnexpectedErrorNotice state={error} />
-              ) : (
-                <p data-testid="cancel-order-error-message">{error.message}</p>
-              )}
-            </div>
-          )}
-
-          <AlertDialogFooter>
-            <AlertDialogCancel className={TOUCH_TARGET} data-testid={CANCEL_ORDER_DISMISS_TESTID}>
-              {DISMISS_LABEL}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              type="submit"
-              variant="destructive"
-              className={TOUCH_TARGET}
-              disabled={isEmpty || isPending}
-              aria-busy={isPending}
-              data-testid={CANCEL_ORDER_CONFIRM_TESTID}
-            >
-              {isPending ? CONFIRM_PENDING_LABEL : CONFIRM_LABEL}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </form>
-      </AlertDialogContent>
-    </AlertDialog>
+          </>
+        ),
+        dismiss: DISMISS_LABEL,
+        confirm: CONFIRM_LABEL,
+        pending: CONFIRM_PENDING_LABEL,
+      }}
+      testIds={{
+        message: 'cancel-order-message',
+        dismiss: CANCEL_ORDER_DISMISS_TESTID,
+        confirm: CANCEL_ORDER_CONFIRM_TESTID,
+        form: 'cancel-order-form',
+        error: CANCEL_ORDER_ERROR_TESTID,
+        errorMessage: 'cancel-order-error-message',
+      }}
+      submit={{
+        kind: 'action',
+        action: formAction,
+        hidden: [{ name: CANCEL_ORDER_ID_FIELD, value: order.id, testId: CANCEL_ORDER_ID_TESTID }],
+        formClassName: 'flex flex-col gap-3',
+      }}
+      layout="error-in-form"
+      isPending={isPending}
+      confirmDisabled={isEmpty}
+      error={error}
+      errorId={errorId}
+    >
+      <div className="flex flex-col gap-2">
+        <label htmlFor={reasonId} className="text-sm font-medium">
+          {REASON_LABEL}
+        </label>
+        <Textarea
+          id={reasonId}
+          name={CANCEL_ORDER_REASON_FIELD}
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          className={FIELD_TEXT}
+          aria-invalid={error === undefined ? undefined : true}
+          aria-describedby={error === undefined ? undefined : errorId}
+          data-testid={CANCEL_ORDER_REASON_TESTID}
+        />
+      </div>
+    </ConfirmDialogBody>
   );
 }

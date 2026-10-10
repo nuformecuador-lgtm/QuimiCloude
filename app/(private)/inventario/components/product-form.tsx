@@ -1,19 +1,11 @@
 'use client';
 
 import { useActionState, useEffect, useId, useState } from 'react';
-import { useFormStatus } from 'react-dom';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
-import { Button } from '@/components/ui/button';
+import { ErrorAlert } from '@/components/shared/error-alert';
+import { FormSheet } from '@/components/shared/form-sheet';
 import { Label } from '@/components/ui/label';
-import {
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
+import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import {
   createProductSchema,
   updateProductSchema,
@@ -24,7 +16,9 @@ import {
   type ProductType,
 } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { formatDateLocalISO } from '@/lib/shared/ui/date-civil';
 import { trimDecimal } from '@/lib/shared/ui/decimal-display';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import {
   createProductAction,
   updateProductAction,
@@ -35,13 +29,11 @@ import { PresentationUnitSelect } from '@/components/shared/presentation-unit-se
 import { SharedSelect } from '@/components/shared/shared-select';
 
 import { sanitizeQuantityInput } from './product-cost-amount';
-import { ProductBatchDateField, formatDateLocalISO } from './product-batch-date-field';
+import { ProductBatchDateField } from './product-batch-date-field';
 import { ProductCostFields } from './product-cost-fields';
 import { ProductField } from './product-field';
 import { ProductNamePicker, type ProductNameOption } from './product-name-picker';
-import { EMPTY_CELL, productUnitLabel } from './product-columns';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
+import { productUnitLabel } from './product-columns';
 
 /**
  * Campos de texto del producto.
@@ -544,7 +536,7 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
   // Solo en la edicion: en el alta la unidad del selector puede cambiar y la etiqueta mentiria.
   const editUnitLabel = product === undefined ? null : productUnitLabel(product, units);
   const qtyAlertLabel =
-    editUnitLabel === null || editUnitLabel === EMPTY_CELL
+    editUnitLabel === null || editUnitLabel === EMPTY_MARK
       ? FIELD_LABELS.qtyAlert
       : `${FIELD_LABELS.qtyAlert} (${editUnitLabel})`;
 
@@ -575,57 +567,38 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
   const packagingPresentationName = product?.presentationName ?? null;
 
   return (
-    /*
-      `isForm`: el panel ENTERO es el <form>, asi que el boton de guardar puede vivir en el pie
-      -donde R31 lo quiere, sin estirarse al ancho- y `useFormStatus()` lo sigue viendo, porque
-      el formulario es su ancestro. Por eso este componente monta el panel y no solo los campos.
-
-      `w-full` en angosto y `sm:max-w-md` a partir de ahi: el primitivo trae `w-3/4`, que en un
-      telefono deja el formulario en una columna incomoda. `pb-[env(safe-area-inset-bottom)]`
-      para que el pie no quede bajo la barra de gestos de iOS. El desbordamiento vertical lo
-      absorbe el CUERPO, no el panel: asi la cabecera y el pie no se van con el scroll.
-    */
-    <SheetContent
-      side="right"
-      className="w-full pb-[env(safe-area-inset-bottom)] data-[side=right]:w-full sm:max-w-md"
-      data-testid="product-sheet"
-      isForm
-      formProps={{ action: formAction, 'data-testid': 'product-form' }}
-      footer={<FormActions />}
+    <FormSheet
+      title={isEdit ? 'Editar producto' : 'Nuevo producto'}
+      description={
+        isEdit
+          ? 'Cambia los datos del producto. Se guardan todos los campos.'
+          : 'Completa los datos del producto.'
+      }
+      formAction={formAction}
+      testIds={{
+        sheet: 'product-sheet',
+        form: 'product-form',
+        cancel: 'product-form-cancel',
+        submit: 'product-form-submit',
+      }}
+      cancelTouch="prop"
     >
-      <SheetHeader>
-        <SheetTitle>{isEdit ? 'Editar producto' : 'Nuevo producto'}</SheetTitle>
-        <SheetDescription>
-          {isEdit
-            ? 'Cambia los datos del producto. Se guardan todos los campos.'
-            : 'Completa los datos del producto.'}
-        </SheetDescription>
-      </SheetHeader>
-
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
       {formError === undefined ? null : (
-        // Region de error del formulario (R20): aqui van los rechazos que no senalan un campo.
-        //
-        // El error INESPERADO lo pinta el componente compartido, que anade el
-        // identificador de la peticion. El error DEL CATALOGO se pinta exactamente como siempre
-        // -mismos `data-testid`, mismo marcado- y sin identificador ninguno.
-        <div
-          role="alert"
+        // Aqui van los rechazos que no senalan un campo.
+        <ErrorAlert
+          error={formError}
           id={formErrorId}
           className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-          data-testid="product-form-error"
-        >
-          {formError.code === UNEXPECTED_ERROR_CODE ? (
-            <UnexpectedErrorNotice state={formError} />
-          ) : (
+          testId="product-form-error"
+          renderCatalogued={(catalogued) => (
             <>
-              <p data-testid="product-form-error-message">{formError.message}</p>
+              <p data-testid="product-form-error-message">{catalogued.message}</p>
               <p className="text-xs" data-testid="product-form-error-code">
-                {formError.code}
+                {catalogued.code}
               </p>
             </>
           )}
-        </div>
+        />
       )}
 
       {/*
@@ -827,9 +800,7 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
           )}
         </>
       )}
-
-      </div>
-    </SheetContent>
+    </FormSheet>
   );
 }
 
@@ -869,52 +840,5 @@ function PackagingPresentationSummary({
         {presentationName}
       </p>
     </div>
-  );
-}
-
-/**
- * Acciones del pie: cancelar y guardar, en ese orden de lectura y alineadas a la derecha por el
- * pie del panel. **Cancelar es `type="button"`** -y no un submit- porque desde que el panel
- * entero es un `<form>` cualquier boton sin tipo dentro de el lo enviaria. Cierra por el
- * primitivo (`SheetClose`), asi que no necesita saber nada del estado de apertura.
- */
-function FormActions() {
-  return (
-    <>
-      <SheetClose
-        render={
-          <Button
-            type="button"
-            variant="outline-dashed"
-            className={TOUCH_TARGET}
-            data-testid="product-form-cancel"
-          />
-        }
-      >
-        Cancelar
-      </SheetClose>
-      <SaveButton />
-    </>
-  );
-}
-
-/**
- * Boton de envio. Archivo aparte no, componente aparte si, y por la misma necesidad tecnica que
- * en el login: `useFormStatus()` solo lee el estado del `<form>` ANCESTRO, asi que dentro del
- * componente que renderiza el `<form>` devolveria siempre `pending: false`.
- */
-function SaveButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button
-      type="submit"
-      className={TOUCH_TARGET}
-      disabled={pending}
-      aria-busy={pending}
-      data-testid="product-form-submit"
-    >
-      {pending ? 'Guardando…' : 'Guardar'}
-    </Button>
   );
 }

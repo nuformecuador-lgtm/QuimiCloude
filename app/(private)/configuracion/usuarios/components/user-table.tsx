@@ -6,13 +6,14 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   DataTable,
   type DataTableParams,
+  type DataTableStates,
   type DataTableTexts,
 } from '@/components/shared/data-table';
 import type { ErrorState } from '@/lib/modules/errores';
 import type { RoleOption, UserRow } from '@/lib/modules/identity';
 
 import { DeleteUserDialog } from './delete-user-dialog';
-import { createUserColumns } from './user-columns';
+import { USER_COLUMN_COUNT, createUserColumns } from './user-columns';
 import { userListHref } from './user-list-params';
 import { UserSheet } from './user-sheet';
 import { UserStatusDialog } from './user-status-dialog';
@@ -40,9 +41,9 @@ import { UserStatusDialog } from './user-status-dialog';
  * **El selector de tamano y la paginacion son los del componente compartido** (R16): 10 y 25 salen
  * de `PAGE_SIZE_OPTIONS`, y la pagina actual y el total los pinta su indicador.
  *
- * **`status` es SIEMPRE `'idle'`**: los tres estados de R18/R19 se pintan fuera de `<DataTable>`,
- * con copy y acciones propias, y el «cargando» lo aporta el `<Suspense>` del servidor. Aqui solo
- * llegan filas ya resueltas.
+ * **Cargando, error y vacio los pinta `<DataTable>` en lugar de toda la tabla**, y en esos
+ * estados no se pinta el envoltorio de aqui. El vacio sustituye a la tabla tambien con busqueda:
+ * es el propio de la pantalla, con su «Limpiar la búsqueda».
  *
  * **El desbordamiento horizontal lo absorbe el primitivo** (R21): `components/ui/table.tsx` ya
  * envuelve la tabla en un contenedor con `overflow-x-auto`, asi que con seis columnas el documento
@@ -54,10 +55,9 @@ import { UserStatusDialog } from './user-status-dialog';
  * asi que cada apertura arranca limpia y un rechazo anterior no reaparece.
  *
  * **El ALTA no esta aqui, y es deliberado.** La monta `user-create-action.tsx`, hermana de esta
- * tabla y no hija suya, porque esta tabla **solo existe cuando la consulta devuelve filas**: con la
- * lista vacia no se renderiza, y con ella se iba el unico camino para crear a nadie. Como el
- * listado excluye al actor (QC-66 R35), eso dejaba sin salida justo el caso de la instalacion —un
- * solo usuario sembrado, que es quien mira la pantalla—.
+ * tabla y no hija suya, porque con la lista vacia esta tabla solo pinta el vacio, y con ella se
+ * iba el unico camino para crear a nadie. Como el listado excluye al actor, eso dejaba sin salida
+ * justo el caso de la instalacion: un solo usuario sembrado, que es quien mira la pantalla.
  *
  * **R6, mitad cliente**: sin `usuarios.modificar` no se emite NINGUNA escritura —ni las acciones de
  * fila, ni el panel, ni los dialogos—. Ocultarlas es comodidad de la interfaz y **no es el
@@ -101,13 +101,28 @@ export const USER_TABLE_TEXTS: DataTableTexts = {
   lastYear: 'Último año',
 };
 
+export const USER_LIST_SKELETON_TESTID = 'user-list-skeleton';
+export const USER_ROW_SKELETON_TESTID = 'user-row-skeleton';
+/** Una celda por columna: un test lo ata al largo de `createUserColumns(...)`. */
+export const USER_SKELETON_COLUMN_COUNT = USER_COLUMN_COUNT;
+
+export const USER_LIST_EMPTY_TESTID = 'user-list-empty';
+export const USER_LIST_EMPTY_MESSAGE_TESTID = 'user-list-empty-message';
+export const USER_LIST_CLEAR_SEARCH_TESTID = 'user-list-clear-search';
+export const USER_LIST_FIRST_PAGE_TESTID = 'user-list-first-page';
+
+export const USER_LIST_ERROR_TESTID = 'user-list-error';
+export const USER_LIST_ERROR_MESSAGE_TESTID = 'user-list-error-message';
+export const USER_LIST_ERROR_CODE_TESTID = 'user-list-error-code';
+export const USER_LIST_RETRY_TESTID = 'user-list-retry';
+
 /**
  * Que escritura hay abierta. **Una sola por vez**, que es lo que permite montar una instancia de
  * cada panel para toda la pagina en vez de una por fila.
  *
  * **Los tres modos actuan SOBRE una fila**, y por eso `user` no es opcional. El alta no esta aqui:
  * vive en `user-create-action.tsx`, fuera de la tabla, para poder ofrecerse tambien cuando la
- * consulta no devuelve ninguna fila y esta tabla no llega a montarse.
+ * consulta no devuelve ninguna fila.
  */
 export type UserPanelMode = 'edit' | 'delete' | 'status';
 
@@ -117,7 +132,22 @@ export type UserPanel = {
   readonly user: UserRow;
 };
 
-export type UserTableProps = {
+type UserTableStatusProps =
+  | { readonly status?: 'idle' | 'loading'; readonly error?: undefined }
+  | { readonly status: 'error'; readonly error: ErrorState };
+
+/**
+ * El vacio de usuarios no ofrece «crear el primero»: el alta vive arriba, fuera de los estados de
+ * la lista.
+ */
+export type UserTableEmpty = {
+  /** Solo si habia termino de busqueda o filtro activos. */
+  readonly clearSearchHref?: string;
+  /** Solo si la pagina pedida era mayor que el total. */
+  readonly firstPageHref?: string;
+};
+
+export type UserTableProps = UserTableStatusProps & {
   /** Las filas **ya resueltas** por la consulta, en el orden en que las entrega (R12, R14). */
   readonly users: readonly UserRow[];
   /** Los parametros vigentes, los mismos con los que se pidio la lista. */
@@ -143,7 +173,69 @@ export type UserTableProps = {
   readonly roles: readonly RoleOption[];
   /** El error de la consulta de roles, o `null`. Degradado declarado de `design.md > 6` (R24). */
   readonly rolesError: ErrorState | null;
+  /** Presente solo con cero filas: el vacio sustituye a toda la tabla. */
+  readonly empty?: UserTableEmpty;
 };
+
+function buildStates(
+  params: DataTableParams,
+  error: ErrorState | undefined,
+  empty: UserTableEmpty | undefined,
+): DataTableStates {
+  return {
+    loading: {
+      columns: USER_SKELETON_COLUMN_COUNT,
+      rows: params.pageSize,
+      label: USER_TABLE_TEXTS.loading,
+      testId: USER_LIST_SKELETON_TESTID,
+      rowTestId: USER_ROW_SKELETON_TESTID,
+      headCellClassName: 'h-4 w-full',
+    },
+    ...(error === undefined
+      ? {}
+      : {
+          error: {
+            error,
+            title: USER_TABLE_TEXTS.error,
+            testId: USER_LIST_ERROR_TESTID,
+            messageTestId: USER_LIST_ERROR_MESSAGE_TESTID,
+            codeTestId: USER_LIST_ERROR_CODE_TESTID,
+            retry: { kind: 'refresh' },
+            retryTestId: USER_LIST_RETRY_TESTID,
+          },
+        }),
+    ...(empty === undefined
+      ? {}
+      : {
+          empty: {
+            testId: USER_LIST_EMPTY_TESTID,
+            messageTestId: USER_LIST_EMPTY_MESSAGE_TESTID,
+            message:
+              empty.clearSearchHref === undefined
+                ? 'No hay usuarios que coincidan con lo que se está pidiendo.'
+                : 'La búsqueda no encontró ningún usuario.',
+            ...(empty.clearSearchHref === undefined
+              ? {}
+              : {
+                  clearSearch: {
+                    href: empty.clearSearchHref,
+                    label: 'Limpiar la búsqueda',
+                    testId: USER_LIST_CLEAR_SEARCH_TESTID,
+                  },
+                }),
+            ...(empty.firstPageHref === undefined
+              ? {}
+              : {
+                  firstPage: {
+                    href: empty.firstPageHref,
+                    label: 'Volver a la primera página',
+                    testId: USER_LIST_FIRST_PAGE_TESTID,
+                  },
+                }),
+          },
+        }),
+  };
+}
 
 export function UserTable({
   users,
@@ -153,6 +245,9 @@ export function UserTable({
   currentUserId,
   roles,
   rolesError,
+  status = 'idle',
+  error,
+  empty,
 }: UserTableProps) {
   const router = useRouter();
 
@@ -162,6 +257,10 @@ export function UserTable({
    * quien, y llaman a `setPanel(null)` al cerrar.
    */
   const [panel, setPanel] = useState<UserPanel | null>(null);
+  // La ultima fila de cada dialogo: tras la primera apertura el dialogo sigue montado y su salida
+  // anima con el contenido de esa fila.
+  const [lastDeleteUser, setLastDeleteUser] = useState<UserRow | null>(null);
+  const [lastStatusUser, setLastStatusUser] = useState<UserRow | null>(null);
 
   /** Cerrar es siempre lo mismo: soltar el estado. Estable, para no rearmar los dialogos. */
   const closePanel = useCallback((next: boolean) => {
@@ -175,8 +274,14 @@ export function UserTable({
       createUserColumns({
         canModify,
         onEdit: (user) => setPanel({ mode: 'edit', user }),
-        onDelete: (user) => setPanel({ mode: 'delete', user }),
-        onStatusChange: (user) => setPanel({ mode: 'status', user }),
+        onDelete: (user) => {
+          setLastDeleteUser(user);
+          setPanel({ mode: 'delete', user });
+        },
+        onStatusChange: (user) => {
+          setLastStatusUser(user);
+          setPanel({ mode: 'status', user });
+        },
       }),
     [canModify],
   );
@@ -186,19 +291,26 @@ export function UserTable({
   const deleteUser = panel !== null && panel.mode === 'delete' ? panel.user : null;
   const statusUser = panel !== null && panel.mode === 'status' ? panel.user : null;
 
+  const table = (
+    <DataTable
+      tableId={USER_TABLE_ID}
+      columns={columns}
+      rows={users}
+      getRowId={(user) => user.id}
+      params={params}
+      totalPages={totalPages}
+      onParamsChange={(next) => router.push(userListHref(next))}
+      status={status}
+      states={buildStates(params, error, empty)}
+      texts={USER_TABLE_TEXTS}
+    />
+  );
+
+  if (status !== 'idle' || (users.length === 0 && empty !== undefined)) return table;
+
   return (
     <div className="flex flex-col gap-4" data-testid={USER_TABLE_TESTID}>
-      <DataTable
-        tableId={USER_TABLE_ID}
-        columns={columns}
-        rows={users}
-        getRowId={(user) => user.id}
-        params={params}
-        totalPages={totalPages}
-        onParamsChange={(next) => router.push(userListHref(next))}
-        status="idle"
-        texts={USER_TABLE_TEXTS}
-      />
+      {table}
 
       {/*
         UNA instancia del panel de EDICION para toda la pagina, y solo mientras esta abierto: asi
@@ -216,12 +328,20 @@ export function UserTable({
         />
       )}
 
-      {deleteUser === null ? null : (
-        <DeleteUserDialog user={deleteUser} open onOpenChange={closePanel} />
+      {lastDeleteUser === null ? null : (
+        <DeleteUserDialog
+          user={deleteUser ?? lastDeleteUser}
+          open={deleteUser !== null}
+          onOpenChange={closePanel}
+        />
       )}
 
-      {statusUser === null ? null : (
-        <UserStatusDialog user={statusUser} open onOpenChange={closePanel} />
+      {lastStatusUser === null ? null : (
+        <UserStatusDialog
+          user={statusUser ?? lastStatusUser}
+          open={statusUser !== null}
+          onOpenChange={closePanel}
+        />
       )}
     </div>
   );

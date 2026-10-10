@@ -2,14 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
 
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { BrandLogo } from '@/components/shared/brand-logo';
+import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { RETURN_PARAM, resolveReturnPath } from '@/lib/modules/identity';
+import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import { FORGOT_PASSWORD_ROUTE } from '@/lib/shared/routes';
 
 import { LoginBackground, LoginForm } from './components';
@@ -92,17 +88,11 @@ async function pantallaConDestinoDeVuelta(
  * El marcado de la pantalla. Es una funcion que devuelve JSX, no un componente: no se monta con
  * `<... />` ni introduce una frontera nueva, solo evita repetir el arbol en las dos ramas.
  *
- * El `<main>` lleva `data-login="screen"`: ese atributo es el unico ambito del que cuelgan todas
- * las reglas de piel de QC-30 en `app/globals.css` (medidas de la tarjeta, vidrio, burbujas).
- * Fuera de el, los primitivos de `components/ui/` conservan sus valores. De ahi llega tambien el
- * `position: relative` que ancla la capa decorativa, asi que no se repite como utilidad aqui. El
- * `min-h-svh` se mantiene: es la unidad de viewport dinamica que pide R23 y no se sustituye por
- * `min-h-screen`.
+ * La clase `dark` del `<main>` pinta la pantalla con los tokens oscuros sea cual sea el tema; el
+ * `Toaster` del layout queda fuera y sigue el tema del usuario.
  *
- * `<LoginBackground />` es hermano de la Card dentro del mismo `<main>`, y va antes que ella en el
- * orden del DOM para quedar por debajo (el CSS le da a la tarjeta `z-index: 2`). Al ser un `<div
- * aria-hidden>` y no un elemento seccionador, la capa de burbujas NO introduce un segundo
- * landmark: la pagina sigue exponiendo exactamente un elemento con rol `main` (R15).
+ * El `h1` de la tarjeta es el logo vertical: su nombre accesible sale del `alt` del logo, sin
+ * texto oculto.
  *
  * El enlace de recuperacion va en el pie de la Card y FUERA del `<form>` (R22, `design.md > 5.4`):
  * no es un control del formulario y dentro estorbaria el orden de tabulacion entre la contrasena y
@@ -116,12 +106,14 @@ function pantallaDeLogin(next: string): ReactElement {
   return (
     <main
       data-login="screen"
-      className="flex min-h-svh items-center justify-center p-6"
+      className="dark flex min-h-svh items-center justify-center p-6"
     >
       <LoginBackground />
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>QuimiCloude</CardTitle>
+          <h1>
+            <BrandLogo variant="vertical" tone="on-dark" height={79} alt={BRAND_LABEL} preload />
+          </h1>
         </CardHeader>
         <CardContent>
           <LoginForm next={next} />

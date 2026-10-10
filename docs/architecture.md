@@ -201,6 +201,18 @@ lote de producto terminado en la misma operacion, pero ahora deja el pedido `POR
 `ENTREGADO`. El Empacador lo **comienza** (`EN_EMPAQUE`, a su nombre) y lo **termina**, y es
 Terminar quien deja el pedido `ENTREGADO` con su fecha de terminado, sin tocar inventario.
 Detalle en `specs/QC-168-estado-por-empacar/requirements.md`.
+**Avanza el 2026-10-06 (acotacion de QC-215 a QC-219): el vencimiento gana su primer
+escritor.** Tras el empaque entra el acondicionamiento (`POR_ACONDICIONAR` →
+`EN_ACONDICIONAMIENTO` → `ENTREGADO`): Terminar el empaque deja el pedido `POR_ACONDICIONAR`,
+ya no `ENTREGADO`. **Entregado el 2026-10-08:** los estados y sus transiciones (QC-215) y la
+pestaña «Por acondicionar» (QC-217). **Sin implementar todavia:** el rol (QC-216), comenzar y
+terminar con equipo (QC-218) y los datos de lote (QC-219). Con QC-219, el Administrador de
+acondicionamiento escribira, por cada lote de producto terminado del pedido, el **lote real**
+(sustituye al automatico y sigue siendo unico por empresa), la **fecha de vencimiento**
+(posterior a hoy) y el **dia de produccion** (hoy o antes). La pregunta **sigue abierta** para
+los insumos: nada consume el vencimiento todavia (QC-196). Detalle en
+`specs/QC-215-estados-de-acondicionamiento/requirements.md` y
+`specs/QC-219-datos-de-lote-en-acondicionamiento/requirements.md`.
 
 **4. Contabilidad e impuestos.** **CERRADA el 2026-09-03 (QC-33).** El ERP **no factura ni
 liquida impuestos**. Texto original: «El dinero **si** entra al modelo —el precio de venta del
@@ -628,6 +640,163 @@ Proceso:
 **`migrate resolve --rolled-back`:** Prisma lleva su propio registro en la tabla
 `_prisma_migrations`, y deshacer el SQL sin avisarle deja el historial mintiendo — la siguiente
 migracion se aplica sobre un estado que Prisma cree que es otro.
+
+## Despliegue a produccion (QC-229, 2026-10-08)
+
+- **Un push a `prod` despliega a produccion.** Lo hace `.github/workflows/desplegar.yml` con la
+  CLI de Vercel (`vercel deploy --prod`, version fija); tambien se lanza a mano
+  (`workflow_dispatch`). El build corre en Vercel, no en el runner.
+- **Tres secrets** en Settings > Secrets and variables > Actions del repo: `VERCEL_TOKEN` (se
+  crea en vercel.com/account/tokens), `VERCEL_ORG_ID` y `VERCEL_PROJECT_ID` (los de
+  `.vercel/project.json`). Sin uno, el workflow falla diciendo cual falta.
+- **En Vercel, migrate y seed solo con `VERCEL_ENV=production`.** `pnpm run build` es
+  `scripts/build.mjs`. Con `VERCEL` definida (Vercel la pone en todo build) corre
+  `prisma migrate deploy` y el seed solo si `VERCEL_ENV=production`; con preview, development,
+  vacio o ausente se los salta (solo `prisma generate` y `next build`). Sin `VERCEL` (local, CI)
+  corre todo, como antes, sea cual sea `VERCEL_ENV`. El build imprime siempre una linea
+  `[build] ...` con la decision y el porque.
+  - *Nota 2026-10-09 (QC-249):* desde QC-249 `VERCEL_ENV=preview` tambien migra y siembra, contra
+    la base de preview y tras una comprobacion previa; ver `## Previews (QC-249)`. Con
+    development, vacio o ausente sigue sin tocar la base.
+
+`tests/guards/guard-despliegue-produccion.test.ts` lo fija.
+
+### Por qué
+
+**CLI y token, no la integracion de Git.** Vercel no se puede conectar al repo: la cuenta de
+Vercel tiene vinculada otra cuenta de GitHub y el repo vive en otra.
+
+**Migrate y seed solo en production y preview, cada uno con su base.** Production migra y
+siembra su base; preview migra y siembra (con el seed de demostracion) la base del proyecto de
+Supabase de preview, y el build se niega antes del primer paso si las URL de base o storage no
+apuntan a ese proyecto (`## Previews (QC-249)`): una preview con la base de produccion migraria
+produccion con las migraciones de una rama sin mergear. Dentro de Vercel, si `VERCEL_ENV` falta,
+viene vacio o trae otro valor no se sabe que base es, y se falla hacia el lado seguro: no se toca
+la base.
+
+> *Nota 2026-10-09 (QC-249):* hasta esa fecha este parrafo decia «Migrate y seed solo en
+> produccion»: preview y produccion compartian base y por eso no habia previews. QC-249 le dio a
+> preview su propio proyecto de Supabase (base y storage) y un workflow de preview.
+
+## Previews (QC-249)
+
+- **Cada PR a `dev` desde una rama de este repo publica una preview.** Lo hace
+  `.github/workflows/preview.yml` en `pull_request` (`opened`, `synchronize`, `reopened`), nunca en
+  `pull_request_target`. Usa la misma CLI de version fija que `desplegar.yml`
+  (`npx --yes vercel@63.1.0 deploy --yes`, **sin** `--prod`), los mismos tres secrets y el token por
+  la variable `VERCEL_TOKEN`, nunca por `--token`. El runner no instala dependencias: el build es
+  remoto, en Vercel, con las variables del scope Preview.
+- **PRs desde forks:** el job queda saltado (no en rojo). GitHub no les da los secrets.
+- **Uno a la vez por PR, sin cancelar:** el grupo de concurrencia es el numero del PR y
+  `cancel-in-progress: false`, porque el build migra la base de preview y uno cortado a medias deja
+  sin saber en que estado quedo. Previews de PRs distintos si corren a la vez.
+- **La URL** queda en el PR como entorno de despliegue de GitHub (`preview`, boton «View
+  deployment», se actualiza con cada push) y en el resumen de la ejecucion.
+- **No es publica:** tras desplegar, el workflow pide la URL con `curl` sin credenciales y falla si
+  responde cualquier `2xx`. La preview solo la abren cuentas de Vercel del equipo (Deployment
+  Protection); el workflow no confia en esa configuracion, la comprueba en cada despliegue.
+- **Una sola base de preview** para todas las previews: la migracion de un PR queda aplicada para
+  las demas. Aceptado; si rompe la base de preview, se arregla o se recrea a mano y produccion no se
+  entera.
+
+`tests/guards/guard-despliegue-preview.test.ts` fija el workflow.
+
+### El build de preview y su comprobacion previa
+
+Con `VERCEL` definida y `VERCEL_ENV=preview`, `scripts/build.mjs` primero llama a
+`comprobarEntornoDePreview` (`scripts/entorno-de-preview.mjs`). Si algo no cumple, el build
+**falla antes del primer paso** con una linea por variable, que nombra la variable y la regla y
+**nunca su valor**. Las reglas:
+
+- **La base y el storage son los de preview.** `PREVIEW_SUPABASE_REF` (el Reference ID del
+  proyecto de Supabase de preview) tiene valor, y `DATABASE_URL`, `DIRECT_URL` y
+  `SUPABASE_STORAGE_URL` lo contienen. El host no basta: el pooler de Supabase comparte host entre
+  proyectos, el Reference ID no. El identificador vive solo en el scope Preview de Vercel, nunca en
+  el repo (es publico).
+  *Nota 2026-10-09 (QC-249, enmienda de R9, m1 del review):* «lo contienen» es ahora mas
+  estricto. `PREVIEW_SUPABASE_REF` tiene que ser exactamente 20 letras minusculas, y el
+  identificador tiene que estar en su posicion: usuario del pooler (`postgres.<ref>`) o host directo
+  (`db.<ref>.supabase.co`) en `DATABASE_URL` y `DIRECT_URL`, y host (`<ref>.supabase.co`) en
+  `SUPABASE_STORAGE_URL`. Como subcadena en otro sitio (nombre de la base, parametros) no cuenta.
+  Y ninguna de las tres puede traer el parametro `host` en la query (sin mirar mayusculas, tambien
+  vacio o repetido), que Prisma prioriza sobre el host de la URL: mismo criterio que H1 de QC-230.
+- **Ningun efecto fuera de la app.** `MAIL_TRANSPORT` es exactamente `desactivado`;
+  `DOCUMENTS_E2E_DOUBLES` tiene valor; `RESEND_API_KEY`, `SMTP_PASS`, `ANTHROPIC_API_KEY`,
+  `GEMINI_API_KEY` y `QSTASH_TOKEN` estan vacias o ausentes. Elegir los dobles y quitar las
+  credenciales son dos cerrojos independientes: aunque uno falle, no hay con que llamar al
+  proveedor.
+
+Si cumple, corre en orden `prisma migrate deploy`, `prisma generate`, el seed base, el seed de
+demostracion (`tsx scripts/seed-demo.ts`, sin `--forzar`) y `next build`, y para en el primer paso
+que falle. Los dos seeds son idempotentes: repetirlos en cada push no duplica nada. El log muestra
+`[build] Vercel preview -> con migrate, seed y seed de demostracion (base de preview)`. El seed de
+demostracion vuelve a comprobar por su cuenta que la base es la de preview
+(`docs/verification.md > Datos de demostración`).
+
+Con el transporte `desactivado`, pedir el enlace para establecer la contrasena no contacta a
+ningun proveedor ni escribe archivos: devuelve `failed` (el usuario queda `pending` y la pantalla
+ofrece el reenvio) y registra una linea sin destinatario, URL ni secreto. En preview se entra con
+las cuentas del seed y del seed de demostracion, que tienen contrasena.
+
+### Limite conocido: la subida de PDF no funciona en preview
+
+Con `DOCUMENTS_E2E_DOUBLES` puesta, el almacenamiento de documentos es el doble en memoria: firma
+la subida contra `https://documentos-e2e.invalid` (un dominio que no resuelve, a proposito: en el
+E2E Playwright intercepta esa peticion) y guarda las rutas firmadas en la memoria del proceso, que
+en Vercel no se comparte entre invocaciones. En una preview, el navegador falla al subir el PDF:
+**los flujos de catalogo y formula desde PDF no se prueban en preview**; se siguen probando en el
+E2E local. Aceptado por el humano el 2026-10-09 (pregunta abierta 1 de
+`specs/QC-249-entorno-de-preview/requirements.md`, opcion por defecto). Separar la IA y la cola de
+los dobles para conservar el storage real de preview seria otra ficha
+(`specs/QC-249-entorno-de-preview/design.md > 9.3`).
+
+### Lo que hace el humano (fuera del codigo)
+
+En el scope **Preview** de Vercel, antes del primer PR que despliegue, dejar las variables como
+dice la tabla de abajo. En concreto:
+
+- **anadir** `PREVIEW_SUPABASE_REF`, `MAIL_TRANSPORT=desactivado` y `DOCUMENTS_E2E_DOUBLES` (con
+  cualquier valor);
+- **borrar** `RESEND_API_KEY` (si esta), `SMTP_*`, `MAIL_FROM_ADDRESS`, `APP_BASE_URL`, `QSTASH_*`,
+  `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` y los modelos;
+- **regenerar** `INTEGRATIONS_ENCRYPTION_*` con claves propias de preview;
+- base, storage, `SESSION_SECRET` y contrasenas de los seeds, propias de preview.
+
+Si falta algo de lo que exige la comprobacion previa, el build de preview falla diciendo que
+variable. El primer despliegue lo confirma el humano con el PR de QC-249 abierto contra `dev`.
+
+### Variables por entorno
+
+Sin valores. «Production» = lo que hay hoy en produccion. «Local» = el `.env` de cada dev. Toda
+variable declarada en `.env.example` fuera del bloque de servidores MCP tiene que aparecer en la
+primera columna; lo vigila `tests/guards/guard-variables-por-entorno.test.ts`.
+
+| Variable | Production | Preview | Local |
+|---|---|---|---|
+| `DATABASE_URL`, `DIRECT_URL` | base de produccion | base del proyecto de preview (contienen `PREVIEW_SUPABASE_REF`) | base local |
+| `PREVIEW_SUPABASE_REF` | ausente | Reference ID del proyecto de Supabase de preview | ausente |
+| `SESSION_SECRET` | propio | **propio de preview**, distinto del de produccion | propio |
+| `SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_EMAIL`, `SEED_MAESTRO_USERNAME`, `SEED_MAESTRO_PASSWORD`, `SEED_MAESTRO_EMAIL` | de produccion | propias de preview | propias |
+| `SEED_DEMO_OPERADOR_PASSWORD`, `SEED_DEMO_EMPACADOR_PASSWORD`, `SEED_DEMO_ACONDICIONAMIENTO_PASSWORD` | ausentes | **obligatorias** (el seed de demostracion falla sin ellas) | en el entorno del comando |
+| `SUPABASE_STORAGE_URL`, `SUPABASE_STORAGE_KEY` | de produccion | del proyecto de preview (la URL contiene `PREVIEW_SUPABASE_REF`) | segun dev |
+| `SUPABASE_STORAGE_BUCKET`, `SUPABASE_DOCUMENTS_BUCKET`, `SUPABASE_CROPS_BUCKET` | de produccion | buckets del proyecto de preview | segun dev |
+| `MAIL_TRANSPORT` | el de hoy (`resend` o `smtp`) | **`desactivado`** | vacia, `outbox` (E2E) o `smtp` |
+| `RESEND_API_KEY`, `SMTP_PASS` | de produccion | **ausentes** (comprobacion previa) | segun dev |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `MAIL_FROM_ADDRESS`, `APP_BASE_URL` | de produccion | ausentes (solo las lee el correo) | segun dev |
+| `MAIL_OUTBOX_DIR` | ausente | ausente | solo con `outbox` |
+| `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` | de produccion | **ausentes** (comprobacion previa) | segun dev |
+| `ANTHROPIC_MODEL`, `GEMINI_MODEL` | de produccion | ausentes | segun dev |
+| `QSTASH_TOKEN` | de produccion | **ausente** (comprobacion previa) | segun dev |
+| `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`, `QSTASH_TARGET_URL` | de produccion | ausentes (sin ellas, el webhook rechaza todo) | segun dev |
+| `DOCUMENT_PROCESSING_TIMEOUT_SECONDS`, `DOCUMENT_PROCESSING_MAX_RETRIES` | opcionales | vacias (valores por defecto) | vacias |
+| `CATALOG_PROMPT`, `FORMULA_PROMPT` | de produccion | copia de produccion (el procesamiento las lee antes de la IA de guion) | segun dev |
+| `CRON_SECRET` | de produccion | ausente (Vercel no ejecuta crons en previews) | segun dev |
+| `INTEGRATIONS_ENCRYPTION_KEYS`, `INTEGRATIONS_ENCRYPTION_ACTIVE` | de produccion | **propias de preview** (la base ya no se comparte) | propias |
+| `DOCUMENTS_E2E_DOUBLES` | ausente | **con valor** (comprobacion previa) | vacia; solo la pone `playwright.config.ts` |
+
+`VERCEL` y `VERCEL_ENV` las pone Vercel y no se cargan a mano; `NODE_ENV` la ponen Next y Vercel.
+Las del bloque de servidores MCP de `.env.example` (`ATLASSIAN_MCP_AUTH`, `CONTEXT7_API_KEY`,
+`SUPABASE_PROJECT_REF`) no las lee la app: las lee `.mcp.json` del entorno del proceso.
 
 ## Componentes
 - `components/ui/`: primitivas de shadcn/ui. **Nunca crees un componente si ya existe en shadcn/ui.**

@@ -2,24 +2,14 @@
 
 import { useActionState, useId, useState } from 'react';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+import { ConfirmDialogBody, ConfirmDialogFrame } from '@/components/shared/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
   cancelAssignedOrderAction,
   type CancelAssignedOrderResult,
 } from '@/lib/modules/asignaciones/adapters/driving/order-execution-actions';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode } from '@/lib/modules/errores';
+import type { ErrorCode } from '@/lib/modules/errores';
 import { cancelOrderSchema } from '@/lib/modules/pedidos';
 
 /**
@@ -49,7 +39,6 @@ export const ORDER_CANCEL_TEXTS = {
   dismiss: 'Volver',
 } as const;
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 // Por debajo de 16 px Safari en iOS hace zoom al enfocar el campo.
 const FIELD_TEXT = 'text-base md:text-base';
 
@@ -73,24 +62,23 @@ export type OrderCancelDialogProps = {
 
 export function OrderCancelDialog({ orderId, stepPosition }: OrderCancelDialogProps) {
   return (
-    <AlertDialog>
-      <AlertDialogTrigger
-        render={
+    <ConfirmDialogFrame
+      trigger={{
+        render: (
           <Button
             type="button"
             variant="outline"
-            className={TOUCH_TARGET}
+            touch
             data-testid={ORDER_CANCEL_TRIGGER_TESTID}
           />
-        }
-      >
-        {ORDER_CANCEL_TEXTS.trigger}
-      </AlertDialogTrigger>
-      <AlertDialogContent data-testid={ORDER_CANCEL_DIALOG_TESTID}>
-        {/* El popup se desmonta al cerrar: cada apertura empieza sin motivo ni error previos. */}
-        <OrderCancelForm orderId={orderId} stepPosition={stepPosition} />
-      </AlertDialogContent>
-    </AlertDialog>
+        ),
+        children: ORDER_CANCEL_TEXTS.trigger,
+      }}
+      testId={ORDER_CANCEL_DIALOG_TESTID}
+    >
+      {/* El popup se desmonta al cerrar: cada apertura empieza sin motivo ni error previos. */}
+      <OrderCancelForm orderId={orderId} stepPosition={stepPosition} />
+    </ConfirmDialogFrame>
   );
 }
 
@@ -121,15 +109,40 @@ function OrderCancelForm({ orderId, stepPosition }: OrderCancelDialogProps) {
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <form action={formAction} className="flex flex-col gap-4" data-testid={ORDER_CANCEL_FORM_TESTID}>
-      <AlertDialogHeader>
-        <AlertDialogTitle>{ORDER_CANCEL_TEXTS.title}</AlertDialogTitle>
-        <AlertDialogDescription>{ORDER_CANCEL_TEXTS.description}</AlertDialogDescription>
-      </AlertDialogHeader>
-
-      <input type="hidden" name={ORDER_CANCEL_ORDER_ID_FIELD} value={orderId} />
-      <input type="hidden" name={ORDER_CANCEL_STEP_POSITION_FIELD} value={stepPosition ?? ''} />
-
+    <ConfirmDialogBody
+      texts={{
+        title: ORDER_CANCEL_TEXTS.title,
+        description: ORDER_CANCEL_TEXTS.description,
+        dismiss: ORDER_CANCEL_TEXTS.dismiss,
+        confirm: ORDER_CANCEL_TEXTS.confirm,
+      }}
+      testIds={{
+        form: ORDER_CANCEL_FORM_TESTID,
+        dismiss: ORDER_CANCEL_DISMISS_TESTID,
+        confirm: ORDER_CANCEL_CONFIRM_TESTID,
+        error: ORDER_CANCEL_ERROR_TESTID,
+      }}
+      variant="destructive"
+      layout="form-wraps-all"
+      confirmAs="button"
+      submit={{
+        kind: 'action',
+        action: formAction,
+        formClassName: 'flex flex-col gap-4',
+        hidden: [
+          { name: ORDER_CANCEL_ORDER_ID_FIELD, value: orderId, controlled: true },
+          {
+            name: ORDER_CANCEL_STEP_POSITION_FIELD,
+            value: stepPosition === null ? '' : String(stepPosition),
+            controlled: true,
+          },
+        ],
+      }}
+      isPending={isPending}
+      dismissDisabled={isPending}
+      error={error}
+      errorId={errorId}
+    >
       <div className="flex flex-col gap-2">
         <label htmlFor={reasonId} className="text-sm font-medium">
           {ORDER_CANCEL_TEXTS.reasonLabel}
@@ -145,43 +158,6 @@ function OrderCancelForm({ orderId, stepPosition }: OrderCancelDialogProps) {
           data-testid={ORDER_CANCEL_REASON_TESTID}
         />
       </div>
-
-      {error === undefined ? null : (
-        <div
-          role="alert"
-          id={errorId}
-          className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-          data-testid={ORDER_CANCEL_ERROR_TESTID}
-          data-code={error.code}
-        >
-          {error.code === UNEXPECTED_ERROR_CODE ? (
-            <UnexpectedErrorNotice state={error} />
-          ) : (
-            <p>{error.message}</p>
-          )}
-        </div>
-      )}
-
-      <AlertDialogFooter>
-        <AlertDialogCancel
-          type="button"
-          className={TOUCH_TARGET}
-          disabled={isPending}
-          data-testid={ORDER_CANCEL_DISMISS_TESTID}
-        >
-          {ORDER_CANCEL_TEXTS.dismiss}
-        </AlertDialogCancel>
-        <Button
-          type="submit"
-          variant="destructive"
-          className={TOUCH_TARGET}
-          disabled={isPending}
-          aria-busy={isPending}
-          data-testid={ORDER_CANCEL_CONFIRM_TESTID}
-        >
-          {ORDER_CANCEL_TEXTS.confirm}
-        </Button>
-      </AlertDialogFooter>
-    </form>
+    </ConfirmDialogBody>
   );
 }

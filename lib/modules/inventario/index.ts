@@ -143,6 +143,14 @@ export {
   type FinishedGoodsOutcome,
   type FinishedGoodsIntake,
 } from './domain/finished-goods';
+export {
+  wholePackagesIn,
+  type DeliverableBatch,
+  type FinishedBatchCatalog,
+  type FinishedGoodsDispatch,
+  type FinishedGoodsDispatchInput,
+  type FinishedGoodsDispatchOutcome,
+} from './domain/finished-goods-dispatch';
 // `pedidos` deriva el coste unitario unico del pedido con la MISMA division que ya usa
 // este modulo para un lote sin costo de compra -mismo criterio de redondeo, misma escala-.
 export { deriveUnitCost } from './domain/unit-cost';
@@ -228,3 +236,12 @@ export type {
   ReservationAllocation,
   ReservationPlan,
 } from './domain/plan-reservation';
+// Los datos de lote del producto terminado que escribe el acondicionamiento: el contrato y la
+// regla del lote tecleado y de la fecha civil, para que quien los valida use la misma definicion.
+export { typedLotSchema, civilDateSchema } from './domain/product-batch-input';
+export type {
+  FinishedBatchLabel,
+  FinishedBatchLabels,
+  FinishedBatchLabelsOutcome,
+  FinishedBatchOfOrderLine,
+} from './domain/finished-batch-labels';

@@ -257,6 +257,16 @@ export function packingOrderRoute(id: string): string {
   return `${ASSIGNED_ORDERS_ROUTE}/empaque/${id}`;
 }
 
+/** Detalle del pedido para quien acondiciona; como `packingOrderRoute`, sin fila propia. */
+export function conditioningOrderRoute(id: string): string {
+  return `${ASSIGNED_ORDERS_ROUTE}/acondicionamiento/${id}`;
+}
+
+/** Ya cae bajo el prefijo privado de `DASHBOARD_ROUTE`: la comparacion es por segmentos. */
+export function executionTraceRoute(orderId: string): string {
+  return `${DASHBOARD_ROUTE}/recorrido/${orderId}`;
+}
+
 /**
  * Nombre del parametro de consulta con el que Terminar anuncia, al volver a la pestaña «Por
  * empacar», que un pedido acaba de quedar `ENTREGADO`: `?vista=por_empacar&empacado=<numero>`.
@@ -264,6 +274,10 @@ export function packingOrderRoute(id: string): string {
  * en dos pestañas distintas.
  */
 export const PACKED_ORDER_PARAM = 'empacado';
+
+/** Con `?vista=por_acondicionar&acondicionado=<numero>`, «Por acondicionar» anuncia el pedido
+ *  que se acaba de terminar de acondicionar. */
+export const CONDITIONED_ORDER_PARAM = 'acondicionado';
 
 /**
  * Nombre del parametro de consulta con el que la lista de pedidos asignados anuncia que uno
@@ -283,6 +297,10 @@ export const CANCELLED_ORDER_PARAM = 'cancelado';
  * en el panel lateral, sin pagina de `/clientes/[id]`.
  */
 export const CUSTOMERS_ROUTE = '/clientes';
+
+export const AI_PROVIDER_INTEGRATION_ROUTE = '/integraciones/proveedor-ia';
+export const INVENTORY_INTEGRATION_ROUTE = '/integraciones/inventarios';
+export const WHATSAPP_INTEGRATION_ROUTE = '/integraciones/whatsapp';
 
 /**
  * Prefijos de URL que cuelgan de `app/(private)/` y, por tanto, exigen sesion valida (R1).
@@ -328,4 +346,7 @@ export const PRIVATE_ROUTE_PREFIXES = [
   // segmentos ya cubriria cualquier subcamino. Cubre SESION; el permiso `clientes.consultar` lo
   // exige la propia pantalla.
   CUSTOMERS_ROUTE,
+  AI_PROVIDER_INTEGRATION_ROUTE,
+  INVENTORY_INTEGRATION_ROUTE,
+  WHATSAPP_INTEGRATION_ROUTE,
 ] as const;

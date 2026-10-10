@@ -1,12 +1,14 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
+import { clickRowAction, openRowActionsMenu } from '../../helpers/row-actions-menu';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
 
 import PrivateLayout from '@/app/(private)/layout';
 import InventarioPage from '@/app/(private)/inventario/page';
 import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
-import { formatDateLocalISO } from '@/components/shared/data-table/data-table-filter-date';
+import { formatDateLocalISO } from '@/lib/shared/ui/date-civil';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import {
   PRESENTATION_UNIT_ERROR_TESTID,
   PRESENTATION_UNIT_FIELD,
@@ -20,7 +22,6 @@ import {
 } from '@/components/shared/unexpected-error-notice';
 import { UNEXPECTED_ERROR_CODE, errorMessage } from '@/lib/modules/errores';
 import {
-  EMPTY_CELL,
   PAGE_PARAM,
   PAGE_SIZE_OPTIONS,
   PAGE_SIZE_PARAM,
@@ -233,6 +234,7 @@ const testId = {
   estadoPagina: 'data-table-page-indicator',
   busqueda: 'data-table-search',
   abrirAlta: 'product-create-open',
+  menuDeFila: 'product-row-actions',
   abrirEdicion: 'product-edit-open',
   panel: 'product-sheet',
   formulario: 'product-form',
@@ -671,7 +673,7 @@ describe('pantalla de productos — lista', () => {
       expect(screen.queryByTestId(`data-table-cell-${campo}`), campo).toBeNull();
     }
 
-    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
     await screen.findByTestId(testId.formulario);
 
     for (const campo of ['cost', 'minPurchase', 'deliveryTime']) {
@@ -892,8 +894,8 @@ describe('pantalla de productos — lista', () => {
 
     await renderPantalla();
 
-    expect(screen.getByTestId('data-table-cell-reserved')).toHaveTextContent(EMPTY_CELL);
-    expect(screen.getByTestId('data-table-cell-available')).toHaveTextContent(EMPTY_CELL);
+    expect(screen.getByTestId('data-table-cell-reserved')).toHaveTextContent(EMPTY_MARK);
+    expect(screen.getByTestId('data-table-cell-available')).toHaveTextContent(EMPTY_MARK);
     expect(screen.queryByTestId('product-reserved')).toBeNull();
     expect(screen.queryByTestId('product-available')).toBeNull();
   });
@@ -927,8 +929,9 @@ describe('pantalla de productos — lista', () => {
     // compartida nombra cada fila con el id del producto (`data-table-row-<id>`), asi que se
     // localiza por patron y no por un `data-testid` fijo.
     const fila = screen.getAllByTestId(testId.fila)[0] as HTMLElement;
-    expect(within(fila).getByTestId(testId.abrirEdicion)).toBeVisible();
-    expect(within(fila).getByTestId(testId.abrirBorrado)).toBeVisible();
+    const menu = await openRowActionsMenu(setupUser(), within(fila).getByTestId(testId.menuDeFila));
+    expect(within(menu).getByTestId(testId.abrirEdicion)).toBeVisible();
+    expect(within(menu).getByTestId(testId.abrirBorrado)).toBeVisible();
   });
 
   it('el selector de tamano de pagina ofrece 10 y 25 y usa 10 por defecto', async () => {
@@ -1140,8 +1143,9 @@ describe('pantalla de productos — lista', () => {
 
       expect(screen.getByTestId(testId.tabla), `tabla a ${ancho}px`).toBeVisible();
       expect(screen.getByTestId(testId.abrirAlta), `alta a ${ancho}px`).toBeVisible();
-      expect(screen.getByTestId(testId.abrirEdicion), `edicion a ${ancho}px`).toBeVisible();
-      expect(screen.getByTestId(testId.abrirBorrado), `borrado a ${ancho}px`).toBeVisible();
+      const menu = await openRowActionsMenu(setupUser(), screen.getByTestId(testId.menuDeFila));
+      expect(within(menu).getByTestId(testId.abrirEdicion), `edicion a ${ancho}px`).toBeVisible();
+      expect(within(menu).getByTestId(testId.abrirBorrado), `borrado a ${ancho}px`).toBeVisible();
       expect(screen.getByTestId(testId.tamanoPagina), `tamano a ${ancho}px`).toBeVisible();
 
       cleanup();
@@ -1235,7 +1239,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     listProductsActionMock.mockResolvedValue(paginaDeProductos([elProducto]));
 
     await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
     await screen.findByTestId(testId.formulario);
 
     const precargado: Record<string, string> = {
@@ -1446,7 +1450,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()]));
 
     await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
     await screen.findByTestId(testId.formulario);
 
     await user.click(screen.getByTestId(testId.enviar));
@@ -1466,7 +1470,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     );
 
     await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
     const formulario = await screen.findByTestId(testId.formulario);
 
     const campo = screen.getByTestId('product-field-qtyAlert');
@@ -1481,7 +1485,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     );
 
     await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
     const formulario = await screen.findByTestId(testId.formulario);
 
     expect(screen.getByTestId('product-field-qtyAlert')).toHaveValue('0.1255');
@@ -1584,7 +1588,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()]));
 
     await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
     await screen.findByTestId(testId.formulario);
 
     expect(screen.queryByTestId('presentation-select')).toBeNull();
@@ -1794,7 +1798,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     listProductsActionMock.mockResolvedValue(paginaDeProductos([elProducto]));
 
     await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
     await screen.findByTestId(testId.formulario);
 
     await user.click(screen.getByTestId(testId.enviar));
@@ -1902,7 +1906,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     listProductsActionMock.mockResolvedValue(paginaDeProductos([producto()]));
 
     await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
     await screen.findByTestId(testId.formulario);
 
     expect(screen.queryByTestId('product-field-purchaseDate')).toBeNull();
@@ -2038,7 +2042,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     );
 
     await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
     await screen.findByTestId(testId.formulario);
 
     await user.click(screen.getByLabelText('Tipo'));
@@ -2057,7 +2061,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
     await renderPantalla({ type: PRODUCT_TYPES.FINISHED_PRODUCT });
     await desplegarPedido(user);
-    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
     await screen.findByTestId(testId.formulario);
 
     expect(screen.getByTestId('product-field-type-readonly')).toHaveTextContent(
@@ -2087,7 +2091,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
 
     await renderPantalla({ type: PRODUCT_TYPES.FINISHED_PRODUCT });
     await desplegarPedido(user);
-    await user.click(screen.getByTestId(testId.abrirEdicion));
+    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirEdicion);
     await screen.findByTestId(testId.formulario);
 
     await user.click(screen.getByTestId(testId.enviar));
@@ -2255,7 +2259,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     listProductsActionMock.mockResolvedValue(paginaDeProductos([elProducto]));
 
     await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirBorrado));
+    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirBorrado);
 
     const dialogo = await screen.findByTestId(testId.dialogoBorrado);
     // El dialogo NOMBRA el producto: el nombre es dato del fixture, no copy de la pantalla.
@@ -2268,7 +2272,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     expect(deleteProductActionMock).not.toHaveBeenCalled();
 
     // Solo al confirmar se invoca la operacion, con el id del producto.
-    await user.click(screen.getByTestId(testId.abrirBorrado));
+    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirBorrado);
     await screen.findByTestId(testId.dialogoBorrado);
     await user.click(screen.getByTestId(testId.confirmarBorrado));
 
@@ -2281,7 +2285,7 @@ describe('pantalla de productos — alta, edicion y borrado', () => {
     const user = setupUser();
 
     await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirBorrado));
+    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirBorrado);
     await screen.findByTestId(testId.dialogoBorrado);
     await user.click(screen.getByTestId(testId.confirmarBorrado));
 
@@ -2443,7 +2447,7 @@ describe('pantalla de productos — el identificador del error inesperado (QC-71
     deleteProductActionMock.mockResolvedValue(errorInesperado());
 
     await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirBorrado));
+    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirBorrado);
     await screen.findByTestId(testId.dialogoBorrado);
     await user.click(screen.getByTestId(testId.confirmarBorrado));
 
@@ -2463,7 +2467,7 @@ describe('pantalla de productos — el identificador del error inesperado (QC-71
     });
 
     await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirBorrado));
+    await clickRowAction(user, screen.getByTestId(testId.menuDeFila), testId.abrirBorrado);
     await screen.findByTestId(testId.dialogoBorrado);
     await user.click(screen.getByTestId(testId.confirmarBorrado));
 

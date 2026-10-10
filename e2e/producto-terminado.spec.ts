@@ -67,6 +67,7 @@ import {
   packingOrderRoute,
 } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import {
   clickAndConfirm,
@@ -78,6 +79,7 @@ import {
 import { addPackagingLine } from './helpers/order-distribution';
 import { batchStock, seedPackaging } from './helpers/packaging';
 import { exactProductNameCellText } from './helpers/product-name-cell';
+import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 const FIXTURE_PREFIX = 'qc150_e2e_';
 
@@ -210,7 +212,7 @@ function rowByNumber(page: Page, numberText: string): Locator {
 async function createUser(user: Credentials, roleId: string): Promise<string> {
   if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
 
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames: `Qc150${RUN_ID.slice(0, 8)}`,
       lastNames: 'ProductoTerminado',
@@ -243,9 +245,11 @@ async function setPresentationContent(page: Page, content: string): Promise<void
   await gotoSettled(page, presentationsUrl(PRESENTATION_NAME));
   await expect(page.getByTestId('presentaciones-title')).toBeVisible({ timeout: 60_000 });
 
-  const rowActions = page.locator(`[data-presentation-id="${presentationId}"]`);
+  const rowActions = page.locator(
+    `[data-testid="presentation-row-actions"][data-presentation-id="${presentationId}"]`,
+  );
   await expect(rowActions).toBeVisible({ timeout: 60_000 });
-  await rowActions.getByTestId('presentation-action-edit').click();
+  await (await openRowActionsMenuItem(page, rowActions, 'presentation-action-edit')).click();
   await expect(page.getByTestId('presentation-sheet')).toBeVisible({ timeout: 60_000 });
 
   await page.getByTestId('presentation-field-content').fill(content);
@@ -324,7 +328,9 @@ async function openFinishedGoodsBatchesPanel(page: Page, productName: string): P
   const row = page
     .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
     .filter({ has: nameCell });
-  await row.getByTestId('product-batches-open').click();
+  await (
+    await openRowActionsMenuItem(page, row.getByTestId('product-row-actions'), 'product-batches-open')
+  ).click();
   await expect(page.getByTestId('product-batches-sheet')).toBeVisible({ timeout: 60_000 });
 
   return page.getByTestId('product-batches-sheet');

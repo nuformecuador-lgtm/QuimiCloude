@@ -2,17 +2,15 @@
 
 import { PencilIcon, TrashIcon } from 'lucide-react';
 
-import type { DataTableColumn } from '@/components/shared/data-table';
+import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
 import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
-import { Button } from '@/components/ui/button';
+import { RowActionsMenu, type RowActionMenuItem } from '@/components/shared/row-actions-menu';
 import { WORK_GROUP_QUERYABLE, type WorkGroupRow } from '@/lib/modules/identity';
 
 import {
   WORK_GROUP_ACTIONS_COLUMN_LABEL,
   WORK_GROUP_MEMBERS_COLUMN_LABEL,
   WORK_GROUP_NAME_COLUMN_LABEL,
-  deleteWorkGroupLabel,
-  editWorkGroupLabel,
 } from './work-group-labels';
 
 /**
@@ -48,9 +46,8 @@ import {
  * **Ningun filtro** (R16): `WORK_GROUP_QUERYABLE.filterable` esta vacio, asi que ninguna columna
  * declara `filter`. Un control de filtro aqui seria un control que no hace nada.
  *
- * **La columna de acciones es una columna NORMAL con `pinnable: false`**, el patron que QC-45 fijo
- * y que la pestana de personas hereda. **No se anade ninguna prop a la tabla compartida ni se abre
- * un solo archivo de `components/shared/data-table/`** (R12).
+ * **La columna de acciones se declara con `actionsColumn()`**: no ordena, no filtra y no se puede
+ * fijar. **No se anade ninguna prop a la tabla compartida**.
  */
 
 /** Ids de las columnas. Constantes porque los comparten la tabla y los tests (R41). */
@@ -60,9 +57,8 @@ export const WORK_GROUP_ACTIONS_COLUMN_ID = 'actions';
 
 /**
  * Cuantas columnas hay: el nombre, los miembros y las acciones. Existe para que el esqueleto de
- * carga —que lo pinta un Server Component y por tanto **no puede importar este modulo de
- * cliente**— pinte tantas celdas como columnas, y para que el test lo ate a la longitud real en
- * vez de dejarlo desincronizarse en silencio.
+ * carga pinte tantas celdas como columnas, y para que el test lo ate a la longitud real en vez de
+ * dejarlo desincronizarse en silencio.
  */
 export const WORK_GROUP_COLUMN_COUNT = 3;
 
@@ -70,8 +66,14 @@ export const WORK_GROUP_ROW_ACTIONS_TESTID = 'work-group-row-actions';
 export const WORK_GROUP_ACTION_EDIT_TESTID = 'work-group-action-edit';
 export const WORK_GROUP_ACTION_DELETE_TESTID = 'work-group-action-delete';
 
-/** Objetivo tactil minimo (44x44 px) de R40. Los primitivos miden 32 px de alto por defecto. */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
+/** Texto de cada item del menu: solo el verbo; el nombre del grupo lo lleva el disparador. */
+export const WORK_GROUP_ACTION_EDIT_LABEL = 'Abrir';
+export const WORK_GROUP_ACTION_DELETE_LABEL = 'Eliminar';
+
+/** Nombre accesible del disparador del menu: nombra al grupo para dar el contexto de la fila. */
+export function workGroupRowActionsLabel(name: string): string {
+  return `Acciones de ${name}`;
+}
 
 /**
  * Lo que hace un disparador de fila: avisar de sobre QUE grupo se pidio actuar. No abre nada por su
@@ -95,19 +97,19 @@ export type WorkGroupRowActionsProps = {
 };
 
 /**
- * Las DOS acciones de fila de un grupo: abrirlo y borrarlo (R9, R40).
+ * Las DOS acciones de fila de un grupo, abrirlo y borrarlo, en el menu de los tres puntos de la
+ * fila (`RowActionsMenu`).
  *
- * **Con `canModify === false` devuelve `null`, o sea la celda queda VACIA** (R9): sin botones, sin
- * botones deshabilitados, sin explicacion y sin nada en el DOM. Un boton deshabilitado anuncia una
- * capacidad que la sesion no tiene y solo sirve para que alguien intente averiguar por que.
+ * **Con `canModify === false` devuelve `null`, o sea la celda queda VACIA**: sin disparador,
+ * sin items deshabilitados, sin explicacion y sin nada en el DOM. Un control deshabilitado anuncia
+ * una capacidad que la sesion no tiene y solo sirve para que alguien intente averiguar por que.
  *
  * **Ocultarlas es comodidad de la interfaz, NO el control**: quien autoriza es el caso de uso del
  * modulo, cuya primera linea es `requirePermission`. Esta pantalla no repite ni sustituye esa
  * comprobacion.
  *
- * **Siempre visibles y siempre en el DOM** (R40): nada se descubre con `:hover` —que en tactil no
- * existe— ni vive dentro de un desplegable que lo esconda del arbol, y cada control mide al menos
- * 44x44 px.
+ * El disparador esta siempre visible y en el DOM, con su objetivo tactil de 44x44 px: nada se
+ * descubre con `:hover`.
  */
 export function WorkGroupRowActions({
   group,
@@ -117,36 +119,31 @@ export function WorkGroupRowActions({
 }: WorkGroupRowActionsProps) {
   if (!canModify) return null;
 
-  return (
-    <div
-      className="flex items-center justify-end gap-1"
-      data-testid={WORK_GROUP_ROW_ACTIONS_TESTID}
-      data-work-group-id={group.id}
-    >
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className={TOUCH_TARGET}
-        aria-label={editWorkGroupLabel(group.name)}
-        data-testid={WORK_GROUP_ACTION_EDIT_TESTID}
-        onClick={() => onEdit?.(group)}
-      >
-        <PencilIcon aria-hidden="true" />
-      </Button>
+  const items: RowActionMenuItem[] = [
+    {
+      key: 'edit',
+      label: WORK_GROUP_ACTION_EDIT_LABEL,
+      icon: PencilIcon,
+      onSelect: () => onEdit?.(group),
+      testId: WORK_GROUP_ACTION_EDIT_TESTID,
+    },
+    {
+      key: 'delete',
+      label: WORK_GROUP_ACTION_DELETE_LABEL,
+      icon: TrashIcon,
+      onSelect: () => onDelete?.(group),
+      destructive: true,
+      testId: WORK_GROUP_ACTION_DELETE_TESTID,
+    },
+  ];
 
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className={TOUCH_TARGET}
-        aria-label={deleteWorkGroupLabel(group.name)}
-        data-testid={WORK_GROUP_ACTION_DELETE_TESTID}
-        onClick={() => onDelete?.(group)}
-      >
-        <TrashIcon aria-hidden="true" />
-      </Button>
-    </div>
+  return (
+    <RowActionsMenu
+      items={items}
+      triggerLabel={workGroupRowActionsLabel(group.name)}
+      triggerTestId={WORK_GROUP_ROW_ACTIONS_TESTID}
+      triggerDataAttributes={{ 'data-work-group-id': group.id }}
+    />
   );
 }
 
@@ -208,14 +205,11 @@ export function createWorkGroupColumns({
         />
       ),
     },
-    {
+    // Sin `sortable` (ordenar por unas acciones no significa nada), sin `filter` (la lista
+    // blanca no declara ninguno) y sin anclar, para no tapar las columnas de datos.
+    actionsColumn<WorkGroupRow>({
       id: WORK_GROUP_ACTIONS_COLUMN_ID,
       label: WORK_GROUP_ACTIONS_COLUMN_LABEL,
-      align: 'end',
-      // Sin `sortable` (ordenar por unos botones no significa nada) y sin `filter` (la lista
-      // blanca no declara ninguno). `pinnable: false` para que el usuario no pueda fijarla y tapar
-      // las columnas de datos.
-      pinnable: false,
       cell: (group) => (
         <WorkGroupRowActions
           group={group}
@@ -224,7 +218,7 @@ export function createWorkGroupColumns({
           onDelete={onDelete}
         />
       ),
-    },
+    }),
   ];
 }
 

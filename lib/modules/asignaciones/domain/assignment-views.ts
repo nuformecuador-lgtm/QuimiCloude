@@ -13,11 +13,19 @@ import { canExecuteAssignedOrders } from './actor';
 
 import { assertPermission, type PermissionBearer, type PermissionCode } from '@/lib/modules/identity';
 
-export type AssignmentViewKind = 'asignados' | 'terminados' | 'todos' | 'por_empacar';
+export type AssignmentViewKind =
+  | 'asignados'
+  | 'terminados'
+  | 'todos'
+  | 'por_empacar'
+  | 'por_acondicionar'
+  | 'acondicionados'
+  | 'acondicionados_entregados';
 
 const PEDIDOS_CONSULTAR: PermissionCode = 'pedidos.consultar';
 const TERMINADOS_CONSULTAR: PermissionCode = 'terminados.consultar';
 const EMPAQUE_MODIFICAR: PermissionCode = 'empaque.modificar';
+const ACONDICIONAMIENTO_MODIFICAR: PermissionCode = 'acondicionamiento.modificar';
 
 /**
  * Centinela privado y reutilizado: `assertPermission` exige una fabrica de error porque su
@@ -44,6 +52,9 @@ function hasPermission(
  *
  * `por_empacar` se anade SIEMPRE AL FINAL, sea cual sea la vista por defecto que ya se calculo:
  * no cambia el aterrizaje de nadie, solo ofrece la pestana a quien tiene `empaque.modificar`.
+ * Detras van `por_acondicionar`, `acondicionados` y `acondicionados_entregados`, con
+ * `acondicionamiento.modificar`; a quien solo tiene esas no se le anade la reserva, y aterriza en
+ * `por_acondicionar`.
  */
 export function resolveAssignmentViews(
   bearer: PermissionBearer | null | undefined,
@@ -55,6 +66,9 @@ export function resolveAssignmentViews(
     if (hasPermission(bearer, TERMINADOS_CONSULTAR)) views.push('terminados');
   }
   if (hasPermission(bearer, EMPAQUE_MODIFICAR)) views.push('por_empacar');
+  if (hasPermission(bearer, ACONDICIONAMIENTO_MODIFICAR)) {
+    views.push('por_acondicionar', 'acondicionados', 'acondicionados_entregados');
+  }
   // La vista vacia de «Mis asignados» es el aterrizaje de quien no tiene ninguna otra.
   return views.length > 0 ? views : ['asignados'];
 }

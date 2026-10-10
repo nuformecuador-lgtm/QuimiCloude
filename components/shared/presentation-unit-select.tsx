@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 /** Campo del formulario de la presentacion que alimenta este selector, via el `input` oculto. */
 export const PRESENTATION_UNIT_FIELD = 'unitId';
@@ -23,9 +24,6 @@ export const PRESENTATION_UNIT_HELPER_TESTID = 'presentation-unit-helper';
 export const PRESENTATION_UNIT_HELPER_TEXT_TESTID = 'presentation-unit-helper-text';
 
 const PRESENTATION_UNIT_HELPER_LABEL = 'Qué es';
-
-/** Objetivo tactil minimo (44x44 px) de R20. */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /** 16 px en TODOS los anchos: el primitivo baja a 14 px en `md` y R20 no distingue por ancho. */
 const FIELD_TEXT = 'text-base md:text-base';
@@ -145,7 +143,7 @@ export function PresentationUnitSelect({
                 <button
                   type="button"
                   aria-label={`${PRESENTATION_UNIT_HELPER_LABEL} ${PRESENTATION_UNIT_LABEL}`}
-                  className={`flex ${TOUCH_TARGET} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none`}
+                  className={`flex ${touchTarget} shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring`}
                   data-testid={PRESENTATION_UNIT_HELPER_TESTID}
                 />
               }
@@ -172,7 +170,7 @@ export function PresentationUnitSelect({
           aria-labelledby={labelId}
           aria-invalid={error === undefined ? undefined : true}
           aria-describedby={error === undefined ? undefined : errorId}
-          className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT}`}
+          className={`w-full ${touchTarget} ${FIELD_TEXT}`}
           data-testid={PRESENTATION_UNIT_SELECT_TESTID}
         >
           <SelectValue placeholder={PRESENTATION_UNIT_PLACEHOLDER} />

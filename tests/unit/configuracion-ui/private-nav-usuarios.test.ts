@@ -21,6 +21,7 @@ import { describe, expect, it } from 'vitest';
 import { ROLE_ADMINISTRADOR, ROLE_OPERADOR, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity';
 import { NAV_ICONS } from '@/lib/shared/navigation/nav-icons';
 import {
+  INTEGRATIONS_LABEL,
   NAV_SECTION_CONFIGURATION,
   NAV_SECTION_OPERATION,
   PRESENTATIONS_LABEL,
@@ -90,24 +91,23 @@ function paginaDe(href: string): string {
   return join(RAIZ, 'app', '(private)', ...href.split('/').filter(Boolean), 'page.tsx');
 }
 
-describe('la seccion Configuración se queda con sus DOS items originales (R2, 2026-09-21)', () => {
-  it('hay exactamente UNA seccion Configuración y lleva exactamente DOS items', () => {
-    // Usuarios ya no vive aqui: paso a «Operación» por decision humana del 2026-09-21. La seccion
-    // vuelve a sus dos items originales, presentaciones y unidades.
+describe('la seccion Configuración lleva presentaciones, unidades e integraciones, sin usuarios (R2, 2026-09-21)', () => {
+  it('hay exactamente UNA seccion Configuración y lleva exactamente TRES items', () => {
     const secciones = groupNavItemsBySection(PRIVATE_NAV_ITEMS).filter(
       (seccion) => seccion.label === NAV_SECTION_CONFIGURATION,
     );
 
     expect(secciones).toHaveLength(1);
-    expect(secciones[0]?.items).toHaveLength(2);
+    expect(secciones[0]?.items).toHaveLength(3);
   });
 
-  it('el orden de Configuración es presentaciones y unidades, sin usuarios', () => {
+  it('el orden de Configuración es presentaciones, unidades e integraciones, sin usuarios', () => {
     const items = seccionConfiguracion() ?? [];
 
     expect(items.map((item) => (item.kind === 'link' ? item.href : item.label))).toEqual([
       PRESENTATIONS_ROUTE,
       UNITS_ROUTE,
+      INTEGRATIONS_LABEL,
     ]);
   });
 

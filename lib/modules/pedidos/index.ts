@@ -7,6 +7,7 @@
 // Los adaptadores driving de QC-34 NO pasan por aqui: QC-35 importara `order-actions.ts` por su
 // ruta exacta (`docs/architecture.md`, excepcion de los driving; `design.md > 9`).
 export { formatOrderNumber } from './domain/order-number';
+export { orderNumberContains } from './domain/order-number';
 export type { OrderId, OrderNumber } from './domain/order-number';
 export {
   ORDER_PRIORITY_VALUES,
@@ -193,6 +194,9 @@ export type {
  *  linea ya resuelto. */
 export { createListAliveSummariesByIds, createListAliveSummariesInCompany } from './domain/list-order-summaries';
 export type { ListOrderSummariesDeps } from './domain/list-order-summaries';
+export { createListSummariesByIdsIncludingDeleted } from './domain/list-order-summaries';
+export type { ListHistorySummariesDeps } from './domain/list-order-summaries';
+export type { OrderHistorySummary } from './domain/order-catalog';
 
 /** La cobertura de varios pedidos a la vez, una consulta por pagina, para pintar «sin
  *  cobertura completa» sin N+1. */
@@ -265,3 +269,30 @@ export { createSearchOrderCustomers } from './domain/search-order-customer-optio
 export type { SearchOrderCustomersDeps } from './domain/search-order-customer-options';
 export { createGetOrderCustomerFilterOption } from './domain/get-order-customer-filter-option';
 export type { GetOrderCustomerFilterOptionDeps } from './domain/get-order-customer-filter-option';
+
+/** La entrega de producto terminado: la regla pura que comparten el sheet y el servidor, los dos
+ *  casos de uso y sus errores propios. */
+export {
+  DELIVERY_MAX_ALLOCATIONS,
+  checkDelivery,
+  remainingPackages,
+} from './domain/order-delivery';
+export type {
+  DeliveryAllocation,
+  DeliveryBatchState,
+  DeliveryCheck,
+  DeliveryLineState,
+} from './domain/order-delivery';
+export { createGetOrderDelivery } from './domain/get-order-delivery';
+export type {
+  GetOrderDeliveryDeps,
+  OrderDeliveryLineView,
+  OrderDeliveryView,
+} from './domain/get-order-delivery';
+export { createDeliverOrder } from './domain/deliver-order';
+export type { DeliverOrderDeps, DeliverOrderResult } from './domain/deliver-order';
+export {
+  DeliveryBatchInsufficientError,
+  DeliveryBatchNotFoundError,
+  DeliveryExceedsRemainingError,
+} from './domain/errors';

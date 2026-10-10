@@ -1,17 +1,9 @@
 'use client';
 
-// QC-79 T19 — Boton de envio de la pagina publica.
-//
-// Archivo aparte por la misma necesidad tecnica que el del login: `useFormStatus()` lee el estado
-// del `<form>` ANCESTRO, asi que dentro del componente que renderiza el `<form>` devolveria
-// siempre `pending: false`.
-//
-// `min-h-11` (44 px) y ancho completo: objetivo tactil de R25. El primitivo `Button` mide 32 px de
-// alto por defecto, que en un movil es la mitad de lo que hace falta.
+// Fachada local sobre el boton de envio compartido: conserva la firma y el testid que usan el
+// formulario y sus tests. La talla tactil (44 px) la pone el compartido.
 
-import { useFormStatus } from 'react-dom';
-
-import { Button } from '@/components/ui/button';
+import { SubmitButton as SharedSubmitButton } from '@/components/shared/submit-button';
 
 type SubmitButtonProps = {
   readonly label: string;
@@ -19,17 +11,12 @@ type SubmitButtonProps = {
 };
 
 export function SubmitButton({ label, pendingLabel }: SubmitButtonProps) {
-  const { pending } = useFormStatus();
-
   return (
-    <Button
-      type="submit"
-      className="min-h-11 w-full"
-      disabled={pending}
-      aria-busy={pending}
-      data-testid="set-credential-submit"
-    >
-      {pending ? pendingLabel : label}
-    </Button>
+    <SharedSubmitButton
+      label={label}
+      pendingLabel={pendingLabel}
+      testId="set-credential-submit"
+      className="w-full"
+    />
   );
 }

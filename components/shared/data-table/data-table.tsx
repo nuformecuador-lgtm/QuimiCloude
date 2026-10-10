@@ -15,6 +15,9 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 
+import { EmptyState } from '@/components/shared/empty-state';
+import { ErrorState } from '@/components/shared/error-state';
+import { TableSkeleton } from '@/components/shared/table-skeleton';
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 
@@ -123,6 +126,7 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
     emptyAction,
     toolbarActions,
     searchable,
+    states,
   } = props;
 
   const columnIds = useMemo(() => columns.map((column) => column.id), [columns]);
@@ -270,6 +274,18 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
   // un `resize` (ver `contentKey` en `DataTableScrollNav`).
   const scrollContentKey = `${columns.length}:${rowCount}:${visibleState}`;
 
+  // Despues de todos los hooks, para no cambiar su orden entre renders: la pieza sustituye a toda
+  // la tabla, barras y paginacion incluidas.
+  if (visibleState === 'loading' && states?.loading !== undefined) {
+    return <TableSkeleton {...states.loading} />;
+  }
+  if (visibleState === 'error' && states?.error !== undefined) {
+    return <ErrorState {...states.error} />;
+  }
+  if (visibleState === 'empty' && states?.empty !== undefined) {
+    return <EmptyState {...states.empty} />;
+  }
+
   const columnAlign = (align: 'start' | 'end' | 'center') => {
     if (align === 'end') {
       return 'text-right';
@@ -361,6 +377,7 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
                           columnAlign(column.align),
                           pinnedSide !== false && 'bg-background',
                           toColumnTextClass(column),
+                          column.tabular === true && 'font-mono tabular-nums',
                           divider && 'relative',
                         )}
                       >

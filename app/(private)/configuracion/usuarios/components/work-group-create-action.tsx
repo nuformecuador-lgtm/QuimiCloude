@@ -35,9 +35,6 @@ export const WORK_GROUP_CREATE_OPEN_TESTID = 'work-group-create-open';
 /** El copy del disparador. Ningun test afirma sobre el (R41). */
 const CREATE_LABEL = 'Nuevo grupo';
 
-/** Objetivo tactil minimo de R40. */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 export type WorkGroupCreateActionProps = {
   /**
    * Si la sesion trae `usuarios.modificar` (R9). **Decision de PRESENTACION**, resuelta en el
@@ -62,7 +59,7 @@ export function WorkGroupCreateAction({ canModify }: WorkGroupCreateActionProps)
         <Button
           type="button"
           variant="default"
-          className={TOUCH_TARGET}
+          touch
           data-testid={WORK_GROUP_CREATE_OPEN_TESTID}
           onClick={() => setOpen(true)}
         >

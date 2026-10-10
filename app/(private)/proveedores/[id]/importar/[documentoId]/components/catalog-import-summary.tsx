@@ -52,7 +52,7 @@ export function CatalogImportSummary({ supplierId, summary }: CatalogImportSumma
       <Link
         href={supplierDetailRoute(supplierId)}
         data-slot="button"
-        className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11 min-w-11')}
+        className={cn(buttonVariants({ variant: 'outline', touch: true }))}
         data-testid="catalog-import-summary-back-link"
       >
         Volver al detalle del proveedor

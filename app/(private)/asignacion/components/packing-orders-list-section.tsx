@@ -17,7 +17,7 @@ import { runInRequestScope } from '@/lib/shared/request-scope';
 import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 import { cn } from '@/lib/utils';
 
-import { AssignedOrdersError } from './assigned-orders-error';
+import { AssignmentListError, AssignmentListSectionFrame } from './assignment-list-parts';
 import { FIRST_PAGE, PAGE_PARAM, PAGE_SIZE_PARAM, VIEW_PARAM } from './assignment-view-params';
 import { buildPackingOrdersColumns } from './packing-orders-columns';
 
@@ -81,15 +81,15 @@ export async function PackingOrdersListSection({ params }: PackingOrdersListSect
     totalPages = result.totalPages;
   } catch (error) {
     return (
-      <div data-testid={PACKING_ORDERS_SECTION_TESTID}>
-        <AssignedOrdersError error={await toErrorState(error)} />
-      </div>
+      <AssignmentListSectionFrame testId={PACKING_ORDERS_SECTION_TESTID}>
+        <AssignmentListError error={await toErrorState(error)} />
+      </AssignmentListSectionFrame>
     );
   }
 
   if (items.length === 0) {
     return (
-      <div data-testid={PACKING_ORDERS_SECTION_TESTID}>
+      <AssignmentListSectionFrame testId={PACKING_ORDERS_SECTION_TESTID}>
         <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-8 text-center">
           <p className="text-sm text-muted-foreground" data-testid="packing-orders-empty-message">
             {currentPage > FIRST_PAGE
@@ -101,13 +101,13 @@ export async function PackingOrdersListSection({ params }: PackingOrdersListSect
               href={packingOrdersHref(FIRST_PAGE, params.pageSize)}
               data-slot="button"
               data-testid="packing-orders-first-page"
-              className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11 min-w-11')}
+              className={cn(buttonVariants({ variant: 'outline', touch: true }))}
             >
               Volver a la primera página
             </Link>
           ) : null}
         </div>
-      </div>
+      </AssignmentListSectionFrame>
     );
   }
 
@@ -116,7 +116,7 @@ export async function PackingOrdersListSection({ params }: PackingOrdersListSect
   const hasNext = currentPage < totalPages;
 
   return (
-    <div data-testid={PACKING_ORDERS_SECTION_TESTID} className="flex flex-col gap-4">
+    <AssignmentListSectionFrame testId={PACKING_ORDERS_SECTION_TESTID} className="flex flex-col gap-4">
       <Table data-testid="packing-orders-table">
         <TableHeader>
           <TableRow>
@@ -131,7 +131,12 @@ export async function PackingOrdersListSection({ params }: PackingOrdersListSect
           {items.map((order) => (
             <TableRow key={order.id} data-testid="packing-order-row">
               {columns.map((column) => (
-                <TableCell key={column.id}>{column.cell(order)}</TableCell>
+                <TableCell
+                  key={column.id}
+                  className={cn(column.tabular === true && 'font-mono tabular-nums')}
+                >
+                  {column.cell(order)}
+                </TableCell>
               ))}
             </TableRow>
           ))}
@@ -148,8 +153,7 @@ export async function PackingOrdersListSection({ params }: PackingOrdersListSect
             data-slot="button"
             data-testid="packing-orders-prev-page"
             className={cn(
-              buttonVariants({ variant: 'outline' }),
-              'min-h-11 min-w-11',
+              buttonVariants({ variant: 'outline', touch: true }),
               hasPrevious ? undefined : 'pointer-events-none opacity-50',
             )}
           >
@@ -161,8 +165,7 @@ export async function PackingOrdersListSection({ params }: PackingOrdersListSect
             data-slot="button"
             data-testid="packing-orders-next-page"
             className={cn(
-              buttonVariants({ variant: 'outline' }),
-              'min-h-11 min-w-11',
+              buttonVariants({ variant: 'outline', touch: true }),
               hasNext ? undefined : 'pointer-events-none opacity-50',
             )}
           >
@@ -170,6 +173,6 @@ export async function PackingOrdersListSection({ params }: PackingOrdersListSect
           </Link>
         </div>
       </div>
-    </div>
+    </AssignmentListSectionFrame>
   );
 }

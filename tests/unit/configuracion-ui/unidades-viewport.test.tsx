@@ -67,6 +67,7 @@ import UnidadesPage from '@/app/(private)/configuracion/unidades/page';
 import type { Page, UnitView } from '@/lib/modules/unidades';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 
+import { clickRowAction, openRowActionsMenu } from '../../helpers/row-actions-menu';
 import { setupUser } from '../../helpers/user-event';
 import {
   NARROW_VIEWPORT,
@@ -440,7 +441,8 @@ describe.each(VIEWPORTS)('pantalla de unidades en viewport %s (%i px)', (_nombre
   // R48 — Nada detras del puntero
   // ------------------------------------------------------------------------------------------
 
-  it('editar y borrar estan en el DOM y visibles desde el primer render, sin :hover (R48)', async () => {
+  it('editar y borrar se alcanzan, visibles, desde el disparador de cada fila, sin :hover (R48)', async () => {
+    const user = setupUser();
     await renderPantalla();
 
     // 1) En el DOM: los dos controles de CADA fila con acciones estan visibles ya, sin pasar el
@@ -448,19 +450,18 @@ describe.each(VIEWPORTS)('pantalla de unidades en viewport %s (%i px)', (_nombre
     //    su nombre accesible, que es el contrato que R28 exige y que compone el propio componente.
     for (const unidad of FILAS_CON_ACCIONES) {
       const fila = screen.getByTestId(`data-table-row-${unidad.id}`);
+      const menu = await openRowActionsMenu(user, within(fila).getByTestId(UNIT_ROW_ACTIONS_TESTID));
 
       for (const accion of [UNIT_ACTION_EDIT_TESTID, UNIT_ACTION_DELETE_TESTID]) {
-        const control = within(fila).getByTestId(accion);
+        const control = within(menu).getByTestId(accion);
         expect(control, `${accion} a ${ancho}px`).toBeVisible();
         expect(control, `${accion} a ${ancho}px`).toBeEnabled();
       }
 
-      expect(
-        within(fila).getByRole('button', { name: editUnitLabel(unidad.name) }),
-      ).toBeVisible();
-      expect(
-        within(fila).getByRole('button', { name: deleteUnitLabel(unidad.name) }),
-      ).toBeVisible();
+      expect(within(menu).getByRole('menuitem', { name: editUnitLabel() })).toBeVisible();
+      expect(within(menu).getByRole('menuitem', { name: deleteUnitLabel() })).toBeVisible();
+
+      await user.keyboard('{Escape}');
     }
 
     expect(screen.getByTestId(UNIT_CREATE_OPEN_TESTID)).toBeVisible();
@@ -490,14 +491,19 @@ describe.each(VIEWPORTS)('pantalla de unidades en viewport %s (%i px)', (_nombre
   // ------------------------------------------------------------------------------------------
 
   it('los controles tactiles de la lista miden al menos 44x44 px (R48)', async () => {
+    const user = setupUser();
     await renderPantalla();
 
     const fila = screen.getByTestId(`data-table-row-${KILOGRAMO.id}`);
-    const controles = [
-      within(fila).getByTestId(UNIT_ACTION_EDIT_TESTID),
-      within(fila).getByTestId(UNIT_ACTION_DELETE_TESTID),
-      screen.getByTestId(UNIT_CREATE_OPEN_TESTID),
-    ];
+    const disparador = within(fila).getByTestId(UNIT_ROW_ACTIONS_TESTID);
+    const controles = [disparador, screen.getByTestId(UNIT_CREATE_OPEN_TESTID)];
+
+    const menu = await openRowActionsMenu(user, disparador);
+    for (const accion of [UNIT_ACTION_EDIT_TESTID, UNIT_ACTION_DELETE_TESTID]) {
+      expect(within(menu).getByTestId(accion).className, `${accion} a ${ancho}px`).toContain(
+        'min-h-11',
+      );
+    }
 
     for (const control of controles) {
       for (const token of AREA_TACTIL) {
@@ -559,7 +565,11 @@ describe.each(VIEWPORTS)('pantalla de unidades en viewport %s (%i px)', (_nombre
     await renderPantalla();
 
     const fila = screen.getByTestId(`data-table-row-${KILOGRAMO.id}`);
-    await user.click(within(fila).getByTestId(UNIT_ACTION_DELETE_TESTID));
+    await clickRowAction(
+      user,
+      within(fila).getByTestId(UNIT_ROW_ACTIONS_TESTID),
+      UNIT_ACTION_DELETE_TESTID,
+    );
 
     const dialogo = await screen.findByTestId(DELETE_UNIT_DIALOG_TESTID);
     expect(dialogo, `el dialogo a ${ancho}px`).toBeVisible();

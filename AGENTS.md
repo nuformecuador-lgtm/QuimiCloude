@@ -33,7 +33,7 @@ Además, `/arnes-init` monta el arnés en un proyecto nuevo o revisa el perfil d
 <produccion> <- PR (solo humano mergea) -- <integracion> <- PR <- feature/<key>-<slug>
 ```
 
-Los nombres reales están en `arnes.config.json > ramas`; en este repo son `main` y `dev`.
+Los nombres reales están en `arnes.config.json > ramas`, y solo ahí.
 
 - Las ramas de feature nacen de la rama de integración y se **publican al nacer** (es el candado
   de equipo, `docs/equipo.md`).

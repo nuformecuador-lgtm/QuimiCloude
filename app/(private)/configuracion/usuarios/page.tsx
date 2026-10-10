@@ -12,12 +12,12 @@ import {
   USERS_TITLE_TESTID,
   UserCreateAction,
   UserListSection,
-  UserListSkeleton,
+  UserTable,
   UsuariosTabsSwitch,
   WORK_GROUP_SECTION_TESTID,
   WorkGroupCreateAction,
   WorkGroupListSection,
-  WorkGroupListSkeleton,
+  WorkGroupTable,
   buildUserListQuery,
   buildWorkGroupListQuery,
   parseUserListParams,
@@ -186,7 +186,15 @@ export default async function UsuariosPage({
         <div data-testid={WORK_GROUP_SECTION_TESTID} className="flex flex-col gap-4">
           <Suspense
             key={buildWorkGroupListQuery(workGroupParams)}
-            fallback={<WorkGroupListSkeleton rows={workGroupParams.pageSize} />}
+            fallback={
+              <WorkGroupTable
+                status="loading"
+                groups={[]}
+                params={workGroupParams}
+                totalPages={0}
+                canModify={canModify}
+              />
+            }
           >
             <WorkGroupListSection params={workGroupParams} canModify={canModify} />
           </Suspense>
@@ -194,7 +202,18 @@ export default async function UsuariosPage({
       ) : (
         <Suspense
           key={buildUserListQuery(params)}
-          fallback={<UserListSkeleton rows={params.pageSize} />}
+          fallback={
+            <UserTable
+              status="loading"
+              users={[]}
+              params={params}
+              totalPages={0}
+              canModify={canModify}
+              currentUserId={currentUserId}
+              roles={roles}
+              rolesError={rolesError}
+            />
+          }
         >
           <UserListSection
             params={params}

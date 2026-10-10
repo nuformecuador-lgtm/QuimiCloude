@@ -1,18 +1,15 @@
 'use client';
 
 import { PencilIcon, PlusIcon } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
-import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
+import { useEntitySheet } from '@/hooks/use-entity-sheet';
 import type { CatalogLineView } from '@/lib/modules/proveedores';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { CatalogLineForm } from './catalog-line-form';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 const CREATE_LABEL = 'Nueva línea';
 const CREATE_SUCCESS = 'Línea de catálogo creada.';
@@ -21,60 +18,50 @@ const UPDATE_SUCCESS = 'Línea de catálogo actualizada.';
 type CatalogLineSheetProps = {
   /** Proveedor dueno del catalogo. Sale de la URL de la pagina de detalle, no de un formulario. */
   readonly supplierId: string;
-  /** Linea que se edita. Ausente en el alta (R29). */
+  /** Linea que se edita. Ausente en el alta. */
   readonly line?: CatalogLineView;
-  /** Unidades existentes, pedidas UNA vez en el servidor y bajadas por props (R46). */
   readonly units: readonly UnitRef[];
+  /** Apertura controlada desde fuera. Ausente = el panel trae su propio disparador. */
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 };
 
 /**
- * Panel lateral de alta y edicion de una linea de catalogo (R26, R33, R34; `design.md > 7`).
- *
- * **Panel lateral, y no dialogo modal centrado ni pagina aparte** (R26, decision humana del
- * 2026-09-04). Como no navega a ninguna URL, el catalogo de detras conserva su pagina y su tamano
- * al cerrarse -la segunda mitad de R26- sin que haya que guardarlos en ningun sitio: el estado de
- * lista vive en la cadena de consulta (`design.md > 6.1`).
- *
- * **Cada panel trae su propio disparador y su propio estado.** Asi la tabla del catalogo no tiene
- * que coordinar cual fila esta abierta y puede seguir sin frontera de cliente: recibe este
- * componente por el slot `rowActions`.
- *
- * **El contenido se monta solo cuando el panel esta abierto** (lo hace el portal del primitivo):
- * el formulario se crea de cero en cada apertura, asi que la edicion siempre precarga los valores
- * actuales de la linea (R31) y un intento fallido anterior no deja restos.
- *
- * **R33 vive aqui**: con exito se cierra, se avisa por toast -la region la monta el layout
- * privado y **no se monta otra** (R34)- y se llama a `router.refresh()`, que vuelve a ejecutar el
- * Server Component del catalogo con la MISMA URL. **No hay `revalidatePath`**: exigiria abrir
- * `lib/modules/proveedores/adapters/driving/`, que R49 prohibe; las propias actions de QC-43
- * dejaron escrito que «QC-44 decide que revalida», y lo decide aqui, en la pantalla.
+ * Panel lateral de alta y edicion de una linea de catalogo. Sin `open`, trae su propio disparador
+ * y su propio estado: es el alta. Con `open`/`onOpenChange` es controlado y no monta disparador:
+ * es el enganche de la edicion desde el menu de la fila.
  */
-export function CatalogLineSheet({ supplierId, line, units }: CatalogLineSheetProps) {
-  const [open, setOpen] = useState(false);
-  const router = useRouter();
+export function CatalogLineSheet({
+  supplierId,
+  line,
+  units,
+  open,
+  onOpenChange,
+}: CatalogLineSheetProps) {
   const isEdit = line !== undefined;
-
-  const handleSaved = useCallback(() => {
-    setOpen(false);
-    toast.success(isEdit ? UPDATE_SUCCESS : CREATE_SUCCESS);
-    router.refresh();
-  }, [isEdit, router]);
+  const { isOpen, isControlled, changeOpen, handleSaved } = useEntitySheet({
+    open,
+    onOpenChange,
+    successMessage: isEdit ? UPDATE_SUCCESS : CREATE_SUCCESS,
+  });
 
   return (
-    <Sheet open={open} onOpenChange={(next) => setOpen(next)}>
-      <SheetTrigger
-        render={
-          <Button
-            variant={isEdit ? 'ghost' : 'default'}
-            className={TOUCH_TARGET}
-            aria-label={isEdit ? `Editar ${line.name}` : undefined}
-            data-testid={isEdit ? 'catalog-line-edit-open' : 'catalog-line-create-open'}
-          />
-        }
-      >
-        {isEdit ? <PencilIcon /> : <PlusIcon />}
-        {isEdit ? null : CREATE_LABEL}
-      </SheetTrigger>
+    <Sheet open={isOpen} onOpenChange={(next) => changeOpen(next)}>
+      {isControlled ? null : (
+        <SheetTrigger
+          render={
+            <Button
+              variant={isEdit ? 'ghost' : 'default'}
+              className={touchTarget}
+              aria-label={isEdit ? `Editar ${line.name}` : undefined}
+              data-testid={isEdit ? 'catalog-line-edit-open' : 'catalog-line-create-open'}
+            />
+          }
+        >
+          {isEdit ? <PencilIcon /> : <PlusIcon />}
+          {isEdit ? null : CREATE_LABEL}
+        </SheetTrigger>
+      )}
       <CatalogLineForm
         supplierId={supplierId}
         line={line}

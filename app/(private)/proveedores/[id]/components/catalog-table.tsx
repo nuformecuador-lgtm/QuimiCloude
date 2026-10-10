@@ -6,16 +6,19 @@ import { useMemo, useTransition } from 'react';
 import {
   DataTable,
   type DataTableParams,
+  type DataTableStates,
   type DataTableTexts,
 } from '@/components/shared/data-table';
+import type { ErrorState } from '@/lib/modules/errores';
 import type { CatalogLineListItem } from '@/lib/modules/proveedores';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 import { CatalogLineSheet } from './catalog-line-sheet';
 import { buildCatalogColumns } from './catalog-columns';
-import type { CatalogDirectories } from './catalog-directories';
+import { CATALOG_SKELETON_COLUMN_COUNT } from './catalog-columns-skeleton';
+import { EMPTY_CATALOG_DIRECTORIES, type CatalogDirectories } from './catalog-directories';
+import { CatalogLineRowActions } from './catalog-line-row-actions';
 import { catalogListHref } from './catalog-list-params';
-import { DeleteCatalogLineDialog } from './delete-catalog-line-dialog';
 
 /**
  * Tabla del catalogo de un proveedor (R12, R13, R21, R22, R30, R41, R48; `design.md > 6`).
@@ -31,7 +34,7 @@ import { DeleteCatalogLineDialog } from './delete-catalog-line-dialog';
  * resueltas, los diccionarios, las unidades y los parametros con los que se pidieron.
  *
  * **Las acciones de fila NO son un slot** (correccion del 2026-09-07): esta tabla monta ella
- * misma `CatalogLineSheet` y `DeleteCatalogLineDialog`. El diseno original las recibia como
+ * misma `CatalogLineRowActions`, el menu de la fila con su panel y su dialogo. El diseno original las recibia como
  * `rowActions`, una funcion que `CatalogListSection` construia; pero esa seccion es un Server
  * Component y una funcion no cruza la frontera servidor->cliente, asi que la pantalla reventaba
  * con «Functions cannot be passed directly to Client Components». De la seccion bajan datos
@@ -46,12 +49,9 @@ import { DeleteCatalogLineDialog } from './delete-catalog-line-dialog';
  * **`searchable` se queda en su defecto (`true`)**: `SUPPLIER_CATALOG_LINE_QUERYABLE.searchable`
  * es `true` y `listCatalogLines` resuelve la busqueda, asi que la caja no miente.
  *
- * **`status` es SIEMPRE `'idle'`**: el error y el catalogo vacio se pintan FUERA de
- * `<DataTable>`, cada uno con su copy y sus acciones (R23, R25). El «cargando» de R24 ya no viene
- * de remontar la pantalla -la `key` del `<Suspense>` desaparecio el 2026-09-07 porque borraba el
- * foco del campo que se estaba escribiendo-: la navegacion va en una transicion y, mientras esta
- * en vuelo, esta pantalla lo anuncia y atenua la tabla sin desmontarla. El `fallback` del
- * `<Suspense>` sigue cubriendo la primera carga con `CatalogTableSkeleton`.
+ * **Cargando, error y catalogo vacio los pinta `<DataTable>` en lugar de toda la tabla**, y en
+ * esos estados no se pinta el envoltorio de aqui. El de cada navegacion posterior lo da esta
+ * tabla, mientras esta en vuelo, sin desmontarla.
  *
  * **El desbordamiento horizontal lo absorbe el primitivo** (R13): `components/ui/table.tsx`, que
  * la tabla compartida usa por dentro, envuelve la tabla en un contenedor con `overflow-x-auto`.
@@ -61,6 +61,9 @@ import { DeleteCatalogLineDialog } from './delete-catalog-line-dialog';
 
 /** Clave de persistencia del fijado de columnas. Una sola tabla en la pantalla, un solo id. */
 export const CATALOG_TABLE_ID = 'proveedor-catalogo';
+
+/** Distinto del vacio de la lista de proveedores: los dos vacios significan cosas distintas. */
+export const CATALOG_LIST_EMPTY_TESTID = 'catalog-list-empty';
 
 /**
  * Textos del componente compartido. Viven aqui -y no en el componente- porque la tabla compartida
@@ -89,9 +92,13 @@ export const CATALOG_TABLE_TEXTS: DataTableTexts = {
   lastYear: 'Último año',
 };
 
-export type CatalogTableProps = {
+type CatalogTableStatusProps =
+  | { readonly status?: 'idle' | 'loading'; readonly error?: undefined }
+  | { readonly status: 'error'; readonly error: ErrorState };
+
+export type CatalogTableProps = CatalogTableStatusProps & {
   readonly lines: readonly CatalogLineListItem[];
-  readonly directories: CatalogDirectories;
+  readonly directories?: CatalogDirectories;
   /** Los parametros vigentes, los mismos con los que se pidio la lista. */
   readonly params: DataTableParams;
   readonly totalPages: number;
@@ -103,15 +110,75 @@ export type CatalogTableProps = {
    * servidor->cliente sin problema.
    */
   readonly units: readonly UnitRef[];
+  /**
+   * Presente solo con cero lineas: el vacio sustituye a toda la tabla. Con `firstPageHref` es la
+   * pagina que se quedo atras.
+   */
+  readonly empty?: { readonly firstPageHref?: string };
 };
+
+function buildStates(
+  params: DataTableParams,
+  supplierId: string,
+  units: readonly UnitRef[],
+  error: ErrorState | undefined,
+  empty: CatalogTableProps['empty'],
+): DataTableStates {
+  return {
+    loading: {
+      columns: CATALOG_SKELETON_COLUMN_COUNT,
+      rows: params.pageSize,
+      label: 'Cargando el catálogo del proveedor…',
+      testId: 'catalog-table-skeleton',
+      rowTestId: 'catalog-row-skeleton',
+    },
+    ...(error === undefined
+      ? {}
+      : {
+          error: {
+            error,
+            title: 'No se pudo cargar la información del proveedor.',
+            testId: 'catalog-list-error',
+            messageTestId: 'catalog-list-error-message',
+            codeTestId: 'catalog-list-error-code',
+            retry: { kind: 'refresh' },
+            retryTestId: 'catalog-list-retry',
+          },
+        }),
+    ...(empty === undefined
+      ? {}
+      : {
+          empty: {
+            testId: CATALOG_LIST_EMPTY_TESTID,
+            message:
+              empty.firstPageHref === undefined
+                ? 'Este proveedor todavía no tiene líneas de catálogo.'
+                : 'Esta página ya no tiene líneas de catálogo.',
+            ...(empty.firstPageHref === undefined
+              ? {}
+              : {
+                  firstPage: {
+                    href: empty.firstPageHref,
+                    label: 'Volver a la primera página',
+                    testId: 'catalog-list-first-page',
+                  },
+                }),
+            children: <CatalogLineSheet supplierId={supplierId} units={units} />,
+          },
+        }),
+  };
+}
 
 export function CatalogTable({
   lines,
-  directories,
+  directories = EMPTY_CATALOG_DIRECTORIES,
   params,
   totalPages,
   supplierId,
   units,
+  status = 'idle',
+  error,
+  empty,
 }: CatalogTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -121,19 +188,15 @@ export function CatalogTable({
     `CatalogListSection`: esa seccion es un Server Component, y una funcion no cruza la frontera
     servidor->cliente («Functions cannot be passed directly to Client Components»). Con el slot,
     la pantalla del proveedor reventaba al pintarse. Lo que baja de la seccion son datos
-    -`supplierId` y `units`-, y esta tabla los enchufa al panel y al dialogo, igual que hace
-    `product-table.tsx` en inventario. Las acciones siguen SIEMPRE visibles: nada tras `:hover`
-    (R48).
+    -`supplierId` y `units`-, y esta tabla los enchufa al menu de la fila. Su disparador sigue
+    SIEMPRE visible: nada tras `:hover`.
   */
   const columns = useMemo(
     () =>
       buildCatalogColumns({
         directories,
         rowActions: (line) => (
-          <>
-            <CatalogLineSheet supplierId={supplierId} units={units} line={line} />
-            <DeleteCatalogLineDialog line={line} />
-          </>
+          <CatalogLineRowActions supplierId={supplierId} units={units} line={line} />
         ),
       }),
     [directories, supplierId, units],
@@ -157,6 +220,23 @@ export function CatalogTable({
     });
   };
 
+  const table = (
+    <DataTable
+      tableId={CATALOG_TABLE_ID}
+      columns={columns}
+      rows={lines}
+      getRowId={(line) => line.id}
+      params={params}
+      totalPages={totalPages}
+      onParamsChange={(next) => navigate(catalogListHref(supplierId, next))}
+      status={status}
+      states={buildStates(params, supplierId, units, error, empty)}
+      texts={CATALOG_TABLE_TEXTS}
+    />
+  );
+
+  if (status !== 'idle' || (lines.length === 0 && empty !== undefined)) return table;
+
   return (
     <div
       data-testid="catalog-table"
@@ -173,17 +253,7 @@ export function CatalogTable({
       {isPending ? (
         <p className="text-xs text-muted-foreground">{CATALOG_TABLE_TEXTS.loading}</p>
       ) : null}
-      <DataTable
-        tableId={CATALOG_TABLE_ID}
-        columns={columns}
-        rows={lines}
-        getRowId={(line) => line.id}
-        params={params}
-        totalPages={totalPages}
-        onParamsChange={(next) => navigate(catalogListHref(supplierId, next))}
-        status="idle"
-        texts={CATALOG_TABLE_TEXTS}
-      />
+      {table}
     </div>
   );
 }

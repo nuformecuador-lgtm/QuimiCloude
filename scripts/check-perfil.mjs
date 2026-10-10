@@ -14,10 +14,17 @@
  *     un doc cumple 61 dias seria un gate que se ignora. Se renueva con `/arnes-init` (modo
  *     revision), que relee el doc con el humano y actualiza la fecha.
  *
+ *   - FALLA si `ramas.integracion` o `ramas.produccion` faltan, o si `.github/workflows/gate.yml`
+ *     no las sigue: su `pull_request.branches` debe incluir las dos y todo `github.base_ref == '<x>'`
+ *     debe nombrar la de produccion. GitHub no lee el JSON, asi que el workflow lleva los nombres
+ *     escritos y aqui se comprueba que no se desalinean (con `main` escrito y `prod` real, el PR
+ *     de despliegue no corria ni el gate ni el E2E). AVISA si `origin/<rama>` no existe en local.
+ *
  * La deriva de DEPENDENCIAS no se mira aqui: la caza `tests/guards/guard-dependencias-aprobadas`.
  *
  * Salida: lineas `AVISO: ...` y notas en stdout; errores en stderr y exit 1.
  */
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 
 const CONFIG = 'arnes.config.json';
@@ -37,6 +44,37 @@ try {
 if (!config.jira?.project) {
   console.error(`${CONFIG} no declara "jira.project". Corre /arnes-init.`);
   process.exit(1);
+}
+
+const { integracion, produccion } = config.ramas ?? {};
+if (!integracion || !produccion) {
+  console.error(`${CONFIG} no declara "ramas.integracion" y "ramas.produccion". Corre /arnes-init.`);
+  process.exit(1);
+}
+const GATE = '.github/workflows/gate.yml';
+if (existsSync(GATE)) {
+  const yml = readFileSync(GATE, 'utf8');
+  const filtro = /pull_request:[\s\S]*?branches:\s*\[([^\]]*)\]/.exec(yml);
+  if (!filtro) {
+    console.log(`AVISO: no se leer el filtro de ramas de ${GATE} (se espera "branches: [a, b]"): comprueba a mano que escucha ${integracion} y ${produccion}.`);
+  } else {
+    const ramasGate = filtro[1].split(',').map((r) => r.trim().replace(/^['"]|['"]$/g, ''));
+    const faltan = [integracion, produccion].filter((r) => !ramasGate.includes(r));
+    if (faltan.length) {
+      console.error(`${GATE} no escucha PRs a ${faltan.join(', ')} (tiene [${ramasGate.join(', ')}]; ${CONFIG} > ramas manda). Corrige "branches:".`);
+      process.exit(1);
+    }
+  }
+  for (const [, rama] of yml.matchAll(/github\.base_ref\s*==\s*'([^']+)'/g)) {
+    if (rama !== produccion) {
+      console.error(`${GATE} compara github.base_ref con '${rama}', pero la rama de produccion es '${produccion}' (${CONFIG} > ramas). El E2E no correria en el PR de despliegue.`);
+      process.exit(1);
+    }
+  }
+}
+for (const rama of [integracion, produccion]) {
+  const hay = spawnSync('git', ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${rama}`], { stdio: 'ignore' });
+  if (hay.status !== 0) console.log(`AVISO: no existe origin/${rama} en local (${CONFIG} > ramas). Haz git fetch o revisa el nombre.`);
 }
 
 const docs = config.perfil?.docs ?? [];

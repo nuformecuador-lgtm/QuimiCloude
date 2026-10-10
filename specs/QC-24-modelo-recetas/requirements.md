@@ -252,3 +252,11 @@ misma empresa (`recipes_company_name_unique`, ahora con `parent_recipe_id IS NUL
 **versiones** vivas de la misma original (nuevo `recipes_version_name_unique`). Una versión puede
 llamarse como otra receta original. Detalle en
 [`specs/QC-172-versiones-de-receta/`](../QC-172-versiones-de-receta/).
+
+## Enmienda 2026-10-08 — defensa de ubicación del módulo (QC-180)
+
+La defensa de ubicación de `tests/unit/recetas/module-contract.test.ts` (`PANTALLAS_AUTORIZADAS`)
+admite, además de `app/(private)/asignacion/[id]/page.tsx`, la página `app/(private)/pedidos/page.tsx`.
+Esa página **sigue sujeta al contrato público**: solo puede consumir recetas por
+`adapters/driving/`, nunca por dentro del módulo. Detalle en
+[`specs/QC-180-rojos-heredados-de-alta-de-grupos/`](../QC-180-rojos-heredados-de-alta-de-grupos/).

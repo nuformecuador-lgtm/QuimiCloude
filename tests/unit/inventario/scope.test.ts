@@ -62,7 +62,13 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-import { FORMULAS_ROUTE, PRESENTATIONS_ROUTE } from '@/lib/shared/routes'
+import {
+  AI_PROVIDER_INTEGRATION_ROUTE,
+  FORMULAS_ROUTE,
+  INVENTORY_INTEGRATION_ROUTE,
+  PRESENTATIONS_ROUTE,
+  WHATSAPP_INTEGRATION_ROUTE,
+} from '@/lib/shared/routes'
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
 function findRepoRoot(startDir: string): string {
@@ -208,11 +214,31 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     // de la pantalla de proveedores. Cualquier otro archivo de esa carpeta que case sigue en rojo.
     const SELECTOR_DE_UNIDAD_DE_LA_IMPORTACION =
       '(private)/proveedores/[id]/importar/[documentoId]/components/new-presentation-units.tsx'
+    // 2026-10-08 (menu de integraciones): QUINTO falso positivo por nombre. Bajo la carpeta de
+    // integraciones viven paginas cascaron, una por integracion; la de inventarios casa con
+    // `screenPattern` solo por llamarse «inventarios». No lista ni edita el catalogo de productos.
+    // La carpeta se deriva de las rutas de `@/lib/shared/routes`, nunca de un literal a mano, y
+    // abajo se exige que lo que casa ahi sea EXACTAMENTE esa pagina y nada mas.
+    const integrationRouteFirstSegments = [
+      AI_PROVIDER_INTEGRATION_ROUTE,
+      INVENTORY_INTEGRATION_ROUTE,
+      WHATSAPP_INTEGRATION_ROUTE,
+    ].map((route) => route.split('/').filter((s) => s.length > 0)[0])
+    const [integrationsSegment] = integrationRouteFirstSegments
+    if (!integrationsSegment) throw new Error('la ruta del proveedor IA no tiene segmentos')
+    expect(
+      integrationRouteFirstSegments,
+      'las rutas de integraciones ya no comparten su primer segmento',
+    ).toEqual([integrationsSegment, integrationsSegment, integrationsSegment])
+    const INTEGRATIONS_ROUTE_DIR = join('(private)', integrationsSegment)
+      .split(sep)
+      .join('/')
     const fueraDeSuCarpeta = appMatches.filter(
       (relPath) =>
         !relPath.startsWith(`${CATALOG_ROUTE_DIR}/`) &&
         !relPath.startsWith(`${RECIPES_ROUTE_DIR}/`) &&
         !relPath.startsWith(`${PRESENTATIONS_ROUTE_DIR}/`) &&
+        !relPath.startsWith(`${INTEGRATIONS_ROUTE_DIR}/`) &&
         relPath !== SELECTOR_DE_UNIDAD_DE_LA_IMPORTACION,
     )
     expect(
@@ -262,6 +288,32 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
       filtracionesEnPresentaciones,
       `pantalla de catalogo de productos escondida bajo la ruta de presentaciones: ${filtracionesEnPresentaciones.join(', ')}`,
     ).toEqual([])
+
+    // Defensa extra de la exclusion de integraciones: lo que casa bajo esa carpeta es
+    // EXACTAMENTE la pagina cascaron de inventarios, y su fuente no declara piezas del catalogo.
+    // Cualquier otro archivo que case ahi, o esa pagina convertida en catalogo, pone esto en rojo.
+    const INVENTORY_INTEGRATION_PAGE = join(
+      '(private)',
+      ...INVENTORY_INTEGRATION_ROUTE.split('/').filter((s) => s.length > 0),
+      'page.tsx',
+    )
+      .split(sep)
+      .join('/')
+    const dentroDeIntegraciones = appMatches.filter((relPath) =>
+      relPath.startsWith(`${INTEGRATIONS_ROUTE_DIR}/`),
+    )
+    expect(
+      dentroDeIntegraciones,
+      `archivos inesperados bajo app/${INTEGRATIONS_ROUTE_DIR}/: ${dentroDeIntegraciones.join(', ')}`,
+    ).toEqual([INVENTORY_INTEGRATION_PAGE])
+    const inventoryIntegrationSource = readFileSync(
+      join(repoRoot, 'app', INVENTORY_INTEGRATION_PAGE),
+      'utf8',
+    )
+    expect(
+      /ProductListSection|product-table/.test(inventoryIntegrationSource),
+      `pantalla de catalogo escondida en app/${INVENTORY_INTEGRATION_PAGE}`,
+    ).toBe(false)
 
     // Esta mitad de R34 sigue INTACTA y en negativo: QC-22 monto sus piezas dentro de la
     // carpeta de ruta, asi que `components/` (compartido entre pantallas) no gano ninguna
@@ -374,11 +426,17 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     // del catalogo ni un spec: es el helper E2E compartido que fija la igualdad «nombre · unidad»
     // de la celda del nombre para los specs de inventario que ya estan en esta lista. La guardia
     // no se afloja; se le añade un renglon.
+    // ACTUALIZADO 2026-10-08 (QC-223, TI): entra `entregar-producto-terminado.spec.ts`, en el orden
+    // que el matcher devuelve (alfabetico). Casa por la palabra «product» del nombre. No es una
+    // segunda pantalla del catalogo: recorre la entrega de un pedido terminado desde Pedidos y solo
+    // siembra lotes de producto terminado por Prisma. La guardia no se afloja; se le añade un
+    // renglon.
     const E2E_DE_AISLAMIENTO = 'aislamiento-inventario.spec.ts'
     const e2eMatches = matchingFiles(join(repoRoot, 'e2e'))
     expect(e2eMatches, `spec E2E de catalogo inesperado: ${e2eMatches.join(', ')}`).toEqual([
       E2E_DE_AISLAMIENTO,
       'ajuste-de-inventario.spec.ts',
+      'entregar-producto-terminado.spec.ts',
       'fixtures/inventario-importar-mixto.csv',
       'helpers/product-name-cell.ts',
       'inventario-importar.spec.ts',

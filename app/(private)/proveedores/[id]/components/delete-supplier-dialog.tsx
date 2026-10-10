@@ -5,28 +5,15 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
+import { DeleteConfirmDialog } from '@/components/shared/delete-confirm-dialog';
 import { Button } from '@/components/ui/button';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import type { SupplierView } from '@/lib/modules/proveedores';
 import {
   deleteSupplierAction,
   type SupplierMutationFormState,
 } from '@/lib/modules/proveedores/adapters/driving/supplier-actions';
 import { SUPPLIERS_ROUTE } from '@/lib/shared/routes';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 const DELETE_SUCCESS = 'Proveedor dado de baja.';
 
@@ -53,71 +40,45 @@ export function DeleteSupplierDialog({ supplier }: { readonly supplier: Supplier
   }, [state, router]);
 
   return (
-    <AlertDialog open={open} onOpenChange={(next) => setRequestedOpen(next)}>
-      <AlertDialogTrigger
-        render={
+    <DeleteConfirmDialog
+      open={open}
+      onOpenChange={(next) => setRequestedOpen(next)}
+      trigger={{
+        render: (
           <Button
             variant="ghost"
-            className={TOUCH_TARGET}
+            className={touchTarget}
             aria-label={`Dar de baja ${supplier.name}`}
             data-testid="supplier-delete-open"
           />
-        }
-      >
-        <Trash2Icon />
-      </AlertDialogTrigger>
-      <AlertDialogContent data-testid="delete-supplier-dialog">
-        <AlertDialogHeader>
-          <AlertDialogTitle>Dar de baja el proveedor</AlertDialogTitle>
-          <AlertDialogDescription data-testid="delete-supplier-message">
-            Se va a dar de baja «{supplier.name}». Esta acción no se puede deshacer.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
+        ),
+        children: <Trash2Icon />,
+      }}
+      texts={{
+        title: 'Dar de baja el proveedor',
+        description: <>Se va a dar de baja «{supplier.name}». Esta acción no se puede deshacer.</>,
+        dismiss: 'Cancelar',
+        confirm: 'Dar de baja',
+      }}
+      testIds={{
+        dialog: 'delete-supplier-dialog',
+        message: 'delete-supplier-message',
+        dismiss: 'delete-supplier-cancel',
+        confirm: 'delete-supplier-confirm',
+        error: 'delete-supplier-error',
+      }}
+      submit={{
+        kind: 'action',
+        action: formAction,
+        hidden: [{ name: 'id', value: supplier.id, testId: 'delete-supplier-id' }],
+      }}
+      aside={
         <p className="text-sm text-muted-foreground" data-testid="delete-supplier-cascade">
           Sus líneas de catálogo se dan de baja con él.
         </p>
-
-        {/*
-          QC-71 (R17, R18): el INESPERADO lo pinta el componente compartido -que necesita un
-          contenedor de bloque-; el CATALOGADO, exactamente como siempre y sin identificador.
-        */}
-        {state.status !== 'error' ? null : state.code === UNEXPECTED_ERROR_CODE ? (
-          <div
-            role="alert"
-            className="text-sm text-destructive"
-            data-testid="delete-supplier-error"
-          >
-            <UnexpectedErrorNotice state={state} />
-          </div>
-        ) : (
-          <p role="alert" className="text-sm text-destructive" data-testid="delete-supplier-error">
-            {state.message}
-          </p>
-        )}
-
-        <form action={formAction}>
-          <input
-            type="hidden"
-            name="id"
-            defaultValue={supplier.id}
-            data-testid="delete-supplier-id"
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel className={TOUCH_TARGET} data-testid="delete-supplier-cancel">
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              type="submit"
-              variant="destructive"
-              className={TOUCH_TARGET}
-              data-testid="delete-supplier-confirm"
-            >
-              Dar de baja
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </form>
-      </AlertDialogContent>
-    </AlertDialog>
+      }
+      error={state.status === 'error' ? state : undefined}
+      errorStyle="inline"
+    />
   );
 }

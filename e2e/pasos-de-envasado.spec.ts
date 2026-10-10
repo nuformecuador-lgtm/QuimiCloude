@@ -42,6 +42,7 @@ import {
   PACKING_ORDER_START_CONFIRM_TESTID,
   clickAndConfirm,
 } from './helpers/confirm-dialog';
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { seedPackaging } from './helpers/packaging';
 
@@ -163,7 +164,7 @@ async function expectNoneOf(page: Page, texts: readonly string[]): Promise<void>
 async function createUser(user: Credentials, roleId: string): Promise<string> {
   if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
 
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames,
       lastNames: LAST_NAMES_BY_USERNAME[user.username] ?? 'Fixture',

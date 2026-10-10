@@ -2,8 +2,10 @@
 
 import type { ReactNode } from 'react';
 
-import type { DataTableColumn } from '@/components/shared/data-table';
+import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
 import { CUSTOMER_QUERYABLE, type CustomerView } from '@/lib/modules/clientes';
+import { formatCivilDate } from '@/lib/shared/ui/date-civil';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
 import { CITY_COLUMN_ID, CREATED_AT_COLUMN_ID } from './customer-list-params';
 
@@ -11,14 +13,11 @@ import { CITY_COLUMN_ID, CREATED_AT_COLUMN_ID } from './customer-list-params';
  * Las nueve columnas de la lista de clientes, declaradas como datos.
  *
  * **Factoria y no un array del modulo**: la columna de acciones es un componente de cliente que
- * llega por parametro (mismo patron que `order-columns.tsx` y `recipe-columns.tsx`), porque en
- * este archivo aun no existe `customer-row-actions.tsx`.
+ * llega por parametro (mismo patron que `order-columns.tsx` y `recipe-columns.tsx`).
  *
  * `sortable` y `filter` se leen de `CUSTOMER_QUERYABLE` en vez de escribirse a mano: si la lista
  * blanca cambia, esta declaracion no queda desincronizada en silencio.
  */
-
-export const MISSING_VALUE_MARK = '—';
 
 export const LAST_NAMES_COLUMN_ID = 'lastNames';
 export const FIRST_NAMES_COLUMN_ID = 'firstNames';
@@ -42,15 +41,9 @@ export type CustomerColumnsDeps = {
 function MissingValue({ field }: { readonly field: string }) {
   return (
     <span aria-label="Sin dato" data-testid={`customer-missing-${field}`}>
-      {MISSING_VALUE_MARK}
+      {EMPTY_MARK}
     </span>
   );
-}
-
-// UTC y no `toLocaleDateString`: servidor y navegador tienen husos distintos y la fecha local
-// provoca un desajuste de hidratacion.
-function formatDate(value: Date): string {
-  return value.toISOString().slice(0, 10);
 }
 
 function isSortable(id: string): boolean {
@@ -102,27 +95,30 @@ export function buildCustomerColumns({ rowActions }: CustomerColumnsDeps): reado
     {
       id: CREATED_AT_COLUMN_ID,
       label: 'Fecha de alta',
+      tabular: true,
       align: 'start',
       sortable: isSortable(CREATED_AT_COLUMN_ID),
       filter:
         CUSTOMER_QUERYABLE.filterable[CREATED_AT_COLUMN_ID] === 'dateRange'
           ? { kind: 'dateRange' }
           : undefined,
-      cell: (customer) => formatDate(customer.createdAt),
+      cell: (customer) => formatCivilDate(customer.createdAt),
     },
     {
       id: UPDATED_AT_COLUMN_ID,
       label: 'Última modificación',
+      tabular: true,
       align: 'start',
       sortable: isSortable(UPDATED_AT_COLUMN_ID),
-      cell: (customer) => formatDate(customer.updatedAt),
+      cell: (customer) => formatCivilDate(customer.updatedAt),
     },
     {
+      ...actionsColumn<CustomerView>({
+        id: ACTIONS_COLUMN_ID,
+        label: 'Acciones',
+        cell: (customer) => rowActions(customer),
+      }),
       id: ACTIONS_COLUMN_ID,
-      label: 'Acciones',
-      align: 'end',
-      pinnable: false,
-      cell: (customer) => rowActions(customer),
     },
   ];
 }

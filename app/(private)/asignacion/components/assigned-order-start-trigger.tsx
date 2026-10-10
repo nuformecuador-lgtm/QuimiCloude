@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useTransition, type ReactNode } from 'react';
 
-import { ConfirmActionDialog } from '@/components/shared/confirm-action-dialog';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { Button } from '@/components/ui/button';
 
 export const ASSIGNED_ORDER_START_DIALOG_TESTID = 'assigned-order-start-dialog';
@@ -18,8 +18,6 @@ export function assignedOrderStartConfirmTexts() {
     confirm: 'Comenzar',
   } as const;
 }
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 
 /**
  * «Entrar» de un pedido aun no comenzado. Abrir la ruta de ejecucion ya lo pasa a `EN_CURSO`,
@@ -37,13 +35,14 @@ export function AssignedOrderStartTrigger({
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const texts = assignedOrderStartConfirmTexts();
 
   return (
     <>
       <Button
         type="button"
         variant="outline"
-        className={TOUCH_TARGET}
+        touch
         disabled={isPending}
         aria-busy={isPending}
         data-testid={testId}
@@ -51,13 +50,21 @@ export function AssignedOrderStartTrigger({
       >
         {children}
       </Button>
-      <ConfirmActionDialog
+      <ConfirmDialog
         open={open}
         onOpenChange={setOpen}
         onConfirm={() => startTransition(() => router.push(href))}
-        texts={assignedOrderStartConfirmTexts()}
-        testId={ASSIGNED_ORDER_START_DIALOG_TESTID}
-        confirmTestId={ASSIGNED_ORDER_START_CONFIRM_TESTID}
+        texts={{
+          title: texts.title,
+          description: texts.description,
+          dismiss: texts.cancel,
+          confirm: texts.confirm,
+        }}
+        testIds={{
+          dialog: ASSIGNED_ORDER_START_DIALOG_TESTID,
+          dismiss: `${ASSIGNED_ORDER_START_DIALOG_TESTID}-cancel`,
+          confirm: ASSIGNED_ORDER_START_CONFIRM_TESTID,
+        }}
       />
     </>
   );

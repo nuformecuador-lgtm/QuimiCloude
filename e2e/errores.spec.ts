@@ -56,6 +56,11 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, test } from '@playwright/test';
 
+import {
+  UNEXPECTED_ERROR_NOTICE_MESSAGE_TESTID,
+  UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
+  UNEXPECTED_ERROR_NOTICE_TESTID,
+} from '@/components/shared/unexpected-error-notice';
 // El mensaje bajo prueba sale del CATALOGO, no de un literal: es su unica fuente (QC-70 R1).
 import { errorMessage, UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 // `normalizeCompanyName` es la UNICA definicion de <<mismo nombre de empresa>> (QC-47 R3), y
@@ -66,6 +71,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { FORMULAS_ROUTE } from '@/lib/shared/routes';
 
 // QC-93 (R8): el aterrizaje tras el login se deriva de los permisos del usuario en el helper unico.
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
@@ -155,7 +161,7 @@ test.beforeAll(async () => {
 
   // Hash REAL: el objetivo es que bcrypt, el adaptador Prisma y la Server Action de login se
   // entiendan de verdad. Un hash inventado probaria otra cosa.
-  await prisma.user.create({
+  await createFixtureUser({
     data: {
       firstNames: `Qc70${RUN_ID.slice(0, 8)}`,
       lastNames: 'Errores',
@@ -217,11 +223,18 @@ test.describe('un error que no es de dominio, visto desde el navegador', () => {
 
     // --- 4. (b) El mensaje es el del CATALOGO para el codigo generico, y el codigo que la
     // pantalla pinta es `unexpected`. El texto se toma de `errorMessage`, nunca copiado a mano.
-    await expect(page.getByTestId('recipe-list-error')).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByTestId('recipe-list-error-message')).toHaveText(
+    // Desde QC-71 (f115cb94), y en esta pantalla desde el `ErrorState` compartido de QC-231
+    // (f3c00f62), el error inesperado se pinta con el aviso `UnexpectedErrorNotice` dentro de la
+    // region de error: el mensaje va en su parrafo, el codigo en su `data-code`, y debajo el
+    // identificador de la peticion en vez del codigo en claro.
+    const errorRegion = page.getByTestId('recipe-list-error');
+    await expect(errorRegion).toBeVisible({ timeout: 60_000 });
+    const notice = errorRegion.getByTestId(UNEXPECTED_ERROR_NOTICE_TESTID);
+    await expect(notice).toHaveAttribute('data-code', UNEXPECTED_ERROR_CODE);
+    await expect(notice.getByTestId(UNEXPECTED_ERROR_NOTICE_MESSAGE_TESTID)).toHaveText(
       errorMessage(UNEXPECTED_ERROR_CODE),
     );
-    await expect(page.getByTestId('recipe-list-error-code')).toHaveText(UNEXPECTED_ERROR_CODE);
+    await expect(notice.getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toBeVisible();
 
     // --- 5. (c) Y el documento SERVIDO no lleva ni un detalle interno. Se mira el HTML entero y no
     // solo el texto visible: un detalle en un atributo o en la carga util serializada esta

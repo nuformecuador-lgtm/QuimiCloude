@@ -46,7 +46,9 @@ import { normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand, permissionsForUsername } from './helpers/landing';
+import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 const FIXTURE_PREFIX = 'qc92_e2e_';
 
@@ -123,7 +125,7 @@ async function createUser(user: Credentials, roleName: string, forCompanyId: str
     );
   }
 
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames: `Qc92${RUN_ID.slice(0, 8)}`,
       lastNames: 'Ajuste',
@@ -202,7 +204,9 @@ async function openBatchesOf(page: Page, user: Credentials, seeded: SeededBatch)
 }
 
 async function openBatchesPanel(page: Page, seeded: SeededBatch): Promise<void> {
-  await page.getByTestId('product-batches-open').click();
+  await (
+    await openRowActionsMenuItem(page, page.getByTestId('product-row-actions'), 'product-batches-open')
+  ).click();
   await expect(page.getByTestId('product-batches-sheet')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId(`product-batch-${seeded.batchId}`)).toBeVisible({ timeout: 60_000 });
 }

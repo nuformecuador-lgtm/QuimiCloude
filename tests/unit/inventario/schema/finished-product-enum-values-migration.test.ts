@@ -54,11 +54,20 @@ describe('db/migrations/*_finished_product_enum_values', () => {
   })
 
   it('R1: db/schema.prisma declara InventoryMovementKind en orden opening, adjustment, consumption, production', () => {
+    // QC-223 2026-10-08: `delivery` se anade al final, sin reordenar; los cuatro primeros siguen
+    // siendo exactamente estos.
+    expect(parseEnum('InventoryMovementKind').slice(0, 4)).toEqual([
+      'opening',
+      'adjustment',
+      'consumption',
+      'production',
+    ])
     expect(parseEnum('InventoryMovementKind')).toEqual([
       'opening',
       'adjustment',
       'consumption',
       'production',
+      'delivery',
     ])
   })
 

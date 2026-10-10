@@ -29,6 +29,7 @@ const RESUMEN_1 = {
   unitId: 'unidad-1',
   finishedAt: null,
   packedBy: null,
+  conditionedBy: null,
 };
 
 const RESUMEN_2 = {
@@ -42,6 +43,7 @@ const RESUMEN_2 = {
   unitId: null,
   finishedAt: null,
   packedBy: BETO,
+  conditionedBy: null,
 };
 
 type Dobles = {

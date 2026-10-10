@@ -4,17 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { ConfirmDialogBody, ConfirmDialogFrame } from '@/components/shared/confirm-dialog';
 import {
   Select,
   SelectContent,
@@ -22,12 +12,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import { USER_ACCOUNT_STATUSES, type UserRow } from '@/lib/modules/identity';
 import {
   setUserAccountStatusAction,
   type UserMutationFormState,
 } from '@/lib/modules/identity/adapters/driving/user-actions';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { USER_ACCOUNT_STATUS_LABELS } from './user-labels';
 
@@ -68,7 +58,6 @@ export const USER_STATUS_ID_TESTID = 'user-status-id';
 export const USER_STATUS_ID_FIELD = 'id';
 export const USER_STATUS_FIELD = 'accountStatus';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base md:text-base';
 
 const TITLE = 'Cambiar el estado de la cuenta';
@@ -89,6 +78,19 @@ export type UserStatusDialogProps = {
 
 export function UserStatusDialog({ user, open, onOpenChange }: UserStatusDialogProps) {
   const fieldId = useId();
+  return (
+    <ConfirmDialogFrame open={open} onOpenChange={onOpenChange} testId={USER_STATUS_DIALOG_TESTID}>
+      <UserStatusDialogBody user={user} onOpenChange={onOpenChange} fieldId={fieldId} />
+    </ConfirmDialogFrame>
+  );
+}
+
+type UserStatusDialogBodyProps = Omit<UserStatusDialogProps, 'open'> & {
+  readonly fieldId: string;
+};
+
+/** Se monta con el popup: cada apertura arranca sin el rechazo ni la selección de la anterior. */
+function UserStatusDialogBody({ user, onOpenChange, fieldId }: UserStatusDialogBodyProps) {
   const labelId = `${fieldId}-label`;
   const errorId = `${fieldId}-error`;
   const router = useRouter();
@@ -105,94 +107,65 @@ export function UserStatusDialog({ user, open, onOpenChange }: UserStatusDialogP
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent data-testid={USER_STATUS_DIALOG_TESTID}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{TITLE}</AlertDialogTitle>
-          <AlertDialogDescription data-testid={USER_STATUS_MESSAGE_TESTID}>
-            Elige el estado de la cuenta de {user.displayName}.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        {error === undefined ? null : (
-          <div
-            role="alert"
-            id={errorId}
-            className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={USER_STATUS_ERROR_TESTID}
-            data-code={error.code}
-          >
-            {error.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={error} />
-            ) : (
-              <p data-testid={USER_STATUS_ERROR_MESSAGE_TESTID}>{error.message}</p>
-            )}
-          </div>
-        )}
-
-        <form
-          action={formAction}
-          className="flex flex-col gap-2"
-          data-testid={USER_STATUS_FORM_TESTID}
+    <ConfirmDialogBody
+      onOpenChange={onOpenChange}
+      texts={{
+        title: TITLE,
+        description: <>Elige el estado de la cuenta de {user.displayName}.</>,
+        dismiss: DISMISS_LABEL,
+        confirm: CONFIRM_LABEL,
+        pending: CONFIRM_PENDING_LABEL,
+      }}
+      testIds={{
+        message: USER_STATUS_MESSAGE_TESTID,
+        dismiss: USER_STATUS_DISMISS_TESTID,
+        confirm: USER_STATUS_CONFIRM_TESTID,
+        form: USER_STATUS_FORM_TESTID,
+        error: USER_STATUS_ERROR_TESTID,
+        errorMessage: USER_STATUS_ERROR_MESSAGE_TESTID,
+      }}
+      submit={{
+        kind: 'action',
+        action: formAction,
+        formClassName: 'flex flex-col gap-2',
+        hidden: [{ name: USER_STATUS_ID_FIELD, value: user.id, testId: USER_STATUS_ID_TESTID }],
+      }}
+      isPending={isPending}
+      error={error}
+      errorId={errorId}
+    >
+      <span id={labelId} className="text-sm font-medium">
+        {SELECT_LABEL}
+      </span>
+      {/* Ningún valor se excluye por el estado actual: el de partida solo va preseleccionado. */}
+      <Select
+        name={USER_STATUS_FIELD}
+        defaultValue={user.accountStatus}
+        items={USER_ACCOUNT_STATUSES.map((status) => ({
+          label: USER_ACCOUNT_STATUS_LABELS[status],
+          value: status,
+        }))}
+      >
+        <SelectTrigger
+          aria-labelledby={labelId}
+          className={`w-full ${touchTarget} ${FIELD_TEXT}`}
+          data-testid={USER_STATUS_SELECT_TESTID}
         >
-          <input
-            type="hidden"
-            name={USER_STATUS_ID_FIELD}
-            defaultValue={user.id}
-            data-testid={USER_STATUS_ID_TESTID}
-          />
-          <span id={labelId} className="text-sm font-medium">
-            {SELECT_LABEL}
-          </span>
-          {/*
-            Los CUATRO valores, derivados del conjunto cerrado del contrato. Ninguno se excluye por
-            el estado actual (R32, R34): el punto de partida es solo el valor preseleccionado.
-          */}
-          <Select
-            name={USER_STATUS_FIELD}
-            defaultValue={user.accountStatus}
-            items={USER_ACCOUNT_STATUSES.map((status) => ({
-              label: USER_ACCOUNT_STATUS_LABELS[status],
-              value: status,
-            }))}
-          >
-            <SelectTrigger
-              aria-labelledby={labelId}
-              className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT}`}
-              data-testid={USER_STATUS_SELECT_TESTID}
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {USER_ACCOUNT_STATUSES.map((status) => (
+            <SelectItem
+              key={status}
+              value={status}
+              data-testid={USER_STATUS_OPTION_TESTID}
+              data-status={status}
             >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {USER_ACCOUNT_STATUSES.map((status) => (
-                <SelectItem
-                  key={status}
-                  value={status}
-                  data-testid={USER_STATUS_OPTION_TESTID}
-                  data-status={status}
-                >
-                  {USER_ACCOUNT_STATUS_LABELS[status]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel className={TOUCH_TARGET} data-testid={USER_STATUS_DISMISS_TESTID}>
-              {DISMISS_LABEL}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              type="submit"
-              className={TOUCH_TARGET}
-              disabled={isPending}
-              aria-busy={isPending}
-              data-testid={USER_STATUS_CONFIRM_TESTID}
-            >
-              {isPending ? CONFIRM_PENDING_LABEL : CONFIRM_LABEL}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </form>
-      </AlertDialogContent>
-    </AlertDialog>
+              {USER_ACCOUNT_STATUS_LABELS[status]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </ConfirmDialogBody>
   );
 }

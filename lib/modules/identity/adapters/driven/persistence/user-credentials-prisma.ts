@@ -21,6 +21,7 @@ type FilaCredenciales = {
   company_id: string | null;
   company_deleted_at: Date | null;
   account_status: UserAccountStatus;
+  sessions_valid_from: Date;
 };
 
 /**
@@ -80,7 +81,7 @@ export async function findActiveByUsername(username: string): Promise<Authentica
     SELECT u.id, u.password_hash, u.failed_login_attempts, u.lock_level, u.locked_until,
            r.name AS role_name,
            u.company_id, c.deleted_at AS company_deleted_at,
-           u.account_status
+           u.account_status, u.sessions_valid_from
     FROM users u
     JOIN roles r ON r.id = u.role_id
     LEFT JOIN companies c ON c.id = u.company_id
@@ -104,6 +105,7 @@ export async function findActiveByUsername(username: string): Promise<Authentica
     // El enum de Postgres llega como cadena por el raw: se afirma contra la union de literales
     // que declara el dominio, que es la unica definicion del conjunto (QC-65 R3).
     accountStatus: fila.account_status as UserAccountStatus,
+    sessionsValidFrom: new Date(fila.sessions_valid_from),
   };
 }
 

@@ -1,10 +1,10 @@
 /**
- * Fecha civil (`YYYY-MM-DD`) en hora LOCAL, para componentes que espejan un `Date` de
- * calendario en un valor de formulario o de filtro.
+ * Fecha civil (`YYYY-MM-DD`).
  *
- * **Nunca `toISOString()`**: desplaza por huso horario y puede devolver el dia anterior o
- * siguiente segun la zona del navegador. Estas dos funciones son inversas exactas entre si,
- * siempre construyendo/leyendo en hora local con `getFullYear`/`getMonth`/`getDate`.
+ * - `formatDateLocalISO` / `parseDateLocalISO`: hora LOCAL, para espejar un `Date` de calendario
+ *   en un valor de formulario o de filtro. Ahí `toISOString()` desplazaría el día según el huso.
+ * - `formatCivilDate`: hora UTC, para las celdas. Servidor y navegador tienen husos distintos y
+ *   la hora local daría un desajuste de hidratación.
  */
 
 /** Formatea una fecha como `YYYY-MM-DD` en hora local. Determinista, sin dependencias. */
@@ -19,4 +19,9 @@ export function formatDateLocalISO(date: Date): string {
 export function parseDateLocalISO(value: string): Date {
   const [year, month, day] = value.split('-').map(Number);
   return new Date(year, month - 1, day);
+}
+
+/** Fecha UTC del instante como `YYYY-MM-DD`. */
+export function formatCivilDate(instant: Date): string {
+  return instant.toISOString().slice(0, 10);
 }

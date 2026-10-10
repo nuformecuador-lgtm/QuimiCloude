@@ -6,8 +6,7 @@ import { EntityImage } from '@/components/shared/entity-image';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import type { CatalogImportPreviewCrop } from '@/lib/modules/documentos';
-
-const TOUCH_TARGET = 'min-h-11 min-w-11';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 type CropPickerProps = {
   /** Todos los recortes del archivo, sin acotar a los que ya se emparejaron con alguna fila. */
@@ -33,7 +32,7 @@ export function CropPicker({ crops, selectedPath, onPick, triggerTestId }: CropP
           <Button
             type="button"
             variant="outline"
-            className={TOUCH_TARGET}
+            className={touchTarget}
             disabled={crops.length === 0}
             data-testid={triggerTestId}
           />
@@ -50,7 +49,7 @@ export function CropPicker({ crops, selectedPath, onPick, triggerTestId }: CropP
             <button
               key={crop.path}
               type="button"
-              className={`${TOUCH_TARGET} rounded-md border p-1 ${
+              className={`${touchTarget} rounded-md border p-1 ${
                 crop.path === selectedPath ? 'border-primary' : 'border-transparent'
               }`}
               onClick={() => {

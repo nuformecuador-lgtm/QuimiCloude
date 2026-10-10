@@ -290,6 +290,14 @@ entorno en `lib/composition`. A cambio, el gate mantiene la propiedad que el rep
 red— y cuatro fichas pagan su deuda de recorrido. La bifurcación es **una** y está vigilada por
 guardia; si se multiplicara, sería momento de una ficha de arnés, no de más `if`.
 
+> **Nota 2026-10-09 (QC-249):** por decisión del humano, `DOCUMENTS_E2E_DOUBLES` se pone también,
+> con valor, en el scope **Preview** de Vercel: en las previews no hay IA, cola ni storage de
+> documentos reales. Vive en Vercel, no en un archivo versionado: ningún archivo versionado la
+> activa salvo `playwright.config.ts`, y la regla de `tests/guards/guard-dobles-e2e.test.ts` sigue
+> igual. Consecuencia aceptada: en preview la subida de PDF desde el navegador falla (la URL
+> firmada apunta a `https://documentos-e2e.invalid` y nadie la intercepta). Detalle en
+> `specs/QC-249-entorno-de-preview/design.md > 7` y `docs/architecture.md > Previews (QC-249)`.
+
 ## 9. Dependencias
 
 **Ninguna nueva.** No se toca `package.json` y `tests/guards/guard-dependencias-aprobadas.test.ts`

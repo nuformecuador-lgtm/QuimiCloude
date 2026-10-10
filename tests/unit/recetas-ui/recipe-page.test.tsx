@@ -18,6 +18,7 @@ import {
   errorInesperado,
   esperarSinIdentificador,
 } from '../../helpers/identificador-de-request';
+import { clickRowAction, getRowActionItem } from '../../helpers/row-actions-menu';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { toast } from 'sonner';
 
@@ -161,6 +162,7 @@ const testId = {
   paginaSiguiente: 'data-table-next',
   estadoPagina: 'data-table-page-indicator',
   crear: 'recipe-create-open',
+  menuFila: 'recipe-row-actions',
   editar: 'recipe-edit-open',
   abrirBorrado: 'recipe-delete-open',
   dialogoBorrado: 'delete-recipe-dialog',
@@ -496,7 +498,7 @@ describe('pantalla de recetas — columnas', () => {
     }
   });
 
-  it('R21: las acciones van en una columna que no se puede fijar, siempre visibles y con area tactil de 44x44', async () => {
+  it('R21: las acciones van en una columna que no se puede fijar, tras un disparador siempre visible de 44x44 y con items tactiles', async () => {
     await renderPantalla();
 
     const acciones = buildRecipeColumns({ rowActions: () => null }).find(
@@ -509,14 +511,16 @@ describe('pantalla de recetas — columnas', () => {
     const celda = within(screen.getAllByTestId(testId.fila)[0] as HTMLElement).getByTestId(
       `data-table-cell-${ACTIONS_COLUMN_ID}`,
     );
-    for (const control of [
-      within(celda).getByTestId(testId.editar),
-      within(celda).getByTestId(testId.abrirBorrado),
-    ]) {
+    const disparador = within(celda).getByTestId(testId.menuFila);
+    expect(disparador).toBeVisible();
+    for (const clase of AREA_TACTIL) {
+      expect(disparador).toHaveClass(clase);
+    }
+    const user = setupUser();
+    for (const item of [testId.editar, testId.abrirBorrado]) {
+      const control = await getRowActionItem(user, disparador, item);
       expect(control).toBeVisible();
-      for (const clase of AREA_TACTIL) {
-        expect(control).toHaveClass(clase);
-      }
+      expect(control).toHaveClass('min-h-11');
     }
   });
 
@@ -527,7 +531,11 @@ describe('pantalla de recetas — columnas', () => {
     expect(crear.tagName).toBe('A');
     expect(crear).toHaveAttribute('href', expect.stringContaining(`${FORMULAS_ROUTE}/nueva`));
 
-    const editar = screen.getByTestId(testId.editar);
+    const editar = await getRowActionItem(
+      setupUser(),
+      screen.getByTestId(testId.menuFila),
+      testId.editar,
+    );
     expect(editar.tagName).toBe('A');
     expect(editar.getAttribute('href')).toBe(`${FORMULAS_ROUTE}/${ID_QUE_NO_DEBE_VERSE}`);
 
@@ -1114,8 +1122,7 @@ describe('pantalla de recetas — paginacion y plataforma', () => {
       expect(screen.getByTestId(testId.tamanoPagina), `tamano a ${ancho}px`).toBeVisible();
 
       const controles: Record<string, HTMLElement> = {
-        editar: screen.getByTestId(testId.editar),
-        borrar: screen.getByTestId(testId.abrirBorrado),
+        acciones: screen.getAllByTestId(testId.menuFila)[0] as HTMLElement,
         busqueda: screen.getByTestId(testId.busqueda),
         filtro: screen.getByTestId(testId.filtroFecha),
         orden: botonDeOrden('name') as HTMLElement,
@@ -1149,7 +1156,7 @@ describe('pantalla de recetas — borrado (QC-26 R24, R39)', () => {
     listRecipesActionMock.mockResolvedValue(paginaDeRecetas([laReceta]));
 
     await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirBorrado));
+    await clickRowAction(user, screen.getByTestId(testId.menuFila), testId.abrirBorrado);
 
     const dialogo = await screen.findByTestId(testId.dialogoBorrado);
     expect(within(dialogo).getByTestId(testId.mensajeBorrado)).toHaveTextContent(laReceta.name);
@@ -1159,7 +1166,7 @@ describe('pantalla de recetas — borrado (QC-26 R24, R39)', () => {
     await waitFor(() => expect(screen.queryByTestId(testId.dialogoBorrado)).toBeNull());
     expect(deleteRecipeActionMock).not.toHaveBeenCalled();
 
-    await user.click(screen.getByTestId(testId.abrirBorrado));
+    await clickRowAction(user, screen.getByTestId(testId.menuFila), testId.abrirBorrado);
     await screen.findByTestId(testId.dialogoBorrado);
     await user.click(screen.getByTestId(testId.confirmarBorrado));
 
@@ -1171,7 +1178,7 @@ describe('pantalla de recetas — borrado (QC-26 R24, R39)', () => {
     const user = setupUser();
 
     await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirBorrado));
+    await clickRowAction(user, screen.getByTestId(testId.menuFila), testId.abrirBorrado);
     await screen.findByTestId(testId.dialogoBorrado);
     await user.click(screen.getByTestId(testId.confirmarBorrado));
 
@@ -1189,7 +1196,7 @@ describe('pantalla de recetas — borrado (QC-26 R24, R39)', () => {
     });
 
     await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirBorrado));
+    await clickRowAction(user, screen.getByTestId(testId.menuFila), testId.abrirBorrado);
     await screen.findByTestId(testId.dialogoBorrado);
     await user.click(screen.getByTestId(testId.confirmarBorrado));
 
@@ -1235,7 +1242,7 @@ describe('borrado de receta — el identificador del error inesperado (QC-71 R17
     deleteRecipeActionMock.mockResolvedValue(errorInesperado());
 
     await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirBorrado));
+    await clickRowAction(user, screen.getByTestId(testId.menuFila), testId.abrirBorrado);
     await screen.findByTestId(testId.dialogoBorrado);
     await user.click(screen.getByTestId(testId.confirmarBorrado));
 
@@ -1255,7 +1262,7 @@ describe('borrado de receta — el identificador del error inesperado (QC-71 R17
     });
 
     await renderPantalla();
-    await user.click(screen.getByTestId(testId.abrirBorrado));
+    await clickRowAction(user, screen.getByTestId(testId.menuFila), testId.abrirBorrado);
     await screen.findByTestId(testId.dialogoBorrado);
     await user.click(screen.getByTestId(testId.confirmarBorrado));
 

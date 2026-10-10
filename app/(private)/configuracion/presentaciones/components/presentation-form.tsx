@@ -1,25 +1,16 @@
 'use client';
 
 import { useActionState, useEffect, useId } from 'react';
-import { useFormStatus } from 'react-dom';
 
+import { ErrorAlert } from '@/components/shared/error-alert';
+import { FormSheet } from '@/components/shared/form-sheet';
 import {
   PRESENTATION_UNIT_FIELD,
   PRESENTATION_UNIT_LABEL,
   PresentationUnitSelect,
 } from '@/components/shared/presentation-unit-select';
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import { UNEXPECTED_ERROR_CODE, type ErrorCode, type ErrorState } from '@/lib/modules/errores';
+import { TextField } from '@/components/shared/text-field';
+import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import {
   createPresentationSchema,
   updatePresentationSchema,
@@ -116,12 +107,6 @@ export const PRESENTATION_FIELD_CONTENT_TESTID = 'presentation-field-content';
 export const PRESENTATION_ERROR_CONTENT_TESTID = 'presentation-error-content';
 
 type PresentationFieldName = (typeof PRESENTATION_BUSINESS_FIELDS)[number];
-
-/** Objetivo tactil minimo (44x44 px) de R34. */
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
-/** 16 px en TODOS los anchos: el primitivo baja a 14 px en `md` y R34 no distingue por ancho. */
-const FIELD_TEXT = 'text-base md:text-base';
 
 /**
  * Copy del error de campo de la validacion previa. Se escribe aqui y no se toma de zod: sus
@@ -263,9 +248,7 @@ export function PresentationForm({ presentation, units, onSaved }: PresentationF
   const fieldId = useId();
   const formErrorId = `${fieldId}-form-error`;
   const inputId = `${fieldId}-${PRESENTATION_NAME_FIELD}`;
-  const nameErrorId = `${inputId}-error`;
   const contentId = `${fieldId}-${PRESENTATION_CONTENT_FIELD}`;
-  const contentErrorId = `${contentId}-error`;
   const isEdit = presentation !== undefined;
 
   async function save(
@@ -364,196 +347,80 @@ export function PresentationForm({ presentation, units, onSaved }: PresentationF
       : undefined;
 
   return (
-    /*
-      `isForm`: el panel ENTERO es el <form>, asi que el boton de guardar vive en el pie y
-      `useFormStatus()` lo sigue viendo, porque el formulario es su ancestro.
-
-      `w-full` en angosto y `sm:max-w-md` a partir de ahi, y `pb-[env(safe-area-inset-bottom)]`
-      para que el pie no quede bajo la barra de gestos de iOS (R34). Sin `100vh` y sin
-      `position: fixed` propio: el que hay lo declara el primitivo.
-    */
-    <SheetContent
-      side="right"
-      className="w-full pb-[env(safe-area-inset-bottom)] data-[side=right]:w-full sm:max-w-md"
-      data-testid={PRESENTATION_SHEET_TESTID}
-      isForm
-      formProps={{ action: formAction, 'data-testid': PRESENTATION_FORM_TESTID }}
-      footer={<FormActions />}
+    <FormSheet
+      title={isEdit ? 'Editar presentación' : 'Nueva presentación'}
+      description={
+        isEdit ? 'Cambia el nombre de la presentación.' : 'Escribe el nombre de la nueva presentación.'
+      }
+      formAction={formAction}
+      testIds={{
+        sheet: PRESENTATION_SHEET_TESTID,
+        form: PRESENTATION_FORM_TESTID,
+        cancel: PRESENTATION_FORM_CANCEL_TESTID,
+        submit: PRESENTATION_FORM_SUBMIT_TESTID,
+      }}
     >
-      <SheetHeader>
-        <SheetTitle>{isEdit ? 'Editar presentación' : 'Nueva presentación'}</SheetTitle>
-        <SheetDescription>
-          {isEdit
-            ? 'Cambia el nombre de la presentación.'
-            : 'Escribe el nombre de la nueva presentación.'}
-        </SheetDescription>
-      </SheetHeader>
-
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
-        {formError === undefined ? null : (
-          // Region de error del formulario (R24): aqui van los rechazos que no senalan campo.
-          //
-          // QC-71 (R17, R18): el error INESPERADO lo pinta el componente compartido, que anade el
-          // identificador de la peticion. El CATALOGADO se pinta como siempre -mismo marcado,
-          // mismos `data-testid`- y sin identificador ninguno.
-          <div
-            role="alert"
-            id={formErrorId}
-            className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={PRESENTATION_FORM_ERROR_TESTID}
-          >
-            {formError.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={formError} />
-            ) : (
-              <>
-                <p>{formError.message}</p>
-                <p className="text-xs" data-testid={PRESENTATION_FORM_ERROR_CODE_TESTID}>
-                  {formError.code}
-                </p>
-              </>
-            )}
-          </div>
-        )}
-
-        <div className="flex flex-col gap-2">
-          <Label htmlFor={inputId}>{FIELD_LABELS.name}</Label>
-          {/*
-            `key={initialName}`: Base UI avisa cuando el `defaultValue` de un campo no controlado
-            cambia despues de montarse, y la clave fuerza un remontaje justo en ese salto -el que
-            ocurre al volver de un intento fallido-. El campo sigue sin estar controlado.
-
-            No se declara `maxLength` ni `pattern`: el minimo, el maximo y el `refine` que rechaza
-            un nombre sin caracteres validos son del esquema del contrato publico, y escribirlos
-            aqui seria una segunda copia de la regla.
-          */}
-          <Input
-            key={initialName}
-            id={inputId}
-            name={PRESENTATION_NAME_FIELD}
-            type="text"
-            autoComplete="off"
-            required
-            defaultValue={initialName}
-            className={`min-h-11 ${FIELD_TEXT}`}
-            aria-invalid={nameError === undefined ? undefined : true}
-            aria-describedby={nameError === undefined ? undefined : nameErrorId}
-            data-testid={PRESENTATION_FIELD_NAME_TESTID}
-          />
-
-          {nameError === undefined ? null : (
-            // R24: el error que SI senala campo se pinta junto a el, no en la region del formulario.
-            <p
-              id={nameErrorId}
-              role="alert"
-              className="text-sm text-destructive"
-              data-testid={PRESENTATION_ERROR_NAME_TESTID}
-            >
-              {nameError}
-            </p>
+      {formError === undefined ? null : (
+        <ErrorAlert
+          error={formError}
+          id={formErrorId}
+          className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
+          testId={PRESENTATION_FORM_ERROR_TESTID}
+          renderCatalogued={(catalogued) => (
+            <>
+              <p>{catalogued.message}</p>
+              <p className="text-xs" data-testid={PRESENTATION_FORM_ERROR_CODE_TESTID}>
+                {catalogued.code}
+              </p>
+            </>
           )}
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <Label htmlFor={contentId}>{FIELD_LABELS.content}</Label>
-          {/*
-            `key={initialContent}`: mismo remontaje que el nombre para el campo no controlado.
-            Sin `required`: el contenido es opcional y vaciarlo es un envio valido.
-          */}
-          <div className="flex items-center gap-2">
-            <Input
-              key={initialContent}
-              id={contentId}
-              name={PRESENTATION_CONTENT_FIELD}
-              type="text"
-              inputMode="decimal"
-              autoComplete="off"
-              defaultValue={initialContent}
-              className={`min-h-11 flex-1 ${FIELD_TEXT}`}
-              aria-invalid={contentError === undefined ? undefined : true}
-              aria-describedby={contentError === undefined ? undefined : contentErrorId}
-              data-testid={PRESENTATION_FIELD_CONTENT_TESTID}
-            />
-            {contentUnit === '' ? null : (
-              <span aria-hidden="true" className="text-sm text-muted-foreground">
-                {contentUnit}
-              </span>
-            )}
-          </div>
-
-          {contentError === undefined ? null : (
-            <p
-              id={contentErrorId}
-              role="alert"
-              className="text-sm text-destructive"
-              data-testid={PRESENTATION_ERROR_CONTENT_TESTID}
-            >
-              {contentError}
-            </p>
-          )}
-        </div>
-
-        {/*
-          `key={initialUnitId}`: mismo motivo que el del nombre. El selector es NO CONTROLADO y su
-          `defaultValue` cambia al volver de un intento fallido; la clave fuerza el remontaje justo
-          en ese salto, sin convertirlo en campo controlado.
-
-          El error del campo se lo pasa el formulario y lo pinta el propio selector, JUNTO a el
-          (QC-80 R17), nunca en la region `role="alert"` de arriba.
-        */}
-        <PresentationUnitSelect
-          key={initialUnitId}
-          units={units}
-          defaultValue={initialUnitId === '' ? undefined : initialUnitId}
-          error={unitError}
         />
-      </div>
-    </SheetContent>
-  );
-}
+      )}
 
-/**
- * Acciones del pie: cancelar y guardar. **Cancelar es `type="button"`** -y no un submit- porque
- * desde que el panel entero es un `<form>` cualquier boton sin tipo dentro de el lo enviaria.
- * Cierra por el primitivo (`SheetClose`), asi que no necesita saber nada del estado de apertura,
- * y al no navegar la URL conserva pagina, tamano, orden y busqueda (R21).
- */
-function FormActions() {
-  return (
-    <>
-      <SheetClose
-        render={
-          <Button
-            type="button"
-            variant="outline-dashed"
-            className={TOUCH_TARGET}
-            data-testid={PRESENTATION_FORM_CANCEL_TESTID}
-          />
+      <TextField
+        id={inputId}
+        name={PRESENTATION_NAME_FIELD}
+        label={FIELD_LABELS.name}
+        autoComplete="off"
+        required
+        defaultValue={initialName}
+        remountOnDefault
+        testId={PRESENTATION_FIELD_NAME_TESTID}
+        error={nameError}
+        errorTestId={PRESENTATION_ERROR_NAME_TESTID}
+      />
+
+      <TextField
+        id={contentId}
+        name={PRESENTATION_CONTENT_FIELD}
+        label={FIELD_LABELS.content}
+        inputMode="decimal"
+        autoComplete="off"
+        defaultValue={initialContent}
+        remountOnDefault
+        inputClassName="min-h-11 flex-1 text-base md:text-base"
+        suffix={
+          contentUnit === '' ? null : (
+            <span aria-hidden="true" className="text-sm text-muted-foreground">
+              {contentUnit}
+            </span>
+          )
         }
-      >
-        Cancelar
-      </SheetClose>
-      <SaveButton />
-    </>
-  );
-}
+        testId={PRESENTATION_FIELD_CONTENT_TESTID}
+        error={contentError}
+        errorTestId={PRESENTATION_ERROR_CONTENT_TESTID}
+      />
 
-/**
- * Boton de envio. Componente aparte por una necesidad tecnica: `useFormStatus()` solo lee el
- * estado del `<form>` ANCESTRO, asi que dentro del componente que renderiza el `<form>`
- * devolveria siempre `pending: false` y el boton no se deshabilitaria nunca.
- */
-function SaveButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button
-      type="submit"
-      className={TOUCH_TARGET}
-      disabled={pending}
-      aria-busy={pending}
-      data-testid={PRESENTATION_FORM_SUBMIT_TESTID}
-    >
-      {pending ? 'Guardando…' : 'Guardar'}
-    </Button>
+      {/*
+        `key`: el selector es no controlado y su `defaultValue` cambia al volver de un intento
+        fallido; la clave fuerza el remontaje sin convertirlo en controlado.
+      */}
+      <PresentationUnitSelect
+        key={initialUnitId}
+        units={units}
+        defaultValue={initialUnitId === '' ? undefined : initialUnitId}
+        error={unitError}
+      />
+    </FormSheet>
   );
 }

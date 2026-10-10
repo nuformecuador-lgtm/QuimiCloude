@@ -1,11 +1,13 @@
 'use client';
 
-import { ChevronRightIcon, FlaskConicalIcon, PanelLeftIcon } from 'lucide-react';
+import { ChevronRightIcon, PanelLeftCloseIcon, PanelLeftOpenIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
 import { NavUser } from '@/components/private/nav-user';
+import { SidebarActiveIndicator } from '@/components/private/sidebar-active-indicator';
+import { BrandLogo } from '@/components/shared/brand-logo';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -34,8 +36,6 @@ import {
 import { NAV_ICONS } from '@/lib/shared/navigation/nav-icons';
 import {
   BRAND_LABEL,
-  BRAND_SHORT_LABEL,
-  BRAND_TAGLINE,
   PRIVATE_NAV_LABEL,
   groupNavItemsBySection,
   type NavGroup,
@@ -119,45 +119,13 @@ export function AppSidebar({ user, navItems }: AppSidebarProps) {
                 aria-label={BRAND_LABEL}
                 onClick={closeMobilePanel}
                 data-testid="private-brand-link"
-                className="h-auto gap-3 py-2"
+                className="h-auto gap-3 py-2 group-data-[collapsible=icon]:p-1.5!"
               >
-                {/*
-                  Simbolo de marca: **quemado a proposito** (decision humana del 2026-09-02).
-                  No hay identidad visual definida; cuando la haya, el icono y el degradado
-                  salen de donde diga esa ficha.
-                */}
-                {/*
-                  En modo icono el simbolo ES la marca: lleva dentro las iniciales (R24) en
-                  lugar del matraz, como en el diseno. Dibujar el cuadro y ademas el texto al
-                  lado no cabe en los 44px del rail —el contenido acababa aplastado contra el
-                  padding— y duplicaria la marca en una columna de iconos.
-                */}
-                <span
-                  aria-hidden={isIconMode ? undefined : 'true'}
-                  data-testid="private-brand-mark"
-                  className="flex size-9 shrink-0 items-center justify-center rounded-[13px] bg-linear-150 from-sidebar-primary to-sidebar-primary/70 font-mono text-[12.5px] font-medium text-sidebar-primary-foreground shadow-[0_8px_22px_-8px_var(--sidebar-primary)]"
-                >
-                  {isIconMode ? (
-                    <span data-testid="private-brand-short">{BRAND_SHORT_LABEL}</span>
-                  ) : (
-                    <FlaskConicalIcon className="size-5" />
-                  )}
-                </span>
-                {isIconMode ? null : (
-                  <span className="flex min-w-0 flex-col text-left leading-tight">
-                    <span
-                      data-testid="private-brand-long"
-                      className="truncate text-base font-semibold tracking-tight"
-                    >
-                      {BRAND_LABEL}
-                    </span>
-                    <span
-                      data-testid="private-brand-tagline"
-                      className="truncate font-mono text-[9.5px] tracking-[0.16em] text-muted-foreground uppercase"
-                    >
-                      {BRAND_TAGLINE}
-                    </span>
-                  </span>
+                {/* `alt` vacio: el nombre ya lo da el enlace y repetirlo haria que se anunciara dos veces. */}
+                {isIconMode ? (
+                  <BrandLogo variant="isotipo" tone="on-dark" height={32} alt="" />
+                ) : (
+                  <BrandLogo variant="horizontal" tone="on-dark" height={28} alt="" />
                 )}
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -177,32 +145,34 @@ export function AppSidebar({ user, navItems }: AppSidebarProps) {
                   </SidebarGroupLabel>
                 )}
                 <SidebarGroupContent>
-                  <SidebarMenu>
-                    {seccion.items.map((item) =>
-                      item.kind === 'link' ? (
-                        <NavLinkItem
-                          key={item.testId}
-                          item={item}
-                          pathname={pathname}
-                          onNavigate={closeMobilePanel}
-                        />
-                      ) : isIconMode ? (
-                        <NavGroupFloating
-                          key={item.testId}
-                          group={item}
-                          pathname={pathname}
-                          onNavigate={closeMobilePanel}
-                        />
-                      ) : (
-                        <NavGroupInline
-                          key={item.testId}
-                          group={item}
-                          pathname={pathname}
-                          onNavigate={closeMobilePanel}
-                        />
-                      ),
-                    )}
-                  </SidebarMenu>
+                  <SidebarActiveIndicator variant="menu">
+                    <SidebarMenu>
+                      {seccion.items.map((item) =>
+                        item.kind === 'link' ? (
+                          <NavLinkItem
+                            key={item.testId}
+                            item={item}
+                            pathname={pathname}
+                            onNavigate={closeMobilePanel}
+                          />
+                        ) : isIconMode ? (
+                          <NavGroupFloating
+                            key={item.testId}
+                            group={item}
+                            pathname={pathname}
+                            onNavigate={closeMobilePanel}
+                          />
+                        ) : (
+                          <NavGroupInline
+                            key={item.testId}
+                            group={item}
+                            pathname={pathname}
+                            onNavigate={closeMobilePanel}
+                          />
+                        ),
+                      )}
+                    </SidebarMenu>
+                  </SidebarActiveIndicator>
                 </SidebarGroupContent>
               </SidebarGroup>
             ))}
@@ -230,9 +200,13 @@ export function AppSidebar({ user, navItems }: AppSidebarProps) {
           aria-expanded={open}
           aria-controls={SIDEBAR_PANEL_ID}
           data-testid="private-sidebar-edge-toggle"
-          className="absolute top-6 -right-[26px] hidden rounded-[10px] bg-sidebar text-sidebar-foreground shadow-[0_0_0_1px_var(--sidebar-border),0_8px_18px_-8px_rgba(10,40,40,0.55)] md:inline-flex hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          className="absolute top-6 -right-[26px] hidden rounded-[10px] bg-sidebar! text-sidebar-foreground! shadow-[0_0_0_1px_var(--sidebar-border),0_8px_18px_-8px_rgba(10,40,40,0.55)] md:inline-flex hover:bg-sidebar-accent! hover:text-sidebar-accent-foreground! hover:border-sidebar-ring! aria-expanded:bg-sidebar! aria-expanded:text-sidebar-foreground! focus-visible:ring-2 focus-visible:ring-sidebar-ring"
         >
-          <PanelLeftIcon className="size-3.5" />
+          {open ? (
+            <PanelLeftCloseIcon className="size-3.5" />
+          ) : (
+            <PanelLeftOpenIcon className="size-3.5" />
+          )}
         </Button>
       </div>
     </Sidebar>
@@ -318,24 +292,26 @@ function NavGroupInline({ group, pathname, onNavigate }: NavGroupProps) {
         >
           {Icon ? <Icon aria-hidden="true" /> : null}
           <span>{group.label}</span>
-          <ChevronRightIcon className="ml-auto transition-transform duration-200 group-data-open/menu-button:rotate-90" />
+          <ChevronRightIcon className="ml-auto transition-transform duration-(--dur-base) ease-(--ease-standard) group-data-open/menu-button:rotate-90" />
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <SidebarMenuSub>
-            {group.items.map((child) => (
-              <SidebarMenuSubItem key={child.testId}>
-                <SidebarMenuSubButton
-                  render={<Link href={child.href} />}
-                  isActive={pathname === child.href}
-                  aria-current={pathname === child.href ? 'page' : undefined}
-                  onClick={onNavigate}
-                  data-testid={child.testId}
-                >
-                  <span>{child.label}</span>
-                </SidebarMenuSubButton>
-              </SidebarMenuSubItem>
-            ))}
-          </SidebarMenuSub>
+          <SidebarActiveIndicator variant="sub">
+            <SidebarMenuSub>
+              {group.items.map((child) => (
+                <SidebarMenuSubItem key={child.testId}>
+                  <SidebarMenuSubButton
+                    render={<Link href={child.href} />}
+                    isActive={pathname === child.href}
+                    aria-current={pathname === child.href ? 'page' : undefined}
+                    onClick={onNavigate}
+                    data-testid={child.testId}
+                  >
+                    <span>{child.label}</span>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              ))}
+            </SidebarMenuSub>
+          </SidebarActiveIndicator>
         </CollapsibleContent>
       </Collapsible>
     </SidebarMenuItem>

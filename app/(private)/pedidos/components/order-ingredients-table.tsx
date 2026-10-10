@@ -1,7 +1,6 @@
 'use client';
 
-import { Loader2Icon } from 'lucide-react';
-
+import { Spinner } from '@/components/shared/spinner';
 import {
   APPROXIMATE_LABEL,
   ApproximateMark,
@@ -18,6 +17,7 @@ import {
 import { createOrderSchema, resolveLineNeed, type OrderLineNeed } from '@/lib/modules/pedidos';
 import { formatPercentage, type RecipeLineView } from '@/lib/modules/recetas';
 import type { MassVolumeBridge, UnitConversion, UnitView } from '@/lib/modules/unidades';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { exactDecimalTitle, formatDecimalDisplay, trimDecimal } from '@/lib/shared/ui/decimal-display';
 
 import { subtractDecimal } from './order-decimal';
@@ -81,9 +81,6 @@ export const ORDER_INGREDIENTS_ERROR_TESTID = 'order-ingredients-error';
 export const ORDER_INGREDIENTS_LOADING_TESTID = 'order-ingredients-loading';
 
 const MISSING_PRODUCT_LABEL = 'Producto no disponible';
-
-/** Marcador de ausencia. Constante para que ningun test dependa del caracter. */
-const MISSING_VALUE_MARK = '—';
 
 /** Simbolo o nombre de la unidad del insumo; `null` si no hay unidad resoluble. */
 function unitLabel(productUnitId: string | null, units: readonly UnitView[]): string | null {
@@ -201,13 +198,13 @@ export function OrderIngredientsTable({
                     {line.productName ?? MISSING_PRODUCT_LABEL}
                   </TableCell>
                   <TableCell
-                    className="text-right"
+                    className="text-right font-mono tabular-nums"
                     data-testid="order-ingredient-percentage"
                   >
                     {formatPercentage(line.percentage)} %
                   </TableCell>
                   <TableCell
-                    className="text-right"
+                    className="text-right font-mono tabular-nums"
                     title={line.productStock === null ? undefined : exactDecimalTitle(line.productStock)}
                     aria-label={
                       line.productStock === null
@@ -217,11 +214,11 @@ export function OrderIngredientsTable({
                     data-testid="order-ingredient-stock"
                   >
                     {line.productStock === null
-                      ? MISSING_VALUE_MARK
+                      ? EMPTY_MARK
                       : withUnit(formatDecimalDisplay(line.productStock), unit)}
                   </TableCell>
                   <TableCell
-                    className="text-right"
+                    className="text-right font-mono tabular-nums"
                     title={required === null ? undefined : exactDecimalTitle(required)}
                     aria-label={
                       required === null
@@ -237,7 +234,7 @@ export function OrderIngredientsTable({
                         className="whitespace-normal"
                       />
                     ) : required === null ? (
-                      MISSING_VALUE_MARK
+                      EMPTY_MARK
                     ) : (
                       <>
                         {withUnit(formatDecimalDisplay(required), unit)}
@@ -251,7 +248,7 @@ export function OrderIngredientsTable({
                     )}
                   </TableCell>
                   <TableCell
-                    className="text-right"
+                    className="text-right font-mono tabular-nums"
                     title={remaining === null ? undefined : exactDecimalTitle(remaining)}
                     aria-label={
                       remaining === null ? undefined : withUnit(trimDecimal(remaining), unit)
@@ -259,7 +256,7 @@ export function OrderIngredientsTable({
                     data-testid="order-ingredient-remaining"
                   >
                     {remaining === null ? (
-                      MISSING_VALUE_MARK
+                      EMPTY_MARK
                     ) : (
                       <span
                         className={
@@ -287,7 +284,7 @@ export function OrderIngredientsTable({
       >
         {loading ? (
           <>
-            <Loader2Icon className="size-4 animate-spin" aria-hidden />
+            <Spinner />
             <span>Cargando ingredientes…</span>
           </>
         ) : null}

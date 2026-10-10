@@ -4,18 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 
-import { UnexpectedErrorNotice } from '@/components/shared/unexpected-error-notice';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
+import { ConfirmDialogFrame } from '@/components/shared/confirm-dialog';
+import { DeleteConfirmDialogBody } from '@/components/shared/delete-confirm-dialog';
 import type { UserRow } from '@/lib/modules/identity';
 import {
   deleteUserAction,
@@ -34,8 +24,8 @@ import {
  *
  * **Un rechazo se pinta DENTRO del dialogo, por su `code` y nunca por su texto** (R31), el dialogo
  * **sigue abierto** y **la fila no se retira**: aqui los casos vivos son `self_operation` (es tu
- * propia ficha) y `last_administrator` (dejaria a la empresa sin administrador). El dialogo se
- * monta solo mientras esta abierto, asi que un rechazo anterior no reaparece.
+ * propia ficha) y `last_administrator` (dejaria a la empresa sin administrador). El cuerpo se
+ * monta solo mientras el popup esta abierto, asi que un rechazo anterior no reaparece.
  *
  * Con exito se aplica R29: cerrar, avisar por toast —sobre el `<Toaster />` del layout privado, no
  * uno propio— y `router.refresh()`, que reejecuta la lista con la MISMA URL.
@@ -53,11 +43,7 @@ export const DELETE_USER_ID_TESTID = 'delete-user-id';
 /** El `id` viaja como campo OCULTO, que es lo que `readTargetId` espera. */
 export const DELETE_USER_ID_FIELD = 'id';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
-
 const TITLE = 'Eliminar al usuario';
-const CONFIRM_LABEL = 'Eliminar';
-const CONFIRM_PENDING_LABEL = 'Eliminando…';
 const DISMISS_LABEL = 'Volver';
 const DELETE_SUCCESS = 'Usuario eliminado.';
 
@@ -73,6 +59,19 @@ export type DeleteUserDialogProps = {
 export function DeleteUserDialog({ user, open, onOpenChange }: DeleteUserDialogProps) {
   const fieldId = useId();
   const errorId = `${fieldId}-error`;
+  return (
+    <ConfirmDialogFrame open={open} onOpenChange={onOpenChange} testId={DELETE_USER_DIALOG_TESTID}>
+      <DeleteUserDialogBody user={user} onOpenChange={onOpenChange} errorId={errorId} />
+    </ConfirmDialogFrame>
+  );
+}
+
+type DeleteUserDialogBodyProps = Omit<DeleteUserDialogProps, 'open'> & {
+  readonly errorId: string;
+};
+
+/** Se monta con el popup: cada apertura arranca sin el rechazo de la anterior. */
+function DeleteUserDialogBody({ user, onOpenChange, errorId }: DeleteUserDialogBodyProps) {
   const router = useRouter();
   const [state, formAction, isPending] = useActionState(deleteUserAction, INITIAL_STATE);
 
@@ -87,55 +86,31 @@ export function DeleteUserDialog({ user, open, onOpenChange }: DeleteUserDialogP
   const error = state.status === 'error' ? state : undefined;
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent data-testid={DELETE_USER_DIALOG_TESTID}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{TITLE}</AlertDialogTitle>
-          <AlertDialogDescription data-testid={DELETE_USER_MESSAGE_TESTID}>
-            Se va a eliminar a {user.displayName}. Esta acción no se puede deshacer.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        {error === undefined ? null : (
-          <div
-            role="alert"
-            id={errorId}
-            className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-            data-testid={DELETE_USER_ERROR_TESTID}
-            data-code={error.code}
-          >
-            {error.code === UNEXPECTED_ERROR_CODE ? (
-              <UnexpectedErrorNotice state={error} />
-            ) : (
-              <p data-testid={DELETE_USER_ERROR_MESSAGE_TESTID}>{error.message}</p>
-            )}
-          </div>
-        )}
-
-        <form action={formAction} data-testid={DELETE_USER_FORM_TESTID}>
-          <input
-            type="hidden"
-            name={DELETE_USER_ID_FIELD}
-            defaultValue={user.id}
-            data-testid={DELETE_USER_ID_TESTID}
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel className={TOUCH_TARGET} data-testid={DELETE_USER_DISMISS_TESTID}>
-              {DISMISS_LABEL}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              type="submit"
-              variant="destructive"
-              className={TOUCH_TARGET}
-              disabled={isPending}
-              aria-busy={isPending}
-              data-testid={DELETE_USER_CONFIRM_TESTID}
-            >
-              {isPending ? CONFIRM_PENDING_LABEL : CONFIRM_LABEL}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </form>
-      </AlertDialogContent>
-    </AlertDialog>
+    <DeleteConfirmDialogBody
+      onOpenChange={onOpenChange}
+      texts={{
+        title: TITLE,
+        description: (
+          <>Se va a eliminar a {user.displayName}. Esta acción no se puede deshacer.</>
+        ),
+        dismiss: DISMISS_LABEL,
+      }}
+      testIds={{
+        message: DELETE_USER_MESSAGE_TESTID,
+        dismiss: DELETE_USER_DISMISS_TESTID,
+        confirm: DELETE_USER_CONFIRM_TESTID,
+        form: DELETE_USER_FORM_TESTID,
+        error: DELETE_USER_ERROR_TESTID,
+        errorMessage: DELETE_USER_ERROR_MESSAGE_TESTID,
+      }}
+      submit={{
+        kind: 'action',
+        action: formAction,
+        hidden: [{ name: DELETE_USER_ID_FIELD, value: user.id, testId: DELETE_USER_ID_TESTID }],
+      }}
+      isPending={isPending}
+      error={error}
+      errorId={errorId}
+    />
   );
 }

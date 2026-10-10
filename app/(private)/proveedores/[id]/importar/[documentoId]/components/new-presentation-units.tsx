@@ -5,8 +5,8 @@ import { useId } from 'react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { UnitRef } from '@/lib/modules/unidades';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 
-const TOUCH_TARGET = 'min-h-11 min-w-11';
 const FIELD_TEXT = 'text-base md:text-base';
 
 /** Una presentacion nueva que alguna fila incluida necesita, vista una sola vez. */
@@ -65,7 +65,7 @@ export function NewPresentationUnits({ groups, units, selections, onChange }: Ne
             >
               <SelectTrigger
                 id={fieldId}
-                className={`w-full ${TOUCH_TARGET} ${FIELD_TEXT}`}
+                className={`w-full ${touchTarget} ${FIELD_TEXT}`}
                 data-testid={`new-presentation-unit-select-${group.key}`}
               >
                 <SelectValue placeholder="Elige una unidad" />
