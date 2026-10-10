@@ -205,3 +205,38 @@ Verificación (salida real):
   correrla, también los de docs y R22 (el otro agente ya había escrito su parte).
 
 Veredicto: Tanda 2 hecha; catálogo con 73 filas y guardia entera en verde.
+
+## Cierre (implementer, 2026-10-10) — T11 y T12
+
+### Archivos (consolidado de todos los subagentes)
+- Creados: `components/shared/CATALOGO.md`, `tests/guards/guard-catalogo-de-componentes.test.ts`,
+  `docs/diseno/README.md`, `docs/diseno/guia-de-marca.html`, `docs/diseno/sistema.css`,
+  `docs/diseno/canvas/` (89 archivos: 87 `*.dc.html`, `canvas.json`, `qc.css`).
+- Modificados: `docs/perfil-agentes.md`, `docs/architecture.md`, `docs/checkpoints-proyecto.md`,
+  `arnes.config.json`, `progress/rediseno.md`,
+  `tests/unit/recetas-ui/recipe-route-contract.test.ts` (fuera de `Archivos esperados`: la guardia
+  nombra `components/shared/step-reader/` en `PIEZAS_PREVIAS_AL_REDISENO` y el contrato la contaba
+  como importadora del asistente; se añade a `TESTS_QUE_LO_NOMBRAN`, como ya está `guard-editor-aislado`).
+
+### Mapa R → test (completo)
+R1–R35: tabla de la sección «Tanda 1» (todos en `tests/guards/guard-catalogo-de-componentes.test.ts`;
+cada `it` lleva sus R en el nombre). R36: `pnpm exec vitest run guard` entero, verde con
+`docs/diseno/` en el árbol y sin excepciones nuevas (Tanda 0 y Tanda 3, y el `./init.sh` de abajo),
+según `design.md > 11`.
+
+### T11 — sincronizar con dev
+`git fetch origin dev`: `HEAD..origin/dev` vacío, no entra ninguna pieza nueva; nada que añadir al
+catálogo ni a `PIEZAS_PREVIAS_AL_REDISENO`.
+
+### T12 — `./init.sh` (rápido), salida real resumida
+Primera corrida: rojo nuevo en `recipe-route-contract.test.ts:1448` (ver arriba), arreglado. Segunda:
+```
+✓ typecheck paso
+✓ lint paso            (0 errores, 7 warnings preexistentes en tests no tocados)
+ Test Files  109 passed (109)
+      Tests  1526 passed | 35 skipped (1561)
+✓ test:rapido paso
+✓ todas las migraciones tienen down.sql
+! no hay .env. Crea uno a partir de .env.example
+== init OK ==
+```

@@ -80,10 +80,10 @@ como tal en la fila y se anota en `progress/impl_QC-251-catalogo-de-componentes.
 
 ## Tanda 4 — cierre (depende de T0c, T6–T10b)
 
-- [ ] **T11 — Sincronizar con `dev`** (`git fetch origin dev && git merge origin/dev`) y añadir la
+- [x] **T11 — Sincronizar con `dev`** (`git fetch origin dev && git merge origin/dev`) y añadir la
   fila de cualquier pieza que haya entrado mientras tanto, también a `PIEZAS_PREVIAS_AL_REDISENO`
   si ya estaba en `dev` (R15, `design.md > 9`). *Hecho:* guardia verde tras el merge.
-- [ ] **T12 — Gate local** `./init.sh` verde y mapa `R<n> -> test` completo (R1–R36) en
+- [x] **T12 — Gate local** `./init.sh` verde y mapa `R<n> -> test` completo (R1–R36) en
   `progress/impl_QC-251-catalogo-de-componentes.md` (`design.md > 11`).
 
 ## Archivos esperados
