@@ -793,6 +793,8 @@ primera columna; lo vigila `tests/guards/guard-variables-por-entorno.test.ts`.
 | `CRON_SECRET` | de produccion | ausente (Vercel no ejecuta crons en previews) | segun dev |
 | `INTEGRATIONS_ENCRYPTION_KEYS`, `INTEGRATIONS_ENCRYPTION_ACTIVE` | de produccion | **propias de preview** (la base ya no se comparte) | propias |
 | `DOCUMENTS_E2E_DOUBLES` | ausente | **con valor** (comprobacion previa) | vacia; solo la pone `playwright.config.ts` |
+| `WHATSAPP_GRAPH_API_VERSION` | la fija quien despliega (no es secreto) | **abierto** (QC-237: sin decidir; la comprobacion previa no la mira) | segun dev |
+| `INTEGRATIONS_E2E_DOUBLES` | ausente (cliente real de Graph) | **abierto** (QC-237: sin decidir; la comprobacion previa no la mira) | vacia; solo la pone `playwright.config.ts` |
 
 `VERCEL` y `VERCEL_ENV` las pone Vercel y no se cargan a mano; `NODE_ENV` la ponen Next y Vercel.
 Las del bloque de servidores MCP de `.env.example` (`ATLASSIAN_MCP_AUTH`, `CONTEXT7_API_KEY`,

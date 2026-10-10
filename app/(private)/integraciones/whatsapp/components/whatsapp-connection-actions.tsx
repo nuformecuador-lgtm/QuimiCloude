@@ -2,7 +2,7 @@
 
 import { startTransition, useActionState, useCallback, useState } from 'react';
 
-import { ConfirmActionDialog } from '@/components/shared/confirm-action-dialog';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
 import type { ErrorState } from '@/lib/modules/errores';
@@ -43,14 +43,14 @@ export const WHATSAPP_ACTION_LABELS = {
 export const WHATSAPP_DISABLE_DIALOG_TEXTS = {
   title: '¿Deshabilitar la conexión de WhatsApp?',
   description: 'Dejarás de recibir mensajes de WhatsApp hasta que vuelvas a habilitarla.',
-  cancel: 'Cancelar',
+  dismiss: 'Cancelar',
   confirm: 'Deshabilitar',
 } as const;
 
 export const WHATSAPP_REGENERATE_DIALOG_TEXTS = {
   title: '¿Regenerar el verify token?',
   description: 'El token actual dejará de funcionar y tendrás que pegar el nuevo en Meta.',
-  cancel: 'Cancelar',
+  dismiss: 'Cancelar',
   confirm: 'Regenerar',
 } as const;
 
@@ -224,21 +224,27 @@ export function WhatsappConnectionActions({ connection }: WhatsappConnectionActi
         </Button>
       </div>
 
-      <ConfirmActionDialog
+      <ConfirmDialog
         open={disableOpen}
         onOpenChange={setDisableOpen}
         onConfirm={() => dispatch('disable', runDisable)}
         texts={WHATSAPP_DISABLE_DIALOG_TEXTS}
-        testId={WHATSAPP_DISABLE_DIALOG_TESTID}
-        confirmTestId={WHATSAPP_DISABLE_CONFIRM_TESTID}
+        testIds={{
+          dialog: WHATSAPP_DISABLE_DIALOG_TESTID,
+          dismiss: `${WHATSAPP_DISABLE_DIALOG_TESTID}-cancel`,
+          confirm: WHATSAPP_DISABLE_CONFIRM_TESTID,
+        }}
       />
-      <ConfirmActionDialog
+      <ConfirmDialog
         open={regenerateOpen}
         onOpenChange={setRegenerateOpen}
         onConfirm={() => dispatch('regenerate', runRegenerate)}
         texts={WHATSAPP_REGENERATE_DIALOG_TEXTS}
-        testId={WHATSAPP_REGENERATE_DIALOG_TESTID}
-        confirmTestId={WHATSAPP_REGENERATE_CONFIRM_TESTID}
+        testIds={{
+          dialog: WHATSAPP_REGENERATE_DIALOG_TESTID,
+          dismiss: `${WHATSAPP_REGENERATE_DIALOG_TESTID}-cancel`,
+          confirm: WHATSAPP_REGENERATE_CONFIRM_TESTID,
+        }}
       />
     </div>
   );
