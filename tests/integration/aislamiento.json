@@ -128,6 +128,11 @@
       "desde": "2026-09-12"
     },
     {
+      "archivo": "identity/login-same-second-stamp.int.test.ts",
+      "motivo": "Encadena login real, firma real y resolucion real ('findActiveByUsername', 'stampAll' y 'findActiveSessionUserById'), que usan el cliente Prisma GLOBAL: una transaccion del test correria en otra conexion del pool y seria un aislamiento de mentira. Fixture propio (rol, empresa efimera y dos usuarios) y barrido por id en afterAll en orden revoked_sessions -> users -> roles/companies.",
+      "desde": "2026-10-10"
+    },
+    {
       "archivo": "identity/role-catalog.int.test.ts",
       "motivo": "Nacido antes de QC-77 (QC-94 T7). Caso aparte: NO ESCRIBE NADA -no crea, no edita, no borra ninguna fila-, asi que no hay nada que deshacer y no necesita transaccion. Solo LEE el catalogo global de roles, que cambia unicamente por migracion y seed; se apoya en que la base de la corrida trae ese seed.",
       "desde": "2026-09-12"

@@ -3,6 +3,7 @@ import type { UserAccountStatus } from './account-status';
 import { loginInputSchema, type LoginInput } from './credentials';
 import { accountStatusAfterAttempt, effectiveAccountStatus } from './effective-account-status';
 import { createSessionTicket } from './session';
+import { issuedAtForNewSession } from './session-revocation';
 
 import type { LoginAttemptRecorder } from '../ports/login-attempt-recorder';
 import type { PasswordHasher } from '../ports/password-hasher';
@@ -31,6 +32,8 @@ export type VerifyCredentialsDeps = {
    * persona producen `sid` distintos sin espiar ninguna global.
    */
   readonly ids: SessionIdFactory;
+  /** Reloj del intento. Opcional: produccion usa el del sistema; los tests fijan el instante. */
+  readonly now?: () => Date;
 };
 
 /**
@@ -65,6 +68,8 @@ const MAX_INTENTOS_DE_REGISTRO = 10;
  * lea como la regla que es y no como un literal suelto repetido por el archivo.
  */
 const ACTIVO: UserAccountStatus = 'active';
+
+const defaultNow = (): Date => new Date();
 
 export function createVerifyCredentials(
   deps: VerifyCredentialsDeps,
@@ -158,7 +163,7 @@ export function createVerifyCredentials(
 
     // Un solo reloj por invocacion: comparar el bloqueo con un instante y escribir el
     // siguiente con otro dejaria ventanas de milisegundos imposibles de razonar.
-    const now = new Date();
+    const now = (deps.now ?? defaultNow)();
 
     // El nombre de usuario se normaliza (R4); la contrasena no se toca ni se recorta, porque
     // un espacio inicial o final es parte de la credencial.
@@ -257,7 +262,7 @@ export function createVerifyCredentials(
         usuario.roleName,
         usuario.companyId,
         deps.ids.newSessionId(),
-        now,
+        issuedAtForNewSession(now, usuario.sessionsValidFrom),
       ),
     );
 

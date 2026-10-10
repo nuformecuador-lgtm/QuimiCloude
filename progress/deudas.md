@@ -333,6 +333,9 @@ Rescatados de *Evaluaciones* y *Features en curso* del archivo: no estaban en *D
 - **Estado:** resuelta el 2026-10-07 en `chore/ci-velocidad-y-d34`. Causa: orden de arranque —las emisiones se lanzaban sin esperar a que el `FOR UPDATE` del bloqueo estuviera tomado; si una llegaba antes, ganaba sin esperar y no quedaba nada encolado—. Ahora se lanzan solo con el bloqueo tomado (y se afirma que atrapó 1 fila). Entrada borrada del baseline. Detalle: `progress/fix-d34-credential-setup.md`.
 - **Dueño:** sin asignar.
 
+## QC-116 — menores del review (2026-10-10)
+
+Ver progress/review_QC-116-sesion-revocada-en-el-mismo-segundo.md: m1 `tests/unit/inventario/adjust-batch-dialog.test.tsx` (R9, toastExito 0 llamadas) inestable bajo carga, ajeno; m2 JSDoc de isStampedOut no menciona su uso en el login; m3 test de R16 comprueba pureza leyendo texto del archivo.
 ## QC-255 — menores del review (2026-10-10)
 
 Ver progress/review_QC-255-sanear-suite-e2e.md: m1 citas de ficha/requisito en comentarios y describe de tests nuevos; m2 cabeceras largas; m3 guardia de usuarios no ve create<Tipo> ni creaciones anidadas; m4 guardia de saltos solo mira *.spec.ts y no ve .skip( partido; m5 guardia de presupuesto no fija nombre `e2e` ni condición de disparo; m6 R14 por focus() programático.
