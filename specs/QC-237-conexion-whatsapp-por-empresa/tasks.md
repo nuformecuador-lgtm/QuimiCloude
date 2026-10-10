@@ -101,7 +101,7 @@
 
 ## T12–T13 — E2E, entorno y cierre
 
-- [ ] **T12.** `.env.example` y `playwright.config.ts` (`design.md > 9`); `e2e/integraciones-whatsapp.spec.ts`
+- [x] **T12.** `.env.example` y `playwright.config.ts` (`design.md > 9`); `e2e/integraciones-whatsapp.spec.ts`
       (`> 11.4`); ajuste del caso Administrador de `e2e/integraciones.spec.ts`; entrada en
       `E2E_ESPERADOS` de `guard-identificador-de-request.test.ts`.
       **Hecho cuando:** `pnpm exec playwright test e2e/integraciones-whatsapp.spec.ts e2e/integraciones.spec.ts`

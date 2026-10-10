@@ -217,3 +217,10 @@ redeclaró al final. Si QC-224 crea una migración, hay que cuidar su orden con
   `20261009120000_product_batches_production_date` de QC-219 y con el rango de QC-224). No se aplicó a
   ninguna base a mano.
 - D10 al editar con secreto ilegible: ver desviación 5.
+
+## E2E (leader, 2026-10-09, HEAD 54790b3f)
+- Con el OK del humano, `pnpm run db:migrate` (`prisma migrate deploy`) aplicó `20261009130000_whatsapp_connections`
+  a la base local compartida «QuimiCloude». Solo esa migración; las tres de otras ramas ya aplicadas no se tocan.
+- `pnpm exec playwright test e2e/integraciones-whatsapp.spec.ts e2e/integraciones.spec.ts` → `14 passed (2.4m)`.
+  T12 queda cerrada (review B1).
+- Textos de UI fuera del spec (review, sección «textos a confirmar»): el humano los aprueba tal cual el 2026-10-09.
