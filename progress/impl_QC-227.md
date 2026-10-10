@@ -351,13 +351,72 @@ hasta que el leader decida.
 
 Enmiendas de la lista cerrada de `design.md > 9` en T9: ninguna más hizo falta.
 
-### T10 — E2E (pendiente)
+### T9 (cierre) — paridad del login (commit `f8c0d3f2`)
 
-No se pudo lanzar el subagente: un hook reescribe la llamada a la herramienta Agent y el modo
-auto no puede evaluarla. Quedan sin hacer:
-- los casos de `design.md > 11` (R10, R11, R13, R15, R16, R21, R23, R24 calculados) en `e2e/marca-componentes.spec.ts`;
-- correr `marca-componentes`, `theme`, `login-skin` y `movimiento` en Chromium y WebKit;
-- comprobar que el aviso de LCP del logo en `next dev` ya no sale (R26).
+Aprobado por el leader. Antes de regenerar se comparó viejo y nuevo quitando `class="…"`: la única
+diferencia eran las 2 líneas del `<img>` del logo con `loading="lazy"`; quitando también ese
+atributo, idénticos. `vitest run tests/unit/paridad/login-paridad.test.tsx -u`: 2 snapshots
+actualizados, 2/2 en verde. Nota de R26 sobre `fetchpriority` en `design.md > 8` (commit `edb40f50`).
+
+### T10 — E2E (commit `f9d03db4`)
+
+**Base aislada.** `quimicloude_e2e_qc227` en el contenedor `quimicloude-pg17`: `CREATE DATABASE`,
+`pnpm run db:migrate` y `pnpm run db:seed` con `DATABASE_URL`/`DIRECT_URL` apuntando a ella (el
+resto de `../../.env` sin cambiar). Borrada al final. La base compartida no se tocó.
+
+**Casos nuevos** en `e2e/marca-componentes.spec.ts`, bloque «tablas, barra y foco calculados», en
+claro y oscuro. Los colores se comparan contra el token resuelto por el mismo navegador (sonda
+con `color: var(--token)`), con tolerancia 0.003 por canal.
+- Tabla: la lista de **Clientes** con un cliente sembrado, no `/pedidos`. **Desvío de
+  `design.md > 11`**: sin filas `DataTable` no pinta la cabecera, y sembrar un pedido arrastra
+  receta, producto y presentación. La cabecera es el mismo `TableHeader`/`DataTableHeaderCell`.
+- R16 con foco: en Chromium con `Tab`. El WebKit de Playwright no tabula enlaces (ni con `Tab` ni
+  con `Alt+Tab`); allí se pulsa una tecla y se enfoca por programa, y se afirma `:focus-visible`.
+
+Medidas (iguales en Chromium y WebKit):
+
+| R | Medida | Claro | Oscuro |
+| --- | --- | --- | --- |
+| R10 | cabecera: fondo = `--muted`, texto e icono de orden = `--muted-foreground`, contraste | 6.70 | 4.66 |
+| R10 | columna fijada por su menú: fondo `--muted`, texto `--muted-foreground`; celda fijada del cuerpo `--background` | ok | ok |
+| R11 | celda «Fecha de alta»: `"IBM Plex Mono", …`, `tabular-nums` | ok | ok |
+| R13 | celda «Apellidos» y cabecera «Fecha de alta»: `"IBM Plex Sans", …`, `normal` | ok | ok |
+| R15 | `nav-dashboard` en reposo: texto e icono = `--sidebar-muted-foreground`, contraste contra `--sidebar` | 7.96 | 7.62 |
+| R16 | con hover: `--sidebar-accent-foreground` | ok | ok |
+| R16 | **con foco por teclado: `--sidebar-foreground` (lab 94.3), no `--sidebar-accent-foreground` (lab 97.8)** | **rojo** | **rojo** |
+| R23 | buscador: borde 1px de `--input`; contra `--card` / `--background` | 3.22 / 3.09 | 3.66 / 4.07 |
+| R24 | buscador con `Tab`: borde `--ring`, un anillo `0 0 0 1px` opaco de `--ring`, `outline-style: none` | ok | ok |
+| R21 | botón «Limpiar filtro» con `Tab`: `solid` 2px, offset 2px, `--ring` opaco; contra `--card` / `--background` | 7.46 / 7.16 | 8.96 / 9.96 |
+
+**R16 con foco — decisión de comportamiento, para el leader.** El primitivo
+(`sidebarMenuButtonVariants`) no fija color en `focus-visible` (solo `focus-visible:ring-2`), y la
+regla de T3 excluye `:focus-visible`, así que el ítem enfocado hereda `--sidebar-foreground`. Antes
+de QC-227 también era `--sidebar-foreground`: el «como hoy» de R16 no se cumple para el foco. O se
+añade `focus-visible` a `--sidebar-accent-foreground` (p. ej. en la regla de `globals.css` o con
+`focus-visible:text-sidebar-accent-foreground` en el primitivo), o se enmienda R16 para el foco. El
+caso E2E afirma R16 tal como está escrito y queda en rojo; no se cambió código.
+
+**Listas cerradas:** `marca-componentes.spec.ts` entra en `E2E_PERMITIDOS`
+(`tests/unit/clientes/scope.test.ts`) y en la lista de E2E que referencian `data-table`
+(`tests/unit/shared/data-table-alcance.test.ts`, de 35 a 36). Las dos se añadieron a `tasks.md >
+Archivos esperados`. Ya estaba en `E2E_ESPERADOS` desde T12.
+
+**Corrida de los cuatro specs** (`pnpm exec playwright test e2e/marca-componentes.spec.ts
+e2e/theme.spec.ts e2e/login-skin.spec.ts e2e/movimiento.spec.ts`, Chromium y WebKit):
+
+```
+  4 failed   (R16 con foco: chromium light/dark, webkit light/dark)
+  94 passed (1.8m)
+```
+
+`theme`, `login-skin` y `movimiento`: 30 de 30 en verde. `marca-componentes`: 64 verdes y los 4 de
+R16 con foco.
+
+**Aviso de LCP (R26).** `next dev --port 3118` y un script temporal de Playwright que abre `/login`
+y recoge la consola: Chromium y WebKit, `loading` ausente, `fetchpriority` ausente, `<link
+rel="preload" as="image" href="/brand/logo-vertical-dark.svg">`, **0 avisos de LCP**. Control
+negativo: quitando `preload` del login (revertido al momento), sale `loading="lazy"` y el aviso
+«Image with src "/brand/logo-vertical-dark.svg" was detected as the Largest Contentful Paint (LCP)».
 
 ### T11 — cierre
 
@@ -391,3 +450,68 @@ y una entrada en `E2E_ESPERADOS`. Lo decide el leader.
 Otra desviación: `data-table-header-menu.tsx` y `data-table-types.ts` salen con el diff entero porque
 su blob en `dev` estaba en CRLF y `.gitattributes` (`* text=auto eol=lf`) lo normaliza a LF al
 editarlos. `git diff -w` muestra el cambio real (4 líneas).
+
+## T11 — Mapa R → test consolidado (R1–R39)
+
+E2E = `e2e/marca-componentes.spec.ts` (Chromium y WebKit, claro y oscuro). `marca/` = `tests/unit/marca/`.
+
+| R | Test |
+| --- | --- |
+| R1 | `marca/badges-estado.test.tsx` > «R1: el Badge ofrece los cinco tonos…», «R1: el foco del badge…» |
+| R2 | `marca/contraste-componentes.test.ts` > caso R2 (cuatro pares subtle/text, claro y oscuro) |
+| R3 | `marca/badges-estado.test.tsx` > «R3: cada estado de pedido se pinta con su tono»; `tests/unit/pedidos-ui/order-columns.test.tsx` (enmienda) |
+| R4 | `marca/badges-estado.test.tsx` > «R4: cada prioridad…» |
+| R5 | `marca/badges-estado.test.tsx` > «R5: cada cobertura…» |
+| R6 | `marca/badges-estado.test.tsx` > «R6: cada estado de cuenta de usuario…» |
+| R7 | `marca/badges-estado.test.tsx` > «R7: «Sobre-reservado» del panel de lotes es un badge de tono error…» |
+| R8 | `marca/badges-estado.test.tsx` > dos casos «R8» (lista y formulario de versión) |
+| R9 | `marca/badges-estado.test.tsx` > «R9: los badges conservan su texto visible, su data-testid y sus atributos data-*» |
+| R10 | `marca/tablas-marca.test.tsx` > «R10: la cabecera…», «R10: la columna fijada…»; `marca/contraste-componentes.test.ts` > R10; E2E > «R10 la cabecera pinta --muted-foreground sobre --muted, tambien la columna fijada, con 4.5:1» |
+| R11 | `marca/tablas-marca.test.tsx` > «R11: la celda de cuerpo…», «R11, R13: …» (lista exacta por archivo); E2E > «R11 R13 la celda de fecha va en Plex Mono tabular…» |
+| R12 | `marca/tablas-marca.test.tsx` > «R12: lote, cantidades y fechas del panel van en Mono con cifras tabulares, y sus etiquetas no» |
+| R13 | `marca/tablas-marca.test.tsx` > «R13: la cabecera de una columna tabular y las celdas sin la marca siguen en Sans»; E2E > «R11 R13 …» |
+| R14 | `marca/sidebar-inactivo.test.ts` > caso R14 |
+| R15 | `marca/sidebar-inactivo.test.ts` > caso R15; `marca/contraste-componentes.test.ts` > R15 (con paradas del degradado); E2E > «R15 R16 un item inactivo pinta --sidebar-muted-foreground con 4.5:1…» |
+| R16 | `marca/sidebar-inactivo.test.ts` > caso R16; E2E > «R15 R16 … con hover» (verde) y «R16 un item inactivo con foco por teclado pinta --sidebar-accent-foreground» (**rojo**, decisión pendiente) |
+| R17 | `marca/sidebar-inactivo.test.ts` > caso R17 |
+| R18 | `marca/botones-y-campos.test.tsx` > «R18 — el primario…»; `marca/contraste-componentes.test.ts` > R18 |
+| R19 | `marca/botones-y-campos.test.tsx` > «R19 — el secundario (outline)…», «R19 — la variante secondary…»; `marca/contraste-componentes.test.ts` > R19 |
+| R20 | `marca/botones-y-campos.test.tsx` > tres casos «R20»; `marca/contraste-componentes.test.ts` > R20 (reposo y hover); `tests/unit/shared-ui/motion-classes.test.tsx` (enmienda) |
+| R21 | `marca/botones-y-campos.test.tsx` > «R21 — el boton %s…», casilla, pestaña, día, limpiar; `marca/contraste-componentes.test.ts` > R21; E2E > «R21 R23 R24 con el teclado…» |
+| R22 | `tests/guards/guard-anillo-de-foco.test.ts` (con caso negativo); `marca/sidebar-inactivo.test.ts` > «R22 la base pinta el contorno con outline-ring opaco» |
+| R23 | `marca/contraste-componentes.test.ts` > R23; `marca/botones-y-campos.test.tsx` > «R24 — el campo %s pinta el borde de --input…»; E2E > «R21 R23 R24 …» |
+| R24 | `marca/botones-y-campos.test.tsx` > «R24 — el campo %s…», «R24 — el primitivo %s no deja ningun anillo translucido…»; E2E > «R21 R23 R24 …» |
+| R25 | `marca/botones-y-campos.test.tsx` > «R25 — un boton aria-invalid…», «R25 — el campo %s marcado aria-invalid…» |
+| R26 | `tests/unit/brand/brand-logo.test.tsx` > «R26: el login pide el logo vertical por precarga y sin carga diferida», «R26: los usos de la barra lateral y del encabezado privado siguen en carga diferida y sin precarga»; aviso de LCP ausente en `next dev` (T10, con control negativo) |
+| R27 | `tests/unit/theme/color-tokens.test.ts`, verde sin editar tablas |
+| R28 | `tests/unit/theme/sin-dependencias-nuevas.test.ts`, `tests/guards/guard-dependencias-aprobadas.test.ts`; `git diff origin/dev...HEAD -- package.json` vacío |
+| R29 | `tests/unit/paridad/*` (21 archivos), regenerados solo con diferencias de `class` (y `loading="lazy"` del logo por R26) |
+| R30 | `tests/guards/guard-movimiento.test.ts`, verde sin editar; `e2e/movimiento.spec.ts` verde |
+| R31 | E2E > «R31 la marca y cada boton de primer nivel son cuadrados de 44 px…»; `marca/sidebar-carril.test.ts` > R31, «R31 R35» |
+| R32 | E2E > «R32 el icono de cada boton … y el avatar del pie estan centrados…» |
+| R33 | E2E > «R33 el indicador del item activo tiene la caja del boton activo…» |
+| R34 | E2E > «R34 el fondo de hover de un boton inactivo cae dentro de su caja centrada» |
+| R35 | E2E > «R35 el isotipo mide 32 px…»; `marca/sidebar-carril.test.ts` > «R31 R35» |
+| R36 | E2E > «R36 expandida…»; `marca/sidebar-carril.test.ts` > R36; `sidebar-ajuste`, `sidebar-desktop`, `app-sidebar`, `theme/ui-primitivas-intactas` |
+| R37 | `marca/sidebar-carril.test.ts` > R37 |
+| R38 | E2E > «R38 la pastilla del borde muestra su icono…» (×2 estados), «R38 el control del encabezado…»; `marca/sidebar-carril.test.ts` > R38 |
+| R39 | E2E > «R39 la pastilla pinta abrir…» (×2), «R39 el control del encabezado…»; `marca/sidebar-carril.test.ts` > R39 ×3 |
+
+### Gate de cierre (2026-10-10)
+
+```
+./init.sh (con ../../.env)                      -> == init OK ==  exit 0
+  typecheck paso · lint paso (0 errores, 7 warnings ajenos)
+  test:rapido related: Test Files 290 passed (290) · Tests 4428 passed | 3 skipped
+  gate.siempre:        Test Files 105 passed (105) · Tests 1461 passed | 35 skipped
+pnpm exec vitest run tests/unit/shared tests/unit/clientes tests/unit/paridad tests/guards
+  Test Files 151 passed (151) · Tests 2036 passed | 19 skipped (2055)
+node scripts/archivos-en-vuelo.mjs --candidata QC-227
+  CHOCA con QC-217 (Christian Quevedo): app/(private)/asignacion/components/conditioning-orders-columns.tsx
+  CHOCA con QC-223 (Christian Quevedo): app/(private)/pedidos/components/order-columns.tsx, tests/guards/guard-identificador-de-request.test.ts
+  AVISO: QC-96 sin rama publicada; QC-131 sin `## Archivos esperados`
+```
+
+Los CHOCA son los mismos de antes (los gestiona el leader); las dos listas nuevas de T10 no añaden choques.
+
+Veredicto: T9–T11 hechas y gate local verde; E2E 94/98 verdes en Chromium y WebKit, con R16 en foco en rojo (pinta `--sidebar-foreground`), que queda para que decida el leader.
