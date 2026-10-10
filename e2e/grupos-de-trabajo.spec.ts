@@ -93,6 +93,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { USERS_ROUTE } from '@/lib/shared/routes';
 
 // QC-93: la entrada y su aterrizaje, derivado de los permisos del usuario en la base.
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openRowActionsMenuItem } from './helpers/row-actions-menu';
 
@@ -220,7 +221,7 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
 
   // Hash REAL: el objetivo es que bcrypt, el adaptador Prisma y la Server Action de login se
   // entiendan de verdad. Un hash inventado probaria otra cosa.
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames: isMember ? memberFirstNames : `Qc85${RUN_ID.slice(0, 8)}`,
       lastNames: isMember ? memberLastNames : 'Fixture',

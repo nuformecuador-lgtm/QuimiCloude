@@ -57,6 +57,7 @@ import { SESSION_COOKIE_NAME } from '@/lib/modules/identity/adapters/driven/sess
 import { RETURN_PARAM } from '@/lib/modules/identity/domain/return-path';
 import { prisma } from '@/lib/shared/db/prisma';
 import { INVENTORY_ROUTE, LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
+import { createFixtureUser } from './helpers/fixture-user';
 
 /** Ruta publica del login (QC-10). No hay constante para ella en `lib/shared/routes.ts`. */
 const LOGIN_PATH = '/login';
@@ -113,7 +114,7 @@ async function createTestUser(label: string): Promise<{
 
   // Hash REAL: el objetivo del E2E es que bcrypt, el adaptador Prisma y la Server Action se
   // entiendan de verdad. Un hash inventado probaria otra cosa.
-  await prisma.user.create({
+  await createFixtureUser({
     data: {
       firstNames,
       lastNames: LAST_NAMES,

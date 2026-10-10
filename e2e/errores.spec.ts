@@ -66,6 +66,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { FORMULAS_ROUTE } from '@/lib/shared/routes';
 
 // QC-93 (R8): el aterrizaje tras el login se deriva de los permisos del usuario en el helper unico.
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
@@ -155,7 +156,7 @@ test.beforeAll(async () => {
 
   // Hash REAL: el objetivo es que bcrypt, el adaptador Prisma y la Server Action de login se
   // entiendan de verdad. Un hash inventado probaria otra cosa.
-  await prisma.user.create({
+  await createFixtureUser({
     data: {
       firstNames: `Qc70${RUN_ID.slice(0, 8)}`,
       lastNames: 'Errores',

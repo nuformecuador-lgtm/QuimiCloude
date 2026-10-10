@@ -17,6 +17,7 @@ import { normalizeUnitName, PACKAGE_UNIT_NAME } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { exactProductNameCellText } from './helpers/product-name-cell';
 import { openRowActionsMenuItem } from './helpers/row-actions-menu';
@@ -159,7 +160,7 @@ test.beforeAll(async () => {
         'correr `pnpm run e2e`.',
     );
   }
-  await prisma.user.create({
+  await createFixtureUser({
     data: {
       firstNames: `Qc199${RUN_ID.slice(0, 8)}`,
       lastNames: 'Insumo',

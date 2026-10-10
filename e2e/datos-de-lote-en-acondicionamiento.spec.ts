@@ -81,6 +81,7 @@ import {
   conditioningOrderRoute,
 } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { seedPackaging } from './helpers/packaging';
 import { exactProductNameCellText } from './helpers/product-name-cell';
@@ -197,7 +198,7 @@ function seeded(): Seeded {
 async function createUser(user: Credentials, roleId: string, lastNames: string): Promise<string> {
   if (!companyId) throw new Error('la empresa del fixture no existe: falló el beforeAll');
 
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames,
       lastNames,

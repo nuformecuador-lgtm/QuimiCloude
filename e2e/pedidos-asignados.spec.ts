@@ -35,6 +35,7 @@ import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { ASSIGNED_ORDERS_ROUTE, assignedOrderRoute } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import {
   clickAndConfirm,
@@ -136,7 +137,7 @@ function rowByNumber(page: Page, numberText: string): Locator {
 async function createUser(user: Credentials, roleId: string): Promise<string> {
   if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
 
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames,
       lastNames: LAST_NAMES_BY_USERNAME[user.username] ?? 'Fixture',
@@ -493,7 +494,7 @@ async function roleIdByName(roleName: string): Promise<string> {
 async function createPackerFixtureUser(user: Credentials, roleId: string): Promise<string> {
   if (!packerCompanyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
 
-  const created = await prisma.user.create({
+  const created = await createFixtureUser({
     data: {
       firstNames: packerFirstNames,
       lastNames: PACKER_LAST_NAMES_BY_USERNAME[user.username] ?? 'Fixture',

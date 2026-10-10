@@ -42,6 +42,7 @@ import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/secur
 import { prisma } from '@/lib/shared/db/prisma';
 import { CUSTOMERS_ROUTE, FORMULAS_ROUTE, SUPPLIERS_ROUTE } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
@@ -405,7 +406,7 @@ test.beforeAll(async () => {
   if (!role) {
     throw new Error(`falta el rol "${ROLE_ADMINISTRADOR}": siembra la base con \`pnpm run db:seed\``);
   }
-  await prisma.user.create({
+  await createFixtureUser({
     data: {
       firstNames: `Qc228${RUN_ID.slice(0, 8)}`,
       lastNames: 'Movimiento',

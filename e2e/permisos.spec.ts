@@ -54,6 +54,7 @@ import { normalizeCompanyName, ROLE_OPERADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import { prisma } from '@/lib/shared/db/prisma';
 import { ASSIGNED_ORDERS_ROUTE, ORDERS_ROUTE } from '@/lib/shared/routes';
+import { createFixtureUser } from './helpers/fixture-user';
 
 /** Ruta publica del login (QC-10). No hay constante para ella en `lib/shared/routes.ts`. */
 const LOGIN_PATH = '/login';
@@ -114,7 +115,7 @@ async function createOperatorUser(): Promise<{ username: string; password: strin
 
   // Hash REAL: el objetivo del E2E es que bcrypt, el adaptador Prisma y la Server Action se
   // entiendan de verdad. Un hash inventado probaria otra cosa.
-  await prisma.user.create({
+  await createFixtureUser({
     data: {
       firstNames,
       lastNames: LAST_NAMES,

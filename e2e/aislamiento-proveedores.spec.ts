@@ -35,6 +35,7 @@ import { normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
 import { SUPPLIERS_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
 const FIXTURE_PREFIX = 'qc59_e2e_';
@@ -341,7 +342,7 @@ test.beforeAll(async () => {
 
   // Hash real: el login tiene que pasar por bcrypt, el adaptador Prisma y la Server Action de
   // verdad. La cuenta es de la empresa A: es la unica sesion de todo el recorrido.
-  await prisma.user.create({
+  await createFixtureUser({
     data: {
       firstNames: `Qc59${RUN_ID.slice(0, 8)}`,
       lastNames: 'Aislamiento',

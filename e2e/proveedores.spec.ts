@@ -67,6 +67,7 @@ import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/secur
 import { prisma } from '@/lib/shared/db/prisma';
 import { SUPPLIERS_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
 
+import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
@@ -143,7 +144,7 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
 
   // Hash REAL: el objetivo es que bcrypt, el adaptador Prisma y la Server Action de login se
   // entiendan de verdad. Un hash inventado probaria otra cosa.
-  await prisma.user.create({
+  await createFixtureUser({
     data: {
       firstNames: `Qc44${RUN_ID.slice(0, 8)}`,
       lastNames: 'Proveedores',
