@@ -332,3 +332,7 @@ Rescatados de *Evaluaciones* y *Features en curso* del archivo: no estaban en *D
 - **Qué falta:** en el runner de 2 vCPU las dos emisiones concurrentes a veces no llegan a encolarse tras el bloqueo (`waitForLockWaiters`). Alargar la espera no lo arregla (con 20 s choca con el `testTimeout`): hay que entender por qué no se encolan (pool de conexiones, orden de arranque, `pg_stat_activity`) y hacer el test determinista. Mientras tanto está en `tests/baseline-rojos.json`; al arreglarlo, se borra la entrada.
 - **Estado:** resuelta el 2026-10-07 en `chore/ci-velocidad-y-d34`. Causa: orden de arranque —las emisiones se lanzaban sin esperar a que el `FOR UPDATE` del bloqueo estuviera tomado; si una llegaba antes, ganaba sin esperar y no quedaba nada encolado—. Ahora se lanzan solo con el bloqueo tomado (y se afirma que atrapó 1 fila). Entrada borrada del baseline. Detalle: `progress/fix-d34-credential-setup.md`.
 - **Dueño:** sin asignar.
+
+## QC-116 — menores del review (2026-10-10)
+
+Ver progress/review_QC-116-sesion-revocada-en-el-mismo-segundo.md: m1 `tests/unit/inventario/adjust-batch-dialog.test.tsx` (R9, toastExito 0 llamadas) inestable bajo carga, ajeno; m2 JSDoc de isStampedOut no menciona su uso en el login; m3 test de R16 comprueba pureza leyendo texto del archivo.
