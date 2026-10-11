@@ -167,3 +167,23 @@ Todo lo demás está bien:
 
 m1 y m3 piden decisión del leader o del humano, no del implementer. Vuelta 2: acotada al commit
 que arregle B1. m4 y m5, si se quieren, en el mismo commit.
+
+## Vuelta 2 (acotada a 7f6a8c25..611b5673)
+
+Verificación:
+- `./init.sh` (rápido): **verde**, `EXIT 0`. Typecheck pasa; lint `0 errors, 7 warnings`, las mismas que antes; `Test Files 109 passed (109)`, `Tests 1531 passed | 35 skipped (1566)`. La guardia pasa 59/59.
+- Sondas de la vuelta 1, repetidas sobre el commit nuevo: la subcarpeta sin `index.ts` (`components/shared/nueva/pieza.tsx`) ya da rojo, `carpeta-sin-barrel … Pz`. Las demás mutaciones siguen en rojo igual que en la vuelta 1; no hay regresión.
+- Grep de comentarios con `R<n>`, `QC-<n>` o `design.md` en la guardia: ninguno.
+
+| Hallazgo vuelta 1 | Estado |
+|---|---|
+| B1 citas `R<n>` en comentarios | **Resuelto**: los cuatro comentarios están limpios. |
+| m1 carpeta sin barrel | **Resuelto**. R37/H11; `componentesSinBarrel` entra en `cruzar` y cubre también subcarpetas anidadas. Muestras roja y verde, «sin tablero → `diseno-requerido`», «con barrel no aplica», más el caso real. La fila de una pieza sin barrel no sale huérfana. |
+| m3 regla 13 contra el paso 4 | **Resuelto**. R26/H12 acota la fila a `ui`/`shared`/`lib/shared/ui`/`hooks`. La «Única excepción» del pase (subcomponente interno de ruta que solo compone piezas catalogadas, sin UI visible nueva) es la misma frase en el pase, en la regla 13 y en el reviewer 11. No contradice R24: la excepción solo alcanza a componentes de ruta. Los casos de docs R18/R26 y R19/R27 siguen verdes. |
+| m4 bitácora Tanda 3 | **Resuelto**: la sección Tanda 3 está, con la salida de `archivos-en-vuelo`. |
+| m5 archivos esperados | **Resuelto**: `recipe-route-contract.test.ts` está en `## Archivos esperados`. |
+| m2, m6, m7, m8 | Sin cambio; siguen como menores y no bloquean. |
+
+Regresiones: ninguna. Hallazgos nuevos: ninguno.
+
+**Veredicto vuelta 2: OK.**
