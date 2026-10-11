@@ -93,6 +93,13 @@ Del leader, al cerrar las preguntas abiertas (2026-10-10):
 | H9 | El pase `/design` lo hace **cualquier persona del equipo** desde Claude Code pidiendo a Claude un diseño (Claude Design: un tablero nuevo en el canvas del proyecto o en uno propio compartido con el humano). El humano lo aprueba y el tablero aprobado se copia a `docs/diseno/canvas/` en la rama de la ficha. El `README.md` lo escribe como flujo paso a paso. | R24, R33 |
 | H10 | `Diseño` se exige **también a Primitivos** (confirma D7): R29 se mantiene. | R29 |
 
+Del leader, vuelta 2 tras la revisión (2026-10-10):
+
+| # | Decisión | Requisitos |
+|---|---|---|
+| H11 | Regla `carpeta-sin-barrel`: todo `.tsx` que exporte un componente en una subcarpeta de `components/shared` **sin** `index.ts` necesita fila propia (con su `Diseño`). Cierra el hueco por el que una pieza nueva sin barrel quedaba en verde sin fila. | R37 |
+| H12 | La regla 13 de `frontend_dev` (R26) se acota. «Sin fila en el catálogo» aplica solo a `components/ui`, `components/shared`, `lib/shared/ui` y `hooks`. Un componente creado en la carpeta de una ruta (paso 4 de la regla de decisión) no lleva fila. Sí exige el pase `/design` si introduce UI visible nueva, salvo que sea un subcomponente interno que solo compone piezas ya catalogadas. | R26 |
+
 ## Decisiones del spec (aprobadas con el spec)
 
 | # | Decisión | Requisitos |
@@ -201,7 +208,10 @@ Del leader, al cerrar las preguntas abiertas (2026-10-10):
   hay, ENTONCES el `spec_author` DEBE parar y devolver `BLOQUEADO: falta el pase /design de <pieza>`
   en vez de escribir el spec.
 - **R26.** `docs/perfil-agentes.md > frontend_dev` DEBE prohibir crear un componente que no tenga
-  fila en el catálogo y referencia de diseño en el `design.md` de su feature.
+  fila en el catálogo y referencia de diseño en el `design.md` de su feature. (H12) La exigencia de
+  fila aplica solo a `components/ui`, `components/shared`, `lib/shared/ui` y `hooks`. Un componente
+  creado en la carpeta de una ruta no lleva fila. Sí exige referencia de diseño si introduce UI
+  visible nueva, salvo que sea un subcomponente interno que solo compone piezas ya catalogadas.
 - **R27.** `docs/perfil-agentes.md > reviewer` DEBE incluir como BLOQUEANTE un componente nuevo (o un
   cambio visual) del diff sin justificación de por qué no se reutilizó lo existente, o sin
   referencia de diseño en el `design.md` de la feature.
@@ -240,6 +250,9 @@ Del leader, al cerrar las preguntas abiertas (2026-10-10):
   del diseño, en vez de a `_trabajo/rediseno/canvas/`.
 - **R36.** CUANDO `docs/diseno/` está en el árbol, todas las guardias del repo DEBEN seguir en verde
   sin excepciones nuevas (`design.md > 12` recoge cuáles lo leen).
+- **R37.** (H11) CUANDO una subcarpeta de `components/shared` no tiene `index.ts`, la guardia DEBE
+  exigir una fila propia en Compuestos, con su `Diseño`, para cada componente que exporte cada
+  `.tsx` de esa subcarpeta. SI falta, DEBE dar rojo con la regla `carpeta-sin-barrel`.
 
 ## Preguntas abiertas
 

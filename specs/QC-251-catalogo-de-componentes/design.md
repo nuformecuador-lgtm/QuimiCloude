@@ -491,3 +491,4 @@ LFS añade una herramienta más al equipo y a CI.
 | R33, R34 | › `docs/diseno` completo y `sistema.css` == `canvas/qc.css` + muestra `sistema-desincronizado` |
 | R35 | › `progress/rediseno.md` apunta a `docs/diseno/` |
 | R36 | `pnpm exec vitest run guard` verde con `docs/diseno/` en el árbol (T10b; evidencia en el `impl_`) |
+| R37 | › `carpeta-sin-barrel`: muestra roja (subcarpeta sin `index.ts` con un `.tsx` sin fila) y verde (con su fila), y caso real (H11, vuelta 2) |

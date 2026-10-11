@@ -206,6 +206,35 @@ Verificación (salida real):
 
 Veredicto: Tanda 2 hecha; catálogo con 73 filas y guardia entera en verde.
 
+## Tanda 3 (frontend_dev, 2026-10-10) — T7, T8, T9, T10, T10b: docs y configuración
+
+Archivos: `docs/perfil-agentes.md` (las dos subsecciones obligatorias bajo `## Todos los agentes`,
+dos puntos de spec_author, reglas 12–13 de frontend_dev, puntos 10–11 de reviewer),
+`docs/architecture.md` («segunda ruta» y la línea del pase de diseño; «Reutilizables entre
+features» pasa a «entre rutas»), `docs/checkpoints-proyecto.md` (dos casillas) y `arnes.config.json`
+(`equipo.archivos_compartidos`). Ninguno está en `arnes.manifest`.
+
+Verificación (salida real, resumida):
+- Casos de docs de la guardia: verdes R16, R23, R24, R17+R25, R18+R26, R19+R27, R20, R21+R32, R22.
+- `node scripts/check-perfil.mjs`: «6/6 docs revisados en los ultimos 60 dias».
+- `node scripts/validate-features.mjs`: sin errores («4 en vuelo con assignee», «cupo respetado»).
+- `node scripts/archivos-en-vuelo.mjs`: exit 0. Los compartidos, evaluados con la expresión de su
+  línea 54 contra la config:
+  `COMPARTIDOS = tests/baseline-rojos.json, progress/deudas.md, components/shared/CATALOGO.md`.
+- `node scripts/archivos-en-vuelo.mjs --candidata QC-251` (vuelta 2, con `recipe-route-contract`
+  ya en `Archivos esperados`):
+  ```
+  AVISO: QC-96 (Christian Quevedo) esta en vuelo y su rama no esta publicada: no se puede comprobar el conflicto
+  AVISO: QC-131 (Christian Quevedo): su tasks.md no tiene `## Archivos esperados`: se leen las rutas de todo el archivo (docs/specs.md > tasks.md)
+  CHOCA con QC-237 (Christian Quevedo): tests/unit/recetas-ui/recipe-route-contract.test.ts, docs/architecture.md
+  ```
+  El choque con QC-237 es de archivo, no de hunk: el reviewer comprobó que el merge textual no choca.
+  Lo decide el leader.
+- `pnpm exec vitest run guard`: 70 de 71 archivos verdes y 964 tests en verde. Los 8 rojos eran los
+  casos de catálogo de la Tanda 2, que iba en paralelo. Ninguna guardia existente se queja de
+  `docs/diseno/`, sin excepciones nuevas (R36).
+- `pnpm run lint`: exit 0.
+
 ## Cierre (implementer, 2026-10-10) — T11 y T12
 
 ### Archivos (consolidado de todos los subagentes)
@@ -229,7 +258,8 @@ según `design.md > 11`.
 catálogo ni a `PIEZAS_PREVIAS_AL_REDISENO`.
 
 ### T12 — `./init.sh` (rápido), salida real resumida
-Primera corrida: rojo nuevo en `recipe-route-contract.test.ts:1448` (ver arriba), arreglado. Segunda:
+Primera corrida, antes del commit `93ef38c0`: rojo nuevo en `recipe-route-contract.test.ts:1448`
+(ver arriba). Se arregló antes de commitear, así que el arreglo ya va en `93ef38c0`. Segunda corrida:
 ```
 ✓ typecheck paso
 ✓ lint paso            (0 errores, 7 warnings preexistentes en tests no tocados)
@@ -238,5 +268,32 @@ Primera corrida: rojo nuevo en `recipe-route-contract.test.ts:1448` (ver arriba)
 ✓ test:rapido paso
 ✓ todas las migraciones tienen down.sql
 ! no hay .env. Crea uno a partir de .env.example
+== init OK ==
+```
+
+## Vuelta 2 (implementer, 2026-10-10) — B1, m1 (H11), m3 (H12), m4, m5
+
+- **B1 (T13):** los cuatro comentarios de la guardia ya no citan `R<n>`; quedan solo en los nombres de los casos.
+- **m1 (T14, R37, H11):** regla `carpeta-sin-barrel` (`componentesSinBarrel` + `cruzar`). Casos nuevos:
+  «R37 un .tsx en una subcarpeta sin index.ts y sin fila: rojo con carpeta-sin-barrel»,
+  «R37 la misma pieza con su fila y su tablero en Diseño: verde, y la fila no sale huérfana»,
+  «R37 la fila sin tablero sigue roja por el Diseño, no por la carpeta»,
+  «R37 con index.ts la carpeta es un módulo con barrel y la regla no aplica» (sensibilidad),
+  «R37 R15 todo componente de una subcarpeta de components/shared sin index.ts tiene su fila» (real).
+- **m3 (T15, R26, H12):** regla 13 de `frontend_dev` acotada por ubicación. Para no contradecirla se
+  añadió una «Única excepción» en «Pase de diseño para componentes nuevos» y una frase en el punto 11
+  del reviewer: un subcomponente interno de una ruta, que solo compone piezas catalogadas, no exige pase.
+- **Spec:** H11, H12 y R37 en `requirements.md`; R26 acotado; fila R37 en `design.md > 11`; T13–T16
+  y `recipe-route-contract.test.ts` en `Archivos esperados` de `tasks.md` (m5).
+- **m4:** sección «Tanda 3» añadida arriba, con la salida de `archivos-en-vuelo --candidata QC-251`.
+
+Mapa R → test: R1–R36 como arriba; R37 → los cinco casos «R37 …» de la guardia.
+
+`./init.sh` (rápido), salida real resumida:
+```
+✓ lint paso
+ Test Files  109 passed (109)
+      Tests  1531 passed | 35 skipped (1566)
+✓ test:rapido paso
 == init OK ==
 ```

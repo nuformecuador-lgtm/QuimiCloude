@@ -86,10 +86,20 @@ como tal en la fila y se anota en `progress/impl_QC-251-catalogo-de-componentes.
 - [x] **T12 — Gate local** `./init.sh` verde y mapa `R<n> -> test` completo (R1–R36) en
   `progress/impl_QC-251-catalogo-de-componentes.md` (`design.md > 11`).
 
+## Vuelta 2 — tras la revisión (H11, H12)
+
+- [x] **T13 — Comentarios sin `R<n>`** en la guardia (B1). La trazabilidad queda en los nombres de
+  los casos.
+- [x] **T14 — Regla `carpeta-sin-barrel`** (R37, H11) en la guardia, con su muestra roja y verde y
+  el caso contra el repo real.
+- [x] **T15 — Acotar la regla 13 de `frontend_dev`** en `docs/perfil-agentes.md` (R26, H12).
+- [x] **T16 — Bitácora**: sección de la Tanda 3 y salida de `archivos-en-vuelo --candidata`.
+
 ## Archivos esperados
 
 - `components/shared/CATALOGO.md`
 - `tests/guards/guard-catalogo-de-componentes.test.ts`
+- `tests/unit/recetas-ui/recipe-route-contract.test.ts`
 - `docs/perfil-agentes.md`
 - `docs/architecture.md`
 - `docs/checkpoints-proyecto.md`

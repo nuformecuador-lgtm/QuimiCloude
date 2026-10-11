@@ -159,6 +159,7 @@ export type Regla =
   | 'diseno-inexistente'
   | 'previa-muerta'
   | 'sistema-desincronizado'
+  | 'carpeta-sin-barrel'
 
 export type Hallazgo = {
   readonly regla: Regla
@@ -198,7 +199,7 @@ export type Arbol = {
 export type Export = { readonly nombre: string; readonly desde?: string }
 
 // ---------------------------------------------------------------------------------------------
-// El parser del catálogo (R1–R4, R11, R28)
+// El parser del catálogo
 // ---------------------------------------------------------------------------------------------
 
 /** Parte una fila de tabla en celdas. Un `|` entre backticks o escapado no separa. */
@@ -410,7 +411,7 @@ export function leerCatalogo(md: string): Catalogo {
 }
 
 // ---------------------------------------------------------------------------------------------
-// El analizador de código (R5–R10)
+// El analizador de código
 // ---------------------------------------------------------------------------------------------
 
 function fuenteTs(archivo: string, fuente: string): ts.SourceFile {
@@ -646,6 +647,23 @@ export function componentesPublicos(arbol: Arbol): ComponentePublico[] {
   return salida
 }
 
+/**
+ * Componentes de los `.tsx` de una subcarpeta de `components/shared` sin `index.ts`. Ninguno es
+ * público por (a), (b) ni (c), así que sin esta lista una pieza nueva sin barrel no pediría fila.
+ */
+export function componentesSinBarrel(arbol: Arbol): ComponentePublico[] {
+  const modulos = modulosConBarrel(arbol.fuentes.keys())
+  const salida: ComponentePublico[] = []
+  for (const [ruta, fuente] of arbol.fuentes) {
+    const modulo = /^components\/shared\/([^/]+)\/.+\.tsx$/.exec(ruta)?.[1]
+    if (modulo === undefined || modulos.has(modulo) || !esProduccion(ruta)) continue
+    for (const e of exportsDeValor(ruta, fuente)) {
+      if (esComponente(e.nombre)) salida.push({ nombre: e.nombre, archivo: ruta })
+    }
+  }
+  return salida.sort((a, b) => (a.archivo + a.nombre < b.archivo + b.nombre ? -1 : 1))
+}
+
 /** Recorrer `app/` entero es lo caro; varios casos lo piden sobre el mismo árbol. */
 const publicosPorArbol = new WeakMap<Arbol, ComponentePublico[]>()
 
@@ -692,6 +710,25 @@ export function cruzar(catalogo: Catalogo, arbol: Arbol): Hallazgo[] {
   for (const entrada of archivosDeEntrada(arbol)) {
     if (!compuestos.some((f) => f.archivo === entrada)) {
       hallazgos.push({ regla: 'archivo-sin-fila', archivo: entrada, accion: 'añade su fila en Compuestos' })
+    }
+  }
+
+  for (const p of componentesSinBarrel(arbol)) {
+    const n = compuestos.filter((f) => f.archivo === p.archivo && f.piezas.includes(p.nombre)).length
+    if (n === 0) {
+      hallazgos.push({
+        regla: 'carpeta-sin-barrel',
+        archivo: p.archivo,
+        pieza: p.nombre,
+        accion: 'añade su fila propia en Compuestos, con su tablero en `Diseño`: su carpeta no tiene index.ts',
+      })
+    } else if (n > 1) {
+      hallazgos.push({
+        regla: 'fila-duplicada',
+        archivo: p.archivo,
+        pieza: p.nombre,
+        accion: 'quita o corrige la fila: la pieza va en una sola',
+      })
     }
   }
 
@@ -772,7 +809,7 @@ export function cruzar(catalogo: Catalogo, arbol: Arbol): Hallazgo[] {
   return hallazgos
 }
 
-/** La columna `Diseño` contra el árbol y la lista de piezas previas (R29–R31). */
+/** La columna `Diseño` contra el árbol y la lista de piezas previas. */
 export function cruzarDiseno(
   catalogo: Catalogo,
   arbol: Arbol,
@@ -821,7 +858,7 @@ export function cruzarDiseno(
   return hallazgos
 }
 
-/** `sistema.css` y `canvas/qc.css` son el mismo archivo (R34). */
+/** `sistema.css` y `canvas/qc.css` son el mismo archivo. */
 export function compararSistema(sistema: Buffer, qc: Buffer): Hallazgo[] {
   return sistema.equals(qc)
     ? []
@@ -1322,6 +1359,51 @@ describe('guard-catalogo-de-componentes — muestras sintéticas', () => {
     })
   })
 
+  describe('R37 carpeta sin barrel', () => {
+    const PIEZA = 'components/shared/nueva/pieza.tsx'
+    const fuentes = {
+      ...FUENTES_BASE,
+      [PIEZA]: "export function NuevaPieza() { return null }\nexport const ayuda = () => ''\nexport type P = { a: 1 }\n",
+    }
+    const arbol = arbolDe(fuentes, [TABLERO])
+    const conFila = (diseno: string) => {
+      const compuestos = [...FILAS_BASE.compuestos, { pieza: ['NuevaPieza'], archivo: PIEZA, diseno }].sort((a, b) =>
+        a.archivo < b.archivo ? -1 : 1,
+      )
+      return todo(catalogoMd({ ...FILAS_BASE, compuestos }), arbol)
+    }
+
+    it('R37 un .tsx en una subcarpeta sin index.ts y sin fila: rojo con carpeta-sin-barrel', () => {
+      const h = todo(catalogoMd(FILAS_BASE), arbol)
+      expect(h).toEqual([
+        expect.objectContaining({ regla: 'carpeta-sin-barrel', archivo: PIEZA, pieza: 'NuevaPieza' }),
+      ])
+      expect(informe(h)).toMatch(
+        /\[carpeta-sin-barrel\] · components\/shared\/nueva\/pieza\.tsx · pieza NuevaPieza · añade su fila propia en Compuestos/,
+      )
+    })
+
+    it('R37 la misma pieza con su fila y su tablero en Diseño: verde, y la fila no sale huérfana', () => {
+      const h = conFila(`\`${TABLERO}\``)
+      expect(h, informe(h)).toEqual([])
+    })
+
+    it('R37 la fila sin tablero sigue roja por el Diseño, no por la carpeta', () => {
+      expect(conFila(PREVIO).map((h) => `${h.regla} ${h.archivo}`)).toEqual([`diseno-requerido ${PIEZA}`])
+    })
+
+    it('R37 con index.ts la carpeta es un módulo con barrel y la regla no aplica', () => {
+      const conBarrel = arbolDe(
+        { ...fuentes, 'components/shared/nueva/index.ts': "export { NuevaPieza } from './pieza'\n" },
+        [TABLERO],
+      )
+      const h = todo(catalogoMd(FILAS_BASE), conBarrel)
+      expect(h.some((x) => x.regla === 'carpeta-sin-barrel')).toBe(false)
+      expect(componentesSinBarrel(conBarrel)).toEqual([])
+      expect(componentesSinBarrel(arbol)).toEqual([{ nombre: 'NuevaPieza', archivo: PIEZA }])
+    })
+  })
+
   describe('R28–R31 la columna Diseño', () => {
     const nueva = (diseno: string, archivo = 'components/shared/nueva-pieza.tsx') => {
       const fuentes = { ...FUENTES_BASE, [archivo]: 'export function NuevaPieza() { return null }\n' }
@@ -1424,6 +1506,11 @@ describe('guard-catalogo-de-componentes — repositorio real', () => {
       (x) => x.regla === 'archivo-sin-fila' || (x.regla === 'fila-duplicada' && x.pieza === undefined),
     )
     expect(h, `Archivos sin su fila:\n${informe(h)}`).toEqual([])
+  })
+
+  it('R37 R15 todo componente de una subcarpeta de components/shared sin index.ts tiene su fila', () => {
+    const h = soloReglas(cruzar(catalogoReal(), arbolReal()), ['carpeta-sin-barrel'])
+    expect(h, `Piezas de carpetas sin barrel sin su fila:\n${informe(h)}`).toEqual([])
   })
 
   it('R8 R15 ninguna fila es huérfana ni nombra lo que su archivo no exporta', () => {

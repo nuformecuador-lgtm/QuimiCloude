@@ -46,7 +46,8 @@ y todo **cambio visual** de uno existente pasa por la guía de marca
 Claude Design con sus animaciones, el componente o librería que usa y sus estados en escritorio,
 tablet y teléfono. El humano lo aprueba **antes** del spec que lo implementa, el tablero se copia a
 `docs/diseno/canvas/` y el `design.md` de esa ficha lo cita. **Sin esa referencia no se
-implementa.** Flujo completo: `docs/diseno/README.md`.
+implementa.** Única excepción: un subcomponente interno de una ruta que solo compone piezas ya
+catalogadas y no introduce UI visible nueva. Flujo completo: `docs/diseno/README.md`.
 
 ## spec_author
 
@@ -246,8 +247,14 @@ app/(public)/login/
 12. Lee `components/shared/CATALOGO.md` antes de crear un componente. Si creas, subes, extiendes
     o borras una pieza de `components/ui`, `components/shared`, `lib/shared/ui` o `hooks`, su
     fila se actualiza en el mismo commit; la guardia `guard-catalogo-de-componentes` lo exige.
-13. No crees un componente que no tenga fila en el catálogo y referencia de diseño en el
-    `design.md` de tu feature. Si falta, para y devuélvelo al leader.
+13. No crees un componente sin lo que le toca según dónde vive. Si falta, para y devuélvelo al
+    leader.
+    - **En `components/ui`, `components/shared`, `lib/shared/ui` o `hooks`:** necesita fila en el
+      catálogo y referencia de diseño en el `design.md` de tu feature.
+    - **En la carpeta `components/` de una ruta** (paso 4 de la regla de decisión): no lleva fila
+      en el catálogo. Necesita referencia de diseño en el `design.md` de tu feature si introduce
+      UI visible nueva. No la necesita si es un subcomponente interno que solo compone piezas ya
+      catalogadas.
 
 ### Tests
 - Los tests de componentes van en el proyecto `ui` de vitest: `*.test.tsx`.
@@ -296,7 +303,8 @@ Puntos propios de este repo (continúan la lista de `.claude/agents/reviewer.md`
     aplicó y por qué los anteriores no bastaban, es BLOQUEANTE.
 11. **Diseño:** un componente nuevo, o un cambio visual de uno existente, sin referencia de diseño
     en el `design.md` de la feature, o cuya fila del catálogo no la lleva en `Diseño`, es
-    BLOQUEANTE.
+    BLOQUEANTE. No lo es un subcomponente interno de una ruta que solo compone piezas ya
+    catalogadas (`frontend_dev` regla 13).
 
 ## extractor
 
