@@ -447,6 +447,7 @@ de R44 recorre `app/` y `components/` y falla si encuentra `animate-spin` o `Loa
 | --- | --- | --- |
 | QC-21 (`ayuda-visual-de-contrasena`) | `CredentialField` desaparece; sus requisitos pasan a `PasswordField` con `requirements`. R17 de QC-21 («sin mostrar/ocultar») queda superado | D5 (D12 del humano) |
 | QC-30 (`rediseno-login`) | `tests/unit/login-skin.test.tsx` fija que `button.tsx` contiene `h-8`; pasa a la talla nueva | D4 (D7 del humano) |
+| QC-231, QC-232, QC-233 (snapshots de `tests/unit/paridad/`) | Los 17 `__snapshots__/*-paridad.test.tsx.snap` que pintan un `Button` se regeneran con `vitest -u` en un commit propio. Un script sobre `git diff` comprueba que cada línea cambiada difiere solo en las clases de talla de § 2 (`default`, `sm`, `icon`, `icon-sm`): 721 líneas, 0 fuera de ese mapa. Cumple la regla de `login-paridad` («el cambio de talla se aplica sobre el snapshot en su propio commit») | D4 (D7 del humano); decisión del leader del 2026-10-10 |
 | QC-232 (`componentizacion-formularios-y-acciones`) | `RowActionsMenu` y `actionsColumn` ganan props opcionales; su contrato se amplía, no cambia | D2 |
 | QC-55 (`tabla-de-datos-compartida`) | La barra de filtros pasa a chips: los filtros `text` y `numberRange` se abren desde su chip, la X de cada filtro solo aparece con el filtro activo y nace «Limpiar filtros». Los tests que escribían directamente en esos campos o daban por hecha la X abren antes el chip | D14 |
 

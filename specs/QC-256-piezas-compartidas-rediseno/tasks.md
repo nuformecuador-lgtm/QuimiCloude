@@ -7,13 +7,13 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
 
 ## Tareas
 
-- [ ] **T1. Tokens (R6, R15, R41).** Añadir a `app/globals.css`, en `:root` y `.dark`, los tokens de
+- [x] **T1. Tokens (R6, R15, R41).** Añadir a `app/globals.css`, en `:root` y `.dark`, los tokens de
   `design.md > 5` con sus `--color-*` y `@keyframes status-pulse`. Test nuevo
   `tests/unit/shared-ui/tokens-rediseno.test.ts`.
   *Hecho:* el test lee `globals.css` y encuentra cada token en los dos temas, con los valores de
   `qc.css`.
 
-- [ ] **T2 [P]. Button (R1–R5).** Depende de nada. Cambiar el mapa de tallas, añadir `xl` y
+- [x] **T2 [P]. Button (R1–R5).** Depende de nada. Cambiar el mapa de tallas, añadir `xl` y
   `touch: 'mobile'` (`design.md > 2`). Test nuevo `tests/unit/shared-ui/button-tallas.test.tsx`.
   Ajustar `tests/unit/login-skin.test.tsx` (enmienda a QC-30) y cualquier test que fije `h-8`/`h-7`
   en `button.tsx`. Fila `Button` del catálogo: tallas nuevas, `touch="mobile"`, `Diseño`
@@ -152,6 +152,24 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
 - `tests/unit/shared-ui/tokens-rediseno.test.ts`
 - `tests/unit/shared-ui/button-tallas.test.tsx`
 - `tests/unit/login-skin.test.tsx`
+- `tests/unit/shared-ui/button-touch.test.tsx`
+- `tests/unit/paridad/__snapshots__/asignacion-listas-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/asignacion-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/buscadores-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/campos-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/catalogo-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/clientes-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/confirmaciones-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/formularios-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/grupos-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/inventario-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/login-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/pedidos-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/presentaciones-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/proveedores-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/recetas-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/unidades-paridad.test.tsx.snap`
+- `tests/unit/paridad/__snapshots__/usuarios-paridad.test.tsx.snap`
 - `tests/unit/shared-ui/status-badge.test.tsx`
 - `tests/unit/shared-ui/order-status.test.ts`
 - `tests/unit/shared-ui/priority-mark.test.tsx`

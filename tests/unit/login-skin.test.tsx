@@ -740,7 +740,8 @@ describe('nivel 2 · contrato del marcado de la pantalla de login', () => {
     // diffear contra `origin/dev`, asi que se afirma que las clases que la piel del login podria
     // haber tentado a cambiar SIGUEN estando en el primitivo.
     expect(leerTexto('components', 'ui', 'input.tsx')).toContain('h-8');
-    expect(leerTexto('components', 'ui', 'button.tsx')).toContain('h-8');
+    // ENMIENDA QC-256: la talla por defecto del boton pasa de `h-8` a `h-9`.
+    expect(leerTexto('components', 'ui', 'button.tsx')).toContain('h-9');
     expect(leerTexto('components', 'ui', 'card.tsx')).toContain('rounded-xl');
     expect(leerTexto('components', 'ui', 'card.tsx')).toContain('[--card-spacing:--spacing(4)]');
   });
