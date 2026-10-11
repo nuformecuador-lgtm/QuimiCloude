@@ -115,8 +115,8 @@ describe('la seccion Configuración sigue siendo una y ahora tiene tres items (R
     expect(ITEMS_DE_UNIDADES[0]?.label).toBe(UNITS_LABEL);
     expect(ITEMS_DE_UNIDADES[0]?.testId).toBe('nav-unidades');
     expect(ITEMS_DE_UNIDADES[0]?.section).toBe(NAV_SECTION_CONFIGURATION);
-    // El icono es uno de los YA declarados en `NavIconName`: esta ficha no anade ninguno.
-    expect(ITEMS_DE_UNIDADES[0]?.icon).toBe('flask-conical');
+    // ENMIENDA QC-257: Unidades deja el matraz, que queda solo para Fórmulas, y pasa a la regla.
+    expect(ITEMS_DE_UNIDADES[0]?.icon).toBe('ruler');
   });
 
   it('el destino y el testId son unicos en toda la navegacion', () => {

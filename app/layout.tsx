@@ -49,7 +49,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
 
   return (
     <html
-      lang="en"
+      lang="es"
       className={`${plexSans.variable} ${plexMono.variable} h-full antialiased${
         isExplicitlyDark ? ` ${THEME_DARK_CLASS}` : ""
       }`}

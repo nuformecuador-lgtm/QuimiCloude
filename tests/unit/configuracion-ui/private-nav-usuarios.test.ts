@@ -134,7 +134,8 @@ describe('la seccion Configuración lleva presentaciones, unidades e integracion
     expect(unidades?.label).toBe(UNITS_LABEL);
     expect(unidades?.testId).toBe('nav-unidades');
     expect(unidades?.permission).toBe('unidades.consultar');
-    expect(unidades?.icon).toBe('flask-conical');
+    // ENMIENDA QC-257: Unidades deja el matraz, que queda solo para Fórmulas, y pasa a la regla.
+    expect(unidades?.icon).toBe('ruler');
   });
 
   it('el item nuevo apunta a USERS_ROUTE y declara etiqueta, testId, permiso, icono y seccion', () => {

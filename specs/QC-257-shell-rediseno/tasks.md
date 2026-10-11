@@ -15,9 +15,9 @@ código de producción. Se limpian los comentarios **de las líneas que se tocan
 
 ### T0 — Respuestas a las preguntas abiertas
 
-- [ ] Leer en `requirements.md > Preguntas abiertas` lo que respondió el humano al aprobar. Lo que
+- [x] Leer en `requirements.md > Preguntas abiertas` lo que respondió el humano al aprobar. Lo que
       no respondió vale como su propuesta.
-- [ ] Si P3 cambia (Clientes se queda en `Contact`), ajustar la tabla de R2 en T1. Si P2 cambia,
+- [x] Si P3 cambia (Clientes se queda en `Contact`), ajustar la tabla de R2 en T1. Si P2 cambia,
       usar los textos aprobados en T2. Si P7 pide esperar a QC-258 o a QC-244, parar y avisar al
       leader.
 
@@ -25,15 +25,15 @@ código de producción. Se limpian los comentarios **de las líneas que se tocan
 
 ### T1 [P] — Iconos del menú (R1, R2, R3)
 
-- [ ] `lib/shared/navigation/private-nav.ts`: añadir `'clipboard-check'`, `'ruler'` y
+- [x] `lib/shared/navigation/private-nav.ts`: añadir `'clipboard-check'`, `'ruler'` y
       `'square-user'` a `NavIconName`. Cambiar `icon` de `nav-asignacion` → `'clipboard-check'`,
       `nav-unidades` → `'ruler'` y `nav-clientes` → `'square-user'`. Nada más del array.
-- [ ] Limpiar los comentarios de las líneas tocadas, por ejemplo el que justifica reutilizar
+- [x] Limpiar los comentarios de las líneas tocadas, por ejemplo el que justifica reutilizar
       `flask-conical` en Unidades, que deja de ser cierto.
-- [ ] `lib/shared/navigation/nav-icons.ts`: filas `ClipboardCheck`, `Ruler` y `SquareUser`.
-- [ ] Test nuevo `tests/unit/shell/nav-iconos.test.ts`: R1 (sin repetidos, nivel superior e
+- [x] `lib/shared/navigation/nav-icons.ts`: filas `ClipboardCheck`, `Ruler` y `SquareUser`.
+- [x] Test nuevo `tests/unit/shell/nav-iconos.test.ts`: R1 (sin repetidos, nivel superior e
       hijos), R2 (la tabla) y R3 (etiqueta, ruta, `testId`, permiso, sección y orden).
-- [ ] Enmendar con nota `ENMIENDA QC-257` el icono de Unidades en
+- [x] Enmendar con nota `ENMIENDA QC-257` el icono de Unidades en
       `tests/unit/configuracion-ui/private-nav-usuarios.test.ts` y
       `tests/unit/configuracion-ui/private-nav-unidades.test.ts`.
 
@@ -42,26 +42,26 @@ código de producción. Se limpian los comentarios **de las líneas que se tocan
 
 ### T2 [P] — Idioma (R14, R15, R16)
 
-- [ ] `app/layout.tsx`: `lang="es"`.
-- [ ] `components/ui/sidebar.tsx`: solo los cuatro literales de `design.md > 7`. Ni clases ni
+- [x] `app/layout.tsx`: `lang="es"`.
+- [x] `components/ui/sidebar.tsx`: solo los cuatro literales de `design.md > 7`. Ni clases ni
       lógica.
-- [ ] `components/shared/CATALOGO.md`: en la fila `SidebarProvider`/`Sidebar`, poner en `Alcance`
+- [x] `components/shared/CATALOGO.md`: en la fila `SidebarProvider`/`Sidebar`, poner en `Alcance`
       que los textos del cajón y del disparador están en español, y en `Diseño` poner
       `docs/diseno/canvas/Sidebar.dc.html`.
-- [ ] Test nuevo `tests/unit/shell/idioma.test.tsx`: R14, R15 y R16.
+- [x] Test nuevo `tests/unit/shell/idioma.test.tsx`: R14, R15 y R16.
 
 **Hecho cuando:** el test pasa, y `guard-catalogo-de-componentes` y
 `guard-primitivas-ui-usan-el-cn-del-repo` siguen verdes.
 
 ### T3 [P] — Flecha de la pastilla (R4, R6, R8)
 
-- [ ] `components/private/app-sidebar.tsx`: la pastilla pinta `ChevronLeftIcon` (`size-3.5`) con
+- [x] `components/private/app-sidebar.tsx`: la pastilla pinta `ChevronLeftIcon` (`size-3.5`) con
       `transition-transform duration-(--dur-base) ease-(--ease-standard)` y `rotate-180` cuando
       `open` es `false`. Quitar los imports de `PanelLeftCloseIcon` y `PanelLeftOpenIcon`.
-- [ ] Limpiar el comentario de la pastilla en las líneas tocadas. Dice que la pastilla «no
+- [x] Limpiar el comentario de la pastilla en las líneas tocadas. Dice que la pastilla «no
       sustituye» al control del encabezado y cita R23/R31.
-- [ ] Test nuevo `tests/unit/shell/control-barra.test.tsx` (parte de la pastilla): R4, R6 y R8.
-- [ ] Enmendar con nota `ENMIENDA QC-257` el caso R39 de la pastilla en
+- [x] Test nuevo `tests/unit/shell/control-barra.test.tsx` (parte de la pastilla): R4, R6 y R8.
+- [x] Enmendar con nota `ENMIENDA QC-257` el caso R39 de la pastilla en
       `tests/unit/marca/sidebar-carril.test.ts`.
 
 **Hecho cuando:** el test nuevo y el enmendado pasan, y los demás casos de `sidebar-carril`,
@@ -69,12 +69,12 @@ código de producción. Se limpian los comentarios **de las líneas que se tocan
 
 ### T4 — Botón móvil: flecha y aspecto (R5, R6, R8, R9) · después de T3
 
-- [ ] `app/(private)/components/sidebar-toggle.tsx`: pasarle a `SidebarTrigger` el mismo
+- [x] `app/(private)/components/sidebar-toggle.tsx`: pasarle a `SidebarTrigger` el mismo
       `ChevronLeftIcon`, con `rotate-180` cuando `openMobile` es `false` (no `isExpanded`; motivo
       en `design.md > 3`). Pasarle `variant="outline"` y `className="size-11"`. El
       `aria-expanded` se queda como está.
-- [ ] Completar `tests/unit/shell/control-barra.test.tsx`: R5, R8 del botón móvil y R9.
-- [ ] Enmendar con nota `ENMIENDA QC-257` el caso R39 del encabezado en
+- [x] Completar `tests/unit/shell/control-barra.test.tsx`: R5, R8 del botón móvil y R9.
+- [x] Enmendar con nota `ENMIENDA QC-257` el caso R39 del encabezado en
       `tests/unit/marca/sidebar-carril.test.ts`.
 
 **Hecho cuando:** pasan los tests, y `sidebar-mobile`, `theme/private-header` y `sidebar-ajuste`
@@ -82,22 +82,22 @@ siguen verdes sin tocarlos.
 
 ### T5 [P] — Tooltips de la cabecera (R10–R13)
 
-- [ ] `app/(private)/components/theme-toggle.tsx` y `app/(private)/components/logout-button.tsx`:
+- [x] `app/(private)/components/theme-toggle.tsx` y `app/(private)/components/logout-button.tsx`:
       envolver el botón en `Tooltip` / `TooltipTrigger render={<Button …/>}` /
       `TooltipContent side="bottom"`, con la constante de su etiqueta como texto. El `aria-label`,
       el `data-testid`, el `<form>` y `useFormStatus` no cambian.
-- [ ] `app/(private)/layout.tsx`: envolver el `div` de la derecha de la cabecera en
+- [x] `app/(private)/layout.tsx`: envolver el `div` de la derecha de la cabecera en
       `TooltipProvider`. Limpiar los comentarios de las líneas tocadas.
-- [ ] Test nuevo `tests/unit/shell/cabecera-tooltips.test.tsx`: R10, R11 y R12 con puntero, y R13.
+- [x] Test nuevo `tests/unit/shell/cabecera-tooltips.test.tsx`: R10, R11 y R12 con puntero, y R13.
 
 **Hecho cuando:** pasan el test nuevo, `tests/unit/theme/theme-toggle.test.tsx` y
 `tests/unit/logout-button.test.tsx` sin tocarlos.
 
 ### T6 — Sol y luna (R17, R18, R19) · después de T5
 
-- [ ] `app/(private)/components/theme-toggle.tsx`: las clases de `design.md > 6`, sin
+- [x] `app/(private)/components/theme-toggle.tsx`: las clases de `design.md > 6`, sin
       `transition-none`.
-- [ ] Test nuevo `tests/unit/shell/tema-sol-luna.test.tsx`: R17 y R18.
+- [x] Test nuevo `tests/unit/shell/tema-sol-luna.test.tsx`: R17 y R18.
 
 **Hecho cuando:** pasan el test nuevo y `tests/unit/theme/*` sin tocarlos.
 

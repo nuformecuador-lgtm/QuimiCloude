@@ -164,6 +164,7 @@ export type NavIconName =
   | 'bell'
   | 'shopping-cart'
   | 'clipboard-list'
+  | 'clipboard-check'
   | 'truck'
   | 'factory'
   | 'flask-conical'
@@ -178,7 +179,9 @@ export type NavIconName =
   // organizacion, y `users` ya lo usa el item de usuarios internos. `lucide-react` ya esta
   // instalado (no es dependencia nueva) y el `Record` de `NAV_ICONS` obliga a que su fila exista.
   | 'contact'
-  | 'puzzle';
+  | 'puzzle'
+  | 'ruler'
+  | 'square-user';
 
 export type NavLink = {
   readonly kind: 'link';
@@ -253,7 +256,7 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     label: ASSIGNED_ORDERS_LABEL,
     testId: 'nav-asignacion',
     permission: 'asignaciones.consultar',
-    icon: 'clipboard-list',
+    icon: 'clipboard-check',
     section: NAV_SECTION_OPERATION,
   },
   // El dashboard va SEGUNDO, detras de «Asignación», y no primero a proposito:
@@ -356,17 +359,13 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
   // que le daria 404. Que eso siga siendo cierto lo vigila
   // `tests/unit/configuracion-ui/permisos-unidades-coherentes.test.ts` (R11): se pone rojo el dia
   // que un rol reciba exactamente uno de los dos.
-  //
-  // El icono `flask-conical` ya existe en `NavIconName` y en `NAV_ICONS`: **no se anade ninguno**.
-  // Se reutiliza a proposito —un matraz es un instrumento de MEDIDA, que es de lo que habla esta
-  // pantalla— y no colisiona dentro de la seccion, donde el otro item lleva `boxes`.
   {
     kind: 'link',
     href: UNITS_ROUTE,
     label: UNITS_LABEL,
     testId: 'nav-unidades',
     permission: 'unidades.consultar',
-    icon: 'flask-conical',
+    icon: 'ruler',
     section: NAV_SECTION_CONFIGURATION,
   },
   // QC-67 R2, R3 origino este item dentro de «Configuración», al final del array y sin tocar los
@@ -413,7 +412,7 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
     label: CUSTOMERS_LABEL,
     testId: 'nav-clientes',
     permission: 'clientes.consultar',
-    icon: 'contact',
+    icon: 'square-user',
     section: NAV_SECTION_CHAIN,
   },
   {

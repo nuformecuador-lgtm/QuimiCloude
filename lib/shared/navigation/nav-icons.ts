@@ -1,6 +1,7 @@
 import {
   Bell,
   Boxes,
+  ClipboardCheck,
   ClipboardList,
   Contact,
   Factory,
@@ -8,7 +9,9 @@ import {
   LayoutDashboard,
   Package,
   Puzzle,
+  Ruler,
   ShoppingCart,
+  SquareUser,
   Truck,
   Users,
   type LucideIcon,
@@ -40,6 +43,7 @@ export const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   bell: Bell,
   'shopping-cart': ShoppingCart,
   'clipboard-list': ClipboardList,
+  'clipboard-check': ClipboardCheck,
   truck: Truck,
   factory: Factory,
   'flask-conical': FlaskConical,
@@ -49,4 +53,6 @@ export const NAV_ICONS: Record<NavIconName, LucideIcon> = {
   users: Users,
   contact: Contact,
   puzzle: Puzzle,
+  ruler: Ruler,
+  'square-user': SquareUser,
 };

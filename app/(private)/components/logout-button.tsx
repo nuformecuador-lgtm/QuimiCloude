@@ -4,6 +4,7 @@ import { LogOutIcon } from 'lucide-react';
 import { useFormStatus } from 'react-dom';
 
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { logoutAction } from '@/lib/modules/identity/adapters/driving/logout-action';
 
 /**
@@ -34,10 +35,16 @@ export const LOGOUT_LABEL = 'Cerrar sesión';
  * objetivo tactil minimo que este repo exige.
  */
 export function LogoutButton() {
+  // El `<form>` hace de disparador y el boton no: si el estado del tooltip re-renderizara el
+  // componente que lee `useFormStatus`, `pending` volveria a `false` con el envio en curso y el
+  // boton se rehabilitaria.
   return (
-    <form action={logoutAction} data-testid="private-logout-form">
-      <LogoutSubmit />
-    </form>
+    <Tooltip>
+      <TooltipTrigger render={<form action={logoutAction} data-testid="private-logout-form" />}>
+        <LogoutSubmit />
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{LOGOUT_LABEL}</TooltipContent>
+    </Tooltip>
   );
 }
 
