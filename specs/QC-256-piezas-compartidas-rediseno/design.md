@@ -23,6 +23,8 @@ tiene índice de este worktree, ver nota al final): `StatusBadge`, `*_STATUS_LAB
 | `ScreenEnter` ya anima la entrada de pantalla en todo el layout privado | `app/(private)/components/screen-enter.tsx` | `PageShell` **no** añade otra (R27) |
 | Un `Spinner` compartido; el `Toaster` pinta su propio `Loader2Icon` | `components/shared/spinner.tsx`, `components/ui/sonner.tsx` | `Toaster` pasa a usar `Spinner` (R44) |
 | Tokens de success, warning, info y destructive (fondo suave y texto) | `app/globals.css` | Se reutilizan; se añaden solo los que faltan (§ 5) |
+| Barra de filtros de `DataTable` (QC-55): campo de búsqueda, un control suelto por filtro (menú de casillas, inputs, `DatePicker` de rango) y una X por filtro siempre visible | `components/shared/data-table/data-table-filters.tsx`, `data-table-filter-date.tsx` | Se **reescribe su aspecto** como chips (§ 7.5); la lógica de emisión (`withFilter`, `withSearch`) no cambia |
+| Enlaces «Volver a…» hechos a mano en pantallas de operario y detalle | `asignacion/empaque/[id]/…/packing-order-screen.tsx`, `asignacion/acondicionamiento/[id]/…/conditioning-order-screen.tsx`, `dashboard/recorrido/[id]/…/execution-trace-detail.tsx`, `asignacion/[id]/…/order-execution-error.tsx`, `inventario/importar/…/import-texts.ts`, `proveedores/[id]/…/catalog-line-form.tsx` | Son los consumidores identificados de `ArrowLink`; los cambian sus fichas (D7). Los «Volver» de los diálogos y «Volver a la primera página» **no** son navegación con flecha y no se tocan |
 
 **Filas de `components/shared/CATALOGO.md` consultadas y paso de la regla de decisión**
 (`docs/perfil-agentes.md > Regla de decisión para componentes`):
@@ -36,6 +38,8 @@ tiene índice de este worktree, ver nota al final): `StatusBadge`, `*_STATUS_LAB
 | `RowActionsMenu` (presentación centrada) | `RowActionsMenu`, `Dialog`, `DropdownMenu` | 2 · extiende | Prop opcional; el menú desplegable sigue igual |
 | `DataTable` (tarjetas) y `actionsColumn` (acciones como datos) | `DataTable` | 2 · extiende | Props opcionales; sin ellas, la tabla de siempre (R38) |
 | `CredentialRequirements` (estilo de regla cumplida) | `CredentialRequirements` | 2 · extiende (visual) | Cambio de aspecto del tablero `Campos` |
+| Barra de filtros en chips (`DataTable`) | `DataTable`, `DropdownMenu`, `Popover`, `DatePicker`, `Input` | 2 · extiende (visual) | La pieza ya existe; cambia su aspecto y gana «Limpiar filtros». Los controles internos se reutilizan |
+| `ArrowLink` | `Button`, `buttonVariants` | 3 · compone | `Button` no navega; `buttonVariants` sobre `Link` ya es el patrón del repo (`EmptyState`, `ErrorState`), y esta pieza le añade la flecha y su movimiento |
 | `Alert` | — (no está) | shadcn | Regla 1 de `frontend_dev`: existe en shadcn/ui; `pnpm exec shadcn add alert` |
 | `StatusBadge` | `Badge` | 3 · compone | `Badge` no tiene tonos con punto ni pulso, y cambiar sus variantes cambiaría las pantallas de hoy (R47) |
 | Mapa de pedido (`order-status.ts`) | `Badge`, `OrderDistributionLabel` | 4 · crea (sin UI) | No hay fuente compartida; tres rutas la copian |
@@ -58,6 +62,7 @@ fichas de módulo (D7) y cada una tiene ya sus consumidores:
 | `PasswordField` | login y establecer contraseña (QC-260), integraciones (QC-237 / QC-267) |
 | `PageShell`, `PageHeader` | todas las pantallas privadas (QC-261 a QC-267) |
 | `UrlTabs` | asignación (QC-265), usuarios (QC-267), inventario (QC-263) |
+| `ArrowLink` | operario: empaque y acondicionamiento (QC-265), recorrido (QC-261), importar inventario (QC-263), proveedores (QC-266) |
 
 **Nota sobre el grafo.** `list_projects` no tiene índice de este worktree (solo del repo principal
 en `dev` y de QC-226). La exploración se hizo con Grep/Read sobre el worktree.
@@ -78,7 +83,7 @@ Cambia solo el mapa de `cva`:
 | `icon` | `size-8` | `size-9` |
 | `icon-sm` | `size-7` | `size-8` |
 | `xl` (nueva) | — | `h-13 px-5 text-base font-semibold rounded-[10px]` (52) |
-| `xs`, `lg`, `icon-xs`, `icon-lg` | sin uso en `app/` | sin tocar (P3) |
+| `xs`, `lg`, `icon-xs`, `icon-lg` | sin uso en `app/` | sin tocar (D11) |
 
 `touch` pasa de `{ true, false }` a `{ true, false, mobile }`: `true` sigue siendo `touchTarget`
 (`min-h-11 min-w-11`); `mobile` es `max-md:min-h-11`. El tipo de la prop queda `boolean | 'mobile'`,
@@ -211,7 +216,7 @@ export const PASSWORD_FIELD_HIDE_LABEL = 'Ocultar la contraseña';
   `password-field-requisitos.test.tsx` con los mismos casos (enmienda a QC-21, § 10).
 - `CredentialRequirements`: regla cumplida con el texto en `foreground` y el icono en
   `--success-text`; pendiente en `muted-foreground` (`qc.css > .rule`), transición de color 200 ms.
-- Desviación del tablero: 44 px y 16 px en vez de 40 px (P5), por la regla multiplataforma.
+- Desviación del tablero: 44 px y 16 px en vez de 40 px (D12), por la regla multiplataforma.
 
 ## 5. Tokens nuevos — `app/globals.css`
 
@@ -337,6 +342,74 @@ variantes y enlaces que en el desplegable. Elegir un ítem llama a `onSelect` (o
 cierra. Base UI devuelve el foco al disparador al cerrar. Animación de la ficha del tablero: zoom de
 0,96 a 1 en 300 ms sobre velo; la trae `DialogContent`.
 
+### 7.5 Barra de filtros en chips (R52–R58, D14)
+
+Cambia el **aspecto** de `DataTableFilters`; su contrato (`DataTableFiltersProps`) y lo que emite no
+cambian. Estructura, con `qc.css > .toolbar` y `.chip`:
+
+```
+<div data-testid="data-table-filters" class="flex flex-wrap items-center gap-2">
+  [búsqueda]  [toolbarActions]
+  <div class="flex flex-wrap items-center gap-2">          ← @max-[760px]: basis-full (R58)
+    [chip col 1] [X col 1 si activo] [chip col 2] … [Limpiar filtros si hay alguno]
+  </div>
+</div>
+```
+
+- **Chip** (`data-table-filter-chip.tsx`, interno): `button` de `min-h-11`, `px-3`, `rounded-lg`,
+  `text-[13px] font-medium`, `whitespace-nowrap`.
+  - Inactivo: `border border-dashed border-input`, icono `Plus` de 16 px `aria-hidden` + etiqueta.
+  - Activo: `border-solid border-primary text-primary bg-[color-mix(in_oklch,var(--primary)_6%,var(--card))]`,
+    sin `Plus`, y el valor en `<span class="border-l border-border pl-2 font-semibold text-foreground">`.
+  - `btn-veil` (la utilidad de `globals.css`, que ya aplica el velo solo con `@media (hover: hover)`)
+    y `active:scale-[0.98]`. Transiciones las de `btn-veil`.
+  - Nombre accesible = texto visible: «Estado» o «Estado En curso» (R54).
+- **Qué abre cada chip** (R53), reutilizando los controles de hoy:
+
+  | `filter.kind` | El chip es el disparador de | `data-testid` del chip | Controles dentro (testids de hoy) |
+  | --- | --- | --- | --- |
+  | `select` | `DropdownMenu` con `DropdownMenuCheckboxItem` | `data-table-filter-<id>` (el de hoy) | `data-table-filter-option-<id>-<valor>` |
+  | `dateRange` | `DatePicker mode="range"` (su `triggerContent` pasa a ser el chip) | `data-table-filter-date-<id>` (el de hoy) | atajos `data-table-date-last-*` |
+  | `text` | `Popover` con un `Input` | `data-table-filter-chip-<id>` (nuevo) | `data-table-filter-<id>` |
+  | `numberRange` | `Popover` con dos `Input` | `data-table-filter-chip-<id>` (nuevo) | `data-table-filter-min-<id>`, `-max-<id>` |
+
+  Para `text` y `numberRange` el `Input` ya no está en la barra: hay que abrir el chip. Es el único
+  cambio de uso, y obliga a ajustar los tests que escriben directamente en esos campos (§ 10).
+- **Valor del chip** (R55): función pura `formatFilterChipValue(spec, value)` en
+  `data-table-filter-chip.tsx`, con «+N» para varias opciones, «≥»/«≤» para rangos abiertos y fechas
+  `AAAA-MM-DD` tal como viajan en `DataTableFilterValue` (no hay conversión).
+- **Quitar un filtro** (R57): la `DataTableFilterClearButton` de hoy (mismo testid y
+  `texts.clearFilter`), pintada solo si ese filtro está activo.
+- **«Limpiar filtros»** (R56): `Button variant="ghost" size="sm" touch`, testid
+  `data-table-clear-filters`, texto `texts.clearFilters` (opcional en `DataTableTexts`; por defecto
+  «Limpiar filtros»). Emite `withoutFilters(params)`, helper nuevo en `data-table-params.ts` que deja
+  `filters: {}` y no toca búsqueda, orden, página ni tamaño (igual que `withFilter`, que no toca la
+  página).
+- **Tarjetas:** la barra está fuera de los dos cuerpos de § 7.3, así que tabla y tarjetas comparten
+  los mismos chips (R39).
+
+## 7b. ArrowLink (R49–R51, D13) — `components/shared/arrow-link.tsx`
+
+```ts
+export type ArrowLinkProps = {
+  readonly href: string;
+  readonly direction: 'back' | 'forward';
+  readonly children: ReactNode;
+  readonly variant?: ButtonVariant;   // ausente: back -> 'outline', forward -> 'default'
+  readonly size?: ButtonSize;
+  readonly touch?: boolean | 'mobile';
+  readonly testId?: string;
+  readonly className?: string;
+};
+```
+
+`next/link` con `className={buttonVariants({ variant, size, touch })}`: navega y nunca es `submit`.
+Icono `ArrowLeft` delante (back) o `ArrowRight` detrás (forward) de `lucide-react`, `aria-hidden`.
+Movimiento (`qc.css > .b-back`, `.b-go`): `transition-[translate] duration-(--dur-base)
+ease-(--ease-standard)` en el icono y, dentro de `@media (hover: hover)`, `group-hover:-translate-x-[3px]`
+(back) o `group-hover:translate-x-[3px]` (forward). En back, relleno izquierdo de 10 px. Movimiento
+reducido: la regla global.
+
 ## 8. Avatar y Spinner (R40–R44)
 
 ```ts
@@ -357,10 +430,12 @@ de R44 recorre `app/` y `components/` y falla si encuentra `animate-spin` o `Loa
 
 - Nada es solo de escritorio. Sin `:hover` como única vía: el ojo, «Acciones», las pestañas y el
   menú se activan con clic, toque y teclado.
-- Objetivos de 44 px: `touch`, pestañas, ojo, «Acciones», disparador ⋯ (ya lo tenía) y paginación.
+- Objetivos de 44 px: `touch`, pestañas, ojo, «Acciones», disparador ⋯ (ya lo tenía), paginación,
+  chips de filtro (el tablero los dibuja a 40 px; suben a 44 por la misma regla que D12) y
+  «Limpiar filtros». El velo del chip y la flecha de `ArrowLink` solo se mueven con `hover: hover`.
   Ítems del menú centrado a 48 px. Campos a 16 px de letra.
 - Tarjetas por **contenedor**, no por ventana, como pide la ficha del tablero `Tabla`.
-  `touch="mobile"` y el relleno de `PageShell` van por ventana (P7).
+  `touch="mobile"` y el relleno de `PageShell` van por ventana (D16).
 - El menú centrado usa `Dialog` de Base UI (fijo, con scroll del cuerpo bloqueado), el mismo que ya
   se usa en iOS en el resto del repo. Comprobación en iOS: en el E2E a 390 px.
 - Movimiento reducido: la regla global de `globals.css` (QC-228) corta pulso, giro, indicador,
@@ -373,6 +448,7 @@ de R44 recorre `app/` y `components/` y falla si encuentra `animate-spin` o `Loa
 | QC-21 (`ayuda-visual-de-contrasena`) | `CredentialField` desaparece; sus requisitos pasan a `PasswordField` con `requirements`. R17 de QC-21 («sin mostrar/ocultar») queda superado | D5 (D12 del humano) |
 | QC-30 (`rediseno-login`) | `tests/unit/login-skin.test.tsx` fija que `button.tsx` contiene `h-8`; pasa a la talla nueva | D4 (D7 del humano) |
 | QC-232 (`componentizacion-formularios-y-acciones`) | `RowActionsMenu` y `actionsColumn` ganan props opcionales; su contrato se amplía, no cambia | D2 |
+| QC-55 (`tabla-de-datos-compartida`) | La barra de filtros pasa a chips: los filtros `text` y `numberRange` se abren desde su chip, la X de cada filtro solo aparece con el filtro activo y nace «Limpiar filtros». Los tests que escribían directamente en esos campos o daban por hecha la X abren antes el chip | D14 |
 
 ## 11. Cruce con QC-257
 
@@ -403,6 +479,23 @@ evaluación marcaba como posible cruce, **no** lo toca esta ficha.
   D12 pide uno.
 - **A7. Cambiar ya `OrderStatusBadge` por dentro para que pinte `StatusBadge`.** Un archivo, pero
   cambia de golpe pedidos, asignación y dashboard sin sus fichas (D7).
+- **A8. Chips solo para `select` y `dateRange`, dejando los `Input` de `text` y `numberRange` en la
+  barra.** No rompería ningún test, pero la barra quedaría con dos formas y el tablero dibuja todos
+  los filtros como chips. Se acepta ajustar los tests (§ 10).
+- **A9. `ArrowLink` como prop `arrow` de `Button`.** `Button` de Base UI pinta un `<button>`; para
+  navegar habría que pasarle `render={<Link />}` en cada uso y la flecha seguiría dependiendo del
+  orden de los hijos. Una pieza que ya es enlace deja claro que navega y no envía (R49).
+
+## 12b. Filas de `CATALOGO.md` de D13 y D14 (borrador para el implementer)
+
+| Pieza | Archivo | Para qué | Alcance | Puntos de extensión | Base de | Diseño |
+|---|---|---|---|---|---|---|
+| `ArrowLink` | `components/shared/arrow-link.tsx` | Enlace con forma de botón y flecha para «Volver…» e «Ir a…». | Cubre: dirección `back` (flecha delante, `outline` por defecto) y `forward` (flecha detrás, `default` por defecto), flecha que se adelanta 3 px al pasar el puntero (solo con `hover: hover`), variantes, tallas y `touch` de `Button`. No cubre: enviar formularios ni acciones sin navegación (ver `Button`), ni volver en el historial del navegador (necesita `href`). | `variant`, `size`, `touch`, `testId`, `className`. | `buttonVariants` | `docs/diseno/canvas/Botones.dc.html` |
+
+En la fila de `DataTable`, `Alcance` pasa a decir «barra de filtros en chips (punteado sin filtro,
+sólido con el valor dentro), X por filtro activo y «Limpiar filtros»» y `Puntos de extensión` gana
+`texts.clearFilters` opcional, `card`, `texts.cardActions`, `texts.closeMenu` y `actionsColumn({ menu })`;
+`Base de` gana `Popover`; `Diseño` pasa a `docs/diseno/canvas/Tabla.dc.html`.
 
 ## 13. Dependencias
 
@@ -435,3 +528,7 @@ intentara añadir un paquete, se para y se pregunta (R48).
 | R45, R46 | `tests/guards/guard-catalogo-de-componentes.test.ts` (existente) y `tests/unit/shared-ui/catalogo-qc256.test.ts` |
 | R47 | `tests/unit/marca/badges-estado.test.tsx` (existente, sin cambios) |
 | R48 | `tests/guards/guard-dependencias-aprobadas.test.ts` (existente) |
+| R49–R51 | `tests/unit/shared-ui/arrow-link.test.tsx` |
+| R52–R55, R57 | `tests/unit/shared/data-table-filters.test.tsx` (reescrito para los chips) y `tests/unit/shared-ui/data-table-filter-chip.test.ts` (`formatFilterChipValue`, R55) |
+| R56 | `tests/unit/shared/data-table-filters.test.tsx` y `tests/unit/shared/data-table-params.test.ts` (`withoutFilters`) |
+| R58 | `tests/unit/shared/data-table-filters.test.tsx` (clases de contenedor estrecho y del velo) |

@@ -74,6 +74,25 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
   *Hecho:* los tres tests unitarios y el E2E en verde; los tests de las tablas existentes en verde
   sin tocarlos (R38).
 
+- [ ] **T9d. Barra de filtros en chips (R52–R58).** Depende de T2 (talla de «Limpiar filtros») y
+  conviene después de T9b (mismo directorio). Crear `data-table-filter-chip.tsx` (chip y
+  `formatFilterChipValue`), reescribir el aspecto de `data-table-filters.tsx` según
+  `design.md > 7.5`, adaptar `data-table-filter-date.tsx` para que su disparador sea el chip, añadir
+  `withoutFilters` a `data-table-params.ts` y `clearFilters?` a `DataTableTexts`. Tests: reescribir
+  `tests/unit/shared/data-table-filters.test.tsx`; nuevo
+  `tests/unit/shared-ui/data-table-filter-chip.test.ts`; ampliar `data-table-params.test.ts`.
+  Ajustar los tests que escriben en un filtro `text`/`numberRange` sin abrir el chip o dan por hecha
+  la X (enmienda a QC-55; candidatos en «Archivos esperados», confirmar con
+  `pnpm exec vitest related --run` sobre los archivos tocados) y `e2e/pedidos-terminados.spec.ts`
+  si usa esos filtros. Fila `DataTable` actualizada (barra en chips, «Limpiar filtros»,
+  `texts.clearFilters`; `Diseño`: `Tabla.dc.html`).
+  *Hecho:* tests de la barra en verde; ningún test de pantalla en rojo por la barra.
+
+- [ ] **T10b [P]. ArrowLink (R49–R51).** Depende de T2. Crear `components/shared/arrow-link.tsx`.
+  Test nuevo `tests/unit/shared-ui/arrow-link.test.tsx`. Fila nueva `ArrowLink` (`Diseño`:
+  `Botones.dc.html`).
+  *Hecho:* test en verde.
+
 - [ ] **T10 [P]. Avatar y Spinner (R40–R44).** Depende de T1. Crear `lib/shared/ui/avatar-tone.ts`;
   `tone` en `components/ui/avatar.tsx`; `ResponsibleAvatars` lo pasa. `Spinner` con `lg` y 0,9 s;
   `components/ui/sonner.tsx` usa `Spinner`. Tests: nuevo `avatar-tone.test.ts`; ampliar
@@ -82,14 +101,15 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
   `Avisos.dc.html`).
   *Hecho:* tests en verde; Grep de `animate-spin` y `Loader2Icon` solo en `spinner.tsx`.
 
-- [ ] **T11. Catálogo (R45, R46).** Depende de T2–T10. Test nuevo
+- [ ] **T11. Catálogo (R45, R46).** Depende de T2–T10b. Test nuevo
   `tests/unit/shared-ui/catalogo-qc256.test.ts`: cada pieza de R45 y R46 tiene fila con su tablero
   en `Diseño`, y no hay fila de `CredentialField`. Revisar que ninguna fila quedó a medias.
   *Hecho:* `catalogo-qc256` y `pnpm exec vitest run guard` en verde.
 
 - [ ] **T12. Cierre.** Depende de todo. `./init.sh` en verde. Escribir `progress/impl_QC-256.md` con
-  el mapa R → test de `design.md > 14`, las enmiendas a QC-21, QC-30 y QC-232, y el aviso del DOM
-  doble de las tarjetas para las fichas de módulo.
+  el mapa R → test de `design.md > 14`, las enmiendas a QC-21, QC-30, QC-55 y QC-232, el aviso del
+  DOM doble de las tarjetas y el de los filtros que ahora se abren desde su chip, para las fichas de
+  módulo.
   *Hecho:* gate local verde y el mapa completo.
 
 ## Archivos esperados
@@ -119,6 +139,11 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
 - `components/shared/data-table/data-table-types.ts`
 - `components/shared/data-table/data-table-cards.tsx`
 - `components/shared/data-table/index.ts`
+- `components/shared/data-table/data-table-filters.tsx`
+- `components/shared/data-table/data-table-filter-chip.tsx`
+- `components/shared/data-table/data-table-filter-date.tsx`
+- `components/shared/data-table/data-table-params.ts`
+- `components/shared/arrow-link.tsx`
 - `lib/shared/ui/avatar-tone.ts`
 - `app/(private)/pedidos/components/order-status-badge.tsx`
 - `app/(private)/asignacion/components/company-orders-columns.tsx`
@@ -144,5 +169,21 @@ al final. Cada task cierra con `pnpm run typecheck`, `pnpm run lint`,
 - `tests/unit/shared-ui/responsible-avatars.test.tsx`
 - `tests/unit/shared-ui/spinner.test.tsx`
 - `tests/unit/shared-ui/catalogo-qc256.test.ts`
+- `tests/unit/shared-ui/arrow-link.test.tsx`
+- `tests/unit/shared-ui/data-table-filter-chip.test.ts`
+- `tests/unit/shared/data-table-filters.test.tsx`
+- `tests/unit/shared/data-table-filter-date.test.tsx`
+- `tests/unit/shared/data-table-params.test.ts`
+- `tests/unit/shared/data-table.test.tsx`
+- `tests/unit/shared/data-table-viewport.test.tsx`
+- `tests/unit/shared/data-table-states-sustituyen.test.tsx`
+- `tests/unit/configuracion-ui/user-table.test.tsx`
+- `tests/unit/configuracion-ui/unit-table.test.tsx`
+- `tests/unit/configuracion-ui/presentation-table.test.tsx`
+- `tests/unit/configuracion-ui/grupos/work-group-table.test.tsx`
+- `tests/ui/dashboard/execution-trace-table.test.tsx`
+- `tests/unit/recetas-ui/recipe-page.test.tsx`
+- `tests/unit/pedidos-ui/order-table.test.tsx`
+- `e2e/pedidos-terminados.spec.ts`
 - `e2e/piezas-compartidas.spec.ts`
 - `progress/impl_QC-256.md`

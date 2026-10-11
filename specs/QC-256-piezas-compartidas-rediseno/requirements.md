@@ -9,6 +9,9 @@
 > `docs/diseno/canvas/Botones.dc.html`, `Estados.dc.html`, `Campos.dc.html`, `Avisos.dc.html`,
 > `Tabla.dc.html`, `Superficies.dc.html` y `Dominio.dc.html`, más la sección «Piezas consolidadas»
 > de `docs/diseno/canvas/qc.css`.
+>
+> **Aprobado por el humano el 2026-10-10.** Sus respuestas a P1–P7 están en D10–D16; P2 y P4 amplían
+> el alcance (R49–R58).
 
 ## Alcance
 
@@ -28,6 +31,10 @@ usen sin crear nada.
 - **PageShell**, **PageHeader** y **UrlTabs** con indicador deslizante.
 - **DataTable:** acciones de fila en el menú ⋯ (D2), menú que no se corta en las últimas filas,
   tarjetas en contenedor estrecho y «Acciones» con el menú centrado en la pantalla visible.
+- **DataTable:** barra de filtros en chips (chip punteado que pasa a sólido con el valor dentro y
+  «Limpiar filtros»), que heredan todas las listas (D14).
+- **ArrowLink:** los botones de navegación «Volver…» / «Ir a…» con flecha (`b-back`, `b-go`)
+  (D13).
 - **Avatar** con color estable por persona.
 - **Spinner** único.
 - Las piezas de `qc.css > Piezas consolidadas` que aplican a piezas compartidas: color de avatar
@@ -49,10 +56,11 @@ usen sin crear nada.
 - De `qc.css > Piezas consolidadas`: `.pop.full`, `.dlg.full-m`, `.dlg-ic.success`, `.g2`/`.g3`,
   `.in.num`, `.in.has-suf`/`.suf`, `.lbox`/`.lrow`, `.num-dot`, `.pcard`/`.strip`, `.stat dd.*`,
   `.low`, `.op-hd`/`.op-ft`/`.op-t`, `.form-ft`, `.ed*` y `.seg`. Son de una pantalla o de un
-  módulo y van en su ficha. Ver P1.
-- La barra de filtros de `DataTable` en forma de chips del tablero `Tabla`. Ver P4.
-- Los botones de navegación «Volver…» / «Ir a…» con flecha (`b-back`, `b-go`). Ver P2.
+  módulo y van en su ficha (D12).
 - Cambiar la altura de `TextField` y demás campos (el canvas dibuja 40 px; el repo usa 44 px).
+- Las tallas `xs` y `lg` de `Button` (D11).
+- Sustituir los enlaces «Volver…» que ya existen en las pantallas por `ArrowLink`: va en la ficha de
+  cada módulo (D7).
 
 ## Decisiones cerradas (no reabrir)
 
@@ -67,6 +75,13 @@ usen sin crear nada.
 | D7 | Aplicar las piezas en cada pantalla queda fuera: va en las fichas de rediseño por módulo | humano (ficha QC-256, «Fuera de alcance») | — | R38, R47 |
 | D8 | Cada pieza nueva o cambio visual cita su tablero aprobado; cada pieza gana o actualiza su fila del catálogo en el mismo commit | humano, 2026-10-10 (`docs/perfil-agentes.md > Pase de diseño`, regla 12 de `frontend_dev`) | — | R45, R46 |
 | D9 | Sin dependencias nuevas. `Alert` entra con `pnpm exec shadcn add alert`, que copia código y no añade paquetes | humano, 2026-08-28 (regla 1 de `frontend_dev`: «nunca inventes componentes si los tiene shadcn/ui») | — | R48 |
+| D10 (P1) | De `qc.css > Piezas consolidadas` entran solo `.av.c6`, el spinner, `.pop.at-row`, `.dlg.menu` y `.rule`; el resto va con la ficha de la pantalla que lo pinta | humano, 2026-10-10 (aprobación del spec) | — | R33, R36, R40, R43, R25 |
+| D11 (P3) | La talla `lg` de `Button` (y `xs`) no se toca | humano, 2026-10-10 (aprobación del spec) | — | R5 |
+| D12 (P5) | `PasswordField` a 44 px de alto y 16 px de letra, no los 40 px del tablero | humano, 2026-10-10 (aprobación del spec) | — | R23 |
+| D13 (P2) | **Entran** los botones «Volver…» / «Ir a…» con flecha (`b-back`, `b-go`) como pieza compartida: «Volver» y similares son botones, no enlaces de texto (D2 del humano, tablero `Botones`) | humano, 2026-10-10 (aprobación del spec) | — | R49, R50, R51 |
+| D14 (P4) | **Entra** la barra de filtros en chips de `DataTable` (chip punteado → sólido con el valor dentro, «Limpiar filtros»; tablero `Tabla`), porque la heredan todas las listas | humano, 2026-10-10 (aprobación del spec) | QC-55 (la barra de filtros de `DataTable` y sus tests) | R52, R53, R54, R55, R56, R57, R58 |
+| D15 (P6) | Los textos del ojo para keys los pone el consumidor (`PasswordField` acepta textos propios); los decide QC-237 o la ficha de Integraciones | humano, 2026-10-10 (aprobación del spec) | — | R21 |
+| D16 (P7) | Tarjetas y acciones a todo el ancho con contenedor ≤ 760 px; `touch="mobile"` y el relleno de `PageShell` con ventana < 768 px | humano, 2026-10-10 (aprobación del spec) | — | R4, R27, R30, R34 |
 
 ## Requisitos (EARS)
 
@@ -218,39 +233,58 @@ usen sin crear nada.
 ### Catálogo, alcance y dependencias
 
 - **R45.** Cada pieza nueva de esta ficha (`Alert`, `StatusBadge`, el mapa de pedido,
-  `PriorityMark`, `Notice`, `PasswordField`, `PageShell`, `PageHeader`, `UrlTabs` y el color de
-  avatar) DEBE tener su fila en `components/shared/CATALOGO.md`, con su tablero de
+  `PriorityMark`, `Notice`, `PasswordField`, `PageShell`, `PageHeader`, `UrlTabs`, `ArrowLink` y
+  el color de avatar) DEBE tener su fila en `components/shared/CATALOGO.md`, con su tablero de
   `docs/diseno/canvas/` en la columna `Diseño`.
 - **R46.** Cada pieza existente que esta ficha extiende o cambia de aspecto (`Button`, `Tabs`,
   `Avatar`, `Toaster`, `Spinner`, `RowActionsMenu`, `DataTable`, `ResponsibleAvatars` y
   `CredentialRequirements`) DEBE actualizar su fila: puntos de extensión nuevos y su tablero en
-  `Diseño`. La fila de `CredentialField` DEBE desaparecer.
+  `Diseño`; la de `DataTable` DEBE decir además que su barra de filtros es de chips con «Limpiar
+  filtros». La fila de `CredentialField` DEBE desaparecer.
 - **R47.** Las pantallas que hoy pintan estado o prioridad con `Badge` NO DEBEN cambiar de aspecto
   por esta ficha.
 - **R48.** Esta ficha NO DEBE añadir ninguna dependencia a `package.json`.
 
+### ArrowLink: «Volver…» e «Ir a…» (tablero `Botones.dc.html`, D13)
+
+- **R49.** El sistema DEBE ofrecer un `ArrowLink` que sea un enlace real (`<a href>`, navega y no
+  envía ningún formulario) con el aspecto de `Button` (sus variantes, tallas y `touch`), y con una
+  flecha oculta a los lectores de pantalla: hacia la izquierda y delante del texto en la dirección
+  «volver», hacia la derecha y detrás del texto en la dirección «seguir».
+- **R50.** MIENTRAS el puntero esté sobre un `ArrowLink` en un dispositivo con puntero que puede
+  pasar por encima, el sistema DEBE desplazar la flecha 3 px en su dirección en 200 ms con la curva
+  estándar, y devolverla al salir; en tacto la flecha NO DEBE moverse y el enlace funciona igual.
+- **R51.** DONDE `ArrowLink` no reciba variante, el sistema DEBE pintar la dirección «volver» con la
+  variante `outline` y la dirección «seguir» con la variante `default`, y su nombre accesible DEBE
+  ser el texto visible.
+
+### Barra de filtros en chips de DataTable (tablero `Tabla.dc.html`, D14)
+
+- **R52.** El sistema DEBE pintar en la barra de filtros de `DataTable` un chip por cada columna que
+  declare filtro, con la etiqueta de la columna, un icono de añadir, borde discontinuo y al menos
+  44 px de alto MIENTRAS su filtro no esté activo.
+- **R53.** CUANDO se pulse un chip, el sistema DEBE abrir el control de su filtro: lista de casillas
+  para `select`, campo de texto para `text`, mínimo y máximo para `numberRange`, y calendario con
+  atajos para `dateRange`. Cada cambio DEBE emitir los parámetros igual que antes de esta ficha
+  (sin filtrar en el cliente y sacando la clave del filtro cuando queda vacío).
+- **R54.** MIENTRAS el filtro de un chip esté activo, el sistema DEBE pintar el chip con borde sólido
+  y el color primario, sin el icono de añadir, y mostrar el valor dentro del chip, tras un separador,
+  en peso 600; el nombre accesible del chip DEBE incluir la etiqueta y el valor.
+- **R55.** El sistema DEBE escribir el valor del chip así: `select`, la etiqueta de la opción elegida,
+  y si hay más de una, la primera seguida de «+N»; `text`, el texto; `numberRange`, «mín – máx»,
+  «≥ mín» o «≤ máx» según los extremos que haya; `dateRange`, «desde – hasta» en formato
+  `AAAA-MM-DD`.
+- **R56.** MIENTRAS haya al menos un filtro activo, el sistema DEBE pintar al final de la barra un
+  botón «Limpiar filtros»; CUANDO se pulse, DEBE quitar todos los filtros en una sola emisión,
+  conservando la búsqueda, el orden y el tamaño de página. Sin filtros activos, el botón NO DEBE
+  existir.
+- **R57.** MIENTRAS el filtro de un chip esté activo, el sistema DEBE ofrecer junto al chip el botón
+  de quitar solo ese filtro (44 × 44 px, el nombre accesible de hoy); sin filtro activo ese botón NO
+  DEBE existir.
+- **R58.** MIENTRAS el contenedor de la `DataTable` mida 760 px o menos, el sistema DEBE pintar el
+  campo de búsqueda a todo el ancho y los chips debajo, partiendo línea cuando no quepan; el velo de
+  `hover` del chip solo DEBE aplicarse en dispositivos con puntero que puede pasar por encima.
+
 ## Preguntas abiertas
 
-- **P1. Corte de «Piezas consolidadas».** La ficha dice «las piezas de `qc.css` sección Piezas
-  consolidadas que apliquen». Propuesta: entran las que usan piezas compartidas (`.av.c6`, spinner,
-  `.pop.at-row`, `.dlg.menu`, `.rule`) y el resto va con la ficha de la pantalla que las pinta
-  (lista en «Lo que NO entra»). ¿Vale el corte?
-- **P2. «Volver» y «Ir a» con flecha.** D2 pide que «Volver…» sea un botón con flecha (`b-back`), y
-  el tablero `Botones` lo dibuja con la flecha que se adelanta 3 px. La ficha no lo lista entre las
-  piezas. Propuesta: queda fuera y lo resuelve la primera ficha de módulo que lo use (sube a
-  `shared` cuando lo pida la segunda). ¿O entra aquí como extensión de `Button`?
-- **P3. Talla `lg` de `Button`.** Con `default` a 36 px, `lg` (hoy 36 px) queda igual que
-  `default`. Ninguna pantalla usa `lg` ni `xs`. Propuesta: no se tocan. ¿Se borran, o `lg` sube a
-  otra medida?
-- **P4. Barra de filtros en chips.** El tablero `Tabla` dibuja los filtros como chips de borde
-  discontinuo y «Limpiar filtros». La ficha solo pide acciones de fila y tarjetas. Propuesta: queda
-  fuera (ficha propia o la primera de módulo). ¿De acuerdo?
-- **P5. Altura del PasswordField.** El tablero `Campos` dibuja el campo a 40 px con el ojo de
-  40 × 40. Propuesta: 44 px y 16 px de letra, como `TextField`, por la regla multiplataforma
-  (`font-size` ≥ 16 px y objetivos de 44 px). ¿De acuerdo?
-- **P6. Textos del ojo para keys.** El tablero deja «Etiqueta del ojo para keys: [POR CONFIRMAR]».
-  `PasswordField` acepta textos propios (R21); los elige QC-237 o la ficha de Integraciones. No
-  bloquea esta ficha.
-- **P7. Umbral de teléfono.** El canvas cambia a tarjetas y a acciones a todo el ancho con
-  contenedor ≤ 760 px (R30, R34), y `touch="mobile"` se apoya en el ancho de la ventana < 768 px
-  (`md` de Tailwind), porque un botón no sabe en qué contenedor está. ¿Vale esa diferencia?
+Ninguna. P1–P7 las resolvió el humano al aprobar el spec (2026-10-10) y están en D10–D16.
