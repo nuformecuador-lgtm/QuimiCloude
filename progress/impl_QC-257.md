@@ -16,15 +16,49 @@
 
 ## Archivos
 
-(se completa al cerrar)
+Producción: `lib/shared/navigation/private-nav.ts`, `lib/shared/navigation/nav-icons.ts`,
+`components/private/app-sidebar.tsx`, `components/ui/sidebar.tsx` (solo 4 literales),
+`components/shared/CATALOGO.md`, `app/layout.tsx`, `app/(private)/layout.tsx`,
+`app/(private)/components/{sidebar-toggle,theme-toggle,logout-button}.tsx`.
+Tests nuevos: `tests/unit/shell/{nav-iconos.test.ts,control-barra,cabecera-tooltips,tema-sol-luna,idioma}.test.tsx`,
+`e2e/shell-rediseno.spec.ts`.
+Enmendados (`ENMIENDA QC-257`): `tests/unit/marca/sidebar-carril.test.ts`,
+`tests/unit/configuracion-ui/private-nav-{usuarios,unidades}.test.ts`, `e2e/marca-componentes.spec.ts`
+y, autorizados por el leader fuera de la lista inicial, `tests/unit/clientes-ui/private-nav-clientes.test.ts`
+y `tests/unit/pedidos-ui/pedidos-viewport.test.tsx` (R45, estrecha + caso de control).
+Sin cambios en `package.json` (`git diff origin/dev -- package.json` vacío).
 
 ## Mapa R → test
 
-(se completa al cerrar)
+| R | Test |
+|---|---|
+| R1, R2, R3 | `tests/unit/shell/nav-iconos.test.ts` |
+| R4 | `tests/unit/shell/control-barra.test.tsx` «R4 …» + R39 de `sidebar-carril.test.ts` y `e2e/marca-componentes.spec.ts` |
+| R5 | `control-barra.test.tsx` «R5 …» + R39 del encabezado en `sidebar-carril.test.ts` |
+| R6 | `control-barra.test.tsx` «R6 …» (×2) + `e2e/shell-rediseno.spec.ts` «R6 la pastilla gira…», «R6 el control de la cabecera en 390 px…» |
+| R7 | `e2e/shell-rediseno.spec.ts` «R7 al cargar e hidratar ninguna flecha gira sola» |
+| R8 | `control-barra.test.tsx` «R8 …» (ancho y angosto) |
+| R9 | `control-barra.test.tsx` «R9 …» |
+| R10, R11, R12 | `tests/unit/shell/cabecera-tooltips.test.tsx` «R10…», «R11…», «R12…», teclado; E2E «R10 R11 con el puntero…» y «… con el teclado…» (escritorio y 390 px) |
+| R13 | `cabecera-tooltips.test.tsx` «R13 …» (×3) |
+| R14 | `tests/unit/shell/idioma.test.tsx` «R14…» + E2E «R14 html[lang=es]…» (login y privada) |
+| R15, R16 | `idioma.test.tsx` «R15…», «R16…» |
+| R17 | `tests/unit/shell/tema-sol-luna.test.tsx` «R17…» (×3) + E2E «R17 al pasar a oscuro el sol sale…» |
+| R18 | `tema-sol-luna.test.tsx` «R18 …» |
+| R19 | E2E «R19 la flecha y los iconos de tema llegan al estado final sin transición medible» |
+| R20 | `tests/guards/guard-dependencias-aprobadas.test.ts` + `git diff origin/dev -- package.json` vacío |
+| R21 | Enmiendas de `design.md > 9` (lista cerrada + 2 autorizadas) y suite de CI (`gate-completo`) |
 
 ## Salida de los tests
 
-(se completa al cerrar)
+- Unit afectados (incluye todos los que fijan icono/clase tocados, aunque `init` rápido no los relacione):
+  `vitest run` de 23 archivos → `Test Files 23 passed (23) · Tests 253 passed (253)`.
+- `private-nav-clientes` + `pedidos-viewport` tras las enmiendas: 2 archivos, 33 tests en verde.
+- E2E: `pnpm exec playwright test e2e/shell-rediseno.spec.ts e2e/marca-componentes.spec.ts` →
+  `100 passed (4.6m)` (chromium y webkit). R38 con hover del control móvil sin enmendar: claro 7.16,
+  oscuro 7.27 (sin hover 18.84 / 13.76). El worktree no tiene `.env`; se cargó el de la raíz.
+- Riesgo anotado: `e2e/marca-componentes.spec.ts` guarda la sesión en `beforeAll` igual que el
+  patrón que dio redirecciones a `/login?sesion=fin` en el spec nuevo (ya corregido allí). Pasó; no se tocó.
 
 ## T3 + T4 — Control de la barra (frontend_dev)
 
@@ -122,14 +156,30 @@ enmienda `ENMIENDA QC-257` que autorice el leader.
 
 **Veredicto T5/T6:** hechas; bloqueadas en verde por la enmienda de `pedidos-viewport` que decide el leader.
 
-## Pendiente del leader (design.md > 9: lista cerrada, no se enmienda sin el leader)
+## Enmiendas autorizadas por el leader (2026-10-10)
 
-Tests fuera de la lista cerrada que quedan rojos con T1–T6 (`./init.sh` rápido sale verde porque
-no los relaciona; `gate-completo` los vería):
+Anotadas en design.md > 9 (tabla «Se enmiendan») y design.md > 5 (desviación).
+
 1. `tests/unit/clientes-ui/private-nav-clientes.test.ts` > «hay un item de NIVEL SUPERIOR cuyo
-   destino es CUSTOMERS_ROUTE»: fija `'contact'`; con D11 es `'square-user'`. Propuesta: enmienda
+   destino es CUSTOMERS_ROUTE»: icono `'contact'` → `'square-user'` (D11/P3), con nota
    `ENMIENDA QC-257`.
 2. `tests/unit/pedidos-ui/pedidos-viewport.test.tsx` > R45 «el disparador esta en el DOM y visible
-   desde el primer render, sin :hover» (375 y 1280 px): rechaza cualquier `opacity-0` en la
-   pantalla; design.md > 6 se la pone a la luna (oculta por tema, no por puntero). Propuesta:
-   enmienda que excluya el icono de tema de la cabecera.
+   desde el primer render, sin :hover»: enmienda estrecha. La comprobación vive en
+   `comprobarQueNadaDependeDelPuntero(raiz, ancho)` y excluye del chequeo de `opacity-0`/`invisible`
+   SOLO los `svg[aria-hidden="true"]` dentro de `button[aria-label=THEME_TOGGLE_LABEL]`. El chequeo
+   de `hover:` que revela no tiene excepción. Caso nuevo «un opacity-0 fuera del boton de tema sigue
+   haciendo fallar la comprobacion (R45, ENMIENDA QC-257)»: la pantalla real pasa; un `span.opacity-0`
+   inyectado y un `svg[aria-hidden].opacity-0` dentro de otro botón hacen que la función lance.
+3. Desviación aceptada (design.md > 5): el tooltip de «Cerrar sesión» se dispara desde el `<form>`
+   y no desde el botón; desde el botón, un re-render del tooltip devolvía `pending` a `false`
+   durante el envío y rompía `logout-button.test.tsx`. Botón, `aria-label`, `data-testid` y
+   `useFormStatus` no cambian.
+
+## T8 — Cierre (2026-10-10)
+
+- `./init.sh --completo` (con el `.env` de la raíz cargado; el worktree no tiene `.env`):
+  `Test Files 1 failed | 1120 passed (1121) · Tests 1 failed | 16843 passed | 139 skipped`. El único
+  rojo era `tests/guards/guard-identificador-de-request.test.ts` (R21: lista cerrada de specs E2E).
+  Se dio de alta `shell-rediseno.spec.ts` en ella, que es su punto de extensión, como hicieron
+  QC-227/QC-228. Tras el alta: `1 passed (23 tests)`. Archivo fuera de la lista esperada: ese.
+- `./init.sh` rápido: ver la salida de la tanda 2 en `progress/features/QC-257.md`.

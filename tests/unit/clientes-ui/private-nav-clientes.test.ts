@@ -70,7 +70,9 @@ describe('la navegacion privada lleva a clientes (R4)', () => {
     expect(ITEMS_DE_CLIENTES[0]?.label).toBe(CUSTOMERS_LABEL);
     expect(ITEMS_DE_CLIENTES[0]?.testId).toBe('nav-clientes');
     expect(ITEMS_DE_CLIENTES[0]?.permission).toBe('clientes.consultar');
-    expect(ITEMS_DE_CLIENTES[0]?.icon).toBe('contact');
+    // ENMIENDA QC-257: el icono de Clientes pasa de 'contact' a 'square-user' (decision humana
+    // D11/P3; autorizada por el leader el 2026-10-10).
+    expect(ITEMS_DE_CLIENTES[0]?.icon).toBe('square-user');
     expect(ITEMS_DE_CLIENTES[0]?.section).toBe(NAV_SECTION_CHAIN);
   });
 

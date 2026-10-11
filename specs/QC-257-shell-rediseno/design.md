@@ -159,6 +159,11 @@ Se reutiliza el primitivo `Tooltip` de `components/ui/tooltip.tsx` (Base UI). Si
 - **Movimiento:** el del primitivo, que ya cumple QC-228 R8 (`--dur-fast`, entrada y salida).
 - **Multiplataforma:** el tooltip **no** es la única vía. El icono y el nombre accesible siguen
   ahí, y en táctil no hace falta que abra. Cumple «`:hover` nunca es la única forma».
+- **Desviación aceptada por el leader (2026-10-10), «Cerrar sesión»:** el tooltip se dispara desde
+  el `<form>` y no desde el botón. Disparado desde el botón, un re-render del tooltip devolvía
+  `pending` a `false` durante el envío y rompía `logout-button.test.tsx`. El botón
+  (`<button type="submit">`), su `aria-label`, su `data-testid` y `useFormStatus` en `LogoutSubmit`
+  no cambian.
 
 ## 6. Sol y luna (R17–R19)
 
@@ -237,6 +242,8 @@ verde.
 | `e2e/marca-componentes.spec.ts` | R39 (pastilla y encabezado) | Mismo cambio de clases. Los casos R38 no cambian: miden caja y contraste del icono, no su nombre. Si el contraste de R38 con hover cambia por pasar a `outline`, se mide y se anota (es el velo de QC-228 R17) |
 | `tests/unit/configuracion-ui/private-nav-usuarios.test.ts` | Línea que fija el icono de Unidades | `'flask-conical'` → `'ruler'` |
 | `tests/unit/configuracion-ui/private-nav-unidades.test.ts` | Caso que fija el icono de Unidades | `'flask-conical'` → `'ruler'` |
+| `tests/unit/clientes-ui/private-nav-clientes.test.ts` | «hay un item de NIVEL SUPERIOR cuyo destino es CUSTOMERS_ROUTE» | Icono de Clientes `'contact'` → `'square-user'` (D11/P3). Autorizada por el leader el 2026-10-10 |
+| `tests/unit/pedidos-ui/pedidos-viewport.test.tsx` | R45 «el disparador esta en el DOM y visible desde el primer render, sin :hover» (cada viewport) | Enmienda estrecha: la comprobación se factoriza en `comprobarQueNadaDependeDelPuntero` y excluye del chequeo de `opacity-0`/`invisible` SOLO los `svg[aria-hidden="true"]` dentro del botón «Cambiar tema» (`THEME_TOGGLE_LABEL`). Caso nuevo «un opacity-0 fuera del boton de tema sigue haciendo fallar la comprobacion (R45, ENMIENDA QC-257)» que demuestra que cualquier otro `opacity-0` sigue en rojo. Autorizada por el leader el 2026-10-10 |
 
 Si el implementer encuentra otro test que fije un icono, un texto o una clase que esta ficha
 cambia, **para y lo anota** en `progress/impl_QC-257.md`. No lo enmienda sin pasar por el leader:

@@ -103,9 +103,9 @@ siguen verdes sin tocarlos.
 
 ### T7 — E2E (R6, R7, R10, R11, R14, R17, R19) · después de T1–T6
 
-- [ ] `e2e/shell-rediseno.spec.ts` con los casos de `design.md > 9`.
-- [ ] Enmendar con nota `ENMIENDA QC-257` los casos R39 de `e2e/marca-componentes.spec.ts`.
-- [ ] Correr solo esos dos: `pnpm exec playwright test e2e/shell-rediseno.spec.ts
+- [x] `e2e/shell-rediseno.spec.ts` con los casos de `design.md > 9`.
+- [x] Enmendar con nota `ENMIENDA QC-257` los casos R39 de `e2e/marca-componentes.spec.ts`.
+- [x] Correr solo esos dos: `pnpm exec playwright test e2e/shell-rediseno.spec.ts
       e2e/marca-componentes.spec.ts`.
 
 **Hecho cuando:** los dos specs pasan en local. Si el contraste de R38 con hover del control móvil
@@ -114,12 +114,12 @@ al leader. No se enmienda.
 
 ### T8 — Cierre
 
-- [ ] `./init.sh` en verde.
-- [ ] `progress/impl_QC-257.md` con el mapa `R1…R21 → test`. R20 apunta a
+- [x] `./init.sh` en verde.
+- [x] `progress/impl_QC-257.md` con el mapa `R1…R21 → test`. R20 apunta a
       `tests/guards/guard-dependencias-aprobadas.test.ts` más `git diff origin/dev -- package.json`
       vacío. R21 apunta a la lista de enmiendas de `design.md > 9` y a la suite de CI
       (`gate-completo`).
-- [ ] Revisar que el diff solo toca los archivos de abajo.
+- [x] Revisar que el diff solo toca los archivos de abajo.
 
 **Hecho cuando:** `./init.sh` está verde, el mapa está completo y no hay archivos fuera de la
 lista.

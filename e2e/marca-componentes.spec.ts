@@ -55,8 +55,18 @@ const USER_INITIALS_TESTID = 'private-user-initials';
 const EDGE_TOGGLE_TESTID = 'private-sidebar-edge-toggle';
 const HEADER_TOGGLE_TESTID = 'private-sidebar-toggle';
 
-const OPEN_ICON_CLASS = 'lucide-panel-left-open';
-const CLOSE_ICON_CLASS = 'lucide-panel-left-close';
+// ENMIENDA QC-257 (D2): los dos controles pintan una sola flecha que gira. «Abrir» es la flecha
+// con `rotate-180` (apunta a la derecha) y «cerrar», la misma sin giro. Antes eran dos iconos,
+// `lucide-panel-left-open` y `lucide-panel-left-close`.
+const ARROW_ICON_CLASS = 'lucide-chevron-left';
+const OPEN_ROTATION_CLASS = 'rotate-180';
+
+/** Clases del icono del control: la flecha, y girada solo cuando el control abre. */
+function expectArrow(iconClasses: string, opens: boolean, what: string): void {
+  const classes = iconClasses.split(/\s+/);
+  expect.soft(classes, `${what}: no es la flecha`).toContain(ARROW_ICON_CLASS);
+  expect.soft(classes.includes(OPEN_ROTATION_CLASS), `${what}: giro de la flecha`).toBe(opens);
+}
 
 /** Por `data-sidebar`: los items con submenu llevan el `data-slot` de su disparador. */
 const CONTENT_BUTTONS = '[data-slot="sidebar-content"] [data-sidebar="menu-button"]';
@@ -823,13 +833,14 @@ for (const theme of THEMES) {
         const before = await iconClass(page, EDGE_TOGGLE_TESTID);
         log(`${theme} R39 pastilla ${state} clase="${before}"`);
         await expect(toggle).toHaveAttribute('aria-expanded', String(!collapsed));
-        expect.soft(before).toContain(collapsed ? OPEN_ICON_CLASS : CLOSE_ICON_CLASS);
+        // ENMIENDA QC-257: flecha girada con el panel colapsado (abre), sin giro con el expandido.
+        expectArrow(before, collapsed, `${theme} R39 pastilla ${state}`);
 
         await toggle.click();
         await expect(toggle).toHaveAttribute('aria-expanded', String(collapsed));
         const after = await iconClass(page, EDGE_TOGGLE_TESTID);
         log(`${theme} R39 pastilla tras pulsar clase="${after}"`);
-        expect.soft(after).toContain(collapsed ? CLOSE_ICON_CLASS : OPEN_ICON_CLASS);
+        expectArrow(after, !collapsed, `${theme} R39 pastilla tras pulsar`);
         await context.close();
       });
     }
@@ -865,13 +876,14 @@ for (const theme of THEMES) {
 
       const before = await iconClass(page, HEADER_TOGGLE_TESTID);
       log(`${theme} R39 encabezado cerrado clase="${before}"`);
-      expect.soft(before).toContain(OPEN_ICON_CLASS);
+      // ENMIENDA QC-257: flecha girada con el panel cerrado (abre), sin giro al abrirlo.
+      expectArrow(before, true, `${theme} R39 encabezado cerrado`);
 
       await toggle.click();
       await expect(toggle).toHaveAttribute('aria-expanded', 'true');
       const after = await iconClass(page, HEADER_TOGGLE_TESTID);
       log(`${theme} R39 encabezado abierto clase="${after}"`);
-      expect.soft(after).toContain(CLOSE_ICON_CLASS);
+      expectArrow(after, false, `${theme} R39 encabezado abierto`);
       await context.close();
     });
   });

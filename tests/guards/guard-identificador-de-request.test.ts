@@ -351,6 +351,11 @@ export const E2E_ESPERADOS = [
   // navegador real las cajas del carril colapsado y el icono de los controles de colapso. No lee
   // ni afirma nada sobre el identificador de peticion ni sobre `reference`.
   'marca-componentes.spec.ts',
+  // Alta el 2026-10-10 (QC-257, enmienda permitida: es el punto de extension de la lista). Mide en
+  // navegador real el giro de la flecha del control de la barra, los tooltips de la cabecera, el
+  // lang del documento y el cruce sol/luna. No lee ni afirma nada sobre el identificador de
+  // peticion ni sobre `reference`.
+  'shell-rediseno.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
