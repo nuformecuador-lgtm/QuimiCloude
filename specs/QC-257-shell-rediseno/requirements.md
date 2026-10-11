@@ -52,6 +52,15 @@ móvil, los tooltips de la cabecera y la transición del icono de tema.
 | D6 | Lo demás del canvas queda aprobado. Cada pantalla se adapta a escritorio, tablet y teléfono | humano, 2026-10-10 (D14) | — | R9 |
 | D7 | El control de la cabecera queda solo en móvil y la pastilla del borde solo en escritorio («existen 2 botones para contraer el sidebar, quita el de la cabecera») | humano, 2026-09-02 (registrada en `app/(private)/layout.tsx`) | — | R8, R9 |
 | D8 | Sin dependencias nuevas: `lucide-react` y `@base-ui/react` ya están instalados | humano (encargo del spec) | — | R20 |
+| D9 (P1) | Se edita `components/ui/sidebar.tsx`, **solo** en sus cuatro literales de texto (título y descripción del `Sheet`, `sr-only` del disparador, `aria-label` y `title` del carril). Ni clases ni comportamiento | humano, 2026-10-10 (aprobación del spec) | R21 y R48 de los specs del layout privado («el primitivo no se edita») | R15, R16 |
+| D10 (P2) | Textos del `Sheet` móvil: título «Menú», descripción «Navegación principal de QuimiCloude.» | humano, 2026-10-10 (aprobación del spec) | — | R15 |
+| D11 (P3) | Clientes pasa a `SquareUser`, como el canvas. QC-244 ajustará su icono | humano, 2026-10-10 (aprobación del spec) | — | R2 |
+| D12 (P4) | Los tres botones de la cabecera miden 44 × 44 px (no los 40 px del tablero) | humano, 2026-10-10 (aprobación del spec) | — | R9 |
+| D13 (P5) | La pastilla del borde no cambia de forma; solo su icono | humano, 2026-10-10 (aprobación del spec) | — | R4, R8 |
+| D14 (P6) | El plegado automático a modo icono en tablet queda fuera de esta ficha | humano, 2026-10-10 (aprobación del spec) | — | — (fuera de alcance) |
+| D15 (P7) | El orden de integración con QC-258 y QC-244 lo decide el leader | humano, 2026-10-10 (aprobación del spec) | — | — (proceso) |
+| D16 (P8) | El «Close» en inglés de `Sheet` y `Dialog` queda fuera; va en la ficha de textos generales (D9 de `progress/rediseno.md`) | humano, 2026-10-10 (aprobación del spec) | — | — (fuera de alcance) |
+| D17 (P9) | D11 de `progress/rediseno.md` aprueba la flecha también en el botón móvil, aunque el tablero dibuje un icono de panel. No hace falta un tablero nuevo | humano, 2026-10-10 (aprobación del spec) | Icono de panel de `Superficies.dc.html` y `Pedidos.dc.html` | R5 |
 
 ## Requisitos (EARS)
 
@@ -138,7 +147,7 @@ formulario de cierre de sesión y deja el botón deshabilitado mientras envía.
 y privadas.
 
 **R15.** MIENTRAS el panel móvil del menú está abierto, el sistema DEBE exponer como nombre
-accesible del panel «Menú» y como descripción un texto en español (propuesta en P2).
+accesible del panel «Menú» y como descripción «Navegación principal de QuimiCloude.» (D10).
 
 **R16.** El sistema NO DEBE exponer textos en inglés en el disparador ni en el carril del
 primitivo de la barra lateral: su texto para lectores de pantalla, su `aria-label` y su `title`
@@ -171,58 +180,11 @@ enmienda (lista cerrada en `design.md > 9`).
 ### Cobertura de las decisiones cerradas
 
 D1→R1, R2, R3 · D2→R4, R5, R6, R7 · D3→R14, R15, R16 · D4→R10, R11, R12, R13 · D5→R17, R18, R19 ·
-D6→R9 · D7→R8, R9 · D8→R20.
+D6→R9 · D7→R8, R9 · D8→R20 · D9→R15, R16 · D10→R15 · D11→R2 · D12→R9 · D13→R4, R8 · D17→R5.
+D14, D15 y D16 no llevan requisito: dejan algo fuera de alcance o son de proceso.
 
 ## Preguntas abiertas
 
-Cada una lleva una propuesta por defecto. Si el humano aprueba el spec sin responderla, vale la
-propuesta.
-
-**P1. Editar el primitivo `components/ui/sidebar.tsx`.** La regla que cita `app/(private)/layout.tsx`
-(R21 y R48 de los specs del layout privado) dice que el primitivo no se edita y se compone por
-`className`. Los textos en inglés de R15 y R16 están escritos dentro del primitivo y no hay prop ni
-`className` que los cambie desde fuera. **Propuesta:** se edita el primitivo, **solo** en sus cuatro
-literales de texto (título y descripción del `Sheet`, texto `sr-only` del disparador, `aria-label`
-y `title` del carril). Ninguna clase ni comportamiento cambia. Ya hay precedente: QC-227 (P13) y
-QC-228 tocaron ese archivo. Alternativas descartadas en `design.md > 10`.
-
-Efecto a saber: los textos nuevos del primitivo valen para cualquier consumidor del `Sidebar`. Hoy
-el único es la barra privada.
-
-**P2. Textos del `Sheet` móvil.** **Propuesta:** título «Menú» (es el `aria-label` del panel móvil en
-`Superficies.dc.html`) y descripción «Navegación principal de QuimiCloude.». Los dos son solo para
-lectores de pantalla (`sr-only`).
-
-**P3. Icono de Clientes.** El canvas (`Sidebar.dc.html`, icono `clientes`) dibuja una persona dentro
-de un cuadrado, que es `SquareUser`; hoy es `Contact` (una tarjeta de agenda). `Contact` ya era
-único, así que no hace falta cambiarlo para cumplir R1. **Propuesta:** `SquareUser`, como el canvas
-aprobado (D6). Ojo: QC-244 (pendiente, sin asignar) convierte Clientes en grupo y su ficha cita el
-icono `contact`; la que llegue segunda adapta ese dato.
-
-**P4. Tamaño de los botones de la cabecera.** La nota de `Superficies.dc.html` dice «a 40 px con
-objetivo de 44 px». Hoy «Cambiar tema» y «Cerrar sesión» miden 44 px y tienen tests que lo fijan.
-**Propuesta:** los tres botones a 44 × 44 px (se mantiene lo de hoy y el control móvil sube de 32 a
-44 px, que además cumple el objetivo táctil del repo).
-
-**P5. Forma de la pastilla del borde.** El canvas la pinta redonda, de 28 px y con fondo de tarjeta.
-La de hoy es cuadrada con radio de 10 px y fondo del panel, con colores fijados por QC-227 R38.
-**Propuesta:** esta ficha solo cambia el icono; la forma se queda como está.
-
-**P6. Plegado automático en tablet.** El canvas pliega la barra a modo icono por debajo de 1100 px
-sin que nadie la toque. **Propuesta:** fuera de esta ficha. Si se quiere, va en una ficha propia,
-porque cambia el estado que guarda la cookie de la barra.
-
-**P7. Choque de archivos con otras fichas.** `app/layout.tsx` también lo tocará QC-258
-(`theme_color` / `viewport` en la metadata), y `lib/shared/navigation/private-nav.ts` lo tocará
-QC-244. Esta ficha solo cambia una línea en cada uno (`lang` y tres valores `icon`). **Propuesta:**
-que las tome la persona que tenga esta ficha en vuelo, o que se ordenen; decide el leader con
-`scripts/archivos-en-vuelo.mjs`.
-
-**P8. «Close» en inglés de `Sheet` y `Dialog`.** El catálogo lo anota en las filas de los dos
-primitivos. En el menú móvil el botón X está oculto, así que no se ve ni se anuncia. **Propuesta:**
-fuera de esta ficha; entra en la de textos generales (D9 de `progress/rediseno.md`).
-
-**P9. Tablero del control móvil.** `Superficies.dc.html` y `Pedidos.dc.html` pintan el botón móvil
-con un icono de panel. La flecha que gira sale de la pastilla de `Sidebar.dc.html` y de D2 (el
-humano pidió aplicarla a los dos controles). **Propuesta:** D2 vale como aprobación del cambio
-visual y no hace falta un tablero nuevo para el botón móvil.
+Ninguna. El humano aprobó el spec el 2026-10-10 con los valores propuestos. Las antiguas P1–P9
+son las decisiones D9–D17 (la columna `#` conserva su número `P`, porque `design.md` y el texto de
+arriba las citan así).
