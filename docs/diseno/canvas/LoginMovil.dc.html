@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Iniciar sesión en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="Login" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Iniciar sesión · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">ui/card · ui/input · ui/label · shared/password-field · shared/brand-logo · shared/submit-button · ui/sonner</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">@base-ui/react · sonner · lucide-react</span> · ninguna nueva</dd>
+      <dt>Escritorio</dt><dd>Fondo de marca (degradado de la barra lateral) con moléculas girando lento · tarjeta de 400 px centrada con isotipo y marca en el h1 · campos de 48 px · «Entrar» táctil de 44 px a todo el ancho</dd>
+      <dt>Tablet</dt><dd>Igual que escritorio; la tarjeta queda centrada con aire alrededor</dd>
+      <dt>Teléfono</dt><dd>Tarjeta a ancho completo menos 16 px de margen · ojo de la contraseña de 44 px · «¿Olvidaste tu contraseña?» con objetivo de 44 px · el toast sube desde abajo a ancho casi completo</dd>
+      <dt>Animación</dt><dd>Entrada escalonada de los campos 300 ms · moléculas giran 40–90 s (se paran con movimiento reducido) · ojo: la barra se dibuja en 200 ms · «Entrando…» con spinner · toast «Usuario o contraseña incorrectos.» 300/150 ms</dd>
+      <dt>Por confirmar</dt><dd>«¿Olvidaste tu contraseña?» enlaza a <span class="mono">/recuperar-contrasena</span>, que no existe: falta la ruta o se quita el enlace · hoy la contraseña no tiene ojo (se añade PasswordField) · hoy el botón no tiene talla táctil · precargar el logo (LCP)</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Empaque del pedido</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="scroller" style="padding-bottom: 112px">
+    <header class="op-hd">
+      <div style="max-width: 1064px; margin: 0 auto; padding: 12px 20px 14px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px">
+          <a class="b b-out b-back b-touch" href="Asignacion.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver a «Por empacar»</a>
+          <button class="b b-out b-ico b-touch" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span></button>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap">
+          <div class="ph-t" style="gap: 2px"><span class="mono cap">2026-0000004</span><h1 class="op-t">Limpiador multiusos limón</h1></div>
+          <span class="{{ stCls }}"><i></i>{{ st }}</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="enter" style="max-width: 1064px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; gap: 20px">
+      <sc-if value="{{ busy }}" hint-placeholder-val="{{ false }}">
+        <div class="nt n-i" role="status"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg><span>Lo está empacando otra persona.</span></div>
+      </sc-if>
+      <div class="cq-2" style="display: grid; grid-template-columns: 300px minmax(0, 720px); gap: 20px 24px; justify-content: center; align-items: start">
+        <section class="card" style="padding: 18px; gap: 14px" aria-labelledby="em-rep">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 15px"><span class="dim">Cantidad:</span><span class="mono strong" style="font-size: 18px">80,50 kg</span></div>
+          <div class="sep" style="margin: 0"></div>
+          <h2 id="em-rep" class="h3">Reparto</h2>
+          <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 15px">
+            <li style="display: flex; align-items: center; gap: 12px"><span class="thumb"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"></path></svg></span><span style="display: flex; flex-direction: column"><span class="strong">Galón 3,78 L</span><span class="cap"><span class="mono">22</span> envases</span></span></li>
+          </ul>
+        </section>
+
+        <section class="card" style="padding: 18px" aria-labelledby="em-pasos">
+          <h2 id="em-pasos" class="h2">Pasos de envasado</h2>
+          <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0">
+            <sc-for list="{{ pasos }}" as="p" hint-placeholder-count="3">
+              <li style="display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 14px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 16px; line-height: 1.5"><span class="num-dot mono">{{ p.n }}</span><span>{{ p.t }}</span></li>
+            </sc-for>
+          </ol>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <footer class="op-ft">
+    <div style="max-width: 1064px; margin: 0 auto">
+      <div class="cq-2" style="display: grid; grid-template-columns: 300px minmax(0, 720px); gap: 0 24px; justify-content: center">
+        <div></div>
+        <div class="g2">
+          <button class="{{ comCls }}" type="button" disabled="{{ comDis }}" onClick="{{ askStart }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg>Comenzar</button>
+          <button class="{{ terCls }}" type="button" disabled="{{ terDis }}" onClick="{{ askEnd }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>Terminar</button>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <div class="{{ startCls }}" role="alertdialog" aria-modal="true" aria-labelledby="em-s">
+    <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg></div>
+    <h2 id="em-s" class="h2">¿Comenzar el empaque?</h2>
+    <p class="sub"><span class="mono">2026-0000004</span> · Limpiador multiusos limón · [DESCRIPCIÓN DEL DIÁLOGO]</p>
+    <div class="actions"><button class="b b-out b-touch" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri b-touch" type="button" onClick="{{ doStart }}">Comenzar</button></div>
+  </div>
+
+  <div class="{{ endCls }}" role="alertdialog" aria-modal="true" aria-labelledby="em-t">
+    <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg></div>
+    <h2 id="em-t" class="h2">¿Terminar el empaque?</h2>
+    <p class="sub"><span class="mono">2026-0000004</span> · Limpiador multiusos limón · [DESCRIPCIÓN DEL DIÁLOGO]</p>
+    <div class="actions"><button class="b b-out b-touch" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri b-touch" type="button" onClick="{{ doEnd }}">Terminar</button></div>
+  </div>
+
+  <div class="toastwrap" aria-live="polite" style="bottom: 104px"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastText }}</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"ocupado":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); }
+toast(text) { clearTimeout(this.t); this.setState({ toast: text }); this.t = setTimeout(() => this.setState({ toast: null }), 3200); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const busy = !!this.props.ocupado;
+const phase = s.phase || 'por';
+const ST = { por: ['Por empacar', 'waiting'], en: ['En empaque', 'progress'], fin: ['Por acondicionar', 'waiting'] };
+const canStart = !busy && phase === 'por';
+const canEnd = !busy && phase === 'en';
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+busy: busy,
+st: ST[phase][0], stCls: 'sb t-' + ST[phase][1],
+pasos: ['[PASO DE ENVASADO DE LA RECETA]', '[PASO DE ENVASADO DE LA RECETA]', '[PASO DE ENVASADO DE LA RECETA]'].map((t, i) => ({ n: i + 1, t: t })),
+comCls: canStart ? 'b b-pri b-xl' : 'b b-out b-xl', comDis: !canStart,
+terCls: canEnd ? 'b b-pri b-xl' : 'b b-out b-xl', terDis: !canEnd,
+askStart: () => { if (canStart) this.setState({ dlg: 'start' }); },
+askEnd: () => { if (canEnd) this.setState({ dlg: 'end' }); },
+doStart: () => this.setState({ dlg: null, phase: 'en' }),
+doEnd: () => { this.setState({ dlg: null, phase: 'fin' }); this.toast('[Empaque terminado.]'); },
+startCls: s.dlg === 'start' ? 'dlg open' : 'dlg',
+endCls: s.dlg === 'end' ? 'dlg open' : 'dlg',
+ovCls: s.dlg ? 'ov open' : 'ov',
+closeAll: () => this.setState({ dlg: null }),
+toastCls: s.toast ? 'toast show' : 'toast', toastText: s.toast || ''
+};
+}
+}
+</script>
+</body>
+</html>

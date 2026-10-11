@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Presentaciones en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="Presentaciones" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Presentaciones · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">presentation-table · presentation-sheet · presentation-form · delete-presentation-dialog · presentation-row-actions · shared/data-table · row-actions-menu · form-sheet · text-field · presentation-unit-select · delete-confirm-dialog · ui/sonner</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">@tanstack/react-table · @base-ui/react</span> (Menu, AlertDialog, Sheet, Select) · <span class="mono">sonner · lucide-react</span></dd>
+      <dt>Escritorio</dt><dd>Tabla corta (Nombre · Contenido · ⋯) limitada a 760 px para no estirar dos columnas · Contenido alineado a la derecha en mono, «Sin contenido» atenuado · ⋯ con Editar y Eliminar</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono · misma tabla</dd>
+      <dt>Teléfono</dt><dd>Tarjetas con nombre y contenido · «Acciones» centrado con objetivos de 48 px · Sheet a pantalla completa · campo Contenido con la unidad como sufijo</dd>
+      <dt>Animación</dt><dd>Entrada escalonada · Select de Unidad 200/150 ms · al eliminar, la tabla se funde · toasts «Presentación creada.», «Presentación actualizada.», «Presentación eliminada.»</dd>
+      <dt>Por confirmar</dt><dd>Formato de las opciones del Select de Unidad (se muestran como «Litro (L)»)</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

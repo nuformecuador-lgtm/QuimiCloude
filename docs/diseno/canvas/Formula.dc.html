@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Fórmula</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="formulas" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div class="ph">
+          <div class="ph-t" style="gap: 12px"><a class="b b-out b-back b-touch-m" href="Formulas.dc.html" style="align-self: flex-start"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver a la lista</a><h1 class="h1">{{ title }}</h1></div>
+        </div>
+
+        <div class="cq-stack" style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap">
+          <div style="flex: 3 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+
+            <section class="card" aria-labelledby="fm-g">
+              <h2 id="fm-g" class="h2">[Datos de la receta]</h2>
+              <div class="drop row" role="button" tabindex="0" aria-label="Imagen"><span class="thumb lg photo"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: oklch(0.38 0.06 190)"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg></span><span style="display: flex; flex-direction: column; gap: 2px"><span class="fl">Imagen</span><span class="cap">Arrastra la imagen aquí o haz clic para elegirla</span></span></div>
+              <div class="f"><label for="fm-n">Nombre</label><input id="fm-n" class="in" type="text" value="Desengrasante alcalino"></div>
+              <div class="f"><label for="fm-d">Descripción</label><textarea id="fm-d" class="in" rows="2">Para superficies de cocina industrial.</textarea></div>
+            </section>
+
+            <section class="card" aria-labelledby="fm-i">
+              <div class="card-hd"><h2 id="fm-i" class="h2">Ingredientes y herramientas</h2>
+                <div class="tabs" role="tablist" aria-label="Ingredientes y herramientas"><button class="tab" type="button" role="tab" aria-selected="{{ tabIng }}" onClick="{{ showIng }}">Ingredientes<span class="count mono">{{ ingCount }}</span></button><button class="tab" type="button" role="tab" aria-selected="{{ tabTool }}" onClick="{{ showTool }}">Herramientas<span class="count mono">{{ toolCount }}</span></button></div>
+              </div>
+              <sc-if value="{{ isIng }}" hint-placeholder-val="{{ true }}">
+                <div class="fade" role="tabpanel" style="display: flex; flex-direction: column; gap: 10px">
+                  <div class="hide-m" style="display: flex; gap: 10px; font-size: 12px; font-weight: 600; color: var(--muted-fg)"><span style="flex: 1 1 260px">Producto</span><span style="flex: 0 0 110px">Porcentaje</span><span style="flex: 1 0 140px; text-align: right">Cantidad (base 1000 g)</span><span style="flex: 0 0 36px"></span></div>
+                  <sc-for list="{{ ings }}" as="g" hint-placeholder-count="3">
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap">
+                      <label class="wrap-ic" style="flex: 1 1 260px; min-width: 0"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="text" value="{{ g.name }}" placeholder="Elegir producto" aria-label="Producto"></label>
+                      <input class="in mono num" type="text" value="{{ g.pct }}" aria-label="Porcentaje" style="flex: 0 0 110px">
+                      <span class="mono dim" style="flex: 1 0 140px; text-align: right">{{ g.qty }}</span>
+                      <button class="b b-gho b-ico" type="button" aria-label="{{ g.label }}" onClick="{{ g.remove }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+                    </div>
+                  </sc-for>
+                  <button class="b b-dash" type="button" onClick="{{ addIng }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Añadir ingrediente</button>
+                </div>
+              </sc-if>
+              <sc-if value="{{ isTool }}" hint-placeholder-val="{{ false }}">
+                <div class="fade" role="tabpanel" style="display: flex; flex-direction: column; gap: 10px">
+                  <div class="hide-m" style="display: flex; gap: 10px; font-size: 12px; font-weight: 600; color: var(--muted-fg)"><span style="flex: 1 1 260px">[Herramienta]</span><span style="flex: 0 0 110px">Cantidad</span><span style="flex: 0 0 36px"></span></div>
+                  <sc-for list="{{ tools }}" as="t" hint-placeholder-count="2">
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap">
+                      <label class="wrap-ic" style="flex: 1 1 260px; min-width: 0"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="text" value="{{ t.name }}" aria-label="[Herramienta]"></label>
+                      <input class="in mono num" type="text" value="{{ t.qty }}" aria-label="Cantidad" style="flex: 0 0 110px">
+                      <button class="b b-gho b-ico" type="button" aria-label="{{ t.label }}" onClick="{{ t.remove }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+                    </div>
+                  </sc-for>
+                  <button class="b b-dash" type="button" onClick="{{ addTool }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>[Añadir herramienta]</button>
+                </div>
+              </sc-if>
+            </section>
+
+            <section class="card" aria-labelledby="fm-p">
+              <div class="card-hd"><h2 id="fm-p" class="h2">Pasos</h2><sc-if value="{{ dragOnSt }}" hint-placeholder-val="{{ false }}"><span class="cap">[Toca otro paso para soltarlo ahí]</span></sc-if></div>
+              <ol class="{{ stListCls }}" style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px">
+                <sc-for list="{{ steps }}" as="s" hint-placeholder-count="4">
+                  <li style="{{ s.cardStyle }}">
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 6px"><button class="b b-gho b-ico" type="button" aria-label="{{ s.gripLabel }}" aria-pressed="{{ s.grabbed }}" onClick="{{ s.grab }}" style="cursor: grab"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"></path></svg></button><span class="num-dot mono">{{ s.n }}</span></div>
+                    <div class="ed" style="min-width: 0">
+                      <div class="ed-tb" role="toolbar" aria-label="Formato del paso" style="align-items: center; flex-wrap: wrap">
+                        <button type="button" aria-label="Negrilla" aria-pressed="{{ s.bP }}" onClick="{{ s.toggleB }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h6a3.5 3.5 0 0 1 0 7H7zM7 12h7a3.5 3.5 0 0 1 0 7H7z"></path></svg></button>
+                        <button type="button" aria-label="Cursiva" aria-pressed="{{ s.iP }}" onClick="{{ s.toggleI }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5h8M6 19h8M14 5l-4 14"></path></svg></button>
+                        <button type="button" aria-label="Lista de verificación" aria-pressed="{{ s.cP }}" onClick="{{ s.toggleC }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 7 2 2 4-4M3 17l2 2 4-4M13 7h8M13 17h8"></path></svg></button>
+                        <label style="margin-left: auto; display: inline-flex; align-items: center; gap: 6px" class="cap"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM12 9v4l2 2M9 2h6"></path></svg><input class="in mono" type="text" value="{{ s.waitTxt }}" placeholder="00:00" aria-label="[Tiempo de espera]" style="height: 32px; width: 76px; padding: 0 8px"></label>
+                      </div>
+                      <div class="ed-bd" contenteditable="true" role="textbox" aria-multiline="true" aria-label="{{ s.edLabel }}" style="{{ s.textStyle }}">{{ s.text }}</div>
+                      <sc-if value="{{ s.hasItems }}" hint-placeholder-val="{{ false }}">
+                        <ul style="list-style: none; margin: 0; padding: 0 12px 10px; display: flex; flex-direction: column; gap: 6px">
+                          <sc-for list="{{ s.items }}" as="it" hint-placeholder-count="2"><li style="display: flex; align-items: center; gap: 10px; font-size: 14px"><span class="cb" aria-hidden="true" style="width: 18px; height: 18px"><svg class="ic" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"></path></svg></span>{{ it.t }}</li></sc-for>
+                        </ul>
+                      </sc-if>
+                    </div>
+                    <button class="b b-gho b-ico" type="button" aria-label="{{ s.rmLabel }}" onClick="{{ s.remove }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></button>
+                  </li>
+                </sc-for>
+              </ol>
+              <button class="b b-dash" type="button" onClick="{{ addStep }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Añadir paso</button>
+            </section>
+
+            <section class="card" aria-labelledby="fm-e">
+              <div class="card-hd"><h2 id="fm-e" class="h2">Pasos de envasado</h2></div>
+              <ol class="{{ pkListCls }}" style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px">
+                <sc-for list="{{ packs }}" as="s" hint-placeholder-count="1">
+                  <li style="{{ s.cardStyle }}">
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 6px"><button class="b b-gho b-ico" type="button" aria-label="{{ s.gripLabel }}" aria-pressed="{{ s.grabbed }}" onClick="{{ s.grab }}" style="cursor: grab"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"></path></svg></button><span class="num-dot mono">{{ s.n }}</span></div>
+                    <div class="ed" style="min-width: 0">
+                      <div class="ed-tb" role="toolbar" aria-label="Formato del paso">
+                        <button type="button" aria-label="Negrilla" aria-pressed="{{ s.bP }}" onClick="{{ s.toggleB }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h6a3.5 3.5 0 0 1 0 7H7zM7 12h7a3.5 3.5 0 0 1 0 7H7z"></path></svg></button>
+                        <button type="button" aria-label="Cursiva" aria-pressed="{{ s.iP }}" onClick="{{ s.toggleI }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5h8M6 19h8M14 5l-4 14"></path></svg></button>
+                        <button type="button" aria-label="Lista de verificación" aria-pressed="{{ s.cP }}" onClick="{{ s.toggleC }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 7 2 2 4-4M3 17l2 2 4-4M13 7h8M13 17h8"></path></svg></button>
+                      </div>
+                      <div class="ed-bd" contenteditable="true" role="textbox" aria-multiline="true" aria-label="{{ s.edLabel }}" style="{{ s.textStyle }}">{{ s.text }}</div>
+                      <sc-if value="{{ s.hasItems }}" hint-placeholder-val="{{ false }}">
+                        <ul style="list-style: none; margin: 0; padding: 0 12px 10px; display: flex; flex-direction: column; gap: 6px">
+                          <sc-for list="{{ s.items }}" as="it" hint-placeholder-count="1"><li style="display: flex; align-items: center; gap: 10px; font-size: 14px"><span class="cb" aria-hidden="true" style="width: 18px; height: 18px"><svg class="ic" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"></path></svg></span>{{ it.t }}</li></sc-for>
+                        </ul>
+                      </sc-if>
+                    </div>
+                    <button class="b b-gho b-ico" type="button" aria-label="{{ s.rmLabel }}" onClick="{{ s.remove }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></button>
+                  </li>
+                </sc-for>
+              </ol>
+              <button class="b b-dash" type="button" onClick="{{ addPack }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Añadir paso de envasado</button>
+            </section>
+          </div>
+
+          <aside style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+            <section class="card" aria-labelledby="fm-v" style="gap: 4px">
+              <div class="card-hd" style="padding-bottom: 8px"><h2 id="fm-v" class="h2">Versiones</h2>
+                <sc-if value="{{ isEdit }}" hint-placeholder-val="{{ true }}"><a class="b b-out b-sm" href="FormulaVersion.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nueva versión</a></sc-if>
+                <sc-if value="{{ isNew }}" hint-placeholder-val="{{ false }}"><button class="b b-out b-sm" type="button" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nueva versión</button></sc-if>
+              </div>
+              <sc-if value="{{ isEdit }}" hint-placeholder-val="{{ true }}">
+                <div class="lbox">
+                  <sc-for list="{{ versions }}" as="v" hint-placeholder-count="2">
+                    <div class="lrow">
+                      <span style="flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px">{{ v.name }}</span>
+                      <sc-if value="{{ v.review }}" hint-placeholder-val="{{ true }}"><span class="sb t-waiting"><i></i>Por revisar</span></sc-if>
+                      <a class="b b-out b-sm b-go" href="FormulaVersion.dc.html" aria-label="{{ v.openLabel }}">Abrir<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ isNew }}" hint-placeholder-val="{{ false }}"><p class="sub" style="padding: 10px 0; border-top: 1px solid var(--border)">Esta receta todavía no tiene versiones.</p></sc-if>
+            </section>
+          </aside>
+        </div>
+      </div>
+
+      <footer class="form-ft" style="flex-wrap: wrap; align-items: center">
+        <button class="b b-out b-touch-m" type="button" aria-haspopup="dialog" onClick="{{ openPreview }}" style="margin-right: auto"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path></svg>Vista previa</button>
+        <a class="b b-out b-touch-m" href="Formulas.dc.html">Cancelar</a>
+        <button class="b b-pri b-touch-m" type="button" onClick="{{ save }}">Guardar</button>
+      </footer>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="formulas" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <div class="{{ pvCls }}" role="dialog" aria-modal="true" aria-labelledby="fm-pv" aria-describedby="fm-pvd" style="width: min(920px, calc(100cqw - clamp(0px, (100cqw - 760px) * 1000, 48px))); height: calc(100% - clamp(0px, (100cqw - 760px) * 1000, 64px)); max-height: 900px; border-radius: clamp(0px, (100cqw - 760px) * 1000, 16px); padding: 0; gap: 0; overflow: hidden">
+    <div class="dlg-hd" style="padding: 20px 24px 16px; border-bottom: 1px solid var(--border)"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="fm-pv" class="h2">Vista previa</h2><p id="fm-pvd" class="sub">Así se leerá esta receta, paso a paso. Nada de lo que hagas aquí se guarda.</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closePreview }}" style="width: 44px; height: 44px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div style="padding: 16px 24px 0; display: flex; flex-direction: column; gap: 8px">
+      <span class="strong" style="font-size: 14px">Paso <span class="mono">{{ pvN }}</span> de <span class="mono">{{ pvTotal }}</span></span>
+      <div class="seg" role="progressbar" aria-valuemin="1" aria-valuemax="{{ pvTotal }}" aria-valuenow="{{ pvN }}" aria-label="Progreso de la receta">
+        <sc-for list="{{ segs }}" as="g" hint-placeholder-count="4"><i class="{{ g.cls }}"></i></sc-for>
+      </div>
+    </div>
+    <div style="flex: 1; overflow: auto; padding: 20px 24px">
+      <div class="{{ pvAnim }}" style="display: flex; flex-direction: column; gap: 14px; max-width: 640px">
+        <p style="{{ pvTextStyle }}">{{ pvText }}</p>
+        <sc-if value="{{ pvHasItems }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column">
+            <sc-for list="{{ pvItems }}" as="it" hint-placeholder-count="2">
+              <button class="chk" type="button" role="checkbox" aria-checked="{{ it.on }}" onClick="{{ it.toggle }}" style="min-height: 48px"><span class="cb" aria-checked="{{ it.on }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></span><span class="chk-t">{{ it.t }}</span></button>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ pvPend }}" hint-placeholder-val="{{ false }}"><div class="nt n-i enter"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg><span>Marca los <span class="mono">{{ pvPendN }}</span> elementos pendientes para continuar.</span></div></sc-if>
+        <sc-if value="{{ pvWait }}" hint-placeholder-val="{{ false }}"><div class="nt n-w enter" aria-live="polite"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM12 9v4l2 2M9 2h6"></path></svg><span>Espera <span class="mono strong">{{ pvLeft }}</span> para continuar.</span></div></sc-if>
+      </div>
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 12px; padding: 14px 24px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border)">
+      <button class="b b-out b-touch" type="button" disabled="{{ pvFirst }}" onClick="{{ pvPrev }}" style="flex: 0 1 160px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Anterior</button>
+      <sc-if value="{{ pvNotLast }}" hint-placeholder-val="{{ true }}"><button class="b b-pri b-touch b-go" type="button" disabled="{{ pvBlocked }}" onClick="{{ pvNext }}" style="flex: 0 1 220px">Siguiente<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></sc-if>
+      <sc-if value="{{ pvLast }}" hint-placeholder-val="{{ false }}"><button class="b b-pri b-touch" type="button" disabled="{{ pvBlocked }}" onClick="{{ closePreview }}" style="flex: 0 1 220px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>Finalizar</button></sc-if>
+    </div>
+  </div>
+
+  <div class="{{ propCls }}" role="alertdialog" aria-modal="true" aria-labelledby="fm-pr" aria-describedby="fm-prd">
+    <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM18 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM6 15V9a4 4 0 0 1 4-4h6M18 9v6a4 4 0 0 1-4 4H8"></path></svg></div>
+    <h2 id="fm-pr" class="h2"><span class="mono">{{ propN }}</span> {{ propTail }}</h2>
+    <p id="fm-prd" class="sub">Marca las versiones que deben recibir este cambio en sus líneas.</p>
+    <div class="lbox">
+      <sc-for list="{{ propRows }}" as="p" hint-placeholder-count="2">
+        <button class="cbl" type="button" role="checkbox" aria-checked="{{ p.on }}" onClick="{{ p.toggle }}" style="border: 0; background: none; padding: 0; font: inherit; color: inherit; width: 100%; text-align: left; min-height: 48px"><span class="cb" aria-checked="{{ p.on }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></span><span style="flex: 1; min-width: 0">{{ p.name }}</span><sc-if value="{{ p.review }}" hint-placeholder-val="{{ false }}"><span class="sb t-waiting"><i></i>Por revisar</span></sc-if></button>
+      </sc-for>
+    </div>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-out" type="button" onClick="{{ commit }}">Guardar sin propagar</button><button class="b b-pri" type="button" onClick="{{ commit }}">Guardar y propagar</button></div>
+  </div>
+
+  <div class="toastwrap" aria-live="polite"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastText }}</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"modo":{"editor":"enum","options":["editar","nueva"],"default":"editar"},"unaVersion":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); clearInterval(this.iv); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const isEdit = (this.props.modo || 'editar') !== 'nueva';
+const k = s.k || 0;
+const S0 = [
+{ t: 'Agrega el 60 % del agua desmineralizada a la mezcladora de 200 L.', b: false, it: false, c: false, items: [], w: 0 },
+{ t: 'Prepara el equipo de protección antes de manipular el hidróxido.', b: true, it: false, c: true, items: ['Ponte guantes de nitrilo.', 'Ponte gafas de seguridad.'], w: 0 },
+{ t: 'Disuelve el hidróxido de sodio agitando a velocidad baja.', b: false, it: false, c: false, items: [], w: 15 },
+{ t: 'Agrega el tensoactivo poco a poco y completa con el resto del agua.', b: false, it: true, c: false, items: [], w: 0 }
+];
+const P0 = [{ t: 'Llena las garrafas de 20 L y etiqueta cada una con el lote.', b: false, it: false, c: false, items: [], w: 0 }];
+const L = { st: s.st || S0, pk: s.pk || P0 };
+const fmt = (n) => { const m = Math.floor(n / 60); const r = n % 60; return (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r; };
+const drag = s.drag || null;
+const base = 'display: grid; grid-template-columns: 36px minmax(0, 1fr) 36px; gap: 10px; align-items: start; padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--card); transition: box-shadow 200ms var(--e-std), border-color 100ms var(--e-std), scale 200ms var(--e-std);';
+const upd = (key, i, patch) => this.setState({ [key]: L[key].map((x, j) => (j === i ? Object.assign({}, x, patch) : x)) });
+const mk = (key, word) => L[key].map((x, i) => {
+const lifted = !!(drag && drag.l === key && drag.i === i);
+const target = !!(drag && drag.l === key && drag.i !== i);
+return {
+n: i + 1, text: x.t,
+textStyle: 'min-height: 44px; outline: none;' +(x.b ? ' font-weight: 600;' : '') + (x.it ? ' font-style: italic;' : ''),
+edLabel: word + ' ' + (i + 1),
+bP: x.b ? 'true' : 'false', iP: x.it ? 'true' : 'false', cP: x.c ? 'true' : 'false',
+hasItems: x.c && x.items.length > 0, items: x.items.map((t) => ({ t: t })),
+waitTxt: x.w ? fmt(x.w) : '',
+cardStyle: base + (lifted ? ' border-color: var(--primary); box-shadow: var(--shadow-pop); scale: 1.01;' : target ? ' border-style: dashed; border-color: var(--primary);' : ''),
+grabbed: lifted ? 'true' : 'false',
+gripLabel: lifted ? 'Soltar el paso ' + (i + 1) : target ? 'Mover a la posición ' + (i + 1) : 'Mover el paso ' + (i + 1),
+rmLabel: 'Quitar el paso ' + (i + 1),
+toggleB: () => upd(key, i, { b: !x.b }),
+toggleI: () => upd(key, i, { it: !x.it }),
+toggleC: () => upd(key, i, { c: !x.c, items: x.items.length ? x.items : ['[Elemento de la lista]'] }),
+remove: () => this.setState({ [key]: L[key].filter((_, j) => j !== i), drag: null, k: k + 1 }),
+grab: () => {
+if (!drag || drag.l !== key) { this.setState({ drag: { l: key, i: i } }); return; }
+if (drag.i === i) { this.setState({ drag: null }); return; }
+const a = L[key].slice(); const m = a.splice(drag.i, 1)[0]; a.splice(i, 0, m);
+this.setState({ [key]: a, drag: null, k: k + 1 });
+}
+};
+});
+const newStep = { t: '[Texto del paso]', b: false, it: false, c: false, items: [], w: 0 };
+const ingsD = s.ings || [['Agua desmineralizada', '82,00'], ['Hidróxido de sodio', '5,00'], ['Tensoactivo LESS 70 %', '13,00']];
+const toolsD = s.tools || [['Mezcladora 200 L', '1'], ['Medidor de pH', '1']];
+const tab = s.tab || 'ing';
+const steps = L.st;
+const pi = Math.min(s.pi || 0, Math.max(steps.length - 1, 0));
+const cur = steps[pi] || newStep;
+const done = s.done || {};
+const left = s.left || 0;
+const pend = cur.c ? cur.items.filter((_, j) => !done[pi + '-' + j]).length : 0;
+const startTimer = (idx) => {
+clearInterval(this.iv);
+const w = (steps[idx] || {}).w || 0;
+if (!w) return 0;
+this.iv = setInterval(() => { const l = ((this.state || {}).left || 0) - 1; if (l <= 0) { clearInterval(this.iv); this.setState({ left: 0 }); } else { this.setState({ left: l }); } }, 1000);
+return w;
+};
+const goTo = (idx, dir) => { const w = startTimer(idx); this.setState({ pi: idx, dir: dir, ak: (s.ak || 0) + 1, left: w }); };
+const ak = s.ak || 0;
+const animBase = (s.dir || 1) > 0 ? 'slide-n' : 'slide-p';
+const sel = s.sel || { a: true, b: false };
+const vers0 = [['a', 'Desengrasante alcalino · sin fragancia', true], ['b', 'Desengrasante alcalino · concentrado', false]];
+const vers = this.props.unaVersion ? vers0.slice(0, 1) : vers0;
+const toast = (txt) => { this.setState({ toast: txt }); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: null }), 3200); };
+const doneText = isEdit ? '[Receta actualizada.]' : 'Receta creada.';
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+title: isEdit ? 'Editar fórmula · Desengrasante alcalino' : 'Nueva fórmula',
+isEdit: isEdit, isNew: !isEdit,
+tabIng: tab === 'ing' ? 'true' : 'false', tabTool: tab === 'tool' ? 'true' : 'false',
+isIng: tab === 'ing', isTool: tab === 'tool',
+showIng: () => this.setState({ tab: 'ing' }), showTool: () => this.setState({ tab: 'tool' }),
+ingCount: ingsD.length, toolCount: toolsD.length,
+ings: ingsD.map((g, i) => { const v = parseFloat(g[1].replace(',', '.')) || 0; return { name: g[0], pct: g[1] + ' %', qty: (v * 10).toFixed(2).replace('.', ',') + ' g', label: 'Quitar ' + (g[0] || 'el ingrediente'), remove: () => this.setState({ ings: ingsD.filter((_, j) => j !== i) }) }; }),
+addIng: () => this.setState({ ings: ingsD.concat([['', '0,00']]) }),
+tools: toolsD.map((t, i) => ({ name: t[0], qty: t[1], label: 'Quitar ' + (t[0] || 'la herramienta'), remove: () => this.setState({ tools: toolsD.filter((_, j) => j !== i) }) })),
+addTool: () => this.setState({ tools: toolsD.concat([['', '1']]) }),
+steps: mk('st', 'Paso'), packs: mk('pk', 'Paso de envasado'),
+dragOnSt: !!(drag && drag.l === 'st'),
+stListCls: k % 2 ? 'fade' : '', pkListCls: k % 2 ? 'fade' : '',
+addStep: () => this.setState({ st: L.st.concat([newStep]), k: k + 1 }),
+addPack: () => this.setState({ pk: L.pk.concat([newStep]), k: k + 1 }),
+versions: vers.map((v) => ({ name: v[1], review: v[2], openLabel: 'Abrir la versión ' + v[1] })),
+propN: vers.length, propTail: vers.length === 1 ? 'versión parte de esta receta' : 'versiones parten de esta receta',
+openPreview: () => { const w = startTimer(0); this.setState({ pv: true, pi: 0, done: {}, ak: 0, dir: 1, left: w }); },
+closePreview: () => { clearInterval(this.iv); this.setState({ pv: false, left: 0 }); },
+pvCls: s.pv ? 'dlg open' : 'dlg',
+pvN: pi + 1, pvTotal: steps.length,
+segs: steps.map((_, j) => ({ cls: j <= pi ? 'on' : '' })),
+pvAnim: ak === 0 ? '' : (ak % 2 ? animBase : animBase + '2'),
+pvText: cur.t,
+pvTextStyle: 'margin: 0; font-size: 18px; line-height: 1.5;' + (cur.b ? ' font-weight: 600;' : '') + (cur.it ? ' font-style: italic;' : ''),
+pvHasItems: cur.c && cur.items.length > 0,
+pvItems: cur.items.map((t, j) => { const key = pi + '-' + j; const on = !!done[key]; return { t: t, on: on ? 'true' : 'false', toggle: () => this.setState({ done: Object.assign({}, done, { [key]: !on }) }) }; }),
+pvPend: pend > 0, pvPendN: pend,
+pvWait: pend === 0 && left > 0, pvLeft: fmt(left),
+pvBlocked: pend > 0 || left > 0,
+pvFirst: pi === 0, pvNotLast: pi < steps.length - 1, pvLast: pi === steps.length - 1,
+pvPrev: () => goTo(pi - 1, -1), pvNext: () => goTo(pi + 1, 1),
+save: () => { if (isEdit) { this.setState({ prop: true }); } else { toast(doneText); } },
+propCls: s.prop ? 'dlg open' : 'dlg',
+propRows: vers.map((v) => ({ name: v[1], review: v[2], on: sel[v[0]] ? 'true' : 'false', toggle: () => this.setState({ sel: Object.assign({}, sel, { [v[0]]: !sel[v[0]] }) }) })),
+commit: () => { this.setState({ prop: false }); toast(doneText); },
+ovCls: (s.menu || s.pv || s.prop) ? 'ov open' : 'ov',
+closeAll: () => { clearInterval(this.iv); this.setState({ menu: false, pv: false, prop: false, left: 0 }); },
+toastCls: s.toast ? 'toast show' : 'toast', toastText: s.toast || doneText
+};
+}
+}
+</script>
+</body>
+</html>

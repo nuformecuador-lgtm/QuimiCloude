@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Importar inventario</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="inventario" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div class="ph">
+          <div class="ph-t" style="gap: 10px; max-width: 720px">
+            <a class="b b-out b-back b-sm" href="Inventario.dc.html" style="align-self: flex-start"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver a inventario</a>
+            <h1 class="h1">Importar inventario</h1>
+            <p class="sub">Sube un archivo .xlsx o .csv con las columnas de la plantilla. Antes de importar verás qué se crea, qué suma un lote y qué filas tienen error.</p>
+          </div>
+          <div class="ph-act" style="display: flex; gap: 8px"><button class="b b-out b-touch-m" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M4 20h16"></path></svg>Descargar plantilla</button></div>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="Pasos">
+          <sc-for list="{{ steps }}" as="t" hint-placeholder-count="3"><button class="tab" type="button" role="tab" aria-selected="{{ t.cur }}" onClick="{{ t.go }}"><span class="count">{{ t.n }}</span>{{ t.label }}</button></sc-for>
+        </div>
+
+        <sc-if value="{{ s1 }}" hint-placeholder-val="{{ true }}">
+          <div class="card slide-n" style="max-width: 720px">
+            <sc-if value="{{ noFile }}" hint-placeholder-val="{{ true }}">
+              <div class="drop" style="padding: 40px 24px">
+                <span class="thumb lg" style="color: var(--primary)"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"></path></svg></span>
+                <span class="cap mono">.xlsx · .csv</span>
+                <button class="b b-out b-touch-m" type="button" onClick="{{ pickFile }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6v18h12V7zM14 3v4h4"></path></svg>Elegir archivo</button>
+              </div>
+            </sc-if>
+            <sc-if value="{{ hasFile }}" hint-placeholder-val="{{ false }}">
+              <div class="drop row fade" style="gap: 14px">
+                <span class="thumb" style="color: var(--primary)"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6v18h12V7zM14 3v4h4"></path></svg></span>
+                <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1"><span class="mono strong" style="font-size: 14px">inventario-octubre.xlsx</span><span class="cap mono">48 filas · 32 KB</span></div>
+                <button class="b b-out b-sm" type="button" onClick="{{ pickFile }}" style="height: 40px">Elegir archivo</button>
+              </div>
+            </sc-if>
+            <div class="actions cq-stack">
+              <sc-if value="{{ canReview }}" hint-placeholder-val="{{ false }}"><button class="b b-pri b-touch-m" type="button" onClick="{{ review }}">Revisar archivo<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></sc-if>
+              <sc-if value="{{ busy }}" hint-placeholder-val="{{ false }}"><button class="b b-pri b-touch-m" type="button" aria-busy="true" disabled><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg>Revisar archivo</button></sc-if>
+              <sc-if value="{{ noFile }}" hint-placeholder-val="{{ true }}"><button class="b b-pri b-touch-m" type="button" disabled>Revisar archivo<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></sc-if>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ s2 }}" hint-placeholder-val="{{ false }}">
+          <div class="slide-n" style="display: flex; flex-direction: column; gap: 20px">
+            <div class="card">
+              <div class="card-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 class="h2">Vista previa</h2><span class="cap mono">inventario-octubre.xlsx</span></div></div>
+              <dl style="margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px">
+                <div class="stat"><dt>Filas</dt><dd class="mono">48</dd></div>
+                <div class="stat"><dt>Se crean</dt><dd class="mono s">12</dd></div>
+                <div class="stat"><dt>Suman lote</dt><dd class="mono" style="color: var(--i-fg)">29</dd></div>
+                <div class="stat"><dt>Duplicadas</dt><dd class="mono w">3</dd></div>
+                <div class="stat"><dt>Con error</dt><dd class="mono d">4</dd></div>
+              </dl>
+            </div>
+
+            <sc-if value="{{ hasMissing }}" hint-placeholder-val="{{ true }}">
+              <div class="card" style="border-color: var(--w-b)">
+                <div class="card-hd"><div style="display: flex; align-items: center; gap: 10px"><span class="dlg-ic warn" style="width: 36px; height: 36px; border-radius: 10px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2zM12 10v4M12 17h.01"></path></svg></span><h2 class="h2">Faltan en el catálogo</h2></div></div>
+                <div class="g2 cq-1" style="gap: 16px">
+                  <div style="display: flex; flex-direction: column; gap: 8px">
+                    <span class="lab">Unidades</span>
+                    <sc-for list="{{ units }}" as="u" hint-placeholder-count="2"><div class="panel" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px"><span><span class="mono strong">{{ u.sym }}</span> <span class="cap">· {{ u.rows }}</span></span><button class="b b-out b-sm b-touch-m" type="button" onClick="{{ u.create }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Crear</button></div></sc-for>
+                    <sc-if value="{{ noUnits }}" hint-placeholder-val="{{ false }}"><span class="sb t-success"><i></i>Añadido</span></sc-if>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 8px">
+                    <span class="lab">Presentaciones</span>
+                    <sc-for list="{{ pres }}" as="p" hint-placeholder-count="1"><div class="panel" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px"><span><span class="strong">{{ p.name }}</span> <span class="cap">· {{ p.rows }}</span></span><button class="b b-out b-sm b-touch-m" type="button" onClick="{{ p.create }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Crear</button></div></sc-for>
+                    <sc-if value="{{ noPres }}" hint-placeholder-val="{{ false }}"><span class="sb t-success"><i></i>Añadido</span></sc-if>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
+            <div style="display: flex; flex-direction: column; gap: 12px">
+              <div class="chips" role="toolbar" aria-label="Filtrar filas">
+                <sc-for list="{{ filters }}" as="f" hint-placeholder-count="5"><button class="pill" type="button" aria-pressed="{{ f.on }}" onClick="{{ f.pick }}">{{ f.label }} <span class="mono">{{ f.n }}</span></button></sc-for>
+              </div>
+              <div class="tw">
+                <div class="scroll">
+                  <table class="collapse">
+                    <thead><tr><th scope="col" class="num" style="width: 72px">Fila</th><th scope="col">Estado</th><th scope="col">Producto</th><th scope="col">Detalle</th></tr></thead>
+                    <tbody class="{{ bodyCls }}">
+                      <sc-for list="{{ rows }}" as="r" hint-placeholder-count="10">
+                        <tr><td class="num mono dim">{{ r.fila }}</td><td><span class="{{ r.stCls }}"><i></i>{{ r.st }}</span></td><td class="strong">{{ r.prod }}</td><td class="{{ r.detCls }}" style="white-space: normal">{{ r.det }}</td></tr>
+                      </sc-for>
+                    </tbody>
+                  </table>
+                  <div class="rows-m">
+                    <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+                      <div class="rm">
+                        <div class="rm-top"><span class="cap">Fila <span class="mono">{{ r.fila }}</span></span><span class="{{ r.stCls }}"><i></i>{{ r.st }}</span></div>
+                        <span class="strong">{{ r.prod }}</span>
+                        <span class="{{ r.detCls }}" style="font-size: 13px">{{ r.det }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+                <div class="pg"><span>{{ pgText }}</span><span class="pgb"><button class="b b-out b-ico b-sm" type="button" aria-label="Página anterior" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><button class="b b-out b-ico b-sm" type="button" aria-label="Página siguiente"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></span></div>
+              </div>
+            </div>
+
+            <div class="actions cq-stack">
+              <button class="b b-out b-touch-m" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M4 20h16"></path></svg>Descargar filas con error</button>
+              <sc-if value="{{ notImporting }}" hint-placeholder-val="{{ true }}"><button class="b b-pri b-touch-m" type="button" onClick="{{ doImport }}">Importar <span class="mono">41</span> filas válidas</button></sc-if>
+              <sc-if value="{{ importing }}" hint-placeholder-val="{{ false }}"><button class="b b-pri b-touch-m" type="button" aria-busy="true" disabled><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg>Importar <span class="mono">41</span> filas válidas</button></sc-if>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ s3 }}" hint-placeholder-val="{{ false }}">
+          <div class="card slide-n" style="max-width: 720px; align-items: center; text-align: center; padding: 40px 24px">
+            <span class="dlg-ic success" style="width: 56px; height: 56px; border-radius: 16px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 28px; height: 28px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg></span>
+            <h2 class="h2" style="font-size: 22px">Importación terminada</h2>
+            <span class="cap mono">inventario-octubre.xlsx</span>
+            <dl style="margin: 0; width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; text-align: left">
+              <div class="stat"><dt>Se crean</dt><dd class="mono s">12</dd></div>
+              <div class="stat"><dt>Suman lote</dt><dd class="mono" style="color: var(--i-fg)">29</dd></div>
+              <div class="stat"><dt>Con error</dt><dd class="mono d">4</dd></div>
+            </dl>
+            <div class="actions cq-stack" style="width: 100%; justify-content: center">
+              <button class="b b-out b-touch-m" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M4 20h16"></path></svg>Descargar filas con error</button>
+              <button class="b b-pri b-touch-m" type="button" onClick="{{ restart }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"></path></svg>Importar otro archivo</button>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="inventario" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <div class="{{ unitCls }}" role="dialog" aria-modal="true" aria-labelledby="im-un">
+    <div class="dlg-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="im-un" class="h2">Nueva unidad</h2><p class="sub">Se crea igual que desde la pantalla de unidades.</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="cq-1" style="display: grid; grid-template-columns: minmax(0, 1fr) 140px; gap: 12px">
+      <div class="f"><label for="im-un-n">Nombre</label><input id="im-un-n" class="in" type="text" value="Galón"></div>
+      <div class="f"><label for="im-un-s">Símbolo</label><input id="im-un-s" class="in mono" type="text" value="{{ unitSym }}"></div>
+    </div>
+    <div class="cq-1" style="display: grid; grid-template-columns: minmax(0, 1fr) 140px; gap: 12px">
+      <div class="f">
+        <label for="im-un-d">Deriva de</label>
+        <div class="anchor">
+          <button id="im-un-d" class="in trig" type="button" aria-haspopup="listbox" aria-expanded="{{ derOpenStr }}" onClick="{{ toggleDer }}"><span>{{ derLabel }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <div class="{{ derPopCls }}" role="listbox" aria-label="Deriva de">
+            <sc-for list="{{ ders }}" as="d" hint-placeholder-count="3"><button class="{{ d.cls }}" type="button" role="option" aria-selected="{{ d.sel }}" onClick="{{ d.pick }}">{{ d.label }}</button></sc-for>
+          </div>
+        </div>
+      </div>
+      <div class="f"><label for="im-un-f">Factor</label><sc-if value="{{ derNone }}" hint-placeholder-val="{{ true }}"><input id="im-un-f" class="in mono" type="text" value="" disabled></sc-if><sc-if value="{{ derSome }}" hint-placeholder-val="{{ false }}"><input id="im-un-f" class="in mono" type="text" value="3,785"></sc-if></div>
+    </div>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ createUnit }}">Crear</button></div>
+  </div>
+
+  <div class="{{ presCls }}" role="dialog" aria-modal="true" aria-labelledby="im-pr">
+    <div class="dlg-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="im-pr" class="h2">Nueva presentación</h2><p class="sub">Se crea igual que desde la pantalla de presentaciones.</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="f"><label for="im-pr-n">Nombre</label><input id="im-pr-n" class="in" type="text" value="Bulto 25 kg"></div>
+    <div class="f"><label for="im-pr-c">Contenido</label><input id="im-pr-c" class="in mono" type="text" value="25,00"></div>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ createPres }}">Crear</button></div>
+  </div>
+
+  <div class="toastwrap" aria-live="polite"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastMsg }}</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1300}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); clearTimeout(this.w); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const step = s.step || 1;
+const toast = (msg, extra) => { this.setState(Object.assign({ toast: true, tmsg: msg }, extra || {})); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: false }), 3200); };
+const ST = { crear: ['Crear', 't-success'], sumar: ['Sumar lote', 't-info'], dup: ['Duplicado', 't-waiting'], err: ['Error', 't-danger'] };
+const data = [
+['2','crear','Peróxido de hidrógeno 50 %','Lote L-2026-1003 · 25,00 kg'],
+['3','sumar','Hipoclorito de sodio 13 %','Lote L-2026-0912 · +60,00 kg'],
+['4','sumar','Ácido cítrico','Lote L-2026-1004 · +20,00 kg'],
+['5','err','Glicerina','[La unidad «gal» no está en el catálogo]'],
+['6','dup','Ácido cítrico','[Repite la fila 4]'],
+['7','crear','Bicarbonato de sodio','Lote L-2026-1005 · 50,00 kg'],
+['8','sumar','Galón 3,78 L','Lote L-2026-1006 · +120 u'],
+['9','err','Carbonato de sodio','[La presentación «Bulto 25 kg» no está en el catálogo]'],
+['10','sumar','Tensoactivo LESS 70 %','Lote L-2026-1007 · +40,00 kg'],
+['11','err','Alcohol etílico','[Falta la cantidad]'],
+['12','crear','Fragancia lavanda','Lote L-2026-1008 · 5,00 kg'],
+['13','sumar','Garrafa 20 L','Lote L-2026-1009 · +30 u']
+];
+const flt = s.flt || 'all';
+const list = flt === 'all' ? data : data.filter((d) => d[1] === flt);
+const F = [['all','Todas','48'],['crear','Crear','12'],['sumar','Sumar lote','29'],['dup','Duplicado','3'],['err','Error','4']];
+const doneU = s.doneU || [];
+const unitsAll = [['gal','Filas 5, 21'],['lb','Fila 33']];
+const units = unitsAll.filter((u) => doneU.indexOf(u[0]) < 0).map((u) => ({ sym: u[0], rows: u[1], create: () => this.setState({ dlg: 'unit', unit: u[0], der: 0, derOpen: false }) }));
+const presDone = !!s.presDone;
+const pres = presDone ? [] : [{ name: 'Bulto 25 kg', rows: 'Filas 9, 40', create: () => this.setState({ dlg: 'pres' }) }];
+const derOpts = ['No deriva de ninguna', 'Litro (L)', 'Kilogramo (kg)'];
+const der = s.der || 0;
+const go = (n) => this.setState({ step: n, busy: false, importing: false, file: n === 1 ? s.file : true });
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+steps: [['1','Elegir archivo'],['2','Vista previa'],['3','Importación terminada']].map((t, i) => ({ n: t[0], label: t[1], cur: step === i + 1 ? 'true' : 'false', go: () => go(i + 1) })),
+s1: step === 1, s2: step === 2, s3: step === 3,
+noFile: !s.file && !s.busy,
+hasFile: !!s.file,
+canReview: !!s.file && !s.busy,
+busy: !!s.busy,
+pickFile: () => this.setState({ file: true }),
+review: () => { this.setState({ busy: true }); clearTimeout(this.w); this.w = setTimeout(() => this.setState({ busy: false, step: 2 }), 900); },
+filters: F.map((f) => ({ label: f[1], n: f[2], on: flt === f[0] ? 'true' : 'false', pick: () => this.setState({ flt: f[0], k: (s.k || 0) + 1 }) })),
+bodyCls: (s.k || 0) % 2 ? 'fade' : '',
+rows: list.map((d) => ({ fila: d[0], st: ST[d[1]][0], stCls: 'sb ' + ST[d[1]][1], prod: d[2], det: d[3], detCls: d[1] === 'err' ? '' : 'mono dim' })),
+pgText: list.length + ' de ' + (F.filter((f) => f[0] === flt)[0][2]) + ' filas',
+units: units, noUnits: units.length === 0,
+pres: pres, noPres: presDone,
+hasMissing: units.length > 0 || !presDone,
+importing: !!s.importing, notImporting: !s.importing,
+doImport: () => { this.setState({ importing: true }); clearTimeout(this.w); this.w = setTimeout(() => this.setState({ importing: false, step: 3 }), 1100); },
+restart: () => this.setState({ step: 1, file: false, flt: 'all' }),
+unitCls: s.dlg === 'unit' ? 'dlg open' : 'dlg',
+unitSym: s.unit || 'gal',
+derOpenStr: s.derOpen ? 'true' : 'false',
+toggleDer: () => this.setState({ derOpen: !s.derOpen }),
+derPopCls: s.derOpen ? 'pop full open' : 'pop full',
+derLabel: derOpts[der],
+ders: derOpts.map((o, i) => ({ label: o, sel: der === i ? 'true' : 'false', cls: der === i ? 'opt hl' : 'opt', pick: () => this.setState({ der: i, derOpen: false }) })),
+derNone: der === 0, derSome: der !== 0,
+createUnit: () => toast('Unidad creada.', { dlg: null, derOpen: false, doneU: doneU.concat([s.unit || 'gal']) }),
+presCls: s.dlg === 'pres' ? 'dlg open' : 'dlg',
+createPres: () => toast('[Presentación creada.]', { dlg: null, presDone: true }),
+ovCls: (s.dlg || s.menu) ? 'ov open' : 'ov',
+closeAll: () => this.setState({ dlg: null, menu: false, derOpen: false }),
+toastCls: s.toast ? 'toast show' : 'toast',
+toastMsg: s.tmsg || ''
+};
+}
+}
+</script>
+</body>
+</html>

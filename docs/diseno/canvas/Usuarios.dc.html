@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Usuarios</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="usuarios" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div class="ph">
+          <div class="ph-t"><h1 class="h1">Usuarios</h1></div>
+          <div class="ph-act" style="display: flex; gap: 8px"><button class="b b-pri b-touch-m" type="button" onClick="{{ openNewPrimary }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>{{ newLabel }}</button></div>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="Secciones de la pantalla de usuarios">
+          <button class="tab" type="button" role="tab" aria-selected="{{ tabPeople }}" onClick="{{ showPeople }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg>Personas</button>
+          <button class="tab" type="button" role="tab" aria-selected="{{ tabGroups }}" onClick="{{ showGroups }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"></path></svg>Grupos</button>
+        </div>
+
+        <div class="toolbar" role="toolbar" aria-label="{{ searchLabel }}">
+          <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="{{ searchPh }}" aria-label="{{ searchPh }}"></label>
+          <sc-if value="{{ isPeople }}" hint-placeholder-val="{{ true }}"><button class="{{ chipCls }}" type="button" aria-pressed="{{ filteredStr }}" onClick="{{ toggleFilter }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Estado<sc-if value="{{ filtered }}" hint-placeholder-val="{{ false }}"><span class="v">Activo</span></sc-if></button></sc-if>
+        </div>
+
+        <sc-if value="{{ isPeople }}" hint-placeholder-val="{{ true }}">
+        <div class="tw" role="tabpanel" aria-label="Personas">
+          <div class="scroll">
+            <table class="collapse">
+              <thead><tr><th scope="col">Nombre</th><th scope="col">Usuario</th><th scope="col">Correo</th><th scope="col">Rol</th><th scope="col">Estado</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead>
+              <tbody class="{{ bodyCls }}">
+                <sc-for list="{{ users }}" as="u" hint-placeholder-count="7">
+                  <tr>
+                    <td><span class="person" style="min-height: 0"><span class="{{ u.avCls }}">{{ u.ini }}</span><span class="strong">{{ u.name }}</span></span></td>
+                    <td class="mono">{{ u.user }}</td>
+                    <td>{{ u.mail }}</td>
+                    <td>{{ u.rol }}</td>
+                    <td><span class="{{ u.stCls }}"><i></i>{{ u.st }}</span></td>
+                    <td class="rowact anchor">
+                      <button class="b b-gho b-ico" type="button" aria-label="{{ u.menuLabel }}" aria-haspopup="menu" aria-expanded="{{ u.open }}" onClick="{{ u.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button>
+                      <div class="{{ u.menuCls }}" role="menu" style="min-width: 260px">
+                        <button class="mi" type="button" role="menuitem" onClick="{{ u.edit }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</button>
+                        <button class="mi" type="button" role="menuitem" onClick="{{ u.status }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 11h14v10H5zM8 11V7a4 4 0 1 1 8 0v4"></path></svg>Cambiar estado</button>
+                        <button class="mi" type="button" role="menuitem" onClick="{{ u.sessions }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg>{{ u.sessionsLabel }}</button>
+                        <div class="sep"></div>
+                        <button class="mi danger" type="button" role="menuitem" onClick="{{ u.del }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Eliminar</button>
+                      </div>
+                    </td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+            <div class="rows-m">
+              <sc-for list="{{ users }}" as="u" hint-placeholder-count="5">
+                <div class="rm">
+                  <div class="rm-top"><span class="person" style="min-height: 0"><span class="{{ u.avCls }}">{{ u.ini }}</span><span class="strong">{{ u.name }}</span></span><span class="{{ u.stCls }}"><i></i>{{ u.st }}</span></div>
+                  <div class="rm-meta"><span class="mono">{{ u.user }}</span><span>{{ u.mail }}</span></div>
+                  <div class="rm-top"><span class="cap">{{ u.rol }}</span><button class="b b-out b-sm" type="button" style="height: 44px" onClick="{{ u.mobileActs }}" aria-label="{{ u.menuLabel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg>Acciones</button></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div class="pg"><span>Página <span class="mono">1</span> de <span class="mono">1</span> · <span class="mono">{{ usersCount }}</span> en total</span><span class="pgb"><button class="b b-out b-ico b-sm" type="button" aria-label="Página anterior" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><button class="b b-out b-ico b-sm" type="button" aria-label="Página siguiente" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></span></div>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isGroups }}" hint-placeholder-val="{{ false }}">
+        <div class="tw" role="tabpanel" aria-label="Grupos">
+          <div class="scroll">
+            <table class="collapse">
+              <thead><tr><th scope="col">Nombre</th><th scope="col">Miembros</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead>
+              <tbody class="{{ bodyCls }}">
+                <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+                  <tr>
+                    <td class="strong">{{ g.name }}</td>
+                    <td><span class="avs"><sc-for list="{{ g.avs }}" as="a" hint-placeholder-count="3"><span class="{{ a.cls }}" title="{{ a.name }}">{{ a.ini }}</span></sc-for><sc-if value="{{ g.hasMore }}" hint-placeholder-val="{{ true }}"><span class="av sm more" title="{{ g.moreLabel }}" aria-label="{{ g.moreLabel }}">{{ g.more }}</span></sc-if></span></td>
+                    <td class="rowact anchor">
+                      <button class="b b-gho b-ico" type="button" aria-label="{{ g.menuLabel }}" aria-haspopup="menu" aria-expanded="{{ g.open }}" onClick="{{ g.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button>
+                      <div class="{{ g.menuCls }}" role="menu">
+                        <button class="mi" type="button" role="menuitem" onClick="{{ g.edit }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>Abrir</button>
+                        <div class="sep"></div>
+                        <button class="mi danger" type="button" role="menuitem" onClick="{{ g.del }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Eliminar</button>
+                      </div>
+                    </td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+            <div class="rows-m">
+              <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+                <div class="rm">
+                  <div class="rm-top"><span class="strong">{{ g.name }}</span><span class="cap"><span class="mono">{{ g.total }}</span> miembros</span></div>
+                  <div class="rm-top"><span class="avs"><sc-for list="{{ g.avs }}" as="a" hint-placeholder-count="3"><span class="{{ a.cls }}">{{ a.ini }}</span></sc-for><sc-if value="{{ g.hasMore }}" hint-placeholder-val="{{ true }}"><span class="av sm more" aria-label="{{ g.moreLabel }}">{{ g.more }}</span></sc-if></span><button class="b b-out b-sm" type="button" style="height: 44px" onClick="{{ g.mobileActs }}" aria-label="{{ g.menuLabel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg>Acciones</button></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div class="pg"><span>Página <span class="mono">1</span> de <span class="mono">1</span> · <span class="mono">{{ groupsCount }}</span> en total</span><span class="pgb"><button class="b b-out b-ico b-sm" type="button" aria-label="Página anterior" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><button class="b b-out b-ico b-sm" type="button" aria-label="Página siguiente" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></span></div>
+        </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="usuarios" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <aside class="{{ userSheetCls }}" role="dialog" aria-modal="true" aria-labelledby="us-sh">
+    <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="us-sh" class="h2">{{ userTitle }}</h2><p class="sub">{{ userDesc }}</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="sheet-bd">
+      <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; gap: 18px" aria-busy="true">
+          <span class="cap" style="display: flex; align-items: center; gap: 8px"><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg>Cargando los datos de la persona…</span>
+          <span class="sk" style="width: 30%"></span><span class="sk" style="height: 40px"></span>
+          <span class="sk" style="width: 30%"></span><span class="sk" style="height: 40px"></span>
+          <span class="sk" style="width: 40%"></span><span class="sk" style="height: 40px"></span>
+          <span class="sk" style="width: 25%"></span><span class="sk" style="height: 40px"></span>
+        </div>
+      </sc-if>
+      <sc-if value="{{ ready }}" hint-placeholder-val="{{ true }}">
+        <div class="fade" style="display: flex; flex-direction: column; gap: 18px">
+          <div class="g2 cq-1">
+            <div class="f"><label for="us-n">Nombres</label><input id="us-n" class="in" type="text" value="{{ fFirst }}"></div>
+            <div class="f"><label for="us-a">Apellidos</label><input id="us-a" class="in" type="text" value="{{ fLast }}"></div>
+          </div>
+          <div class="f"><label for="us-fn">Fecha de nacimiento</label><button id="us-fn" class="in trig" type="button"><span class="mono">{{ fBirth }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg></button></div>
+          <div class="g2 cq-1">
+            <div class="f"><label for="us-c">Correo</label><input id="us-c" class="in" type="email" value="{{ fMail }}"></div>
+            <div class="f"><label for="us-t">Teléfono</label><input id="us-t" class="in mono" type="tel" value="{{ fPhone }}"></div>
+          </div>
+          <div class="cq-1" style="display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 12px">
+            <div class="f"><label for="us-td">Tipo de documento</label><button id="us-td" class="in trig" type="button"><span>CC</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+            <div class="f"><label for="us-nd">Número de documento</label><input id="us-nd" class="in mono" type="text" value="{{ fDoc }}"></div>
+          </div>
+          <div class="f"><label for="us-u">Nombre de usuario</label><input id="us-u" class="in mono" type="text" value="{{ fUser }}" aria-describedby="us-u-ok"><span id="us-u-ok" class="cap" style="display: flex; align-items: center; gap: 6px; color: var(--s-fg)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>Este nombre de usuario está libre: <span class="mono strong">{{ fUser }}</span></span></div>
+          <div class="f"><label for="us-r">Rol</label><button id="us-r" class="in trig" type="button"><span>{{ fRol }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+          <sc-if value="{{ isEditUser }}" hint-placeholder-val="{{ false }}">
+            <div class="panel" style="display: flex; flex-direction: column; gap: 10px">
+              <span class="h3">Cerrar sesiones</span>
+              <span class="cap">{{ sessionsMsg }}</span>
+              <button class="b b-out" type="button" style="align-self: flex-start" aria-label="{{ sessionsLabel }}" onClick="{{ sessionsFromSheet }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg>{{ sessionsLabel }}</button>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+    </div>
+    <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ saveUser }}">Guardar</button></div>
+  </aside>
+
+  <aside class="{{ groupSheetCls }}" role="dialog" aria-modal="true" aria-labelledby="gr-sh">
+    <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="gr-sh" class="h2">{{ groupTitle }}</h2><p class="sub">{{ groupDesc }}</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="sheet-bd">
+      <div class="f"><label for="gr-n">Nombre del grupo</label><input id="gr-n" class="in" type="text" value="{{ gName }}"></div>
+      <div class="f">
+        <span class="fl">{{ pickerTitle }}</span>
+        <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Buscar personas para añadir" aria-label="Buscar personas para añadir"></label>
+        <div class="tw">
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 120px 110px; gap: 10px; padding: 0 14px; height: 36px; align-items: center; background: var(--muted); border-bottom: 1px solid var(--border)"><span class="lab">Nombre</span><span class="lab hide-m">Rol</span><span class="lab" style="text-align: right">Acciones</span></div>
+          <sc-for list="{{ pick }}" as="p" hint-placeholder-count="5">
+            <div style="display: grid; grid-template-columns: minmax(0, 1fr) 120px 110px; gap: 10px; padding: 0 14px; min-height: 52px; align-items: center; border-bottom: 1px solid var(--border)">
+              <span class="person" style="min-height: 0"><span class="{{ p.avCls }}">{{ p.ini }}</span>{{ p.name }}</span>
+              <span class="cap hide-m">{{ p.rol }}</span>
+              <button class="{{ p.btnCls }}" type="button" style="justify-self: end" aria-pressed="{{ p.addedStr }}" onClick="{{ p.add }}"><sc-if value="{{ p.added }}" hint-placeholder-val="{{ false }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></sc-if>{{ p.btn }}</button>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <sc-if value="{{ isEditGroup }}" hint-placeholder-val="{{ false }}">
+        <div class="f">
+          <span class="fl">Miembros del grupo</span>
+          <div class="{{ membersCls }}" style="display: flex; flex-direction: column">
+            <sc-for list="{{ members }}" as="m" hint-placeholder-count="5">
+              <div class="person" style="border-bottom: 1px solid var(--border)"><span class="{{ m.avCls }}">{{ m.ini }}</span><span style="display: flex; flex-direction: column; min-width: 0"><span>{{ m.name }}</span><span class="cap">{{ m.rol }}</span></span><button class="b b-gho b-sm" type="button" style="margin-left: auto" onClick="{{ m.remove }}">Quitar del grupo</button></div>
+            </sc-for>
+          </div>
+          <div class="pg" style="border-top: 0; padding: 6px 0 0"><span>Página <span class="mono">{{ mPage }}</span> de <span class="mono">{{ mPages }}</span> · <span class="mono">{{ mTotal }}</span> en total</span><span class="pgb"><button class="b b-out b-ico b-sm" type="button" aria-label="Miembros anteriores" aria-disabled="{{ mPrevDis }}" onClick="{{ mPrev }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><button class="b b-out b-ico b-sm" type="button" aria-label="Miembros siguientes" aria-disabled="{{ mNextDis }}" onClick="{{ mNext }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></span></div>
+        </div>
+      </sc-if>
+    </div>
+    <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ saveGroup }}">Guardar</button></div>
+  </aside>
+
+  <div class="{{ statusCls }}" role="dialog" aria-modal="true" aria-labelledby="us-st">
+    <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 11h14v10H5zM8 11V7a4 4 0 1 1 8 0v4"></path></svg></div>
+    <h2 id="us-st" class="h2">Cambiar el estado de la cuenta</h2>
+    <p class="sub">Elige el estado de la cuenta de {{ tName }}.</p>
+    <div class="f anchor"><span id="us-st-l" class="fl">Estado de la cuenta</span>
+      <button class="in trig" type="button" aria-labelledby="us-st-l" aria-haspopup="listbox" aria-expanded="{{ stOpenStr }}" onClick="{{ toggleStOpen }}"><span class="{{ pickCls }}"><i></i>{{ pickLabel }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+      <div class="{{ stPopCls }}" role="listbox">
+        <sc-for list="{{ stOpts }}" as="o" hint-placeholder-count="4"><button class="opt" type="button" role="option" aria-selected="{{ o.sel }}" onClick="{{ o.pick }}"><span class="{{ o.cls }}"><i></i>{{ o.label }}</span><sc-if value="{{ o.on }}" hint-placeholder-val="{{ false }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-left: auto"><path d="m5 12 5 5 9-10"></path></svg></sc-if></button></sc-for>
+      </div>
+    </div>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-pri" type="button" onClick="{{ confirmStatus }}">Cambiar estado</button></div>
+  </div>
+
+  <div class="{{ sessionsCls }}" role="alertdialog" aria-modal="true" aria-labelledby="us-se">
+    <div class="dlg-ic warn"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg></div>
+    <h2 id="us-se" class="h2">¿Cerrar todas las sesiones de {{ tName }}?</h2>
+    <p class="sub">Se cerrarán todas las sesiones de {{ tName }}. Tendrá que volver a entrar.</p>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des" type="button" onClick="{{ confirmSessions }}">Cerrar sesiones</button></div>
+  </div>
+
+  <div class="{{ delUserCls }}" role="alertdialog" aria-modal="true" aria-labelledby="us-de">
+    <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+    <h2 id="us-de" class="h2">Eliminar al usuario</h2>
+    <p class="sub">Se va a eliminar a <span class="strong">{{ tName }}</span>. Esta acción no se puede deshacer.</p>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des" type="button" onClick="{{ confirmDelUser }}">Eliminar</button></div>
+  </div>
+
+  <div class="{{ delGroupCls }}" role="alertdialog" aria-modal="true" aria-labelledby="gr-de">
+    <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+    <h2 id="gr-de" class="h2">Eliminar el grupo</h2>
+    <p class="sub">Se va a eliminar el grupo <span class="strong">{{ gTargetName }}</span>. Esta acción no se puede deshacer.</p>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des" type="button" onClick="{{ confirmDelGroup }}">Eliminar</button></div>
+  </div>
+
+  <div class="{{ actsCls }}" role="menu" aria-label="{{ actsLabel }}">
+    <div class="dlg-hd" style="padding: 0 4px 8px"><span class="h3">{{ actsName }}</span><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <sc-if value="{{ actsIsUser }}" hint-placeholder-val="{{ true }}">
+      <button class="mi" type="button" role="menuitem" onClick="{{ aEditUser }}">Editar</button>
+      <button class="mi" type="button" role="menuitem" onClick="{{ aStatus }}">Cambiar estado</button>
+      <button class="mi" type="button" role="menuitem" onClick="{{ aSessions }}">{{ actsSessions }}</button>
+      <div class="sep"></div>
+      <button class="mi danger" type="button" role="menuitem" onClick="{{ aDelUser }}">Eliminar</button>
+    </sc-if>
+    <sc-if value="{{ actsIsGroup }}" hint-placeholder-val="{{ false }}">
+      <button class="mi" type="button" role="menuitem" onClick="{{ aEditGroup }}">Abrir</button>
+      <div class="sep"></div>
+      <button class="mi danger" type="button" role="menuitem" onClick="{{ aDelGroup }}">Eliminar</button>
+    </sc-if>
+  </div>
+
+  <div class="toastwrap" aria-live="polite"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastMsg }}</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"pestana":{"editor":"enum","options":["personas","grupos"],"default":"personas"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); clearTimeout(this.lt); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const tab = s.tab || this.props.pestana || 'personas';
+const ST = { active: ['Activo', 'success'], pending: ['Pendiente', 'neutral'], inactive: ['Inactivo', 'muted'], blocked: ['Bloqueado', 'danger'] };
+const P = [
+{ id: 'cr', first: 'Carlos', last: 'Restrepo', ini: 'CR', c: 'c5', user: 'crestrepo', mail: 'crestrepo@empresa.co', rol: 'Administrador', st: 'active', birth: '12/05/1984', phone: '300 412 7781', doc: '79845120' },
+{ id: 'lg', first: 'Laura', last: 'Gómez', ini: 'LG', c: '', user: 'lgomez', mail: 'lgomez@empresa.co', rol: '[Operario]', st: 'active', birth: '03/09/1992', phone: '310 220 4518', doc: '1020456789' },
+{ id: 'ms', first: 'Mateo', last: 'Sánchez', ini: 'MS', c: 'c2', user: 'msanchez', mail: 'msanchez@empresa.co', rol: '[Operario]', st: 'blocked', birth: '21/01/1995', phone: '315 908 1123', doc: '1032987654' },
+{ id: 'vh', first: 'Valentina', last: 'Herrera', ini: 'VH', c: 'c3', user: 'vherrera', mail: 'vherrera@empresa.co', rol: '[Supervisor]', st: 'pending', birth: '17/11/1990', phone: '301 554 9087', doc: '52789456' },
+{ id: 'sv', first: 'Santiago', last: 'Vargas', ini: 'SV', c: 'c4', user: 'svargas', mail: 'svargas@empresa.co', rol: '[Operario]', st: 'inactive', birth: '08/07/1988', phone: '320 667 3410', doc: '80123654' },
+{ id: 'co', first: 'Camila', last: 'Ortiz', ini: 'CO', c: 'c6', user: 'cortiz', mail: 'cortiz@empresa.co', rol: '[Operario]', st: 'active', birth: '29/02/1996', phone: '312 445 0098', doc: '1015478963' },
+{ id: 'ar', first: 'Andrés', last: 'Rojas', ini: 'AR', c: 'c2', user: 'arojas', mail: 'arojas@empresa.co', rol: '[Operario]', st: 'active', birth: '14/10/1993', phone: '317 330 2265', doc: '1018745632' }
+];
+const byId = {}; P.forEach((p) => { byId[p.id] = p; });
+const nameOf = (p) => p.first + ' ' + p.last;
+const stMap = s.st || {};
+const stOf = (p) => stMap[p.id] || p.st;
+const gone = s.gone || {};
+const G0 = [
+{ id: 'g1', name: 'Turno mañana', ids: ['lg', 'ms', 'vh', 'sv', 'co', 'ar', 'cr'] },
+{ id: 'g2', name: 'Empaque', ids: ['lg', 'sv'] },
+{ id: 'g3', name: 'Acondicionamiento', ids: ['vh', 'ms', 'co', 'ar', 'sv'] }
+];
+const gMembers = s.gm || {};
+const membersOf = (g) => gMembers[g.id] || g.ids;
+const ggone = s.ggone || {};
+const open = s.open;
+const filtered = !!s.filtered;
+const k = s.k || 0;
+const flash = (msg, extra) => { this.setState(Object.assign({ toast: true, toastMsg: msg }, extra || {})); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: false }), 3200); };
+const closed = { sheet: null, dlg: null, menu: false, acts: null, open: null, stOpen: false };
+const openUserEdit = (id) => { this.setState(Object.assign({}, closed, { sheet: 'ue', target: id, loading: true })); clearTimeout(this.lt); this.lt = setTimeout(() => this.setState({ loading: false }), 900); };
+const openDlg = (d, id) => this.setState(Object.assign({}, closed, { dlg: d, target: id, pick: d === 'st' ? stOf(byId[id]) : s.pick }));
+const openGroupEdit = (id) => this.setState(Object.assign({}, closed, { sheet: 'ge', gtarget: id, mpage: 1, added: {} }));
+const openGroupDel = (id) => this.setState(Object.assign({}, closed, { dlg: 'dg', gtarget: id }));
+let list = P.filter((p) => !gone[p.id]);
+if (filtered) list = list.filter((p) => stOf(p) === 'active');
+const nU = list.length;
+const users = list.map((p, i) => {
+const st = ST[stOf(p)]; const nm = nameOf(p); const up = i >= nU - 2 && nU > 3;
+return { name: nm, ini: p.ini, avCls: p.c ? 'av sm ' + p.c : 'av sm', user: p.user, mail: p.mail, rol: p.rol, st: st[0], stCls: 'sb t-' + st[1],
+open: open === p.id ? 'true' : 'false', menuCls: 'pop right at-row' + (up ? ' up' : '') + (open === p.id ? ' open' : ''),
+menuLabel: 'Acciones de ' + nm, sessionsLabel: 'Cerrar todas las sesiones de ' + nm,
+toggle: () => this.setState({ open: open === p.id ? null : p.id }),
+edit: () => openUserEdit(p.id), status: () => openDlg('st', p.id), sessions: () => openDlg('ses', p.id), del: () => openDlg('du', p.id),
+mobileActs: () => this.setState({ acts: { kind: 'u', id: p.id } }) };
+});
+const gl = G0.filter((g) => !ggone[g.id]);
+const groups = gl.map((g, i) => {
+const ids = membersOf(g); const shown = ids.slice(0, 3); const rest = ids.length - shown.length; const up = i >= gl.length - 1 && gl.length > 1;
+return { name: g.name, total: ids.length,
+avs: shown.map((id) => ({ ini: byId[id].ini, name: nameOf(byId[id]), cls: byId[id].c ? 'av sm ' + byId[id].c : 'av sm' })),
+hasMore: rest > 0, more: '+' + rest, moreLabel: 'Ver los ' + rest + ' miembros restantes',
+open: open === g.id ? 'true' : 'false', menuCls: 'pop right at-row' + (up ? ' up' : '') + (open === g.id ? ' open' : ''),
+menuLabel: 'Acciones del grupo ' + g.name,
+toggle: () => this.setState({ open: open === g.id ? null : g.id }),
+edit: () => openGroupEdit(g.id), del: () => openGroupDel(g.id),
+mobileActs: () => this.setState({ acts: { kind: 'g', id: g.id } }) };
+});
+const sheet = s.sheet;
+const isUserSheet = sheet === 'un' || sheet === 'ue';
+const isGroupSheet = sheet === 'gn' || sheet === 'ge';
+const tp = sheet === 'ue' && s.target ? byId[s.target] : null;
+const target = s.target ? byId[s.target] : null;
+const tName = target ? nameOf(target) : '';
+const loading = sheet === 'ue' && !!s.loading;
+const gT = s.gtarget ? G0.filter((g) => g.id === s.gtarget)[0] : null;
+const gIds = gT ? membersOf(gT) : [];
+const added = s.added || {};
+const isEditGroup = sheet === 'ge';
+const pick = ['lg', 'ms', 'vh', 'sv', 'co'].map((id) => {
+const p = byId[id]; const inG = isEditGroup ? gIds.indexOf(id) >= 0 : !!added[id];
+return { name: nameOf(p), ini: p.ini, avCls: p.c ? 'av sm ' + p.c : 'av sm', rol: p.rol, added: inG, addedStr: inG ? 'true' : 'false',
+btn: inG ? 'Agregado' : 'Agregar', btnCls: inG ? 'b b-sec b-sm' : 'b b-out b-sm',
+add: () => {
+if (inG) return;
+if (isEditGroup) { const nx = Object.assign({}, gMembers); nx[gT.id] = gIds.concat([id]); flash('Persona añadida al grupo.', { gm: nx, mk: (s.mk || 0) + 1 }); }
+else { const na = Object.assign({}, added); na[id] = true; this.setState({ added: na }); }
+} };
+});
+const per = 5; const mTotal = gIds.length; const mPages = Math.max(1, Math.ceil(mTotal / per)); const mPage = Math.min(s.mpage || 1, mPages);
+const members = gIds.slice((mPage - 1) * per, mPage * per).map((id) => {
+const p = byId[id];
+return { name: nameOf(p), ini: p.ini, avCls: p.c ? 'av sm ' + p.c : 'av sm', rol: p.rol,
+remove: () => { const nx = Object.assign({}, gMembers); nx[gT.id] = gIds.filter((x) => x !== id); flash('Persona retirada del grupo.', { gm: nx, mk: (s.mk || 0) + 1 }); } };
+});
+const pickSt = s.pick || 'active';
+const acts = s.acts;
+const actsTarget = acts ? (acts.kind === 'u' ? nameOf(byId[acts.id]) : G0.filter((g) => g.id === acts.id)[0].name) : '';
+const isPeople = tab === 'personas';
+const ov = sheet || s.dlg || s.menu || acts;
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+isPeople: isPeople, isGroups: !isPeople,
+tabPeople: isPeople ? 'true' : 'false', tabGroups: isPeople ? 'false' : 'true',
+showPeople: () => this.setState({ tab: 'personas', open: null, k: k + 1 }),
+showGroups: () => this.setState({ tab: 'grupos', open: null, k: k + 1 }),
+newLabel: isPeople ? 'Nuevo usuario' : 'Nuevo grupo',
+openNewPrimary: () => isPeople ? this.setState(Object.assign({}, closed, { sheet: 'un', target: null })) : this.setState(Object.assign({}, closed, { sheet: 'gn', gtarget: null, added: {} })),
+searchPh: isPeople ? 'Buscar usuarios por nombre, correo o nombre de usuario' : 'Buscar grupos por nombre',
+searchLabel: isPeople ? 'Filtros de personas' : 'Filtros de grupos',
+filtered: filtered, filteredStr: filtered ? 'true' : 'false', chipCls: filtered ? 'chip on' : 'chip',
+toggleFilter: () => this.setState({ filtered: !filtered, open: null, k: k + 1 }),
+bodyCls: k % 2 ? 'fade' : '',
+users: users, usersCount: users.length, groups: groups, groupsCount: groups.length,
+userSheetCls: isUserSheet ? 'sheet wide open' : 'sheet wide',
+userTitle: sheet === 'ue' ? 'Editar usuario' : 'Nuevo usuario',
+userDesc: sheet === 'ue' ? 'Cambia los datos de la persona.' : 'Describe los datos de la persona que va a usar el sistema.',
+loading: loading, ready: !loading, isEditUser: sheet === 'ue',
+fFirst: tp ? tp.first : '', fLast: tp ? tp.last : '', fBirth: tp ? tp.birth : 'dd/mm/aaaa', fMail: tp ? tp.mail : '', fPhone: tp ? tp.phone : '', fDoc: tp ? tp.doc : '',
+fUser: tp ? tp.user : 'jperez', fRol: tp ? tp.rol : '[Elige un rol]',
+sessionsLabel: 'Cerrar todas las sesiones de ' + tName, sessionsMsg: 'Se cerrarán todas las sesiones de ' + tName + '. Tendrá que volver a entrar.',
+sessionsFromSheet: () => this.setState({ sheet: null, dlg: 'ses' }),
+saveUser: () => flash(sheet === 'ue' ? 'Usuario actualizado.' : 'Usuario creado.', { sheet: null }),
+groupSheetCls: isGroupSheet ? 'sheet wide open' : 'sheet wide',
+groupTitle: isEditGroup ? 'Editar grupo' : 'Nuevo grupo',
+groupDesc: isEditGroup ? 'Cambia el nombre del grupo y gestiona sus miembros.' : 'Ponle nombre al grupo de trabajo.',
+gName: isEditGroup && gT ? gT.name : '',
+pickerTitle: isEditGroup ? 'Buscar personas para añadir' : 'Miembros iniciales',
+pick: pick, isEditGroup: isEditGroup, members: members, membersCls: (s.mk || 0) % 2 ? 'fade' : '',
+mPage: mPage, mPages: mPages, mTotal: mTotal, mPrevDis: mPage <= 1 ? 'true' : 'false', mNextDis: mPage >= mPages ? 'true' : 'false',
+mPrev: () => { if (mPage > 1) this.setState({ mpage: mPage - 1, mk: (s.mk || 0) + 1 }); }, mNext: () => { if (mPage < mPages) this.setState({ mpage: mPage + 1, mk: (s.mk || 0) + 1 }); },
+saveGroup: () => flash(isEditGroup ? 'Grupo actualizado.' : 'Grupo creado.', { sheet: null }),
+tName: tName, gTargetName: gT ? gT.name : '',
+statusCls: s.dlg === 'st' ? 'dlg open' : 'dlg',
+stOpenStr: s.stOpen ? 'true' : 'false', stPopCls: s.stOpen ? 'pop full open' : 'pop full',
+toggleStOpen: () => this.setState({ stOpen: !s.stOpen }),
+pickLabel: ST[pickSt][0], pickCls: 'sb t-' + ST[pickSt][1],
+stOpts: ['active', 'pending', 'inactive', 'blocked'].map((v) => ({ label: ST[v][0], cls: 'sb t-' + ST[v][1], on: v === pickSt, sel: v === pickSt ? 'true' : 'false', pick: () => this.setState({ pick: v, stOpen: false }) })),
+confirmStatus: () => { const nx = Object.assign({}, stMap); nx[s.target] = pickSt; flash('Estado de la cuenta actualizado.', Object.assign({}, closed, { st: nx, k: k + 1 })); },
+sessionsCls: s.dlg === 'ses' ? 'dlg open' : 'dlg',
+confirmSessions: () => flash('Se cerraron las sesiones de ' + tName + '.', closed),
+delUserCls: s.dlg === 'du' ? 'dlg open' : 'dlg',
+confirmDelUser: () => { const nx = Object.assign({}, gone); nx[s.target] = true; flash('Usuario eliminado.', Object.assign({}, closed, { gone: nx, k: k + 1 })); },
+delGroupCls: s.dlg === 'dg' ? 'dlg open' : 'dlg',
+confirmDelGroup: () => { const nx = Object.assign({}, ggone); nx[s.gtarget] = true; flash('Grupo eliminado.', Object.assign({}, closed, { ggone: nx, k: k + 1 })); },
+actsCls: acts ? 'dlg menu open' : 'dlg menu', actsName: actsTarget, actsLabel: 'Acciones de ' + actsTarget,
+actsIsUser: !!acts && acts.kind === 'u', actsIsGroup: !!acts && acts.kind === 'g',
+actsSessions: 'Cerrar todas las sesiones de ' + actsTarget,
+aEditUser: () => openUserEdit(acts.id), aStatus: () => openDlg('st', acts.id), aSessions: () => openDlg('ses', acts.id), aDelUser: () => openDlg('du', acts.id),
+aEditGroup: () => openGroupEdit(acts.id), aDelGroup: () => openGroupDel(acts.id),
+ovCls: ov ? 'ov open' : 'ov',
+closeAll: () => this.setState(closed),
+toastCls: s.toast ? 'toast show' : 'toast', toastMsg: s.toastMsg || ''
+};
+}
+}
+</script>
+</body>
+</html>

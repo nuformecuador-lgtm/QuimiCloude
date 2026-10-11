@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Inventario en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="Inventario" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Inventario · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">shared/data-table · entity-image · row-actions-menu · form-sheet · presentation-select · presentation-unit-select · shared-select · async-autocomplete · date-picker · text-field · delete-confirm-dialog · error-alert · ui/tabs (UrlTabs) · ui/sonner</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">@tanstack/react-table · @base-ui/react</span> (Tabs, Menu, Dialog, Sheet, Select, Tooltip) · <span class="mono">sonner · lucide-react</span></dd>
+      <dt>Escritorio</dt><dd>«Importar» (outline, enlaza a /inventario/importar) y «Nuevo producto» · pestañas Todos · Producto · Máquina · Envase · Producto terminado (terminado cambia columnas a Imagen · # Pedido · Nombre · Existencia · Alerta de cantidad y el buscador a «Buscar por número de pedido o receta») · cifras en mono a la derecha · existencia bajo la alerta en ámbar con icono · «Disponible» en negrita · ⋯: Lotes, Historial, Ajustar existencia, Editar, Borrar · el menú se abre hacia arriba en las últimas filas para no cortarse</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono (78 px) · la tabla hace scroll horizontal dentro de su caja · Sheets de producto y de lotes a 600 px</dd>
+      <dt>Teléfono</dt><dd>Cabecera con «Alternar barra lateral» + isotipo · «Importar» y «Nuevo producto» a lo ancho · pestañas con scroll horizontal · tabla en tarjetas (imagen, nombre, existencia, alerta, disponible, aviso ámbar) · «Acciones» abre el menú centrado con objetivos de 48 px · lotes e historial también pasan a tarjetas · Sheets a pantalla completa</dd>
+      <dt>Animación</dt><dd>Entrada escalonada · fundido de filas al cambiar de pestaña · menú ⋯ 200/150 ms · Sheet 300/150 ms · Dialog con zoom 300 ms (sobre un segundo velo cuando sale encima de Lotes) · error «Elige un motivo.» sube 150 ms · toasts «Producto creado.», «Existencia ajustada.», «Producto borrado.»</dd>
+      <dt>Por confirmar</dt><dd>Título y texto del borrado de producto · textos de las ayudas «Qué es X» · placeholder de los selects vacíos · toast al editar (hoy ninguno) · si «Historial» del menú de fila abre el lote principal o pide elegir lote · motivos de aumento: solo Conteo físico y Error de carga</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

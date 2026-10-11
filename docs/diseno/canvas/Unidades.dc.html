@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Unidades</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="unidades" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div class="ph">
+          <div class="ph-t"><h1 class="h1">Unidades</h1></div>
+          <div class="ph-act" style="display: flex; gap: 8px"><button class="b b-pri b-touch-m" type="button" onClick="{{ openNew }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nueva unidad</button></div>
+        </div>
+
+        <div class="toolbar" role="toolbar" aria-label="Filtros de unidades">
+          <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Buscar unidades por nombre" aria-label="Buscar unidades por nombre"></label>
+        </div>
+
+        <div class="tw" style="max-width: 880px">
+          <div class="scroll">
+            <table class="collapse">
+              <thead><tr><th scope="col">Nombre</th><th scope="col">Símbolo</th><th scope="col">Equivalencia</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead>
+              <tbody class="{{ bodyCls }}">
+                <sc-for list="{{ rows }}" as="r" hint-placeholder-count="7">
+                  <tr>
+                    <td class="strong">{{ r.name }}</td>
+                    <td class="{{ r.symCls }}">{{ r.sym }}</td>
+                    <td class="{{ r.eqCls }}">{{ r.eq }}</td>
+                    <td class="rowact anchor">
+                      <button class="b b-gho b-ico" type="button" aria-label="{{ r.menuLabel }}" aria-haspopup="menu" aria-expanded="{{ r.open }}" onClick="{{ r.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button>
+                      <div class="{{ r.menuCls }}" role="menu">
+                        <button class="mi" type="button" role="menuitem" onClick="{{ r.edit }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</button>
+                        <div class="sep"></div>
+                        <button class="mi danger" type="button" role="menuitem" onClick="{{ r.del }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Eliminar</button>
+                      </div>
+                    </td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+            <div class="rows-m">
+              <sc-for list="{{ rows }}" as="r" hint-placeholder-count="5">
+                <div class="rm">
+                  <div class="rm-top"><span class="strong">{{ r.name }}</span><span class="{{ r.symCls }}">{{ r.sym }}</span></div>
+                  <div class="rm-top"><span class="{{ r.eqCls }}" style="font-size: 13px">{{ r.eq }}</span><button class="b b-out b-sm" type="button" style="height: 44px" onClick="{{ r.mobileActs }}" aria-label="{{ r.menuLabel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg>Acciones</button></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div class="pg"><span>Página <span class="mono">1</span> de <span class="mono">1</span> · <span class="mono">{{ count }}</span> en total</span><span class="pgb"><button class="b b-out b-ico b-sm" type="button" aria-label="Página anterior" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><button class="b b-out b-ico b-sm" type="button" aria-label="Página siguiente" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="unidades" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <aside class="{{ sheetCls }}" role="dialog" aria-modal="true" aria-labelledby="un-sh">
+    <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="un-sh" class="h2">{{ sheetTitle }}</h2><p class="sub">{{ sheetDesc }}</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="sheet-bd">
+      <div class="f"><label for="un-n">Nombre</label><input id="un-n" class="in" type="text" value="{{ fName }}" autocomplete="off"></div>
+      <div class="f"><label for="un-s">Símbolo</label><input id="un-s" class="in mono" type="text" value="{{ fSym }}" autocomplete="off"></div>
+      <div class="f anchor">
+        <span id="un-b-l" class="fl">Deriva de</span>
+        <button class="in trig" type="button" aria-labelledby="un-b-l" aria-haspopup="listbox" aria-expanded="{{ bOpenStr }}" onClick="{{ toggleB }}"><span>{{ baseLabel }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <div class="{{ bPopCls }}" role="listbox">
+          <sc-for list="{{ bOpts }}" as="o" hint-placeholder-count="3"><button class="opt" type="button" role="option" aria-selected="{{ o.sel }}" onClick="{{ o.pick }}"><span class="{{ o.cls }}">{{ o.label }}</span><sc-if value="{{ o.on }}" hint-placeholder-val="{{ false }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-left: auto"><path d="m5 12 5 5 9-10"></path></svg></sc-if></button></sc-for>
+        </div>
+      </div>
+      <div class="f"><label for="un-f">Factor</label><sc-if value="{{ hasBase }}" hint-placeholder-val="{{ false }}"><input id="un-f" class="in mono" type="text" inputmode="decimal" value="{{ fFactor }}"></sc-if><sc-if value="{{ factorOff }}" hint-placeholder-val="{{ true }}"><input id="un-f" class="in mono" type="text" inputmode="decimal" value="" disabled></sc-if></div>
+    </div>
+    <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ save }}">Guardar</button></div>
+  </aside>
+
+  <div class="{{ deleteCls }}" role="alertdialog" aria-modal="true" aria-labelledby="un-de">
+    <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+    <h2 id="un-de" class="h2">Eliminar la unidad</h2>
+    <p class="sub">Se va a eliminar la unidad <span class="strong">{{ tName }}</span>. Esta acción no se puede deshacer.</p>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des" type="button" onClick="{{ confirmDelete }}">Eliminar</button></div>
+  </div>
+
+  <div class="{{ actsCls }}" role="menu" aria-label="{{ actsLabel }}">
+    <div class="dlg-hd" style="padding: 0 4px 8px"><span class="h3">{{ tName }}</span><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <button class="mi" type="button" role="menuitem" onClick="{{ aEdit }}">Editar</button>
+    <div class="sep"></div>
+    <button class="mi danger" type="button" role="menuitem" onClick="{{ aDel }}">Eliminar</button>
+  </div>
+
+  <div class="toastwrap" aria-live="polite"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastMsg }}</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const data = [
+{ id: 'kg', name: 'Kilogramo', sym: 'kg', base: null, factor: null },
+{ id: 'g', name: 'Gramo', sym: 'g', base: 'kg', factor: '0,001' },
+{ id: 't', name: 'Tonelada', sym: 't', base: 'kg', factor: '1000' },
+{ id: 'L', name: 'Litro', sym: 'L', base: null, factor: null },
+{ id: 'mL', name: 'Mililitro', sym: 'mL', base: 'L', factor: '0,001' },
+{ id: 'gal', name: 'Galón', sym: 'gal', base: 'L', factor: '3,78' },
+{ id: 'u', name: 'Unidad', sym: null, base: null, factor: null }
+];
+const byId = {}; data.forEach((d) => { byId[d.id] = d; });
+const lbl = (d) => d.sym || d.name;
+const gone = s.gone || {};
+const list = data.filter((d) => !gone[d.id]);
+const open = s.open;
+const k = s.k || 0;
+const closed = { sheet: null, dlg: null, menu: false, acts: null, open: null, bOpen: false };
+const flash = (msg, extra) => { this.setState(Object.assign({ toast: true, toastMsg: msg }, extra || {})); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: false }), 3200); };
+const t = s.target ? byId[s.target] : null;
+const edit = s.sheet === 'edit';
+const base = s.base !== undefined ? s.base : (edit && t ? t.base : null);
+const bases = data.filter((d) => d.base === null && d.sym);
+const n = list.length;
+const fFactor = edit && t && t.factor && base === t.base ? t.factor : (base ? '1' : '');
+const fSym = edit && t ? (t.sym || '') : '';
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+bodyCls: k % 2 ? 'fade' : '',
+count: n,
+rows: list.map((d, i) => { const up = i >= n - 2 && n > 3; return {
+name: d.name, sym: d.sym || '—', symCls: d.sym ? 'mono' : 'dim',
+eq: d.base ? '1 ' + lbl(d) + ' = ' + d.factor + ' ' + lbl(byId[d.base]) : '—', eqCls: d.base ? 'mono' : 'dim',
+open: open === d.id ? 'true' : 'false', menuCls: 'pop right at-row' + (up ? ' up' : '') + (open === d.id ? ' open' : ''),
+menuLabel: 'Acciones de la unidad ' + d.name,
+toggle: () => this.setState({ open: open === d.id ? null : d.id }),
+edit: () => this.setState(Object.assign({}, closed, { sheet: 'edit', target: d.id, base: undefined })),
+del: () => this.setState(Object.assign({}, closed, { dlg: 'del', target: d.id })),
+mobileActs: () => this.setState({ acts: true, target: d.id }) }; }),
+openNew: () => this.setState(Object.assign({}, closed, { sheet: 'new', target: null, base: undefined })),
+sheetCls: s.sheet ? 'sheet open' : 'sheet',
+sheetTitle: edit ? 'Editar unidad' : 'Nueva unidad',
+sheetDesc: edit ? 'Cambia los datos de la unidad de medida.' : 'Describe la nueva unidad de medida.',
+fName: edit && t ? t.name : '', fSym: fSym, fFactor: fFactor,
+baseLabel: base ? lbl(byId[base]) : 'No deriva de ninguna',
+bOpenStr: s.bOpen ? 'true' : 'false', bPopCls: s.bOpen ? 'pop full open' : 'pop full',
+toggleB: () => this.setState({ bOpen: !s.bOpen }),
+bOpts: [{ id: null, label: 'No deriva de ninguna', cls: 'dim' }].concat(bases.map((b) => ({ id: b.id, label: lbl(b), cls: 'mono' }))).map((o) => ({ label: o.label, cls: o.cls, on: o.id === base, sel: o.id === base ? 'true' : 'false', pick: () => this.setState({ base: o.id, bOpen: false }) })),
+hasBase: !!base, factorOff: !base,
+save: () => flash(edit ? 'Unidad actualizada.' : 'Unidad creada.', closed),
+tName: t ? t.name : '',
+deleteCls: s.dlg === 'del' ? 'dlg open' : 'dlg',
+confirmDelete: () => { const nx = Object.assign({}, gone); nx[s.target] = true; flash('Unidad eliminada.', Object.assign({}, closed, { gone: nx, k: k + 1 })); },
+actsCls: s.acts ? 'dlg menu open' : 'dlg menu', actsLabel: 'Acciones de la unidad ' + (t ? t.name : ''),
+aEdit: () => this.setState(Object.assign({}, closed, { sheet: 'edit', base: undefined })),
+aDel: () => this.setState(Object.assign({}, closed, { dlg: 'del' })),
+ovCls: (s.sheet || s.dlg || s.menu || s.acts) ? 'ov open' : 'ov',
+closeAll: () => this.setState(closed),
+toastCls: s.toast ? 'toast show' : 'toast', toastMsg: s.toastMsg || ''
+};
+}
+}
+</script>
+</body>
+</html>

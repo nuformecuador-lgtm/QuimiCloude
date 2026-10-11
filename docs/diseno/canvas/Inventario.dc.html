@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Inventario</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="inventario" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div class="ph">
+          <div class="ph-t"><h1 class="h1">Inventario</h1></div>
+          <div class="ph-act" style="display: flex; gap: 8px">
+            <a class="b b-out b-touch-m" href="InventarioImportar.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"></path></svg>Importar</a>
+            <button class="b b-pri b-touch-m" type="button" onClick="{{ openNew }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nuevo producto</button>
+          </div>
+        </div>
+
+        <nav class="tabs" aria-label="Tipo de producto">
+          <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5"><button class="tab" type="button" aria-current="{{ t.cur }}" onClick="{{ t.pick }}">{{ t.label }}</button></sc-for>
+        </nav>
+
+        <div class="toolbar" role="toolbar" aria-label="Buscar en el inventario">
+          <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="{{ ph }}" aria-label="{{ ph }}"></label>
+        </div>
+
+        <div class="tw">
+          <div class="scroll">
+            <table class="collapse">
+              <thead><tr>
+                <th scope="col" style="width: 68px">Imagen</th>
+                <sc-if value="{{ fin }}" hint-placeholder-val="{{ false }}"><th scope="col"># Pedido</th></sc-if>
+                <th scope="col">Nombre</th>
+                <th scope="col" class="num">Existencia</th>
+                <th scope="col" class="num">Alerta de cantidad</th>
+                <sc-if value="{{ notFin }}" hint-placeholder-val="{{ true }}"><th scope="col" class="num">Reservado</th><th scope="col" class="num">Disponible</th></sc-if>
+                <th scope="col"><span class="sr">Acciones</span></th>
+              </tr></thead>
+              <tbody class="{{ bodyCls }}">
+                <sc-for list="{{ rows }}" as="r" hint-placeholder-count="7">
+                  <tr>
+                    <td><span class="{{ r.thumbCls }}" role="img" aria-label="{{ r.imgLabel }}"><sc-if value="{{ r.noPhoto }}" hint-placeholder-val="{{ true }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg></sc-if></span></td>
+                    <sc-if value="{{ fin }}" hint-placeholder-val="{{ false }}"><td class="{{ r.pedCls }}">{{ r.ped }}</td></sc-if>
+                    <td class="strong">{{ r.name }}</td>
+                    <td class="num mono"><span class="{{ r.exCls }}" title="{{ r.exTitle }}"><sc-if value="{{ r.low }}" hint-placeholder-val="{{ false }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 3 22 20H2zM12 10v4M12 17h.01"></path></svg></sc-if>{{ r.ex }}</span></td>
+                    <td class="num mono dim">{{ r.al }}</td>
+                    <sc-if value="{{ notFin }}" hint-placeholder-val="{{ true }}"><td class="num mono">{{ r.res }}</td><td class="num mono strong">{{ r.disp }}</td></sc-if>
+                    <td class="rowact anchor">
+                      <button class="b b-gho b-ico" type="button" aria-label="{{ r.menuLabel }}" aria-haspopup="menu" aria-expanded="{{ r.open }}" onClick="{{ r.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button>
+                      <div class="{{ r.menuCls }}" role="menu">
+                        <button class="mi" type="button" role="menuitem" onClick="{{ r.openLots }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5zM2 13l10 5 10-5"></path></svg>Lotes</button>
+                        <button class="mi" type="button" role="menuitem" onClick="{{ r.openHist }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 8v4l3 2"></path></svg>Historial</button>
+                        <button class="mi" type="button" role="menuitem" onClick="{{ r.openAdjust }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z"></path></svg>Ajustar existencia</button>
+                        <button class="mi" type="button" role="menuitem" onClick="{{ r.openEdit }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</button>
+                        <div class="sep"></div>
+                        <button class="mi danger" type="button" role="menuitem" onClick="{{ r.openDelete }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Borrar</button>
+                      </div>
+                    </td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+            <div class="rows-m">
+              <sc-for list="{{ rows }}" as="r" hint-placeholder-count="5">
+                <div class="rm">
+                  <div style="display: flex; align-items: center; gap: 12px; min-width: 0">
+                    <span class="{{ r.thumbCls }}" role="img" aria-label="{{ r.imgLabel }}"><sc-if value="{{ r.noPhoto }}" hint-placeholder-val="{{ true }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg></sc-if></span>
+                    <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0"><span class="strong">{{ r.name }}</span><sc-if value="{{ fin }}" hint-placeholder-val="{{ false }}"><span class="{{ r.pedCls }}" style="font-size: 13px">{{ r.ped }}</span></sc-if></div>
+                  </div>
+                  <div class="rm-meta"><span>Existencia <span class="mono" style="color: {{ r.exColor }}; font-weight: {{ r.exWeight }}">{{ r.ex }}</span></span><span>Alerta de cantidad <span class="mono">{{ r.al }}</span></span><sc-if value="{{ notFin }}" hint-placeholder-val="{{ true }}"><span>Disponible <span class="mono strong" style="color: var(--fg)">{{ r.disp }}</span></span></sc-if></div>
+                  <div class="rm-top"><sc-if value="{{ r.low }}" hint-placeholder-val="{{ false }}"><span class="cap low"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 3 22 20H2zM12 10v4M12 17h.01"></path></svg>{{ r.exTitle }}</span></sc-if><span style="flex: 1"></span><button class="b b-out b-sm" type="button" onClick="{{ r.mobileActs }}" aria-label="{{ r.menuLabel }}" style="height: 44px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg>Acciones</button></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div class="pg"><span>{{ pgText }}</span><span class="pgb"><button class="b b-out b-ico b-sm" type="button" aria-label="Página anterior" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><sc-if value="{{ hasNext }}" hint-placeholder-val="{{ true }}"><button class="b b-out b-ico b-sm" type="button" aria-label="Página siguiente"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></sc-if><sc-if value="{{ noNext }}" hint-placeholder-val="{{ false }}"><button class="b b-out b-ico b-sm" type="button" aria-label="Página siguiente" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></sc-if></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="inventario" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <aside class="{{ sheetCls }}" role="dialog" aria-modal="true" aria-labelledby="iv-sh">
+    <div class="sheet-hd"><h2 id="iv-sh" class="h2">{{ sheetTitle }}</h2><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="sheet-bd">
+      <div class="f"><label for="iv-n">Nombre</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="iv-n" class="in" type="text" value="{{ pv.name }}" placeholder="Escribe un nombre o busca un producto existente"></label></div>
+      <div class="f"><label for="iv-t">Tipo</label><button id="iv-t" class="in trig" type="button"><span>{{ pv.tipo }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+      <div class="g2 cq-1">
+        <div class="f"><div style="display: flex; align-items: center; gap: 4px"><label class="fl" for="iv-e">Existencia</label><button class="b b-gho b-ico b-sm" type="button" aria-label="Qué es Existencia" style="width: 24px; height: 24px; position: relative"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg><span class="tip">[Qué es Existencia]</span></button></div><input id="iv-e" class="in mono" type="text" value="{{ pv.ex }}"></div>
+        <div class="f"><div style="display: flex; align-items: center; gap: 4px"><label class="fl" for="iv-a">Alerta de cantidad</label><button class="b b-gho b-ico b-sm" type="button" aria-label="Qué es Alerta de cantidad" style="width: 24px; height: 24px; position: relative"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg><span class="tip">[Qué es Alerta de cantidad]</span></button></div><input id="iv-a" class="in mono" type="text" value="{{ pv.al }}"></div>
+        <div class="f"><label for="iv-p">Presentación</label><button id="iv-p" class="in trig" type="button"><span>{{ pv.pres }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+        <div class="f"><label for="iv-u">Unidad</label><button id="iv-u" class="in trig" type="button"><span>{{ pv.uni }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+        <div class="f"><label for="iv-cu">Costo unitario</label><input id="iv-cu" class="in mono" type="text" value="{{ pv.cu }}"></div>
+        <div class="f"><div style="display: flex; align-items: center; gap: 4px"><label class="fl" for="iv-ct">Costo total</label><button class="b b-gho b-ico b-sm" type="button" aria-label="Qué es Costo total" style="width: 24px; height: 24px; position: relative"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg><span class="tip">[Qué es Costo total]</span></button></div><input id="iv-ct" class="in mono" type="text" value="{{ pv.ct }}"></div>
+      </div>
+      <div class="f"><label for="iv-l">Lote</label><input id="iv-l" class="in mono" type="text" value="{{ pv.lote }}"></div>
+      <div class="g2 cq-1">
+        <div class="f"><label for="iv-fx">Fecha de expiración</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg><input id="iv-fx" class="in mono" type="text" value="{{ pv.exp }}"></label></div>
+        <div class="f"><label for="iv-fc">Fecha de compra</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg><input id="iv-fc" class="in mono" type="text" value="{{ pv.comp }}"></label></div>
+      </div>
+    </div>
+    <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ saveProduct }}">Guardar</button></div>
+  </aside>
+
+  <aside class="{{ lotsCls }}" role="dialog" aria-modal="true" aria-labelledby="iv-lt">
+    <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><span class="lab">Lotes</span><h2 id="iv-lt" class="h2">{{ lotsName }}</h2></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="sheet-bd">
+      <div class="tw">
+        <div class="scroll">
+          <table class="collapse" style="font-size: 13px">
+            <thead><tr><th scope="col">Lote</th><th scope="col" class="num">Cantidad</th><th scope="col" class="num">Fecha de compra</th><th scope="col" class="num">Vencimiento</th><th scope="col" class="num">Apartado</th><th scope="col" class="num">Disponible</th><th scope="col">Presentación del envase</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead>
+            <tbody>
+              <sc-for list="{{ lots }}" as="l" hint-placeholder-count="3">
+                <tr>
+                  <td class="mono strong">{{ l.code }}</td>
+                  <td class="num mono">{{ l.qty }}</td>
+                  <td class="num mono">{{ l.buy }}</td>
+                  <td class="num mono" style="color: {{ l.vColor }}; font-weight: {{ l.vWeight }}">{{ l.exp }}</td>
+                  <td class="num mono">{{ l.res }}</td>
+                  <td class="num mono strong">{{ l.disp }}</td>
+                  <td>{{ l.pres }}</td>
+                  <td class="rowact anchor">
+                    <button class="b b-gho b-ico" type="button" aria-label="{{ l.menuLabel }}" aria-haspopup="menu" aria-expanded="{{ l.open }}" onClick="{{ l.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button>
+                    <div class="{{ l.menuCls }}" role="menu">
+                      <button class="mi" type="button" role="menuitem" onClick="{{ l.openHist }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 8v4l3 2"></path></svg>Historial</button>
+                      <button class="mi" type="button" role="menuitem" onClick="{{ l.openAdjust }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z"></path></svg>Ajustar existencia</button>
+                    </div>
+                  </td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+          <div class="rows-m">
+            <sc-for list="{{ lots }}" as="l" hint-placeholder-count="3">
+              <div class="rm">
+                <div class="rm-top"><span class="mono strong">{{ l.code }}</span><span class="cap">{{ l.pres }}</span></div>
+                <div class="rm-meta"><span>Cantidad <span class="mono">{{ l.qty }}</span></span><span>Apartado <span class="mono">{{ l.res }}</span></span><span>Disponible <span class="mono strong" style="color: var(--fg)">{{ l.disp }}</span></span></div>
+                <div class="rm-meta"><span>Fecha de compra <span class="mono">{{ l.buy }}</span></span><span>Vencimiento <span class="mono" style="color: {{ l.vColor }}; font-weight: {{ l.vWeight }}">{{ l.exp }}</span></span></div>
+                <div class="rm-top"><span></span><button class="b b-out b-sm" type="button" onClick="{{ l.mobileActs }}" aria-label="{{ l.menuLabel }}" style="height: 44px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg>Acciones</button></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="{{ ov2Cls }}" style="z-index: 41" onClick="{{ closeDlg }}"></div>
+
+  <div class="{{ histCls }}" role="dialog" aria-modal="true" aria-labelledby="iv-hi" style="z-index: 42">
+    <div class="dlg-hd"><h2 id="iv-hi" class="h2">Historial del lote <span class="mono">{{ histLot }}</span></h2><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeDlg }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="tw">
+      <div class="scroll" style="max-height: 420px">
+        <table class="collapse" style="font-size: 13px">
+          <thead><tr><th scope="col">Tipo</th><th scope="col" class="num">Cantidad</th><th scope="col" class="num">Existencia anterior</th><th scope="col" class="num">Total contado</th><th scope="col">Motivo</th><th scope="col">Pedido</th><th scope="col">Autor</th><th scope="col" class="num">Fecha</th></tr></thead>
+          <tbody>
+            <sc-for list="{{ hist }}" as="h" hint-placeholder-count="6">
+              <tr><td class="strong">{{ h.tipo }}</td><td class="num mono">{{ h.qty }}</td><td class="num mono dim">{{ h.prev }}</td><td class="num mono">{{ h.cont }}</td><td>{{ h.mot }}</td><td class="mono">{{ h.ped }}</td><td class="{{ h.autCls }}">{{ h.aut }}</td><td class="num mono">{{ h.date }}</td></tr>
+            </sc-for>
+          </tbody>
+        </table>
+        <div class="rows-m">
+          <sc-for list="{{ hist }}" as="h" hint-placeholder-count="4">
+            <div class="rm">
+              <div class="rm-top"><span class="strong">{{ h.tipo }}</span><span class="mono strong">{{ h.qty }}</span></div>
+              <div class="rm-meta"><span>Existencia anterior <span class="mono">{{ h.prev }}</span></span><span>Total contado <span class="mono">{{ h.cont }}</span></span><span>Motivo {{ h.mot }}</span><span>Pedido <span class="mono">{{ h.ped }}</span></span></div>
+              <div class="rm-meta"><span class="{{ h.autCls }}">{{ h.aut }}</span><span class="mono">{{ h.date }}</span></div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ adjCls }}" role="dialog" aria-modal="true" aria-labelledby="iv-aj" style="z-index: 42">
+    <div class="dlg-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="iv-aj" class="h2">Ajustar existencia</h2><p class="sub"><span class="strong" style="color: var(--fg)">{{ adjName }}</span> · Lote <span class="mono">{{ adjLot }}</span></p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeDlg }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="g2 cq-1">
+      <div class="f"><label for="iv-er">Existencia registrada</label><input id="iv-er" class="in mono" type="text" value="120,00" disabled></div>
+      <div class="f"><label for="iv-tc">Total contado</label><input id="iv-tc" class="in mono focus" type="text" value="115,50"></div>
+    </div>
+    <div class="panel" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; font-size: 14px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--muted-fg)"><path d="M12 4v11M7 10l5 5 5-5M4 20h16"></path></svg><span>Disminución de <span class="mono strong">4,50</span></span></div>
+    <div class="f">
+      <label for="iv-mo">Motivo</label>
+      <div class="anchor">
+        <button id="iv-mo" class="in trig" type="button" aria-haspopup="listbox" aria-expanded="{{ motOpenStr }}" aria-invalid="{{ adjErrStr }}" onClick="{{ toggleMot }}"><span style="color: {{ motColor }}">{{ motLabel }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <div class="{{ motPopCls }}" role="listbox" aria-label="Motivo">
+          <sc-for list="{{ motivos }}" as="m" hint-placeholder-count="4"><button class="{{ m.cls }}" type="button" role="option" aria-selected="{{ m.sel }}" onClick="{{ m.pick }}">{{ m.label }}<sc-if value="{{ m.isSel }}" hint-placeholder-val="{{ false }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="margin-left: auto"><path d="m5 12 5 5 9-10"></path></svg></sc-if></button></sc-for>
+        </div>
+      </div>
+      <sc-if value="{{ adjErr }}" hint-placeholder-val="{{ false }}"><span class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Elige un motivo.</span></sc-if>
+    </div>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeDlg }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ doAdjust }}">Ajustar</button></div>
+  </div>
+
+  <div class="{{ delCls }}" role="alertdialog" aria-modal="true" aria-labelledby="iv-de" style="z-index: 42">
+    <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+    <h2 id="iv-de" class="h2">[Borrar el producto]</h2>
+    <p class="sub">[Se va a borrar «<span class="strong" style="color: var(--fg)">{{ delName }}</span>». Esta acción no se puede deshacer.]</p>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeDlg }}">Cancelar</button><button class="b b-des" type="button" onClick="{{ doDelete }}">Borrar</button></div>
+  </div>
+
+  <div class="{{ actsCls }}" role="menu" aria-label="Acciones del producto" style="z-index: 42">
+    <div class="dlg-hd" style="padding: 0 4px 8px"><span class="h3">{{ actsName }}</span><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeDlg }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <button class="mi" type="button" role="menuitem" onClick="{{ actsLots }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5zM2 13l10 5 10-5"></path></svg>Lotes</button>
+    <button class="mi" type="button" role="menuitem" onClick="{{ actsHist }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 8v4l3 2"></path></svg>Historial</button>
+    <button class="mi" type="button" role="menuitem" onClick="{{ actsAdjust }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z"></path></svg>Ajustar existencia</button>
+    <sc-if value="{{ actsIsProduct }}" hint-placeholder-val="{{ true }}">
+      <button class="mi" type="button" role="menuitem" onClick="{{ actsEdit }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</button>
+      <div class="sep"></div>
+      <button class="mi danger" type="button" role="menuitem" onClick="{{ actsDelete }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Borrar</button>
+    </sc-if>
+  </div>
+
+  <div class="toastwrap" aria-live="polite"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastMsg }}</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const tab = s.tab || 0;
+const fin = tab === 4;
+const labels = ['Todos', 'Producto', 'Máquina', 'Envase', 'Producto terminado'];
+// [nombre, existencia, alerta, reservado, disponible, bajo alerta, con foto]
+const prod = [
+['Hipoclorito de sodio 13 %','180,00 kg','50,00','40,00','140,00',false,true],
+['Ácido cítrico','12,50 kg','20,00','5,00','7,50',true,false],
+['Tensoactivo LESS 70 %','64,00 kg','25,00','10,00','54,00',false,true],
+['Hidróxido de sodio','3,40 kg','10,00','2,00','1,40',true,false],
+['Fragancia limón','8,20 kg','5,00','0,00','8,20',false,true],
+['Cloruro de sodio','95,00 kg','30,00','12,00','83,00',false,false],
+['Colorante amarillo','1,80 kg','0,50','0,20','1,60',false,false]
+];
+const maq = [
+['Mezcladora 200 L','1 u','—','0','1',false,true],
+['Mezcladora 500 L','1 u','—','1','0',false,true],
+['Balanza 300 kg','2 u','—','0','2',false,false],
+['Balanza de precisión','1 u','—','0','1',false,false],
+['Envasadora semiautomática','1 u','—','1','0',false,true],
+['Agitador de hélice','3 u','—','1','2',false,false],
+['Medidor de pH','2 u','—','0','2',false,false]
+];
+const env = [
+['Galón 3,78 L','35 u','60','12','23',true,true],
+['Garrafa 20 L','18 u','10','6','12',false,true],
+['Tambor 200 L','9 u','4','1','8',false,true],
+['Botella 1 L','240 u','100','40','200',false,false],
+['Bidón 5 L','22 u','30','0','22',true,false],
+['Tapa rosca 38 mm','410 u','200','60','350',false,false],
+['Etiqueta multiusos','520 u','300','0','520',false,false]
+];
+// [pedido, nombre, existencia, alerta, bajo alerta, con foto]
+const term = [
+['2026-0000008','Limpiador multiusos limón','30 u','10',false,true],
+['2026-0000005','Blanqueador hipoclorito 5 %','52 u','10',false,true],
+['2026-0000001','Desengrasante alcalino','6 u','10',true,true],
+['2026-0000007','Limpiador cítrico','18 u','10',false,false],
+['2026-0000002','Desengrasante alcalino','24 u','10',false,true],
+['','Limpiador cítrico','14 u','10',false,false],
+['2026-0000013','Blanqueador hipoclorito 5 %','4 u','10',true,false]
+];
+const todos = [prod[0], prod[1], prod[2], prod[3], env[0], env[1], maq[0], maq[2], prod[4], env[2]];
+const src = tab === 1 ? prod : tab === 2 ? maq : tab === 3 ? env : todos;
+const list = fin
+? term.map((d) => ({ ped: d[0] || 'Sin pedido', pedCls: d[0] ? 'mono' : 'dim', name: d[1], ex: d[2], al: d[3], res: '', disp: '', low: d[4], photo: d[5] }))
+: src.map((d) => ({ ped: '', pedCls: '', name: d[0], ex: d[1], al: d[2], res: d[3], disp: d[4], low: d[5], photo: d[6] }));
+const n = list.length;
+const open = s.open;
+const mainLot = 'L-2026-0912';
+const toast = (msg, extra) => { this.setState(Object.assign({ toast: true, tmsg: msg }, extra || {})); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: false }), 3200); };
+const rows = list.map((r, i) => Object.assign(r, {
+thumbCls: r.photo ? 'thumb photo' : 'thumb',
+imgLabel: r.photo ? r.name : 'Sin imagen',
+noPhoto: !r.photo,
+exColor: r.low ? 'var(--w-fg)' : 'inherit',
+exWeight: r.low ? '600' : '400',
+exCls: r.low ? 'low' : '',
+exTitle: r.low ? 'Por debajo de la alerta de cantidad' : '',
+open: open === i ? 'true' : 'false',
+menuCls: 'pop right at-row' + (i <= n - 5 ? '' : ' up') + (open === i ? ' open' : ''),
+menuLabel: 'Acciones de ' + r.name,
+toggle: () => this.setState({ open: open === i ? null : i }),
+mobileActs: () => this.setState({ acts: r.name, actsKind: 'product', open: null }),
+openLots: () => this.setState({ lots: r.name, open: null, lotOpen: null }),
+openHist: () => this.setState({ hist: mainLot, open: null }),
+openAdjust: () => this.setState({ dlg: 'adjust', adjName: r.name, adjLot: mainLot, mot: null, motOpen: false, adjErr: false, open: null }),
+openEdit: () => this.setState({ sheet: 'edit', editName: r.name, open: null }),
+openDelete: () => this.setState({ dlg: 'delete', delName: r.name, open: null })
+}));
+const lotData = [
+['L-2026-0912','120,00','12/09/2026','12/03/2027',false,'40,00','80,00','Garrafa 20 L'],
+['L-2026-0921','60,00','21/09/2026','30/10/2026',true,'0,00','60,00','Garrafa 20 L'],
+['L-2026-0830','0,00','30/08/2026','28/02/2027',false,'0,00','0,00','Tambor 200 L']
+];
+const lotOpen = s.lotOpen;
+const lots = lotData.map((d, i) => ({
+code: d[0], qty: d[1], buy: d[2], exp: d[3], res: d[5], disp: d[6], pres: d[7],
+vColor: d[4] ? 'var(--w-fg)' : 'inherit', vWeight: d[4] ? '600' : '400',
+open: lotOpen === d[0] ? 'true' : 'false',
+menuCls: 'pop right at-row' + (i === 0 ? '' : ' up') + (lotOpen === d[0] ? ' open' : ''),
+menuLabel: 'Acciones del lote ' + d[0],
+toggle: () => this.setState({ lotOpen: lotOpen === d[0] ? null : d[0] }),
+mobileActs: () => this.setState({ acts: d[0], actsKind: 'lot' }),
+openHist: () => this.setState({ hist: d[0], lotOpen: null }),
+openAdjust: () => this.setState({ dlg: 'adjust', adjName: s.lots, adjLot: d[0], mot: null, motOpen: false, adjErr: false, lotOpen: null })
+}));
+const hist = [
+['Apertura','+120,00','0,00','—','—','—','Sistema','12/09/2026 10:14'],
+['Apartado','40,00','120,00','—','—','2026-0000003','Sistema','02/10/2026 08:30'],
+['Apartado','15,00','120,00','—','—','2026-0000009','Sistema','06/10/2026 11:05'],
+['Liberación','15,00','120,00','—','—','2026-0000009','Sistema','08/10/2026 09:12'],
+['Ajuste','−4,50','120,00','115,50','Merma','—','Carlos Restrepo','09/10/2026 16:02'],
+['Ajuste','+4,50','115,50','120,00','Conteo físico','—','Laura Gómez','10/10/2026 08:41']
+].map((h) => ({ tipo: h[0], qty: h[1], prev: h[2], cont: h[3], mot: h[4], ped: h[5], aut: h[6], autCls: h[6] === 'Sistema' ? 'dim' : '', date: h[7] }));
+const mot = s.mot;
+const motivos = ['Merma', 'Rotura', 'Conteo físico', 'Error de carga'].map((m) => ({ label: m, sel: mot === m ? 'true' : 'false', isSel: mot === m, cls: mot === m ? 'opt hl' : 'opt', pick: () => this.setState({ mot: m, motOpen: false, adjErr: false }) }));
+const sheetMode = s.sheet;
+const ed = sheetMode === 'edit';
+const pv = ed
+? { name: s.editName || 'Hipoclorito de sodio 13 %', tipo: 'Producto', ex: '180,00', al: '50,00', pres: 'Garrafa 20 L', uni: 'kg', cu: '4.200,00', ct: '756.000,00', lote: 'L-2026-0912', exp: '12/03/2027', comp: '12/09/2026' }
+: { name: '', tipo: 'Producto', ex: '', al: '', pres: '[Elegir]', uni: '[Elegir]', cu: '', ct: '', lote: '', exp: '', comp: '' };
+const dlgOn = !!(s.hist || s.dlg || s.acts);
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+tabs: labels.map((l, i) => ({ label: l, cur: i === tab ? 'page' : 'false', pick: () => this.setState({ tab: i, open: null, k: (s.k || 0) + 1 }) })),
+fin: fin, notFin: !fin,
+ph: fin ? 'Buscar por número de pedido o receta' : 'Buscar producto',
+bodyCls: (s.k || 0) % 2 ? 'fade' : '',
+rows: rows,
+pgText: tab === 0 ? '10 de 28 productos' : n + ' de ' + n + ' productos',
+hasNext: tab === 0, noNext: tab !== 0,
+openNew: () => this.setState({ sheet: 'new', open: null }),
+sheetCls: sheetMode ? 'sheet wide open' : 'sheet wide',
+sheetTitle: ed ? 'Editar producto' : 'Nuevo producto',
+pv: pv,
+saveProduct: () => ed ? this.setState({ sheet: null }) : toast('Producto creado.', { sheet: null }),
+lotsCls: s.lots ? 'sheet wide open' : 'sheet wide',
+lotsName: s.lots || '',
+lots: lots,
+histCls: s.hist ? 'dlg wide open' : 'dlg wide',
+histLot: s.hist || '',
+hist: hist,
+adjCls: s.dlg === 'adjust' ? 'dlg open' : 'dlg',
+adjName: s.adjName || '',
+adjLot: s.adjLot || '',
+motOpenStr: s.motOpen ? 'true' : 'false',
+toggleMot: () => this.setState({ motOpen: !s.motOpen }),
+motPopCls: s.motOpen ? 'pop full open' : 'pop full',
+motLabel: mot || '[Elegir]',
+motColor: mot ? 'var(--fg)' : 'var(--muted-fg)',
+motivos: motivos,
+adjErr: !!s.adjErr,
+adjErrStr: s.adjErr ? 'true' : 'false',
+doAdjust: () => mot ? toast('Existencia ajustada.', { dlg: null, motOpen: false }) : this.setState({ adjErr: true, motOpen: false }),
+delCls: s.dlg === 'delete' ? 'dlg open' : 'dlg',
+delName: s.delName || '',
+doDelete: () => toast('Producto borrado.', { dlg: null }),
+actsCls: s.acts ? 'dlg menu open' : 'dlg menu',
+actsName: s.acts || '',
+actsIsProduct: s.actsKind !== 'lot',
+actsLots: () => this.setState({ lots: s.acts, acts: null }),
+actsHist: () => this.setState({ hist: s.actsKind === 'lot' ? s.acts : mainLot, acts: null }),
+actsAdjust: () => this.setState({ dlg: 'adjust', adjName: s.actsKind === 'lot' ? s.lots : s.acts, adjLot: s.actsKind === 'lot' ? s.acts : mainLot, mot: null, motOpen: false, adjErr: false, acts: null }),
+actsEdit: () => this.setState({ sheet: 'edit', editName: s.acts, acts: null }),
+actsDelete: () => this.setState({ dlg: 'delete', delName: s.acts, acts: null }),
+ovCls: (sheetMode || s.lots || s.menu || dlgOn) ? 'ov open' : 'ov',
+ov2Cls: (dlgOn && (s.lots || sheetMode)) ? 'ov open' : 'ov',
+closeAll: () => this.setState({ sheet: null, lots: null, lotOpen: null, hist: null, dlg: null, acts: null, menu: false, motOpen: false }),
+closeDlg: () => this.setState({ hist: null, dlg: null, acts: null, motOpen: false }),
+toastCls: s.toast ? 'toast show' : 'toast',
+toastMsg: s.tmsg || ''
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Fórmulas</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="formulas" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div class="ph">
+          <div class="ph-t"><h1 class="h1">Fórmulas</h1></div>
+          <div class="ph-act" style="display: flex; gap: 8px"><button class="b b-out b-touch-m" type="button" aria-haspopup="dialog" onClick="{{ openUpload }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"></path></svg>Subir PDFs</button><a class="b b-pri b-touch-m" href="Formula.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nueva fórmula</a></div>
+        </div>
+
+        <div class="toolbar" role="toolbar" aria-label="Filtros de recetas">
+          <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Buscar receta" aria-label="Buscar receta" value="{{ q }}"></label>
+        </div>
+
+        <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+          <div class="tw">
+            <div class="scroll">
+              <table class="collapse">
+                <thead><tr><th scope="col" style="width: 72px">Imagen</th><th scope="col">Nombre</th><th scope="col" class="num">Pasos</th><th scope="col" class="num">Creado</th><th scope="col" class="num">Actualizado</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead>
+                <tbody>
+                  <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+                    <tr>
+                      <td><span class="{{ r.thumbCls }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="{{ r.icStyle }}"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg></span></td>
+                      <td class="strong">{{ r.name }}</td>
+                      <td class="num mono">{{ r.steps }}</td>
+                      <td class="num mono">{{ r.created }}</td>
+                      <td class="num mono">{{ r.updated }}</td>
+                      <td class="rowact anchor">
+                        <button class="b b-gho b-ico" type="button" aria-label="{{ r.menuLabel }}" aria-haspopup="menu" aria-expanded="{{ r.open }}" onClick="{{ r.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button>
+                        <div class="{{ r.menuCls }}" role="menu">
+                          <a class="mi" role="menuitem" href="Formula.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</a>
+                          <div class="sep"></div>
+                          <button class="mi danger" type="button" role="menuitem" onClick="{{ r.askDelete }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Borrar</button>
+                        </div>
+                      </td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+              <div class="rows-m">
+                <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+                  <div class="rm">
+                    <div class="rm-top" style="justify-content: flex-start; gap: 12px"><span class="{{ r.thumbCls }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="{{ r.icStyle }}"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg></span><span class="strong" style="min-width: 0">{{ r.name }}</span></div>
+                    <div class="rm-meta"><span>Pasos <span class="mono">{{ r.steps }}</span></span><span>Creado <span class="mono">{{ r.created }}</span></span><span>Actualizado <span class="mono">{{ r.updated }}</span></span></div>
+                    <div class="rm-top" style="justify-content: flex-end"><button class="b b-out b-sm" type="button" style="height: 44px" onClick="{{ r.mobileActs }}" aria-label="{{ r.menuLabel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg>Acciones</button></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div class="pg"><span><span class="mono">4</span> de <span class="mono">4</span> recetas</span><span class="pgb"><button class="b b-out b-ico b-sm" type="button" aria-label="Página anterior" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><button class="b b-out b-ico b-sm" type="button" aria-label="Página siguiente" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></span></div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+          <div class="box"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6v18h12V7zM14 3v4h4"></path></svg></span><p class="sub">Todavía no hay recetas en el catálogo.</p><a class="b b-pri" href="Formula.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nueva fórmula</a></div>
+        </sc-if>
+
+        <sc-if value="{{ isNoMatch }}" hint-placeholder-val="{{ false }}">
+          <div class="box"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg></span><p class="sub">[Ninguna receta coincide con la búsqueda.]</p><button class="b b-out" type="button" onClick="{{ clearSearch }}">Limpiar búsqueda y filtros</button></div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="formulas" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <div class="{{ upCls }}" role="dialog" aria-modal="true" aria-labelledby="fo-up" aria-describedby="fo-upd">
+    <div class="dlg-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="fo-up" class="h2">Subir PDFs</h2><p id="fo-upd" class="sub">Solo PDF, hasta [N] archivos por tanda.</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <sc-if value="{{ phPick }}" hint-placeholder-val="{{ false }}">
+      <div class="drop" style="padding: 32px 24px"><span class="thumb lg"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"></path></svg></span><button class="b b-out" type="button" onClick="{{ pick }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6v18h12V7zM14 3v4h4"></path></svg>Elegir PDFs</button></div>
+    </sc-if>
+    <sc-if value="{{ phFiles }}" hint-placeholder-val="{{ true }}">
+      <ul class="lbox fade" style="list-style: none; margin: 0">
+        <sc-for list="{{ files }}" as="f" hint-placeholder-count="3">
+          <li class="lrow" style="justify-content: flex-start; flex-wrap: wrap; padding: 10px 0">
+            <span class="thumb"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6v18h12V7zM14 3v4h4"></path></svg></span>
+            <span style="display: flex; flex-direction: column; gap: 4px; flex: 1 1 180px; min-width: 0"><span class="strong" style="font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ f.name }}</span><span class="cap mono">{{ f.size }}</span>
+              <sc-if value="{{ f.uploading }}" hint-placeholder-val="{{ false }}"><span class="progress bar-ind" role="progressbar" aria-label="Subiendo"><i></i></span></sc-if>
+            </span>
+            <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="{{ f.upCls }}"><i></i>{{ f.up }}</span><sc-if value="{{ f.hasProc }}" hint-placeholder-val="{{ false }}"><span class="{{ f.procCls }}"><i></i>{{ f.proc }}</span></sc-if></span>
+            <sc-if value="{{ f.canResume }}" hint-placeholder-val="{{ false }}"><button class="b b-out b-sm" type="button" onClick="{{ f.resume }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"></path></svg>Reanudar</button></sc-if>
+            <sc-if value="{{ f.canReview }}" hint-placeholder-val="{{ false }}"><a class="b b-pri b-sm b-go" href="ImportarFormula.dc.html">Revisar<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a></sc-if>
+          </li>
+        </sc-for>
+      </ul>
+    </sc-if>
+    <div class="actions">
+      <sc-if value="{{ phSel }}" hint-placeholder-val="{{ false }}"><button class="b b-gho" type="button" style="margin-right: auto" onClick="{{ unpick }}">Quitar la selección</button></sc-if>
+      <button class="b b-out" type="button" onClick="{{ closeAll }}">Cerrar</button>
+      <sc-if value="{{ phSel }}" hint-placeholder-val="{{ false }}"><button class="b b-pri" type="button" onClick="{{ upload }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"></path></svg>Subir</button></sc-if>
+    </div>
+  </div>
+
+  <div class="{{ delCls }}" role="alertdialog" aria-modal="true" aria-labelledby="fo-de" aria-describedby="fo-ded">
+    <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+    <h2 id="fo-de" class="h2">[Borrar la receta]</h2>
+    <div id="fo-ded" style="display: flex; flex-direction: column; gap: 6px"><p class="sub">Se va a borrar «{{ delName }}». Esta acción no se puede deshacer.</p><sc-if value="{{ delHasVers }}" hint-placeholder-val="{{ true }}"><p class="sub" style="color: var(--d-fg)">También se borrarán sus <span class="mono">{{ delVers }}</span> versiones.</p></sc-if></div>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-des" type="button" onClick="{{ doDelete }}">Borrar</button></div>
+  </div>
+
+  <div class="{{ actsCls }}" role="menu" aria-label="Acciones de la receta">
+    <div class="dlg-hd" style="padding: 0 4px 8px"><span class="h3">{{ actsName }}</span><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <a class="mi" role="menuitem" href="Formula.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</a>
+    <div class="sep"></div>
+    <button class="mi danger" type="button" role="menuitem" onClick="{{ actsDelete }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Borrar</button>
+  </div>
+
+  <div class="toastwrap" aria-live="polite"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Receta borrada.</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"estado":{"editor":"enum","options":["lista","vacio","sin-resultados"],"default":"lista"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); clearTimeout(this.t1); clearTimeout(this.t2); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const est = s.est || this.props.estado || 'lista';
+const data = [
+['Desengrasante alcalino', '6', '12/08/2026', '02/10/2026', true, 2],
+['Limpiador multiusos limón', '5', '20/08/2026', '28/09/2026', true, 0],
+['Limpiador cítrico', '4', '03/09/2026', '03/09/2026', false, 0],
+['Blanqueador hipoclorito 5 %', '7', '15/09/2026', '06/10/2026', true, 3]
+];
+const gone = s.gone || {};
+const list = data.filter((d) => !gone[d[0]]);
+const open = s.open;
+const del = data.find((d) => d[0] === s.del);
+const ph = s.ph || 0;
+const resumed = !!s.resumed;
+const files = [['desengrasante-alcalino.pdf', '1,2 MB'], ['limpiador-citrico.pdf', '860 KB'], ['blanqueador-hipoclorito.pdf', '2,4 MB']];
+const T = { 'Sin subir': 'neutral', 'Subiendo': 'progress', 'Subido': 'success', 'No se pudo subir': 'danger', 'En cola': 'neutral', 'Procesando': 'info', 'Listo': 'success', 'Error': 'danger' };
+const fileRow = (f, i) => {
+let up = 'Sin subir'; let proc = '';
+if (ph === 2) up = 'Subiendo';
+if (ph >= 3) {
+if (i === 0) { up = 'Subido'; proc = ph === 3 ? 'Procesando' : 'Listo'; }
+if (i === 1) { up = 'Subido'; proc = ph === 3 ? 'En cola' : 'Error'; }
+if (i === 2) { if (resumed) { up = 'Subido'; proc = 'En cola'; } else { up = 'No se pudo subir'; } }
+}
+return { name: f[0], size: f[1], up: up, upCls: 'sb t-' + T[up], uploading: up === 'Subiendo', hasProc: !!proc, proc: proc, procCls: proc ? 'sb t-' + T[proc] : 'sb', canResume: up === 'No se pudo subir', canReview: proc === 'Listo', resume: () => this.setState({ resumed: true }) };
+};
+const closeAll = () => { clearTimeout(this.t1); clearTimeout(this.t2); this.setState({ menu: false, up: false, ph: 0, resumed: false, del: null, acts: null, open: null }); };
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+q: est === 'sin-resultados' ? 'jabón líquido' : '',
+isList: est === 'lista', isEmpty: est === 'vacio', isNoMatch: est === 'sin-resultados',
+clearSearch: () => this.setState({ est: 'lista' }),
+rows: list.map((d) => ({ name: d[0], steps: d[1], created: d[2], updated: d[3], thumbCls: d[4] ? 'thumb photo' : 'thumb', icStyle: d[4] ? 'color: oklch(0.38 0.06 190)' : '', open: open === d[0] ? 'true' : 'false', menuCls: open === d[0] ? 'pop right at-row open' : 'pop right at-row', menuLabel: 'Acciones de la receta ' + d[0], toggle: () => this.setState({ open: open === d[0] ? null : d[0] }), askDelete: () => this.setState({ del: d[0], open: null }), mobileActs: () => this.setState({ acts: d[0] }) })),
+actsCls: s.acts ? 'dlg menu open' : 'dlg menu', actsName: s.acts || '',
+actsDelete: () => this.setState({ del: s.acts, acts: null }),
+openUpload: () => this.setState({ up: true, ph: 0, resumed: false }),
+upCls: s.up ? 'dlg wide open' : 'dlg wide',
+phPick: ph === 0, phFiles: ph > 0, phSel: ph === 1, phNotSel: ph !== 1,
+files: files.map(fileRow),
+pick: () => this.setState({ ph: 1 }),
+unpick: () => this.setState({ ph: 0 }),
+upload: () => { this.setState({ ph: 2 }); clearTimeout(this.t1); clearTimeout(this.t2); this.t1 = setTimeout(() => this.setState({ ph: 3 }), 1500); this.t2 = setTimeout(() => this.setState({ ph: 4 }), 3300); },
+delCls: del ? 'dlg open' : 'dlg',
+delName: del ? del[0] : '', delVers: del ? del[5] : 0, delHasVers: !!(del && del[5] > 0),
+doDelete: () => { this.setState({ gone: Object.assign({}, gone, { [s.del]: true }), del: null, toast: true }); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: false }), 3200); },
+ovCls: (s.menu || s.up || s.del || s.acts) ? 'ov open' : 'ov',
+closeAll: closeAll,
+toastCls: s.toast ? 'toast show' : 'toast'
+};
+}
+}
+</script>
+</body>
+</html>

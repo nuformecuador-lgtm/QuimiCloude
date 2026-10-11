@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Establecer contraseña</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="scroller" style="background: var(--side)">
+    <div style="position: relative; min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 40px 16px; overflow: hidden">
+      <div aria-hidden="true" style="position: absolute; inset: 0; pointer-events: none; color: rgb(255 255 255 / 0.13)">
+        <svg style="position: absolute; left: 5%; top: 10%; width: 130px; height: 130px; animation: qc-spin 70s linear infinite" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="21,10.5 32.7,17.3 32.7,30.8 21,37.5 9.3,30.8 9.3,17.3"></polygon><path d="M32.7 30.8 40.9 35.5"></path><circle cx="40.9" cy="35.5" r="3" fill="currentColor"></circle></svg>
+        <svg style="position: absolute; right: 6%; top: 18%; width: 90px; height: 90px; animation: qc-spin 55s linear infinite reverse" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="16" cy="24" r="6"></circle><circle cx="34" cy="16" r="4"></circle><circle cx="34" cy="34" r="4"></circle><path d="M21.5 21.5 30.5 17.5M21.5 26.5 30.5 32.5"></path></svg>
+        <svg style="position: absolute; right: 9%; bottom: 5%; width: 160px; height: 160px; animation: qc-spin 90s linear infinite" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="21,10.5 32.7,17.3 32.7,30.8 21,37.5 9.3,30.8 9.3,17.3"></polygon><path d="M14.5 26.7v-5.4M21.9 17l4.7 2.7"></path></svg>
+        <svg style="position: absolute; left: 12%; bottom: 8%; width: 70px; height: 70px; animation: qc-spin 44s linear infinite reverse" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.6"><polygon points="21,10.5 32.7,17.3 32.7,30.8 21,37.5 9.3,30.8 9.3,17.3"></polygon><path d="M9.3 17.3 3.3 13.8"></path><circle cx="3.3" cy="13.8" r="3" fill="currentColor"></circle></svg>
+      </div>
+
+      <sc-if value="{{ form }}" hint-placeholder-val="{{ true }}">
+        <main class="card enter" style="position: relative; width: min(440px, 100%); padding: 28px 28px 24px; gap: 18px; border-radius: 18px; box-shadow: var(--shadow-dlg)" aria-labelledby="ec-h">
+          <img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 40px; height: 40px">
+          <div style="display: flex; flex-direction: column; gap: 6px"><h1 id="ec-h" class="h1" style="font-size: 24px">Establece tu contraseña</h1><p class="sub">Escribe la contraseña con la que vas a entrar y repítela para confirmarla.</p></div>
+
+          <div class="f"><label for="ec-p">Contraseña nueva</label>
+            <div class="pw"><input id="ec-p" class="in in-touch" type="{{ type1 }}" autocomplete="new-password" value="{{ pw }}" onInput="{{ onPw }}" aria-describedby="ec-r" aria-invalid="{{ inv1 }}"><button class="pw-eye" type="button" aria-controls="ec-p" aria-pressed="{{ show1 }}" aria-label="{{ eye1 }}" onClick="{{ toggle1 }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><path class="eye-slash" d="M3 3l18 18"></path></svg></button></div>
+          </div>
+
+          <ul id="ec-r" class="panel" style="list-style: none; margin: 0; display: flex; flex-direction: column; gap: 8px">
+            <sc-for list="{{ rules }}" as="r" hint-placeholder-count="7">
+              <li class="{{ r.cls }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ r.icon }}"></path></svg><span>{{ r.label }}<span class="sr">{{ r.sr }}</span></span></li>
+            </sc-for>
+          </ul>
+
+          <div class="f"><label for="ec-p2">Repite la contraseña</label>
+            <div class="pw"><input id="ec-p2" class="in in-touch" type="{{ type2 }}" autocomplete="new-password" value="{{ pw2 }}" onInput="{{ onPw2 }}" aria-invalid="{{ inv2 }}" aria-describedby="ec-e2"><button class="pw-eye" type="button" aria-controls="ec-p2" aria-pressed="{{ show2 }}" aria-label="{{ eye2 }}" onClick="{{ toggle2 }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path><path class="eye-slash" d="M3 3l18 18"></path></svg></button></div>
+            <sc-if value="{{ mismatch }}" hint-placeholder-val="{{ false }}"><span id="ec-e2" class="err" role="alert"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Las dos contraseñas no coinciden.</span></sc-if>
+          </div>
+
+          <sc-if value="{{ failing }}" hint-placeholder-val="{{ false }}">
+            <div class="nt n-d enter" role="alert"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg><div><b>La contraseña todavía no cumple estos requisitos:</b><ul style="margin: 4px 0 0; padding-left: 18px"><sc-for list="{{ missing }}" as="m" hint-placeholder-count="2"><li>{{ m.label }}</li></sc-for></ul></div></div>
+          </sc-if>
+
+          <button class="b b-pri b-touch b-block" type="button" aria-busy="{{ busyStr }}" aria-disabled="{{ busyStr }}" onClick="{{ save }}"><sc-if value="{{ busy }}" hint-placeholder-val="{{ false }}"><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg></sc-if>{{ saveLabel }}</button>
+        </main>
+      </sc-if>
+
+      <sc-if value="{{ done }}" hint-placeholder-val="{{ false }}">
+        <main class="card enter" style="position: relative; width: min(440px, 100%); padding: 36px 28px 28px; gap: 16px; align-items: center; text-align: center; border-radius: 18px; box-shadow: var(--shadow-dlg)" aria-labelledby="ec-ok">
+          <div class="dlg-ic success"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg></div>
+          <div style="display: flex; flex-direction: column; gap: 6px"><h1 id="ec-ok" class="h1" style="font-size: 24px">Contraseña establecida</h1><p class="sub">Ya puedes entrar con ella.</p></div>
+          <a class="b b-pri b-touch b-block b-go" href="Login.dc.html">Ir a iniciar sesión<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+        </main>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"exito":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); }
+renderVals() {
+const s = this.state || {};
+const dark = !!this.props.oscuro;
+const pw = s.pw === undefined ? 'Quimi' : s.pw;
+const pw2 = s.pw2 === undefined ? '' : s.pw2;
+const done = s.done !== undefined ? s.done : !!this.props.exito;
+const busy = !!s.busy;
+const tried = !!s.tried;
+const ok = [
+pw.length >= 8,
+pw.length > 0 && pw.length <= 64,
+/[A-ZÁÉÍÓÚÑ]/.test(pw),
+/[a-záéíóúñ]/.test(pw),
+/[0-9]/.test(pw),
+/[^A-Za-z0-9ÁÉÍÓÚÑáéíóúñ]/.test(pw),
+!!s.leakOk
+];
+const labels = ['Al menos 8 caracteres','Como máximo 64 caracteres','Al menos una letra mayúscula','Al menos una letra minúscula','Al menos un número','Al menos un símbolo que no sea letra ni número','No debe figurar en una lista de credenciales filtradas'];
+const CHECK = 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6';
+const RING = 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z';
+const localOk = ok.slice(0, 6).every(Boolean);
+const missing = labels.filter((l, i) => i < 6 && !ok[i]).map((l) => ({ label: l }));
+const mismatch = tried && pw2 !== pw;
+const failing = tried && !localOk;
+const show1 = !!s.s1; const show2 = !!s.s2;
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+form: !done, done: done,
+pw: pw, pw2: pw2,
+onPw: (e) => this.setState({ pw: e && e.target ? e.target.value : '' }),
+onPw2: (e) => this.setState({ pw2: e && e.target ? e.target.value : '' }),
+type1: show1 ? 'text' : 'password', show1: show1 ? 'true' : 'false', eye1: show1 ? 'Ocultar la contraseña' : 'Mostrar la contraseña', toggle1: () => this.setState({ s1: !show1 }),
+type2: show2 ? 'text' : 'password', show2: show2 ? 'true' : 'false', eye2: show2 ? 'Ocultar la contraseña' : 'Mostrar la contraseña', toggle2: () => this.setState({ s2: !show2 }),
+rules: labels.map((l, i) => ({ label: l, icon: ok[i] ? CHECK : RING, cls: ok[i] ? 'rule ok' : 'rule', sr: ok[i] ? ' (cumplido)' : ' (pendiente)' })),
+inv1: failing ? 'true' : 'false',
+inv2: mismatch ? 'true' : 'false',
+mismatch: mismatch, failing: failing, missing: missing,
+busy: busy, busyStr: busy ? 'true' : 'false',
+saveLabel: busy ? 'Guardando…' : 'Guardar contraseña',
+save: () => {
+if (busy) return;
+if (!localOk || pw2 !== pw) { this.setState({ tried: true }); return; }
+this.setState({ tried: true, busy: true });
+clearTimeout(this.t);
+this.t = setTimeout(() => this.setState({ busy: false, leakOk: true, done: true }), 1400);
+}
+};
+}
+}
+</script>
+</body>
+</html>

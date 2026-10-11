@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Dashboard en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="Dashboard" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Dashboard · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">shared/data-table · status-badge · responsible-avatars · row-actions-menu · ui/checkbox · shared/empty-state · shared/error-state</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">@tanstack/react-table · @base-ui/react</span> (Menu, Checkbox, Tooltip) · <span class="mono">lucide-react</span></dd>
+      <dt>Escritorio</dt><dd>Sección «Recorridos de ejecución» con buscador «Buscar por número de pedido» y check «Solo cancelados» · columnas Nº de pedido · Estado · Personas · Primera anotación · Última anotación · Duración · Vueltas atrás · «Ver recorrido» deja de ser enlace en la celda y pasa al menú ⋯ · vueltas atrás mayores que 0 en ámbar</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono (78 px) · la tabla hace scroll horizontal dentro de su caja</dd>
+      <dt>Teléfono</dt><dd>Cabecera con «Alternar barra lateral» + isotipo · la tabla pasa a tarjetas (nº, estado, primera anotación, duración, vueltas atrás, personas) · «Acciones» abre el menú centrado con objetivos de 48 px</dd>
+      <dt>Animación</dt><dd>Entrada escalonada · al buscar o marcar el check las filas se refrescan con fundido 200 ms · menú ⋯ 200/150 ms · tooltip de nombre al pasar por el avatar</dd>
+      <dt>Por confirmar</dt><dd>Qué marca exactamente «Dado de baja» (aquí: la persona de la fila está dada de baja) · paginación del listado · texto del botón de reintento del error</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

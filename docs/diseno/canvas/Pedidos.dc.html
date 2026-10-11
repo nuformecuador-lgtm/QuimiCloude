@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Pedidos</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="pedidos" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div class="ph">
+          <div class="ph-t"><h1 class="h1">Pedidos</h1></div>
+          <div class="ph-act" style="display: flex; gap: 8px"><button class="b b-pri b-touch-m" type="button" onClick="{{ openNew }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nuevo pedido</button></div>
+        </div>
+
+        <div class="toolbar" role="toolbar" aria-label="Filtros de pedidos">
+          <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Buscar por receta" aria-label="Buscar por receta"></label>
+          <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Filtrar por cliente" aria-label="Filtrar por cliente"></label>
+          <button class="{{ chipStateCls }}" type="button" onClick="{{ toggleFilter }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Estado<sc-if value="{{ filtered }}" hint-placeholder-val="{{ false }}"><span class="v">En proceso</span></sc-if></button>
+          <button class="chip" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Prioridad</button>
+          <button class="chip" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg>Fecha de solicitud</button>
+        </div>
+
+        <div class="tw">
+          <div class="scroll">
+            <table class="collapse">
+              <thead><tr><th scope="col">Nº de pedido</th><th scope="col">Estado</th><th scope="col">Prioridad</th><th scope="col">Receta</th><th scope="col">Cliente</th><th scope="col" class="num">Cantidad</th><th scope="col">Presentación</th><th scope="col" class="num">Fecha de solicitud</th><th scope="col">Motivo de cancelación</th><th scope="col">Cobertura</th><th scope="col">Responsables</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead>
+              <tbody class="{{ bodyCls }}">
+                <sc-for list="{{ rows }}" as="r" hint-placeholder-count="7">
+                  <tr>
+                    <td class="mono">{{ r.no }}</td>
+                    <td><span class="{{ r.stCls }}"><i></i>{{ r.st }}</span></td>
+                    <td><span class="{{ r.pmCls }}"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="10" width="3" height="5" rx="1" fill="currentColor"></rect><rect x="6" y="6" width="3" height="9" rx="1" fill="currentColor" opacity="{{ r.o2 }}"></rect><rect x="11" y="2" width="3" height="13" rx="1" fill="currentColor" opacity="{{ r.o3 }}"></rect></svg>{{ r.pr }}</span></td>
+                    <td class="strong">{{ r.rec }}</td>
+                    <td>{{ r.cli }}</td>
+                    <td class="num mono">{{ r.qty }}</td>
+                    <td>{{ r.pres }}</td>
+                    <td class="num mono">{{ r.date }}</td>
+                    <td>{{ r.mot }}</td>
+                    <td><span class="{{ r.covCls }}"><i></i>{{ r.cov }}</span></td>
+                    <td><span class="avs"><span class="av sm">LG</span><span class="av sm c2">MS</span></span></td>
+                    <td class="rowact anchor">
+                      <button class="b b-gho b-ico" type="button" aria-label="{{ r.menuLabel }}" aria-haspopup="menu" aria-expanded="{{ r.open }}" onClick="{{ r.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button>
+                      <div class="{{ r.menuCls }}" role="menu">
+                        <button class="mi" type="button" role="menuitem" onClick="{{ openEdit }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</button>
+                        <button class="mi" type="button" role="menuitem" onClick="{{ openResp }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg>Responsables</button>
+                        <button class="mi" type="button" role="menuitem" onClick="{{ openCli }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM7 18c1-2 3-3 5-3s4 1 5 3"></path></svg>Cliente</button>
+                        <button class="mi" type="button" role="menuitem" onClick="{{ openRep }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13h8v8H3zM13 13h8v8h-8zM8 3h8v8H8z"></path></svg>Reparto y unidad</button>
+                        <button class="mi" type="button" role="menuitem" onClick="{{ openDeliver }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7"></path></svg>Entregar</button>
+                        <div class="sep"></div>
+                        <button class="mi danger" type="button" role="menuitem" onClick="{{ openCancel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg>Cancelar</button>
+                        <button class="mi danger" type="button" role="menuitem" onClick="{{ openDelete }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Eliminar</button>
+                      </div>
+                    </td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+            <div class="rows-m">
+              <sc-for list="{{ rows }}" as="r" hint-placeholder-count="5">
+                <div class="rm">
+                  <div class="rm-top"><span class="mono strong">{{ r.no }}</span><span class="{{ r.stCls }}"><i></i>{{ r.st }}</span></div>
+                  <span class="strong">{{ r.rec }}</span>
+                  <div class="rm-meta"><span>{{ r.cli }}</span><span class="mono">{{ r.qty }}</span><span class="mono">{{ r.date }}</span></div>
+                  <div class="rm-top"><span class="{{ r.pmCls }}"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="10" width="3" height="5" rx="1" fill="currentColor"></rect><rect x="6" y="6" width="3" height="9" rx="1" fill="currentColor" opacity="{{ r.o2 }}"></rect><rect x="11" y="2" width="3" height="13" rx="1" fill="currentColor" opacity="{{ r.o3 }}"></rect></svg>{{ r.pr }}</span><button class="b b-out b-sm" type="button" onClick="{{ r.mobileActs }}" aria-label="{{ r.menuLabel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg>Acciones</button></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div class="pg"><span>8 de 10 pedidos</span><span class="pgb"><button class="b b-out b-ico b-sm" type="button" aria-label="Página anterior" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><button class="b b-out b-ico b-sm" type="button" aria-label="Página siguiente"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="pedidos" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <aside class="{{ sheetCls }}" role="dialog" aria-modal="true" aria-labelledby="pd-sh">
+    <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="pd-sh" class="h2">{{ sheetTitle }}</h2><p class="sub">{{ sheetDesc }}</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="sheet-bd">
+      <div class="drop row"><span class="thumb lg"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg></span><span class="sub">Sin receta elegida</span></div>
+      <div class="f"><label for="pd-r">Receta</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="pd-r" class="in" type="text" placeholder="Busca una receta por su nombre"></label></div>
+      <div class="f"><label for="pd-v">Versión</label><button id="pd-v" class="in trig" type="button"><span>Original</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+      <div class="f"><label for="pd-c">Cliente</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="pd-c" class="in" type="text" placeholder="Busca un cliente por su nombre"></label></div>
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) 140px; gap: 10px"><div class="f"><label for="pd-q">Cantidad</label><input id="pd-q" class="in mono num" type="text" value="120,00"></div><div class="f"><label for="pd-u">Unidad</label><button id="pd-u" class="in trig" type="button"><span>kg</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div></div>
+      <div class="f"><label for="pd-p">Prioridad</label><button id="pd-p" class="in trig" type="button"><span>Media</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+      <div class="card" style="padding: 16px; gap: 10px"><span class="h3">Reparto en envases</span><div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 8px; align-items: end"><div class="f"><label>Envase</label><button class="in trig" type="button"><span>Garrafa 20 L</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div><div class="f"><label>Cantidad</label><input class="in mono num" type="text" value="6"></div><button class="b b-out" type="button" style="height: 40px">Añadir</button></div><span class="cap">Disponible <span class="mono">18</span> · Cubre <span class="mono">120,00 kg</span></span></div>
+      <div class="f"><span class="fl">Responsables</span><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="text" placeholder="Buscar personas para asignar"></label><span class="cap">Asignados directamente</span><div class="person"><span class="av sm">LG</span>Laura Gómez<button class="b b-gho b-sm" type="button" style="margin-left: auto" onClick="{{ removeResp }}">Quitar del pedido</button></div></div>
+    </div>
+    <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ save }}">Guardar</button></div>
+  </aside>
+
+  <div class="{{ cancelCls }}" role="alertdialog" aria-modal="true" aria-labelledby="pd-ca">
+    <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg></div>
+    <h2 id="pd-ca" class="h2">Cancelar el pedido</h2>
+    <p class="sub">Se va a cancelar el pedido <span class="mono">2026-0000003</span>. Un pedido cancelado ya no se puede editar.</p>
+    <div class="f"><label for="pd-m">Motivo de la cancelación</label><textarea id="pd-m" class="in" rows="3"></textarea></div>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des" type="button" onClick="{{ doCancel }}">Cancelar el pedido</button></div>
+  </div>
+
+  <div class="{{ deleteCls }}" role="alertdialog" aria-modal="true" aria-labelledby="pd-de">
+    <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+    <h2 id="pd-de" class="h2">Eliminar el pedido</h2>
+    <p class="sub">Se va a eliminar el pedido <span class="mono">2026-0000003</span>. Esta acción no se puede deshacer.</p>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des" type="button" onClick="{{ doDelete }}">Eliminar</button></div>
+  </div>
+
+  <div class="{{ respCls }}" role="dialog" aria-modal="true" aria-labelledby="pd-rs">
+    <div class="dlg-hd"><h2 id="pd-rs" class="h2">Responsables</h2><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <p class="sub">Pedido <span class="mono">{{ curNo }}</span>.</p>
+    <div class="f"><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="text" placeholder="Buscar personas para asignar" aria-label="Buscar personas para asignar"></label></div>
+    <span class="cap">Asignados directamente</span>
+    <div class="lbox">
+      <div class="lrow"><span class="person"><span class="av sm">LG</span>Laura Gómez</span><button class="b b-gho b-sm" type="button" onClick="{{ removeResp }}">Quitar del pedido</button></div>
+      <div class="lrow"><span class="person"><span class="av sm c2">MS</span>Mateo Sánchez</span><button class="b b-gho b-sm" type="button" onClick="{{ removeResp }}">Quitar del pedido</button></div>
+    </div>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ doAssign }}">Asignar</button></div>
+  </div>
+
+  <div class="{{ cliCls }}" role="dialog" aria-modal="true" aria-labelledby="pd-cl">
+    <div class="dlg-hd"><h2 id="pd-cl" class="h2">Cliente</h2><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <p class="sub">Pedido <span class="mono">{{ curNo }}</span>. Solo se cambia el cliente.</p>
+    <div class="f"><label for="pd-cl2">Cliente</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="pd-cl2" class="in" type="text" value="Mateo Sánchez" placeholder="Busca un cliente por su nombre"></label></div>
+    <div class="actions"><button class="b b-gho" type="button" style="margin-right: auto" onClick="{{ doCli }}">Quitar cliente</button><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ doCli }}">Guardar</button></div>
+  </div>
+
+  <div class="{{ repCls }}" role="dialog" aria-modal="true" aria-labelledby="pd-rp">
+    <div class="dlg-hd"><h2 id="pd-rp" class="h2">Reparto y unidad</h2><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <p class="sub">Pedido <span class="mono">{{ curNo }}</span>. Solo se cambian la unidad y el reparto en envases.</p>
+    <div class="g2"><div class="f"><label for="pd-rq">Cantidad</label><input id="pd-rq" class="in mono num" type="text" value="120,00" disabled></div><div class="f"><label for="pd-ru">Unidad</label><button id="pd-ru" class="in trig" type="button"><span>kg</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div></div>
+    <div class="lbox"><div class="lrow"><span>Garrafa 20 L</span><span class="mono">6</span></div></div>
+    <span class="cap">Disponible <span class="mono">18</span> · Cubre <span class="mono">120,00 kg</span></span>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ doRep }}">Guardar</button></div>
+  </div>
+
+  <aside class="{{ deliverCls }}" role="dialog" aria-modal="true" aria-labelledby="pd-en">
+    <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="pd-en" class="h2">Entregar pedido <span class="mono">{{ curNo }}</span></h2><p class="sub">Elige el cliente y, por presentación, de qué lotes salen los envases.</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="sheet-bd">
+      <div class="f"><label for="pd-ec">Cliente</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="pd-ec" class="in" type="text" value="Mateo Sánchez" placeholder="Busca un cliente por su nombre"></label></div>
+      <span class="h3">Garrafa 20 L</span>
+      <div class="tw">
+        <div class="scroll">
+          <table class="collapse">
+            <thead><tr><th scope="col">Lote</th><th scope="col" class="num">Disponibles</th><th scope="col" class="num">Entrada</th><th scope="col" class="num">Vence</th></tr></thead>
+            <tbody>
+              <sc-for list="{{ lots }}" as="l" hint-placeholder-count="2">
+                <tr><td class="mono">{{ l.lot }}</td><td class="num mono">{{ l.av }}</td><td class="num"><input class="in mono num" type="text" value="{{ l.inp }}" aria-label="{{ l.lbl }}" style="width: 90px"></td><td class="num mono">{{ l.exp }}</td></tr>
+              </sc-for>
+            </tbody>
+          </table>
+          <div class="rows-m">
+            <sc-for list="{{ lots }}" as="l" hint-placeholder-count="2">
+              <div class="rm">
+                <div class="rm-top"><span class="mono strong">{{ l.lot }}</span><span class="mono">{{ l.exp }}</span></div>
+                <div class="rm-meta"><span>Disponibles <span class="mono">{{ l.av }}</span></span></div>
+                <div class="f"><label>Entrada</label><input class="in mono num" type="text" value="{{ l.inp }}" aria-label="{{ l.lbl }}"></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ doDeliver }}">Entregar</button></div>
+  </aside>
+
+  <div class="{{ actsCls }}" role="menu" aria-label="Acciones del pedido">
+    <div class="dlg-hd" style="padding: 0 4px 8px"><span class="h3">Pedido <span class="mono">{{ actsNo }}</span></span><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <button class="mi" type="button" role="menuitem" onClick="{{ openEdit }}">Editar</button>
+    <button class="mi" type="button" role="menuitem" onClick="{{ openResp }}">Responsables</button>
+    <button class="mi" type="button" role="menuitem" onClick="{{ openCli }}">Cliente</button>
+    <button class="mi" type="button" role="menuitem" onClick="{{ openRep }}">Reparto y unidad</button>
+    <button class="mi" type="button" role="menuitem" onClick="{{ openDeliver }}">Entregar</button>
+    <div class="sep"></div>
+    <button class="mi danger" type="button" role="menuitem" onClick="{{ openCancel }}">Cancelar</button>
+    <button class="mi danger" type="button" role="menuitem" onClick="{{ openDelete }}">Eliminar</button>
+  </div>
+
+  <div class="toastwrap" aria-live="polite"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastText }}</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const data = [
+['2026-0000003','En curso','progress','Alta',3,'Desengrasante alcalino','Mateo Sánchez','120,00 kg','Garrafa 20 L','02/10/2026','Apartado','success',''],
+['2026-0000004','Por empacar','waiting','Crítica',4,'Limpiador multiusos limón','Valentina Herrera','80,50 kg','Galón 3,78 L','03/10/2026','Apartado','success',''],
+['2026-0000005','En empaque','progress','Media',2,'Blanqueador hipoclorito 5 %','Santiago Vargas','200,00 L','Tambor 200 L','04/10/2026','Apartado','success',''],
+['2026-0000006','Por acondicionar','waiting','Alta',3,'Limpiador multiusos limón','Laura Gómez','45,00 kg','Galón 3,78 L','05/10/2026','Apartado','success',''],
+['2026-0000010','Bloqueado','danger','Alta',3,'Limpiador cítrico','Laura Gómez','25,00 kg','Galón 3,78 L','09/10/2026','Sin cobertura completa','waiting',''],
+['2026-0000011','Pendiente','neutral','Baja',1,'Desengrasante alcalino','Mateo Sánchez','60,00 kg','Garrafa 20 L','10/10/2026','Sin apartar','neutral',''],
+['2026-0000009','Cancelado','muted','Media',2,'Blanqueador hipoclorito 5 %','Valentina Herrera','150,00 L','Tambor 200 L','08/10/2026','Sin apartar','neutral','El cliente retiró el pedido.']
+];
+const toast = (text, extra) => { this.setState(Object.assign({ sheet: null, dlg: null, acts: null, toast: text }, extra || {})); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: null }), 3200); };
+const openDlg = (kind) => () => this.setState({ dlg: kind, open: null, acts: null, cur: s.open || s.acts || '2026-0000003' });
+const filtered = !!s.filtered;
+const list = filtered ? data.filter((d) => d[2] === 'progress') : data;
+const open = s.open;
+const k = s.k || 0;
+const sheetMode = s.sheet;
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+filtered: filtered,
+chipStateCls: filtered ? 'chip on' : 'chip',
+toggleFilter: () => this.setState({ filtered: !filtered, open: null, k: k + 1 }),
+bodyCls: k % 2 ? 'fade' : '',
+rows: list.map((d, i) => ({ no: d[0], st: d[1], stCls: 'sb t-' + d[2], pr: d[3], pmCls: d[4] === 4 ? 'pm crit' : 'pm', o2: d[4] >= 2 ? '1' : '0.2', o3: d[4] >= 3 ? '1' : '0.2', rec: d[5], cli: d[6], qty: d[7], pres: d[8], date: d[9], mot: d[12] || '—',cov: d[10], covCls: 'sb t-' + d[11], open: open === d[0] ? 'true' : 'false', menuCls: 'pop right at-row' +(i >= list.length - 3 ? ' up' : '') + (open === d[0] ? ' open' : ''), menuLabel: 'Acciones del pedido ' + d[0], toggle: () => this.setState({ open: open === d[0] ? null : d[0] }), mobileActs: () => this.setState({ acts: d[0] }) })),
+actsCls: s.acts ? 'dlg menu open' : 'dlg menu', actsNo: s.acts || '',
+curNo: s.cur || '2026-0000003',
+openResp: openDlg('resp'), openCli: openDlg('cli'), openRep: openDlg('rep'), openDeliver: openDlg('deliver'),
+respCls: s.dlg === 'resp' ? 'dlg open' : 'dlg',
+cliCls: s.dlg === 'cli' ? 'dlg open' : 'dlg',
+repCls: s.dlg === 'rep' ? 'dlg open' : 'dlg',
+deliverCls: s.dlg === 'deliver' ? 'sheet wide open' : 'sheet wide',
+lots: [['L-2026-0912','12','6','12/09/2027'],['L-2026-0930','6','0','30/09/2027']].map((l) => ({ lot: l[0], av: l[1], inp: l[2], exp: l[3], lbl: 'Entrada del lote ' + l[0] })),
+removeResp: () => toast('Responsable retirado del pedido.', { sheet: s.sheet, dlg: s.dlg }),
+doAssign: () => toast('Se añadieron 2 personas al pedido.'),
+doCli: () => toast('Cliente actualizado.'),
+doRep: () => toast('Reparto actualizado.'),
+doDeliver: () => toast('Pedido entregado'),
+doCancel: () => toast('Pedido cancelado.'),
+doDelete: () => toast('Pedido eliminado.'),
+openNew: () => this.setState({ sheet: 'new', open: null }),
+openEdit: () => this.setState({ sheet: 'edit', open: null, acts: null }),
+openCancel: () => this.setState({ dlg: 'cancel', open: null, acts: null }),
+openDelete: () => this.setState({ dlg: 'delete', open: null, acts: null }),
+sheetCls: sheetMode ? 'sheet wide open' : 'sheet wide',
+sheetTitle: sheetMode === 'edit' ? 'Editar pedido' : 'Nuevo pedido',
+sheetDesc: sheetMode === 'edit' ? 'Cambia los datos del pedido. Se guardan todos los campos.' : 'Completa los datos del pedido. La fecha y el número los pone el sistema.',
+cancelCls: s.dlg === 'cancel' ? 'dlg open' : 'dlg',
+deleteCls: s.dlg === 'delete' ? 'dlg open' : 'dlg',
+ovCls: (sheetMode || s.dlg || s.menu || s.acts) ? 'ov open' : 'ov',
+closeAll: () => this.setState({ sheet: null, dlg: null, menu: false, acts: null }),
+save: () => toast(sheetMode === 'edit' ? 'Pedido actualizado.' : 'Pedido creado.'),
+toastCls: s.toast ? 'toast show' : 'toast',
+toastText: s.toast || ''
+};
+}
+}
+</script>
+</body>
+</html>

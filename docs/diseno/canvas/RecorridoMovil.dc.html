@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Recorrido en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="Recorrido" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Recorrido · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">shared/back-button · status-badge · shared/stat · ui/avatar · shared/timeline · ui/skeleton · shared/error-state</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">lucide-react</span> · ninguna nueva</dd>
+      <dt>Escritorio</dt><dd>«Volver a la lista» pasa de enlace a botón con flecha · h1 «Recorrido del pedido {nº}» · tres datos Estado / Duración / Vueltas atrás (en ámbar si hay alguna) · «Anotaciones» como línea de tiempo: acción, posición, hora, persona y motivo; Retroceder en ámbar, Arrancar/Retomar/Comenzar empaque en azul, Finalizar/Terminar empaque en verde, Cancelar en rojo</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono · la línea de tiempo ocupa todo el ancho</dd>
+      <dt>Teléfono</dt><dd>Los tres datos se apilan en una columna · hora y acción se reparten en dos líneas si no caben · botón «Volver a la lista» de 36 px dentro de una fila de 44 px</dd>
+      <dt>Animación</dt><dd>Esqueleto 700 ms mientras carga · las anotaciones entran subiendo una tras otra (40 ms de desfase) · la tarjeta de cada anotación se realza al pasar · la flecha de «Volver» se desplaza 3 px</dd>
+      <dt>Por confirmar</dt><dd>Formato de «posición» (aquí «Paso X de Y») y de las posiciones de empaque · texto real del motivo: [MOTIVO…] · estado del pedido tras «Terminar empaque»</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

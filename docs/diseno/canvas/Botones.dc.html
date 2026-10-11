@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Botones</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 1200px; height: 980px; padding: 40px 48px; display: flex; flex-direction: column; gap: 20px; position: relative; overflow: hidden">
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <h1 class="h1">Botones</h1>
+    <p class="sub" style="max-width: 860px">Un solo <span class="mono">Button</span> con variantes y tallas. El primario desliza su degradado al pasar; contorno, secundario y fantasma reciben un velo que entra desde la derecha. Al pulsar, todos bajan a 98 %. «Volver» nunca es un enlace de texto suelto.</p>
+  </div>
+
+  <div class="g2" style="gap: 20px">
+    <section class="card" aria-labelledby="bt-var">
+      <span id="bt-var" class="lab">Variantes</span>
+      <div style="display: flex; flex-wrap: wrap; gap: 16px 20px; align-items: flex-start">
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start"><button class="b b-pri" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nuevo pedido</button><span class="cap mono">b-pri · default</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start"><button class="b b-out" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"></path></svg>Importar</button><span class="cap mono">b-out · outline</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start"><button class="b b-sec" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M4 20h16"></path></svg>Descargar plantilla</button><span class="cap mono">b-sec · secondary</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start"><button class="b b-gho" type="button">Quitar del pedido</button><span class="cap mono">b-gho · ghost</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start"><button class="b b-des" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Eliminar</button><span class="cap mono">b-des · destructive</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start"><button class="b b-lnk" type="button" style="height: 36px">¿Olvidaste tu contraseña?</button><span class="cap mono">b-lnk · link</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start"><button class="b b-gho b-ico" type="button" aria-label="Acciones del pedido 2026-0000003"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button><span class="cap mono">b-ico</span></div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="bt-sz">
+      <span id="bt-sz" class="lab">Tallas</span>
+      <div style="display: grid; grid-template-columns: 130px auto auto auto; gap: 14px 14px; align-items: center; justify-content: start">
+        <span class="cap mono">b-sm · 32 px</span><button class="b b-pri b-sm" type="button">Guardar</button><button class="b b-out b-sm" type="button">Cancelar</button><button class="b b-out b-ico b-sm" type="button" aria-label="Página siguiente"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button>
+        <span class="cap mono">default · 36 px</span><button class="b b-pri" type="button">Guardar</button><button class="b b-out" type="button">Cancelar</button><button class="b b-out b-ico" type="button" aria-label="Página siguiente"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button>
+        <span class="cap mono">b-touch · 44 px</span><button class="b b-pri b-touch" type="button">Guardar</button><button class="b b-out b-touch" type="button">Cancelar</button><button class="b b-out b-ico b-touch" type="button" aria-label="Página siguiente"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button>
+        <span class="cap mono">b-xl · 52 px</span><button class="b b-pri b-xl" type="button">Siguiente<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button><button class="b b-out b-xl" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Anterior</button><span></span>
+      </div>
+      <span class="cap">touch y xl son las del operario en el teléfono (StepReader: Anterior / Siguiente / Finalizar). En pantallas privadas, <span class="mono">b-touch-m</span> sube a 44 px solo en el ancho de teléfono.</span>
+    </section>
+  </div>
+
+  <div style="display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px">
+    <section class="card" aria-labelledby="bt-st">
+      <span id="bt-st" class="lab">Estados</span>
+      <div class="g3" style="gap: 16px 14px">
+        <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start"><span class="cap">Reposo</span><button class="b b-pri" type="button">Guardar</button><button class="b b-out" type="button">Cancelar</button></div>
+        <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start"><span class="cap">Al pasar</span><button class="b b-pri hov" type="button">Guardar</button><button class="b b-out hov" type="button">Cancelar</button></div>
+        <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start"><span class="cap">Foco de teclado</span><button class="b b-pri foc" type="button">Guardar</button><button class="b b-out foc" type="button">Cancelar</button></div>
+        <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start"><span class="cap">Pulsado · 98 %</span><button class="b b-pri" type="button" style="scale: .98">Guardar</button><button class="b b-out hov" type="button" style="scale: .98">Cancelar</button></div>
+        <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start"><span class="cap">Deshabilitado</span><button class="b b-pri" type="button" disabled>Guardar</button><button class="b b-out" type="button" disabled>Cancelar</button></div>
+        <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start"><span class="cap">Enviando (pulsa)</span><button class="b b-pri" type="button" aria-busy="{{ busyStr }}" disabled="{{ busy }}" onClick="{{ save }}"><sc-if value="{{ busy }}" hint-placeholder-val="{{ false }}"><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg></sc-if>{{ saveLabel }}</button><span class="cap">«Entrar» → «Entrando…» sigue la misma regla.</span></div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="bt-nav">
+      <span id="bt-nav" class="lab">Navegación: volver y seguir</span>
+      <div style="display: flex; flex-wrap: wrap; gap: 12px">
+        <a class="b b-out b-back" href="Dashboard.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver a la lista</a>
+        <a class="b b-out b-back" href="Inventario.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver a inventario</a>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 12px">
+        <a class="b b-pri b-go" href="Login.dc.html">Ir a iniciar sesión<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+        <a class="b b-out b-go" href="Formula.dc.html">Ver la fórmula<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+      </div>
+      <button class="b b-dash" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Añadir paso</button>
+      <span class="cap">La flecha se adelanta 3 px al pasar. Son <span class="mono">&lt;a href&gt;</span> con forma de botón: navegan, no envían.</span>
+    </section>
+  </div>
+
+  <section class="card" aria-labelledby="bt-ft" style="gap: 14px">
+    <span id="bt-ft" class="lab">Pies: secundario a la izquierda, principal a la derecha</span>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 8px"><span class="cap">Pie de formulario · FormSheet</span><div style="border: 1px solid var(--border); border-radius: 10px; overflow: hidden"><div class="sheet-ft" style="padding: 12px 14px"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div></div></div>
+      <div style="display: flex; flex-direction: column; gap: 8px"><span class="cap">Pie de borrado · DeleteConfirmDialog</span><div style="border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px"><div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-des" type="button">Eliminar</button></div></div></div>
+      <div style="display: flex; flex-direction: column; gap: 8px"><span class="cap">AlertDialog con motivo</span><div style="border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px"><div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-des" type="button">Cancelar el pedido</button></div></div></div>
+      <div style="display: flex; flex-direction: column; gap: 8px"><span class="cap">En teléfono · 44 px, mitad y mitad</span><div style="border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; display: flex; gap: 10px"><button class="b b-out b-touch" type="button" style="flex: 1">Cancelar</button><button class="b b-pri b-touch" type="button" style="flex: 1">Guardar</button></div></div>
+    </div>
+  </section>
+
+  <dl class="spec" style="margin-top: auto">
+    <dt>Componente</dt><dd><span class="mono">components/ui/button.tsx</span> · variantes <span class="mono">default · outline · outline-dashed</span> (<span class="mono">b-dash</span>) <span class="mono">· secondary · ghost · destructive · link</span> · tallas <span class="mono">xs · sm · default · lg · icon-*</span> + prop <span class="mono">touch</span> (44 px) · <span class="mono">xl</span> es propuesta para el operario · clases <span class="mono">btn-shine</span> y <span class="mono">btn-veil</span> · ojo: <span class="mono">qc.css</span> dibuja sm/default a 32/36 px; hoy son <span class="mono">h-7</span>/<span class="mono">h-8</span> (28/32 px)</dd>
+    <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (Button, useRender para los <span class="mono">&lt;a&gt;</span> con forma de botón) · <span class="mono">class-variance-authority</span> · <span class="mono">lucide-react</span></dd>
+    <dt>Animación</dt><dd>degradado del primario 200 ms <span class="mono">--ease-standard</span> · velo 200 ms · color y borde 100 ms · pulsado <span class="mono">scale .98</span> 100 ms · flecha de <span class="mono">b-back</span>/<span class="mono">b-go</span> 3 px en 200 ms · spinner 0.9 s lineal · todo a 0.01 ms con movimiento reducido</dd>
+    <dt>Notas</dt><dd>Enviando: <span class="mono">aria-busy</span> + deshabilitado + texto en gerundio («Guardando…», «Entrando…»). Botón de solo icono siempre con <span class="mono">aria-label</span>. Foco visible de 2 px con <span class="mono">--ring</span>.</dd>
+  </dl>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":980}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); }
+renderVals() {
+const s = this.state || {};
+const busy = !!s.busy;
+return {
+busy: busy,
+busyStr: busy ? 'true' : 'false',
+saveLabel: busy ? 'Guardando…' : 'Guardar contraseña',
+save: () => { if (busy) return; this.setState({ busy: true }); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ busy: false }), 1800); }
+};
+}
+}
+</script>
+</body>
+</html>

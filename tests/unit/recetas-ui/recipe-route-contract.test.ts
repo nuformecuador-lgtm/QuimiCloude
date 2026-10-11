@@ -1295,6 +1295,8 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     'tests/unit/recetas-ui/recipe-route-contract.test.ts',
     'tests/guards/guard-editor-aislado.test.ts',
     'tests/unit/asignaciones-ui/order-execution-screen.test.tsx',
+    // Lo nombra en su lista de piezas del catalogo, no lo monta.
+    'tests/guards/guard-catalogo-de-componentes.test.ts',
   ] as const;
 
   it('ninguna page.tsx del repo monta el asistente', () => {

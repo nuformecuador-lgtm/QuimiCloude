@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Acondicionamiento</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="scroller" style="padding-bottom: 112px">
+    <header class="op-hd">
+      <div style="max-width: 1064px; margin: 0 auto; padding: 12px 20px 14px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px">
+          <a class="b b-out b-back b-touch" href="Asignacion.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>[Volver a «Por acondicionar»]</a>
+          <button class="b b-out b-ico b-touch" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span></button>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap">
+          <div class="ph-t" style="gap: 2px"><span class="mono cap">2026-0000006</span><h1 class="op-t">Limpiador multiusos limón</h1><p class="sub"><span class="mono">12</span> × Galón 3,78 L</p></div>
+          <span class="{{ stCls }}"><i></i>{{ st }}</span>
+        </div>
+      </div>
+    </header>
+
+    <div style="max-width: 1064px; margin: 0 auto; padding: 20px">
+      <div class="g2 cq-2 enter" style="gap: 20px; align-items: start">
+        <section class="card" aria-labelledby="ac-eq">
+          <div class="card-hd"><h2 id="ac-eq" class="h2">Equipo</h2><span class="avs"><sc-for list="{{ team }}" as="a" hint-placeholder-count="3"><span class="{{ a.cls }}" title="{{ a.name }}">{{ a.ini }}</span></sc-for></span></div>
+          <div class="tabs" role="tablist" aria-label="Equipo">
+            <button class="tab" type="button" role="tab" aria-selected="{{ tPer }}" onClick="{{ pickPer }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg>Personas</button>
+            <button class="tab" type="button" role="tab" aria-selected="{{ tGru }}" onClick="{{ pickGru }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"></path></svg>Grupos de trabajo</button>
+          </div>
+
+          <sc-if value="{{ isPer }}" hint-placeholder-val="{{ true }}">
+            <div class="fade" role="tabpanel" aria-label="Personas" style="display: flex; flex-direction: column; gap: 12px">
+              <div class="anchor">
+                <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in in-touch" type="search" placeholder="Buscar personas" aria-label="Buscar personas" aria-expanded="{{ searchStr }}" onClick="{{ openSearch }}"></label>
+                <div class="{{ searchCls }}" role="listbox" aria-label="Buscar personas">
+                  <sc-for list="{{ results }}" as="o" hint-placeholder-count="1"><button class="opt" type="button" role="option" style="min-height: 48px" onClick="{{ o.add }}"><span class="{{ o.cls }}">{{ o.ini }}</span>{{ o.name }}<span class="cap" style="margin-left: auto">Agregar</span></button></sc-for>
+                  <sc-if value="{{ noResults }}" hint-placeholder-val="{{ false }}"><span class="cap" style="display: block; padding: 10px">[Sin resultados.]</span></sc-if>
+                </div>
+              </div>
+              <span class="lab">Personas sueltas</span>
+              <div class="lbox">
+                <sc-for list="{{ loose }}" as="p" hint-placeholder-count="2">
+                  <div class="lrow"><span class="person"><span class="{{ p.cls }}">{{ p.ini }}</span>{{ p.name }}</span><button class="b b-gho b-sm" type="button" aria-label="{{ p.rmLabel }}" onClick="{{ p.remove }}" style="height: 40px">Quitar</button></div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isGru }}" hint-placeholder-val="{{ false }}">
+            <div class="lbox fade" role="tabpanel" aria-label="Grupos de trabajo">
+              <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+                <div class="lrow" style="min-height: 60px">
+                  <span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span class="strong">{{ g.name }}</span><span class="cap">{{ g.count }}</span></span>
+                  <span class="avs"><sc-for list="{{ g.avs }}" as="a" hint-placeholder-count="2"><span class="{{ a.cls }}" title="{{ a.name }}">{{ a.ini }}</span></sc-for></span>
+                  <button class="{{ g.btnCls }}" type="button" onClick="{{ g.toggle }}" style="height: 40px">{{ g.btn }}</button>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </section>
+
+        <section class="card" aria-labelledby="ac-lote">
+          <h2 id="ac-lote" class="h2">Datos de lote</h2>
+          <div class="f"><label for="ac-l">Lote</label><input id="ac-l" class="in in-touch mono" type="text" value="L-2026-1043" disabled="{{ locked }}"></div>
+          <div class="g2 cq-1">
+            <div class="f"><label for="ac-v">Vencimiento</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg><input id="ac-v" class="in in-touch mono" type="text" value="10/10/2028" disabled="{{ locked }}"></label></div>
+            <div class="f"><label for="ac-d">Día de producción</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg><input id="ac-d" class="in in-touch mono" type="text" value="09/10/2026" disabled="{{ locked }}"></label></div>
+          </div>
+          <div class="actions"><button class="b b-out b-touch" type="button" disabled="{{ locked }}" onClick="{{ saveLot }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M4 20h16"></path></svg>Guardar datos de lote</button></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <footer class="op-ft">
+    <div style="max-width: 1064px; margin: 0 auto; display: flex; justify-content: flex-end">
+      <div class="g2" style="width: min(520px, 100%)">
+        <button class="{{ acCls }}" type="button" disabled="{{ acDis }}" onClick="{{ askStart }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg>Acondicionar</button>
+        <button class="{{ terCls }}" type="button" disabled="{{ terDis }}" onClick="{{ askEnd }}" aria-describedby="ac-cd">
+          <sc-if value="{{ counting }}" hint-placeholder-val="{{ false }}"><svg class="ring" viewBox="0 0 44 44" aria-hidden="true" style="width: 28px; height: 28px"><circle class="bgc" cx="22" cy="22" r="17"></circle><circle class="fgc" cx="22" cy="22" r="17" stroke-dasharray="106.8" stroke-dashoffset="{{ dash }}" transform="rotate(-90 22 22)"></circle></svg></sc-if>
+          <sc-if value="{{ notCounting }}" hint-placeholder-val="{{ true }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></sc-if>
+          Terminar<sc-if value="{{ counting }}" hint-placeholder-val="{{ false }}"><span id="ac-cd" class="mono" style="font-weight: 500">{{ leftTxt }}</span></sc-if>
+        </button>
+      </div>
+    </div>
+  </footer>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <div class="{{ startCls }}" role="alertdialog" aria-modal="true" aria-labelledby="ac-s">
+    <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg></div>
+    <h2 id="ac-s" class="h2">Acondicionar el pedido <span class="mono">2026-0000006</span></h2>
+    <p class="sub">[DESCRIPCIÓN DEL DIÁLOGO]</p>
+    <div class="actions"><button class="b b-out b-touch" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri b-touch" type="button" onClick="{{ doStart }}">Comenzar</button></div>
+  </div>
+
+  <div class="{{ endCls }}" role="alertdialog" aria-modal="true" aria-labelledby="ac-t" aria-describedby="ac-t-d">
+    <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg></div>
+    <h2 id="ac-t" class="h2">Terminar el acondicionamiento</h2>
+    <p id="ac-t-d" class="sub">El pedido <span class="mono">2026-0000006</span> pasará a Terminado.</p>
+    <div class="actions"><button class="b b-out b-touch" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri b-touch" type="button" onClick="{{ doEnd }}">Terminar</button></div>
+  </div>
+
+  <div class="toastwrap" aria-live="polite" style="bottom: 104px"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastText }}</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearInterval(this.iv); clearTimeout(this.t); }
+toast(text) { clearTimeout(this.t); this.setState({ toast: text }); this.t = setTimeout(() => this.setState({ toast: null }), 3200); }
+startCount() {
+const total = 10;
+clearInterval(this.iv);
+this.end = Date.now() + total * 1000;
+this.setState({ left: total });
+this.iv = setInterval(() => { const left = Math.max(0, Math.ceil((this.end - Date.now()) / 1000)); this.setState({ left: left }); if (!left) clearInterval(this.iv); }, 250);
+}
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const P = { LG: ['LG', '', 'Laura Gómez'], MS: ['MS', 'c2', 'Mateo Sánchez'], VH: ['VH', 'c3', 'Valentina Herrera'], SV: ['SV', 'c4', 'Santiago Vargas'] };
+const av = (k, size) => ({ ini: P[k][0], cls: 'av' + (size ? ' ' + size : '') + (P[k][1] ? ' ' + P[k][1] : ''), name: P[k][2] });
+const phase = s.phase || 'por';
+const ST = { por: ['Por acondicionar', 'waiting'], en: ['En acondicionamiento', 'progress'], fin: ['Terminado', 'success'] };
+const loose = s.loose || ['VH'];
+const gOn = s.gOn || { a: true };
+const GROUPS = [['a', 'Turno mañana', ['LG', 'MS']], ['b', 'Turno tarde', ['SV', 'VH']]];
+const team = [];
+GROUPS.forEach((g) => { if (gOn[g[0]]) g[2].forEach((x) => { if (team.indexOf(x) < 0) team.push(x); }); });
+loose.forEach((x) => { if (team.indexOf(x) < 0) team.push(x); });
+const candidates = ['SV', 'LG', 'MS'].filter((x) => loose.indexOf(x) < 0);
+const left = s.left === undefined ? 0 : s.left;
+const counting = phase === 'en' && left > 0;
+const tab = s.tab || 'per';
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+st: ST[phase][0], stCls: 'sb t-' + ST[phase][1],
+team: team.map((x) => av(x, 'sm')),
+tPer: tab === 'per' ? 'true' : 'false', tGru: tab === 'gru' ? 'true' : 'false',
+isPer: tab === 'per', isGru: tab === 'gru',
+pickPer: () => this.setState({ tab: 'per' }), pickGru: () => this.setState({ tab: 'gru', search: false }),
+searchStr: s.search ? 'true' : 'false',
+searchCls: s.search ? 'pop full open' : 'pop full',
+openSearch: () => this.setState({ search: !s.search }),
+results: candidates.map((x) => Object.assign(av(x, 'sm'), { add: () => this.setState({ loose: loose.concat([x]), search: false }) })),
+noResults: candidates.length === 0,
+loose: loose.map((x) => Object.assign(av(x), { rmLabel: 'Quitar a ' + P[x][2], remove: () => this.setState({ loose: loose.filter((y) => y !== x) }) })),
+groups: GROUPS.map((g) => ({ name: g[1], count: g[2].length + ' personas', avs: g[2].map((x) => av(x, 'sm')), btn: gOn[g[0]] ? 'Quitar' : 'Asignar', btnCls: gOn[g[0]] ? 'b b-gho b-sm' : 'b b-out b-sm', toggle: () => this.setState({ gOn: Object.assign({}, gOn, { [g[0]]: !gOn[g[0]] }) }) })),
+locked: phase === 'fin',
+saveLot: () => this.toast('[Datos de lote guardados.]'),
+acCls: phase === 'por' ? 'b b-pri b-xl' : 'b b-out b-xl', acDis: phase !== 'por',
+terCls: (phase === 'en' && !counting) ? 'b b-pri b-xl' : 'b b-out b-xl', terDis: phase !== 'en' || counting,
+counting: counting, notCounting: !counting,
+leftTxt: '00:' + String(left).padStart(2, '0'),
+dash: (106.8 * (1 - left / 10)).toFixed(1),
+askStart: () => { if (phase === 'por') this.setState({ dlg: 'start' }); },
+askEnd: () => { if (phase === 'en' && !counting) this.setState({ dlg: 'end' }); },
+doStart: () => { this.setState({ dlg: null, phase: 'en' }); this.startCount(); },
+doEnd: () => { this.setState({ dlg: null, phase: 'fin' }); this.toast('[Acondicionamiento terminado.]'); },
+startCls: s.dlg === 'start' ? 'dlg open' : 'dlg',
+endCls: s.dlg === 'end' ? 'dlg open' : 'dlg',
+ovCls: s.dlg ? 'ov open' : 'ov',
+closeAll: () => this.setState({ dlg: null, search: false }),
+toastCls: s.toast ? 'toast show' : 'toast', toastText: s.toast || ''
+};
+}
+}
+</script>
+</body>
+</html>

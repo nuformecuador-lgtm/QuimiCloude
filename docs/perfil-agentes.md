@@ -22,9 +22,43 @@ Si una regla de aquí contradice a un doc del perfil (`docs/architecture.md`,
 - **Rutas en `tasks.md > Archivos esperados`:** en este repo tienen la forma
   `` `lib/modules/x/y.ts` ``.
 
+### Regla de decisión para componentes (obligatoria)
+
+Regla dura del humano (2026-10-10), no una recomendación: **antes de crear cualquier componente
+SIEMPRE se reutiliza lo que existe.** Solo se crea uno nuevo si no existe. Busca en
+`components/shared/CATALOGO.md` y aplica en este orden, sin saltarte pasos:
+
+1. **Reutiliza** la pieza que ya existe.
+2. **Extiéndela** con una prop opcional, sin romper los usos actuales (los consumidores no cambian
+   y sus tests siguen verdes). Anota el punto de extensión en su fila.
+3. **Compón** una pieza nueva con las existentes.
+4. **Crea** la pieza en la carpeta `components/` de la ruta.
+
+Una pieza **sube a `components/shared`** cuando la necesita una **segunda ruta**, y en ese commit
+gana su fila. Subirla antes solo con excepción declarada en el `design.md`, con los consumidores
+identificados.
+
+### Pase de diseño para componentes nuevos (obligatorio)
+
+Regla dura del humano (2026-10-10). Todo componente **nuevo** —pasos 3 y 4 de la regla de arriba—
+y todo **cambio visual** de uno existente pasa por la guía de marca
+(`docs/diseno/guia-de-marca.html`) y lleva su propio pase `/design`: un tablero en el canvas de
+Claude Design con sus animaciones, el componente o librería que usa y sus estados en escritorio,
+tablet y teléfono. El humano lo aprueba **antes** del spec que lo implementa, el tablero se copia a
+`docs/diseno/canvas/` y el `design.md` de esa ficha lo cita. **Sin esa referencia no se
+implementa.** Única excepción: un subcomponente interno de una ruta que solo compone piezas ya
+catalogadas y no introduce UI visible nueva. Flujo completo: `docs/diseno/README.md`.
+
 ## spec_author
 
 - En `design.md`, el **modelo de datos** incluye tablas, **RLS** y migraciones.
+- Si la feature toca UI, `## Lo que ya existe` cita las filas de `components/shared/CATALOGO.md`
+  consultadas y, por cada componente nuevo, el paso de la regla de decisión que lo justifica
+  (`> Todos los agentes > Regla de decisión para componentes`).
+- Si el spec propone un componente nuevo o un cambio visual, `design.md` cita su tablero aprobado
+  (`docs/diseno/canvas/<Nombre>.dc.html`). Si no existe, **no escribas el spec**: devuelve
+  `BLOQUEADO: falta el pase /design de <pieza>` (`> Todos los agentes > Pase de diseño para
+  componentes nuevos`).
 
 ## implementer
 
@@ -210,6 +244,17 @@ app/(public)/login/
     fichas del board-. Si la limpieza abulta, va en un commit aparte `chore(<key>): limpia
     comentarios de <archivo>` que no cambie codigo. Si no has verificado el motivo, no lo
     escribas. Detalle en `docs/conventions.md > Comentarios`; el reviewer lo rechaza.
+12. Lee `components/shared/CATALOGO.md` antes de crear un componente. Si creas, subes, extiendes
+    o borras una pieza de `components/ui`, `components/shared`, `lib/shared/ui` o `hooks`, su
+    fila se actualiza en el mismo commit; la guardia `guard-catalogo-de-componentes` lo exige.
+13. No crees un componente sin lo que le toca según dónde vive. Si falta, para y devuélvelo al
+    leader.
+    - **En `components/ui`, `components/shared`, `lib/shared/ui` o `hooks`:** necesita fila en el
+      catálogo y referencia de diseño en el `design.md` de tu feature.
+    - **En la carpeta `components/` de una ruta** (paso 4 de la regla de decisión): no lleva fila
+      en el catálogo. Necesita referencia de diseño en el `design.md` de tu feature si introduce
+      UI visible nueva. No la necesita si es un subcomponente interno que solo compone piezas ya
+      catalogadas.
 
 ### Tests
 - Los tests de componentes van en el proyecto `ui` de vitest: `*.test.tsx`.
@@ -253,6 +298,13 @@ Puntos propios de este repo (continúan la lista de `.claude/agents/reviewer.md`
    - una limpieza de comentarios mezclada con cambios de código en el mismo commit.
 
    Hasta que exista la guardia (**QC-115**), esto solo lo ves tú.
+10. **Duplicados:** un componente nuevo del diff que cubre lo mismo que una fila de
+    `components/shared/CATALOGO.md`, sin que el `design.md` diga qué paso de la regla de decisión
+    aplicó y por qué los anteriores no bastaban, es BLOQUEANTE.
+11. **Diseño:** un componente nuevo, o un cambio visual de uno existente, sin referencia de diseño
+    en el `design.md` de la feature, o cuya fila del catálogo no la lleva en `Diseño`, es
+    BLOQUEANTE. No lo es un subcomponente interno de una ruta que solo compone piezas ya
+    catalogadas (`frontend_dev` regla 13).
 
 ## extractor
 

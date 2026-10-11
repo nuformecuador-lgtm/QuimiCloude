@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Modales de inventario</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}" style="width: 1440px; min-height: 4400px; padding: 40px; display: flex; flex-direction: column; gap: 24px">
+  <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 16px">
+    <div style="display: flex; flex-direction: column; gap: 4px"><h1 class="h1">Modales de inventario</h1><p class="sub">Todos los Sheets y Dialogs de /inventario y /inventario/importar, abiertos a la vez.</p></div>
+    <button class="b b-out" type="button" onClick="{{ toggleDark }}">Cambiar tema</button>
+  </div>
+
+  <div class="modal-grid">
+
+    <div class="stage for-sheet">
+      <span class="stage-cap">Sheet · Nuevo producto</span>
+      <aside class="sheet wide static" role="dialog" aria-labelledby="mi-np">
+        <div class="sheet-hd"><h2 id="mi-np" class="h2">Nuevo producto</h2><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div class="f"><label for="mi-np-n">Nombre</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="mi-np-n" class="in" type="text" placeholder="Escribe un nombre o busca un producto existente"></label></div>
+          <div class="f"><label for="mi-np-t">Tipo</label><button id="mi-np-t" class="in trig" type="button"><span>Producto</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+          <div class="g2">
+            <div class="f"><div style="display: flex; align-items: center; gap: 4px"><label class="fl" for="mi-np-e">Existencia</label><button class="b b-gho b-ico b-sm" type="button" aria-label="Qué es Existencia" style="width: 24px; height: 24px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg></button></div><input id="mi-np-e" class="in mono" type="text"></div>
+            <div class="f"><div style="display: flex; align-items: center; gap: 4px"><label class="fl" for="mi-np-a">Alerta de cantidad</label><button class="b b-gho b-ico b-sm" type="button" aria-label="Qué es Alerta de cantidad" style="width: 24px; height: 24px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg></button></div><input id="mi-np-a" class="in mono" type="text"></div>
+            <div class="f"><label for="mi-np-p">Presentación</label><button id="mi-np-p" class="in trig" type="button"><span class="dim">[Elegir]</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+            <div class="f"><label for="mi-np-u">Unidad</label><button id="mi-np-u" class="in trig" type="button"><span class="dim">[Elegir]</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+            <div class="f"><label for="mi-np-cu">Costo unitario</label><input id="mi-np-cu" class="in mono" type="text"></div>
+            <div class="f"><div style="display: flex; align-items: center; gap: 4px"><label class="fl" for="mi-np-ct">Costo total</label><button class="b b-gho b-ico b-sm" type="button" aria-label="Qué es Costo total" style="width: 24px; height: 24px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg></button></div><input id="mi-np-ct" class="in mono" type="text"></div>
+          </div>
+          <div class="f"><label for="mi-np-l">Lote</label><input id="mi-np-l" class="in mono" type="text"></div>
+          <div class="g2">
+            <div class="f"><label for="mi-np-fx">Fecha de expiración</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg><input id="mi-np-fx" class="in mono" type="text"></label></div>
+            <div class="f"><label for="mi-np-fc">Fecha de compra</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg><input id="mi-np-fc" class="in mono" type="text"></label></div>
+          </div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
+      </aside>
+    </div>
+
+    <div class="stage for-sheet">
+      <span class="stage-cap">Sheet · Editar producto</span>
+      <aside class="sheet wide static" role="dialog" aria-labelledby="mi-ep">
+        <div class="sheet-hd"><h2 id="mi-ep" class="h2">Editar producto</h2><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div class="f"><label for="mi-ep-n">Nombre</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="mi-ep-n" class="in" type="text" value="Hipoclorito de sodio 13 %"></label></div>
+          <div class="f"><label for="mi-ep-t">Tipo</label><button id="mi-ep-t" class="in trig" type="button"><span>Producto</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+          <div class="g2">
+            <div class="f"><div style="display: flex; align-items: center; gap: 4px"><label class="fl" for="mi-ep-e">Existencia</label><button class="b b-gho b-ico b-sm" type="button" aria-label="Qué es Existencia" style="width: 24px; height: 24px; position: relative"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg><span class="tip" style="opacity: 1; transform: none">[Qué es Existencia]</span></button></div><input id="mi-ep-e" class="in mono" type="text" value="180,00"></div>
+            <div class="f"><div style="display: flex; align-items: center; gap: 4px"><label class="fl" for="mi-ep-a">Alerta de cantidad</label><button class="b b-gho b-ico b-sm" type="button" aria-label="Qué es Alerta de cantidad" style="width: 24px; height: 24px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg></button></div><input id="mi-ep-a" class="in mono" type="text" value="50,00"></div>
+            <div class="f"><label for="mi-ep-p">Presentación</label><button id="mi-ep-p" class="in trig" type="button"><span>Garrafa 20 L</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+            <div class="f"><label for="mi-ep-u">Unidad</label><button id="mi-ep-u" class="in trig" type="button"><span>kg</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+            <div class="f"><label for="mi-ep-cu">Costo unitario</label><input id="mi-ep-cu" class="in mono" type="text" value="4.200,00"></div>
+            <div class="f"><div style="display: flex; align-items: center; gap: 4px"><label class="fl" for="mi-ep-ct">Costo total</label><button class="b b-gho b-ico b-sm" type="button" aria-label="Qué es Costo total" style="width: 24px; height: 24px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg></button></div><input id="mi-ep-ct" class="in mono" type="text" value="756.000,00"></div>
+          </div>
+          <div class="f"><label for="mi-ep-l">Lote</label><input id="mi-ep-l" class="in mono" type="text" value="L-2026-0912"></div>
+          <div class="g2">
+            <div class="f"><label for="mi-ep-fx">Fecha de expiración</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg><input id="mi-ep-fx" class="in mono" type="text" value="12/03/2027"></label></div>
+            <div class="f"><label for="mi-ep-fc">Fecha de compra</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg><input id="mi-ep-fc" class="in mono" type="text" value="12/09/2026"></label></div>
+          </div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
+      </aside>
+    </div>
+
+    <div class="stage for-sheet" style="grid-column: 1 / -1; min-height: 460px">
+      <span class="stage-cap">Sheet · Lotes (título = nombre del producto)</span>
+      <aside class="sheet static" role="dialog" aria-labelledby="mi-lt" style="width: 900px">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><span class="lab">Lotes</span><h2 id="mi-lt" class="h2">Hipoclorito de sodio 13 %</h2></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div class="tw">
+            <table class="collapse" style="font-size: 13px">
+              <thead><tr><th scope="col">Lote</th><th scope="col" class="num">Cantidad</th><th scope="col" class="num">Fecha de compra</th><th scope="col" class="num">Vencimiento</th><th scope="col" class="num">Apartado</th><th scope="col" class="num">Disponible</th><th scope="col">Presentación del envase</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead>
+              <tbody>
+                <tr><td class="mono strong">L-2026-0912</td><td class="num mono">120,00</td><td class="num mono">12/09/2026</td><td class="num mono">12/03/2027</td><td class="num mono">40,00</td><td class="num mono strong">80,00</td><td>Garrafa 20 L</td>
+                  <td class="rowact anchor"><button class="b b-gho b-ico" type="button" aria-label="Acciones del lote L-2026-0912" aria-haspopup="menu" aria-expanded="true"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button>
+                    <div class="pop right at-row open" role="menu"><button class="mi" type="button" role="menuitem"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 8v4l3 2"></path></svg>Historial</button><button class="mi" type="button" role="menuitem"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z"></path></svg>Ajustar existencia</button></div></td></tr>
+                <tr><td class="mono strong">L-2026-0921</td><td class="num mono">60,00</td><td class="num mono">21/09/2026</td><td class="num mono" style="color: var(--w-fg); font-weight: 600">30/10/2026</td><td class="num mono">0,00</td><td class="num mono strong">60,00</td><td>Garrafa 20 L</td><td class="rowact"><button class="b b-gho b-ico" type="button" aria-label="Acciones del lote L-2026-0921"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button></td></tr>
+                <tr><td class="mono strong">L-2026-0830</td><td class="num mono">0,00</td><td class="num mono">30/08/2026</td><td class="num mono">28/02/2027</td><td class="num mono">0,00</td><td class="num mono strong">0,00</td><td>Tambor 200 L</td><td class="rowact"><button class="b b-gho b-ico" type="button" aria-label="Acciones del lote L-2026-0830"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button></td></tr>
+              </tbody>
+            </table>
+            <div class="rows-m">
+              <div class="rm">
+                <div class="rm-top"><span class="mono strong">L-2026-0912</span><span class="cap">Garrafa 20 L</span></div>
+                <div class="rm-meta"><span>Cantidad <span class="mono">120,00</span></span><span>Apartado <span class="mono">40,00</span></span><span>Disponible <span class="mono strong" style="color: var(--fg)">80,00</span></span></div>
+                <div class="rm-meta"><span>Fecha de compra <span class="mono">12/09/2026</span></span><span>Vencimiento <span class="mono">12/03/2027</span></span></div>
+                <div class="rm-top"><span></span><button class="b b-out b-sm" type="button" aria-label="Acciones del lote L-2026-0912" style="height: 44px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg>Acciones</button></div>
+              </div>
+              <div class="rm">
+                <div class="rm-top"><span class="mono strong">L-2026-0921</span><span class="cap">Garrafa 20 L</span></div>
+                <div class="rm-meta"><span>Cantidad <span class="mono">60,00</span></span><span>Apartado <span class="mono">0,00</span></span><span>Disponible <span class="mono strong" style="color: var(--fg)">60,00</span></span></div>
+                <div class="rm-meta"><span>Fecha de compra <span class="mono">21/09/2026</span></span><span>Vencimiento <span class="mono" style="color: var(--w-fg); font-weight: 600">30/10/2026</span></span></div>
+                <div class="rm-top"><span></span><button class="b b-out b-sm" type="button" aria-label="Acciones del lote L-2026-0921" style="height: 44px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg>Acciones</button></div>
+              </div>
+              <div class="rm">
+                <div class="rm-top"><span class="mono strong">L-2026-0830</span><span class="cap">Tambor 200 L</span></div>
+                <div class="rm-meta"><span>Cantidad <span class="mono">0,00</span></span><span>Apartado <span class="mono">0,00</span></span><span>Disponible <span class="mono strong" style="color: var(--fg)">0,00</span></span></div>
+                <div class="rm-meta"><span>Fecha de compra <span class="mono">30/08/2026</span></span><span>Vencimiento <span class="mono">28/02/2027</span></span></div>
+                <div class="rm-top"><span></span><button class="b b-out b-sm" type="button" aria-label="Acciones del lote L-2026-0830" style="height: 44px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg>Acciones</button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="stage" style="grid-column: 1 / -1">
+      <span class="stage-cap">Dialog · Historial del lote</span>
+      <div class="dlg wide static" role="dialog" aria-labelledby="mi-hi" style="width: 1000px">
+        <div class="dlg-hd"><h2 id="mi-hi" class="h2">Historial del lote <span class="mono">L-2026-0912</span></h2><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="tw">
+          <table class="collapse" style="font-size: 13px">
+            <thead><tr><th scope="col">Tipo</th><th scope="col" class="num">Cantidad</th><th scope="col" class="num">Existencia anterior</th><th scope="col" class="num">Total contado</th><th scope="col">Motivo</th><th scope="col">Pedido</th><th scope="col">Autor</th><th scope="col" class="num">Fecha</th></tr></thead>
+            <tbody>
+              <tr><td class="strong">Apertura</td><td class="num mono">+120,00</td><td class="num mono dim">0,00</td><td class="num mono">—</td><td>—</td><td class="mono">—</td><td class="dim">Sistema</td><td class="num mono">12/09/2026 10:14</td></tr>
+              <tr><td class="strong">Apartado</td><td class="num mono">40,00</td><td class="num mono dim">120,00</td><td class="num mono">—</td><td>—</td><td class="mono">2026-0000003</td><td class="dim">Sistema</td><td class="num mono">02/10/2026 08:30</td></tr>
+              <tr><td class="strong">Apartado</td><td class="num mono">15,00</td><td class="num mono dim">120,00</td><td class="num mono">—</td><td>—</td><td class="mono">2026-0000009</td><td class="dim">Sistema</td><td class="num mono">06/10/2026 11:05</td></tr>
+              <tr><td class="strong">Liberación</td><td class="num mono">15,00</td><td class="num mono dim">120,00</td><td class="num mono">—</td><td>—</td><td class="mono">2026-0000009</td><td class="dim">Sistema</td><td class="num mono">08/10/2026 09:12</td></tr>
+              <tr><td class="strong">Ajuste</td><td class="num mono">−4,50</td><td class="num mono dim">120,00</td><td class="num mono">115,50</td><td>Merma</td><td class="mono">—</td><td>Carlos Restrepo</td><td class="num mono">09/10/2026 16:02</td></tr>
+              <tr><td class="strong">Ajuste</td><td class="num mono">+4,50</td><td class="num mono dim">115,50</td><td class="num mono">120,00</td><td>Conteo físico</td><td class="mono">—</td><td>Laura Gómez</td><td class="num mono">10/10/2026 08:41</td></tr>
+            </tbody>
+          </table>
+          <div class="rows-m">
+            <div class="rm"><div class="rm-top"><span class="strong">Apertura</span><span class="mono strong">+120,00</span></div><div class="rm-meta"><span>Existencia anterior <span class="mono">0,00</span></span></div><div class="rm-meta"><span class="dim">Sistema</span><span class="mono">12/09/2026 10:14</span></div></div>
+            <div class="rm"><div class="rm-top"><span class="strong">Apartado</span><span class="mono strong">40,00</span></div><div class="rm-meta"><span>Existencia anterior <span class="mono">120,00</span></span><span>Pedido <span class="mono">2026-0000003</span></span></div><div class="rm-meta"><span class="dim">Sistema</span><span class="mono">02/10/2026 08:30</span></div></div>
+            <div class="rm"><div class="rm-top"><span class="strong">Ajuste</span><span class="mono strong">−4,50</span></div><div class="rm-meta"><span>Existencia anterior <span class="mono">120,00</span></span><span>Total contado <span class="mono">115,50</span></span><span>Motivo Merma</span></div><div class="rm-meta"><span>Carlos Restrepo</span><span class="mono">09/10/2026 16:02</span></div></div>
+            <div class="rm"><div class="rm-top"><span class="strong">Ajuste</span><span class="mono strong">+4,50</span></div><div class="rm-meta"><span>Existencia anterior <span class="mono">115,50</span></span><span>Total contado <span class="mono">120,00</span></span><span>Motivo Conteo físico</span></div><div class="rm-meta"><span>Laura Gómez</span><span class="mono">10/10/2026 08:41</span></div></div>
+          </div>
+        </div>
+        <p class="cap">Otros tipos posibles: Salida por entrega · Caducidad · Consumo · Entrega a cliente.</p>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">Dialog · Ajustar existencia (disminución)</span>
+      <div class="dlg static" role="dialog" aria-labelledby="mi-aj1">
+        <div class="dlg-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mi-aj1" class="h2">Ajustar existencia</h2><p class="sub"><span class="strong" style="color: var(--fg)">Hipoclorito de sodio 13 %</span> · Lote <span class="mono">L-2026-0912</span></p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="g2">
+          <div class="f"><label for="mi-aj1-r">Existencia registrada</label><input id="mi-aj1-r" class="in mono" type="text" value="120,00" disabled></div>
+          <div class="f"><label for="mi-aj1-c">Total contado</label><input id="mi-aj1-c" class="in mono" type="text" value="115,50"></div>
+        </div>
+        <div class="panel" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; font-size: 14px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--muted-fg)"><path d="M12 4v11M7 10l5 5 5-5M4 20h16"></path></svg><span>Disminución de <span class="mono strong">4,50</span></span></div>
+        <div class="f"><label for="mi-aj1-m">Motivo</label><button id="mi-aj1-m" class="in trig" type="button"><span>Merma</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button><span class="cap">Merma · Rotura · Conteo físico · Error de carga</span></div>
+        <div class="actions"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Ajustar</button></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">Dialog · Ajustar existencia (aumento, sin motivo)</span>
+      <div class="dlg static" role="dialog" aria-labelledby="mi-aj2">
+        <div class="dlg-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mi-aj2" class="h2">Ajustar existencia</h2><p class="sub"><span class="strong" style="color: var(--fg)">Ácido cítrico</span> · Lote <span class="mono">L-2026-0921</span></p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="g2">
+          <div class="f"><label for="mi-aj2-r">Existencia registrada</label><input id="mi-aj2-r" class="in mono" type="text" value="12,50" disabled></div>
+          <div class="f"><label for="mi-aj2-c">Total contado</label><input id="mi-aj2-c" class="in mono" type="text" value="14,00"></div>
+        </div>
+        <div class="panel" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; font-size: 14px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--muted-fg)"><path d="M12 20V9M7 14l5-5 5 5M4 4h16"></path></svg><span>Aumento de <span class="mono strong">1,50</span></span></div>
+        <div class="f"><label for="mi-aj2-m">Motivo</label><button id="mi-aj2-m" class="in trig" type="button" aria-invalid="true"><span class="dim">[Elegir]</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button><span class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Elige un motivo.</span><span class="cap">Para aumentar solo valen Conteo físico y Error de carga.</span></div>
+        <div class="actions"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Ajustar</button></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">AlertDialog · Borrar producto</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="mi-de">
+        <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+        <h2 id="mi-de" class="h2">[Borrar el producto]</h2>
+        <p class="sub">[Se va a borrar «<span class="strong" style="color: var(--fg)">Ácido cítrico</span>». Esta acción no se puede deshacer.]</p>
+        <div class="actions"><button class="b b-out" type="button">Cancelar</button><button class="b b-des" type="button">Borrar</button></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">Menú centrado · Acciones del producto (teléfono)</span>
+      <div class="dlg menu static" role="menu" aria-label="Acciones del producto">
+        <div class="dlg-hd" style="padding: 0 4px 8px"><span class="h3">Ácido cítrico</span><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <button class="mi" type="button" role="menuitem"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5zM2 13l10 5 10-5"></path></svg>Lotes</button>
+        <button class="mi" type="button" role="menuitem"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 8v4l3 2"></path></svg>Historial</button>
+        <button class="mi" type="button" role="menuitem"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z"></path></svg>Ajustar existencia</button>
+        <button class="mi" type="button" role="menuitem"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</button>
+        <div class="sep"></div>
+        <button class="mi danger" type="button" role="menuitem"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Borrar</button>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">Menú centrado · Acciones del lote (teléfono)</span>
+      <div class="dlg menu static" role="menu" aria-label="Acciones del lote">
+        <div class="dlg-hd" style="padding: 0 4px 8px"><span class="h3 mono">L-2026-0912</span><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <button class="mi" type="button" role="menuitem"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 8v4l3 2"></path></svg>Historial</button>
+        <button class="mi" type="button" role="menuitem"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z"></path></svg>Ajustar existencia</button>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">Dialog · Nueva unidad (importar)</span>
+      <div class="dlg static" role="dialog" aria-labelledby="mi-un">
+        <div class="dlg-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mi-un" class="h2">Nueva unidad</h2><p class="sub">Se crea igual que desde la pantalla de unidades.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 140px; gap: 12px">
+          <div class="f"><label for="mi-un-n">Nombre</label><input id="mi-un-n" class="in" type="text" value="Galón"></div>
+          <div class="f"><label for="mi-un-s">Símbolo</label><input id="mi-un-s" class="in mono" type="text" value="gal"></div>
+        </div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 140px; gap: 12px">
+          <div class="f"><label for="mi-un-d">Deriva de</label><button id="mi-un-d" class="in trig" type="button"><span>No deriva de ninguna</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+          <div class="f"><label for="mi-un-f">Factor</label><input id="mi-un-f" class="in mono" type="text" disabled></div>
+        </div>
+        <div class="actions"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Crear</button></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">Dialog · Nueva unidad (deriva de otra)</span>
+      <div class="dlg static" role="dialog" aria-labelledby="mi-un2">
+        <div class="dlg-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mi-un2" class="h2">Nueva unidad</h2><p class="sub">Se crea igual que desde la pantalla de unidades.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 140px; gap: 12px">
+          <div class="f"><label for="mi-un2-n">Nombre</label><input id="mi-un2-n" class="in" type="text" value="Galón"></div>
+          <div class="f"><label for="mi-un2-s">Símbolo</label><input id="mi-un2-s" class="in mono" type="text" value="gal"></div>
+        </div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 140px; gap: 12px">
+          <div class="f"><label for="mi-un2-d">Deriva de</label><button id="mi-un2-d" class="in trig" type="button"><span>Litro (L)</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+          <div class="f"><label for="mi-un2-f">Factor</label><input id="mi-un2-f" class="in mono" type="text" value="3,785"></div>
+        </div>
+        <div class="actions"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Crear</button></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <span class="stage-cap">Dialog · Nueva presentación (importar)</span>
+      <div class="dlg static" role="dialog" aria-labelledby="mi-pr">
+        <div class="dlg-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="mi-pr" class="h2">Nueva presentación</h2><p class="sub">Se crea igual que desde la pantalla de presentaciones.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="f"><label for="mi-pr-n">Nombre</label><input id="mi-pr-n" class="in" type="text" value="Bulto 25 kg"></div>
+        <div class="f"><label for="mi-pr-c">Contenido</label><input id="mi-pr-c" class="in mono" type="text" value="25,00"></div>
+        <div class="actions"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Crear</button></div>
+      </div>
+    </div>
+
+    <div class="stage" style="align-items: flex-end; justify-content: flex-end">
+      <span class="stage-cap">Toasts del módulo</span>
+      <div style="display: flex; flex-direction: column; gap: 10px; width: 340px">
+        <div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Producto creado.</span></div>
+        <div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Existencia ajustada.</span></div>
+        <div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Producto borrado.</span></div>
+        <div class="toast show"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>Unidad creada.</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":4400}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+return {
+rootCls: dark ? 'qc dk' : 'qc',
+toggleDark: () => this.setState({ dark: !dark })
+};
+}
+}
+</script>
+</body>
+</html>

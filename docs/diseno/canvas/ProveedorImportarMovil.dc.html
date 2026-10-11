@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Revisar importación en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="ProveedorImportar" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Revisar importación de catálogo · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">catalog-import-review · catalog-import-row · crop-picker · new-presentation-units · catalog-import-summary · ui/checkbox · status-badge · unit-select</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (Checkbox, Dialog, Select) · <span class="mono">lucide-react</span></dd>
+      <dt>Escritorio</dt><dd>Una tarjeta por fila: casilla «Incluir fila N», badge (Nueva = éxito, Cambia de costo = en espera, Sin cambios = neutral, Incompleta = peligro, Duplicada = apagado), imagen con «Elige una imagen del archivo» y los campos Nombre, Presentación, Costo, Mínimo de compra, Tiempo de entrega (días), Material, Diámetro + unidad, Alto + unidad, Boca · bloque «Unidades de presentaciones nuevas» con «Elige una unidad» · barra fija con «Confirmar»</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono · los campos de cada fila se reacomodan solos (rejilla <span class="mono">auto-fit</span> de 170 px)</dd>
+      <dt>Teléfono</dt><dd>Campos en una columna · «Elige una imagen del archivo» y la casilla a 44 px · selects de unidad a 48 px · la barra de «Confirmar» se apila y queda pegada abajo · resumen con las cuatro cifras en una columna y «Volver al detalle del proveedor»</dd>
+      <dt>Animación</dt><dd>La casilla dibuja el check (200 ms) y la fila excluida baja a 60 % de opacidad · menú de unidades 200/150 ms · «Confirmar» pasa a «Confirmando…» con spinner · el resumen entra con la entrada escalonada</dd>
+      <dt>Por confirmar</dt><dd>Contador «[Filas incluidas]» y la línea «[Costo actual]» en «Cambia de costo» no existen hoy · formato real de la etiqueta de unidad (se muestra «Litro (L)»)</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

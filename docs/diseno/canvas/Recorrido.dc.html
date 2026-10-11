@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Recorrido del pedido</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="dashboard" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div><a class="b b-out b-back" href="Dashboard.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver a la lista</a></div>
+
+        <div class="ph">
+          <div class="ph-t"><h1 class="h1">Recorrido del pedido <span class="mono">{{ no }}</span></h1></div>
+        </div>
+
+        <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+          <div class="box error" role="alert"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg></span><p class="sub" style="color: var(--fg)">No se pudo cargar el recorrido.</p></div>
+        </sc-if>
+
+        <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 16px" aria-busy="true">
+            <div class="g3 cq-1"><div class="stat"><span class="sk" style="width: 40%"></span><span class="sk" style="width: 70%; height: 22px"></span></div><div class="stat"><span class="sk" style="width: 40%"></span><span class="sk" style="width: 60%; height: 22px"></span></div><div class="stat"><span class="sk" style="width: 40%"></span><span class="sk" style="width: 30%; height: 22px"></span></div></div>
+            <div class="card"><span class="sk" style="width: 140px; height: 16px"></span><span class="sk" style="height: 56px"></span><span class="sk" style="height: 56px"></span><span class="sk" style="height: 56px"></span></div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ ready }}" hint-placeholder-val="{{ true }}">
+          <dl class="g3 cq-1 fade" style="margin: 0">
+            <div class="stat"><dt>Estado</dt><dd><span class="{{ stCls }}"><i></i>{{ st }}</span></dd></div>
+            <div class="stat"><dt>Duración</dt><dd class="mono">{{ dur }}</dd></div>
+            <div class="stat"><dt>Vueltas atrás</dt><dd><span class="{{ backCls }}" style="{{ backStyle }}">{{ back }}</span></dd></div>
+          </dl>
+
+          <section class="card fade" aria-labelledby="rc-an">
+            <div class="card-hd"><h2 id="rc-an" class="h2">Anotaciones</h2><span class="count">{{ count }}</span></div>
+            <ol class="tl">
+              <sc-for list="{{ events }}" as="e" hint-placeholder-count="9">
+                <li class="{{ e.cls }}" style="animation-delay: {{ e.delay }}ms">
+                  <span class="ev-dot"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ e.icon }}"></path></svg></span>
+                  <div class="ev-body">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap"><span class="strong">{{ e.act }}</span><time class="mono cap">{{ e.time }}</time></div>
+                    <div class="rm-meta" style="align-items: center"><span>{{ e.pos }}</span><span style="display: inline-flex; align-items: center; gap: 6px; color: var(--fg)"><span class="{{ e.avCls }}">{{ e.ini }}</span>{{ e.name }}</span></div>
+                    <sc-if value="{{ e.hasMot }}" hint-placeholder-val="{{ false }}"><p class="cap" style="margin: 0; color: var(--fg)"><span class="strong">Motivo</span> · [MOTIVO…]</p></sc-if>
+                  </div>
+                </li>
+              </sc-for>
+            </ol>
+          </section>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="dashboard" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"variante":{"editor":"enum","options":["terminado","cancelado"],"default":"terminado"},"error":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+componentDidMount() { this.t = setTimeout(() => this.setState({ loaded: true }), 700); }
+componentWillUnmount() { clearTimeout(this.t); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const isError = !!this.props.error;
+const cancel = this.props.variante === 'cancelado';
+const I = {
+start: 'M7 4v16l13-8z',
+fwd: 'M5 12h14M13 6l6 6-6 6',
+back: 'M3 12a9 9 0 1 0 3-6.7M3 4v5h5',
+end: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6',
+box: 'M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8',
+ban: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12'
+};
+const P = { LG: ['LG','av sm','Laura Gómez'], MS: ['MS','av sm c2','Mateo Sánchez'], VH: ['VH','av sm c3','Valentina Herrera'] };
+const done = [
+['k-start','start','Arrancar','Paso 1 de 6','02/10/2026 08:12','LG',false],
+['','fwd','Avanzar','Paso 2 de 6','02/10/2026 08:40','LG',false],
+['','fwd','Avanzar','Paso 3 de 6','02/10/2026 09:15','MS',false],
+['k-back','back','Retroceder','Paso 2 de 6','02/10/2026 09:31','MS',true],
+['k-start','start','Retomar','Paso 2 de 6','02/10/2026 10:02','LG',false],
+['','fwd','Avanzar','Paso 6 de 6','02/10/2026 10:48','LG',false],
+['k-end','end','Finalizar','Paso 6 de 6','02/10/2026 11:05','LG',false],
+['k-start','box','Comenzar empaque','Paso 1 de 2','02/10/2026 11:12','MS',false],
+['k-end','box','Terminar empaque','Paso 2 de 2','02/10/2026 11:40','MS',false]
+];
+const canc = [
+['k-start','start','Arrancar','Paso 1 de 5','08/10/2026 10:02','VH',false],
+['','fwd','Avanzar','Paso 2 de 5','08/10/2026 10:30','VH',false],
+['k-back','back','Retroceder','Paso 1 de 5','08/10/2026 10:47','MS',true],
+['k-start','start','Retomar','Paso 1 de 5','08/10/2026 11:05','MS',false],
+['k-cancel','ban','Cancelar','Paso 1 de 5','08/10/2026 11:21','MS',true]
+];
+const ev = cancel ? canc : done;
+const back = ev.filter((e) => e[0] === 'k-back').length;
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+ovCls: s.menu ? 'ov open' : 'ov',
+closeAll: () => this.setState({ menu: false }),
+isError: isError, loading: !isError && !s.loaded, ready: !isError && !!s.loaded,
+no: cancel ? '2026-0000009' : '2026-0000003',
+st: cancel ? 'Cancelado' : 'Por acondicionar',
+stCls: cancel ? 'sb t-muted' : 'sb t-waiting',
+dur: cancel ? '1 h 19 min' : '3 h 28 min',
+back: String(back),
+backCls: back > 0 ? 'sb t-waiting mono' : 'mono',
+backStyle: back > 0 ? 'height: 28px; padding: 0 12px; font-size: 16px' : '',
+count: String(ev.length),
+events: ev.map((e, i) => ({
+cls: e[0] ? 'ev ' + e[0] : 'ev', icon: I[e[1]], act: e[2], pos: e[3], time: e[4],
+ini: P[e[5]][0], avCls: P[e[5]][1], name: P[e[5]][2], hasMot: e[6], delay: String(i * 40)
+}))
+};
+}
+}
+</script>
+</body>
+</html>

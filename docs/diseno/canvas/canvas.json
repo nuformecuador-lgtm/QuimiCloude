@@ -1,0 +1,1332 @@
+{
+ "v": 3,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-10-10T21:30:00Z"
+ },
+ "title": "QuimiCloude — Rediseño",
+ "launch": {
+  "view": "canvas",
+  "page": "fundamentos"
+ },
+ "pages": [
+  {
+   "id": "fundamentos",
+   "name": "1 · Fundamentos y componentes"
+  },
+  {
+   "id": "acceso",
+   "name": "2 · Acceso, Dashboard y 404"
+  },
+  {
+   "id": "pedidos",
+   "name": "3 · Pedidos"
+  },
+  {
+   "id": "inventario",
+   "name": "4 · Inventario"
+  },
+  {
+   "id": "formulas",
+   "name": "5 · Fórmulas"
+  },
+  {
+   "id": "operario",
+   "name": "6 · Operario"
+  },
+  {
+   "id": "proveedores",
+   "name": "7 · Proveedores y clientes"
+  },
+  {
+   "id": "configuracion",
+   "name": "8 · Configuración e integraciones"
+  }
+ ],
+ "boards": {
+  "Main.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 1560,
+   "title": "Fundamentos de marca",
+   "page": "fundamentos",
+   "is_interactive": false
+  },
+  "Botones.dc.html": {
+   "x": 0,
+   "y": 2000,
+   "w": 1200,
+   "h": 980,
+   "title": "Botones",
+   "page": "fundamentos",
+   "is_interactive": true
+  },
+  "Estados.dc.html": {
+   "x": 1280,
+   "y": 2000,
+   "w": 1200,
+   "h": 1120,
+   "title": "StatusBadge y tonos",
+   "page": "fundamentos",
+   "is_interactive": true
+  },
+  "Sidebar.dc.html": {
+   "x": 2560,
+   "y": 2000,
+   "w": 272,
+   "h": 760,
+   "title": "Sidebar (componente)",
+   "page": "fundamentos",
+   "is_interactive": true
+  },
+  "Campos.dc.html": {
+   "x": 0,
+   "y": 3240,
+   "w": 1200,
+   "h": 1200,
+   "title": "Campos y PasswordField",
+   "page": "fundamentos",
+   "is_interactive": true
+  },
+  "Avisos.dc.html": {
+   "x": 1280,
+   "y": 3240,
+   "w": 1200,
+   "h": 1160,
+   "title": "Avisos, vacíos, errores y carga",
+   "page": "fundamentos",
+   "is_interactive": true
+  },
+  "Tabla.dc.html": {
+   "x": 0,
+   "y": 4560,
+   "w": 1440,
+   "h": 980,
+   "title": "DataTable (escritorio y teléfono)",
+   "page": "fundamentos",
+   "is_interactive": true
+  },
+  "Superficies.dc.html": {
+   "x": 1520,
+   "y": 4560,
+   "w": 1440,
+   "h": 980,
+   "title": "Cabecera, pestañas, FormSheet y borrado",
+   "page": "fundamentos",
+   "is_interactive": true
+  },
+  "Dominio.dc.html": {
+   "x": 0,
+   "y": 5660,
+   "w": 1440,
+   "h": 1120,
+   "title": "Piezas compartidas que ya existen",
+   "page": "fundamentos",
+   "is_interactive": true
+  },
+  "Login.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 900,
+   "title": "Login",
+   "page": "acceso",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "LoginTablet.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 904,
+   "h": 1300,
+   "title": "LoginTablet",
+   "page": "acceso",
+   "is_interactive": true
+  },
+  "LoginMovil.dc.html": {
+   "x": 2504,
+   "y": 0,
+   "w": 960,
+   "h": 1300,
+   "title": "LoginMovil",
+   "page": "acceso",
+   "is_interactive": true
+  },
+  "EstablecerContrasena.dc.html": {
+   "x": 0,
+   "y": 1580,
+   "w": 1440,
+   "h": 1000,
+   "title": "Establecer contraseña",
+   "page": "acceso",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "EstablecerContrasenaTablet.dc.html": {
+   "x": 1520,
+   "y": 1580,
+   "w": 904,
+   "h": 1300,
+   "title": "EstablecerContrasenaTablet",
+   "page": "acceso",
+   "is_interactive": true
+  },
+  "EstablecerContrasenaMovil.dc.html": {
+   "x": 2504,
+   "y": 1580,
+   "w": 960,
+   "h": 1300,
+   "title": "EstablecerContrasenaMovil",
+   "page": "acceso",
+   "is_interactive": true
+  },
+  "Dashboard.dc.html": {
+   "x": 0,
+   "y": 3160,
+   "w": 1440,
+   "h": 900,
+   "title": "Dashboard",
+   "page": "acceso",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "DashboardTablet.dc.html": {
+   "x": 1520,
+   "y": 3160,
+   "w": 904,
+   "h": 1300,
+   "title": "DashboardTablet",
+   "page": "acceso",
+   "is_interactive": true
+  },
+  "DashboardMovil.dc.html": {
+   "x": 2504,
+   "y": 3160,
+   "w": 960,
+   "h": 1300,
+   "title": "DashboardMovil",
+   "page": "acceso",
+   "is_interactive": true
+  },
+  "Recorrido.dc.html": {
+   "x": 0,
+   "y": 4740,
+   "w": 1440,
+   "h": 1240,
+   "title": "Recorrido del pedido",
+   "page": "acceso",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "RecorridoTablet.dc.html": {
+   "x": 1520,
+   "y": 4740,
+   "w": 904,
+   "h": 1300,
+   "title": "RecorridoTablet",
+   "page": "acceso",
+   "is_interactive": true
+  },
+  "RecorridoMovil.dc.html": {
+   "x": 2504,
+   "y": 4740,
+   "w": 960,
+   "h": 1300,
+   "title": "RecorridoMovil",
+   "page": "acceso",
+   "is_interactive": true
+  },
+  "NoEncontrada.dc.html": {
+   "x": 0,
+   "y": 6320,
+   "w": 1440,
+   "h": 800,
+   "title": "Página no encontrada (404)",
+   "page": "acceso",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "NoEncontradaTablet.dc.html": {
+   "x": 1520,
+   "y": 6320,
+   "w": 904,
+   "h": 1300,
+   "title": "NoEncontradaTablet",
+   "page": "acceso",
+   "is_interactive": true
+  },
+  "NoEncontradaMovil.dc.html": {
+   "x": 2504,
+   "y": 6320,
+   "w": 960,
+   "h": 1300,
+   "title": "NoEncontradaMovil",
+   "page": "acceso",
+   "is_interactive": true
+  },
+  "Pedidos.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 1000,
+   "title": "Pedidos",
+   "page": "pedidos",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "PedidosTablet.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 904,
+   "h": 1300,
+   "title": "PedidosTablet",
+   "page": "pedidos",
+   "is_interactive": true
+  },
+  "PedidosMovil.dc.html": {
+   "x": 2504,
+   "y": 0,
+   "w": 960,
+   "h": 1300,
+   "title": "PedidosMovil",
+   "page": "pedidos",
+   "is_interactive": true
+  },
+  "ModalesPedidos.dc.html": {
+   "x": 0,
+   "y": 1880,
+   "w": 1440,
+   "h": 3900,
+   "title": "ModalesPedidos",
+   "page": "pedidos",
+   "is_interactive": true
+  },
+  "Inventario.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 1000,
+   "title": "Inventario",
+   "page": "inventario",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "InventarioTablet.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 904,
+   "h": 1300,
+   "title": "InventarioTablet",
+   "page": "inventario",
+   "is_interactive": true
+  },
+  "InventarioMovil.dc.html": {
+   "x": 2504,
+   "y": 0,
+   "w": 960,
+   "h": 1300,
+   "title": "InventarioMovil",
+   "page": "inventario",
+   "is_interactive": true
+  },
+  "InventarioImportar.dc.html": {
+   "x": 0,
+   "y": 1580,
+   "w": 1440,
+   "h": 1300,
+   "title": "Importar inventario",
+   "page": "inventario",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "InventarioImportarTablet.dc.html": {
+   "x": 1520,
+   "y": 1580,
+   "w": 904,
+   "h": 1300,
+   "title": "InventarioImportarTablet",
+   "page": "inventario",
+   "is_interactive": true
+  },
+  "InventarioImportarMovil.dc.html": {
+   "x": 2504,
+   "y": 1580,
+   "w": 960,
+   "h": 1300,
+   "title": "InventarioImportarMovil",
+   "page": "inventario",
+   "is_interactive": true
+  },
+  "ModalesInventario.dc.html": {
+   "x": 0,
+   "y": 3460,
+   "w": 1440,
+   "h": 4400,
+   "title": "ModalesInventario",
+   "page": "inventario",
+   "is_interactive": true
+  },
+  "Formulas.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 1000,
+   "title": "Fórmulas",
+   "page": "formulas",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "FormulasTablet.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 904,
+   "h": 1300,
+   "title": "FormulasTablet",
+   "page": "formulas",
+   "is_interactive": true
+  },
+  "FormulasMovil.dc.html": {
+   "x": 2504,
+   "y": 0,
+   "w": 960,
+   "h": 1300,
+   "title": "FormulasMovil",
+   "page": "formulas",
+   "is_interactive": true
+  },
+  "Formula.dc.html": {
+   "x": 0,
+   "y": 1580,
+   "w": 1440,
+   "h": 1000,
+   "title": "Fórmula: crear y editar",
+   "page": "formulas",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "FormulaTablet.dc.html": {
+   "x": 1520,
+   "y": 1580,
+   "w": 904,
+   "h": 1300,
+   "title": "FormulaTablet",
+   "page": "formulas",
+   "is_interactive": true
+  },
+  "FormulaMovil.dc.html": {
+   "x": 2504,
+   "y": 1580,
+   "w": 960,
+   "h": 1300,
+   "title": "FormulaMovil",
+   "page": "formulas",
+   "is_interactive": true
+  },
+  "FormulaVersion.dc.html": {
+   "x": 0,
+   "y": 3160,
+   "w": 1440,
+   "h": 1000,
+   "title": "Versión de fórmula",
+   "page": "formulas",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "FormulaVersionTablet.dc.html": {
+   "x": 1520,
+   "y": 3160,
+   "w": 904,
+   "h": 1300,
+   "title": "FormulaVersionTablet",
+   "page": "formulas",
+   "is_interactive": true
+  },
+  "FormulaVersionMovil.dc.html": {
+   "x": 2504,
+   "y": 3160,
+   "w": 960,
+   "h": 1300,
+   "title": "FormulaVersionMovil",
+   "page": "formulas",
+   "is_interactive": true
+  },
+  "ImportarFormula.dc.html": {
+   "x": 0,
+   "y": 4740,
+   "w": 1440,
+   "h": 1000,
+   "title": "Revisar fórmula importada",
+   "page": "formulas",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "ImportarFormulaTablet.dc.html": {
+   "x": 1520,
+   "y": 4740,
+   "w": 904,
+   "h": 1300,
+   "title": "ImportarFormulaTablet",
+   "page": "formulas",
+   "is_interactive": true
+  },
+  "ImportarFormulaMovil.dc.html": {
+   "x": 2504,
+   "y": 4740,
+   "w": 960,
+   "h": 1300,
+   "title": "ImportarFormulaMovil",
+   "page": "formulas",
+   "is_interactive": true
+  },
+  "ModalesProduccion.dc.html": {
+   "x": 0,
+   "y": 6620,
+   "w": 1440,
+   "h": 2800,
+   "title": "ModalesProduccion",
+   "page": "formulas",
+   "is_interactive": true
+  },
+  "Asignacion.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 1000,
+   "title": "Asignación",
+   "page": "operario",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "AsignacionTablet.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 904,
+   "h": 1300,
+   "title": "AsignacionTablet",
+   "page": "operario",
+   "is_interactive": true
+  },
+  "AsignacionMovil.dc.html": {
+   "x": 2504,
+   "y": 0,
+   "w": 960,
+   "h": 1300,
+   "title": "AsignacionMovil",
+   "page": "operario",
+   "is_interactive": true
+  },
+  "Ejecucion.dc.html": {
+   "x": 0,
+   "y": 1580,
+   "w": 1440,
+   "h": 1000,
+   "title": "Ejecución del operario",
+   "page": "operario",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "EjecucionTablet.dc.html": {
+   "x": 1520,
+   "y": 1580,
+   "w": 904,
+   "h": 1300,
+   "title": "EjecucionTablet",
+   "page": "operario",
+   "is_interactive": true
+  },
+  "EjecucionMovil.dc.html": {
+   "x": 2504,
+   "y": 1580,
+   "w": 960,
+   "h": 1300,
+   "title": "EjecucionMovil",
+   "page": "operario",
+   "is_interactive": true
+  },
+  "Empaque.dc.html": {
+   "x": 0,
+   "y": 3160,
+   "w": 1440,
+   "h": 900,
+   "title": "Empaque",
+   "page": "operario",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "EmpaqueTablet.dc.html": {
+   "x": 1520,
+   "y": 3160,
+   "w": 904,
+   "h": 1300,
+   "title": "EmpaqueTablet",
+   "page": "operario",
+   "is_interactive": true
+  },
+  "EmpaqueMovil.dc.html": {
+   "x": 2504,
+   "y": 3160,
+   "w": 960,
+   "h": 1300,
+   "title": "EmpaqueMovil",
+   "page": "operario",
+   "is_interactive": true
+  },
+  "Acondicionamiento.dc.html": {
+   "x": 0,
+   "y": 4740,
+   "w": 1440,
+   "h": 1000,
+   "title": "Acondicionamiento",
+   "page": "operario",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "AcondicionamientoTablet.dc.html": {
+   "x": 1520,
+   "y": 4740,
+   "w": 904,
+   "h": 1300,
+   "title": "AcondicionamientoTablet",
+   "page": "operario",
+   "is_interactive": true
+  },
+  "AcondicionamientoMovil.dc.html": {
+   "x": 2504,
+   "y": 4740,
+   "w": 960,
+   "h": 1300,
+   "title": "AcondicionamientoMovil",
+   "page": "operario",
+   "is_interactive": true
+  },
+  "ModalesOperario.dc.html": {
+   "x": 0,
+   "y": 6620,
+   "w": 1440,
+   "h": 1900,
+   "title": "ModalesOperario",
+   "page": "operario",
+   "is_interactive": true
+  },
+  "Proveedores.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 1100,
+   "title": "Proveedores",
+   "page": "proveedores",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "ProveedoresTablet.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 904,
+   "h": 1300,
+   "title": "ProveedoresTablet",
+   "page": "proveedores",
+   "is_interactive": true
+  },
+  "ProveedoresMovil.dc.html": {
+   "x": 2504,
+   "y": 0,
+   "w": 960,
+   "h": 1300,
+   "title": "ProveedoresMovil",
+   "page": "proveedores",
+   "is_interactive": true
+  },
+  "ProveedorDetalle.dc.html": {
+   "x": 0,
+   "y": 1580,
+   "w": 1440,
+   "h": 1000,
+   "title": "Detalle del proveedor",
+   "page": "proveedores",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "ProveedorDetalleTablet.dc.html": {
+   "x": 1520,
+   "y": 1580,
+   "w": 904,
+   "h": 1300,
+   "title": "ProveedorDetalleTablet",
+   "page": "proveedores",
+   "is_interactive": true
+  },
+  "ProveedorDetalleMovil.dc.html": {
+   "x": 2504,
+   "y": 1580,
+   "w": 960,
+   "h": 1300,
+   "title": "ProveedorDetalleMovil",
+   "page": "proveedores",
+   "is_interactive": true
+  },
+  "ProveedorImportar.dc.html": {
+   "x": 0,
+   "y": 3160,
+   "w": 1440,
+   "h": 1600,
+   "title": "Revisar importación de catálogo",
+   "page": "proveedores",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "ProveedorImportarTablet.dc.html": {
+   "x": 1520,
+   "y": 3160,
+   "w": 904,
+   "h": 1300,
+   "title": "ProveedorImportarTablet",
+   "page": "proveedores",
+   "is_interactive": true
+  },
+  "ProveedorImportarMovil.dc.html": {
+   "x": 2504,
+   "y": 3160,
+   "w": 960,
+   "h": 1300,
+   "title": "ProveedorImportarMovil",
+   "page": "proveedores",
+   "is_interactive": true
+  },
+  "Clientes.dc.html": {
+   "x": 0,
+   "y": 5040,
+   "w": 1440,
+   "h": 1000,
+   "title": "Clientes",
+   "page": "proveedores",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "ClientesTablet.dc.html": {
+   "x": 1520,
+   "y": 5040,
+   "w": 904,
+   "h": 1300,
+   "title": "ClientesTablet",
+   "page": "proveedores",
+   "is_interactive": true
+  },
+  "ClientesMovil.dc.html": {
+   "x": 2504,
+   "y": 5040,
+   "w": 960,
+   "h": 1300,
+   "title": "ClientesMovil",
+   "page": "proveedores",
+   "is_interactive": true
+  },
+  "ModalesProveedores.dc.html": {
+   "x": 0,
+   "y": 6920,
+   "w": 1440,
+   "h": 3150,
+   "title": "ModalesProveedores",
+   "page": "proveedores",
+   "is_interactive": true
+  },
+  "Usuarios.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 1000,
+   "title": "Usuarios y grupos",
+   "page": "configuracion",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "UsuariosTablet.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 904,
+   "h": 1300,
+   "title": "UsuariosTablet",
+   "page": "configuracion",
+   "is_interactive": true
+  },
+  "UsuariosMovil.dc.html": {
+   "x": 2504,
+   "y": 0,
+   "w": 960,
+   "h": 1300,
+   "title": "UsuariosMovil",
+   "page": "configuracion",
+   "is_interactive": true
+  },
+  "Presentaciones.dc.html": {
+   "x": 0,
+   "y": 1580,
+   "w": 1440,
+   "h": 900,
+   "title": "Presentaciones",
+   "page": "configuracion",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "PresentacionesTablet.dc.html": {
+   "x": 1520,
+   "y": 1580,
+   "w": 904,
+   "h": 1300,
+   "title": "PresentacionesTablet",
+   "page": "configuracion",
+   "is_interactive": true
+  },
+  "PresentacionesMovil.dc.html": {
+   "x": 2504,
+   "y": 1580,
+   "w": 960,
+   "h": 1300,
+   "title": "PresentacionesMovil",
+   "page": "configuracion",
+   "is_interactive": true
+  },
+  "Unidades.dc.html": {
+   "x": 0,
+   "y": 3160,
+   "w": 1440,
+   "h": 900,
+   "title": "Unidades",
+   "page": "configuracion",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "UnidadesTablet.dc.html": {
+   "x": 1520,
+   "y": 3160,
+   "w": 904,
+   "h": 1300,
+   "title": "UnidadesTablet",
+   "page": "configuracion",
+   "is_interactive": true
+  },
+  "UnidadesMovil.dc.html": {
+   "x": 2504,
+   "y": 3160,
+   "w": 960,
+   "h": 1300,
+   "title": "UnidadesMovil",
+   "page": "configuracion",
+   "is_interactive": true
+  },
+  "Integraciones.dc.html": {
+   "x": 0,
+   "y": 4740,
+   "w": 1440,
+   "h": 1000,
+   "title": "Integraciones",
+   "page": "configuracion",
+   "is_interactive": true,
+   "expand": "fill"
+  },
+  "IntegracionesTablet.dc.html": {
+   "x": 1520,
+   "y": 4740,
+   "w": 904,
+   "h": 1300,
+   "title": "IntegracionesTablet",
+   "page": "configuracion",
+   "is_interactive": true
+  },
+  "IntegracionesMovil.dc.html": {
+   "x": 2504,
+   "y": 4740,
+   "w": 960,
+   "h": 1300,
+   "title": "IntegracionesMovil",
+   "page": "configuracion",
+   "is_interactive": true
+  },
+  "ModalesConfiguracion.dc.html": {
+   "x": 0,
+   "y": 6620,
+   "w": 1440,
+   "h": 5000,
+   "title": "ModalesConfiguracion",
+   "page": "configuracion",
+   "is_interactive": true
+  }
+ },
+ "order": [
+  "Main.dc.html",
+  "Botones.dc.html",
+  "Estados.dc.html",
+  "Sidebar.dc.html",
+  "Campos.dc.html",
+  "Avisos.dc.html",
+  "Tabla.dc.html",
+  "Superficies.dc.html",
+  "Dominio.dc.html",
+  "Login.dc.html",
+  "LoginTablet.dc.html",
+  "LoginMovil.dc.html",
+  "EstablecerContrasena.dc.html",
+  "EstablecerContrasenaTablet.dc.html",
+  "EstablecerContrasenaMovil.dc.html",
+  "Dashboard.dc.html",
+  "DashboardTablet.dc.html",
+  "DashboardMovil.dc.html",
+  "Recorrido.dc.html",
+  "RecorridoTablet.dc.html",
+  "RecorridoMovil.dc.html",
+  "NoEncontrada.dc.html",
+  "NoEncontradaTablet.dc.html",
+  "NoEncontradaMovil.dc.html",
+  "Pedidos.dc.html",
+  "PedidosTablet.dc.html",
+  "PedidosMovil.dc.html",
+  "ModalesPedidos.dc.html",
+  "Inventario.dc.html",
+  "InventarioTablet.dc.html",
+  "InventarioMovil.dc.html",
+  "InventarioImportar.dc.html",
+  "InventarioImportarTablet.dc.html",
+  "InventarioImportarMovil.dc.html",
+  "ModalesInventario.dc.html",
+  "Formulas.dc.html",
+  "FormulasTablet.dc.html",
+  "FormulasMovil.dc.html",
+  "Formula.dc.html",
+  "FormulaTablet.dc.html",
+  "FormulaMovil.dc.html",
+  "FormulaVersion.dc.html",
+  "FormulaVersionTablet.dc.html",
+  "FormulaVersionMovil.dc.html",
+  "ImportarFormula.dc.html",
+  "ImportarFormulaTablet.dc.html",
+  "ImportarFormulaMovil.dc.html",
+  "ModalesProduccion.dc.html",
+  "Asignacion.dc.html",
+  "AsignacionTablet.dc.html",
+  "AsignacionMovil.dc.html",
+  "Ejecucion.dc.html",
+  "EjecucionTablet.dc.html",
+  "EjecucionMovil.dc.html",
+  "Empaque.dc.html",
+  "EmpaqueTablet.dc.html",
+  "EmpaqueMovil.dc.html",
+  "Acondicionamiento.dc.html",
+  "AcondicionamientoTablet.dc.html",
+  "AcondicionamientoMovil.dc.html",
+  "ModalesOperario.dc.html",
+  "Proveedores.dc.html",
+  "ProveedoresTablet.dc.html",
+  "ProveedoresMovil.dc.html",
+  "ProveedorDetalle.dc.html",
+  "ProveedorDetalleTablet.dc.html",
+  "ProveedorDetalleMovil.dc.html",
+  "ProveedorImportar.dc.html",
+  "ProveedorImportarTablet.dc.html",
+  "ProveedorImportarMovil.dc.html",
+  "Clientes.dc.html",
+  "ClientesTablet.dc.html",
+  "ClientesMovil.dc.html",
+  "ModalesProveedores.dc.html",
+  "Usuarios.dc.html",
+  "UsuariosTablet.dc.html",
+  "UsuariosMovil.dc.html",
+  "Presentaciones.dc.html",
+  "PresentacionesTablet.dc.html",
+  "PresentacionesMovil.dc.html",
+  "Unidades.dc.html",
+  "UnidadesTablet.dc.html",
+  "UnidadesMovil.dc.html",
+  "Integraciones.dc.html",
+  "IntegracionesTablet.dc.html",
+  "IntegracionesMovil.dc.html",
+  "ModalesConfiguracion.dc.html"
+ ],
+ "notes": {
+  "t1": {
+   "x": 0,
+   "y": -300,
+   "text": "1 · Fundamentos",
+   "kind": "title1",
+   "maxW": 1440,
+   "page": "fundamentos"
+  },
+  "t1b": {
+   "x": 0,
+   "y": 1700,
+   "text": "Componentes compartidos",
+   "kind": "title1",
+   "maxW": 2960,
+   "page": "fundamentos"
+  },
+  "t_acceso": {
+   "x": 0,
+   "y": -300,
+   "text": "2 · Acceso, Dashboard y 404",
+   "kind": "title1",
+   "maxW": 3464,
+   "page": "acceso"
+  },
+  "c_Login": {
+   "x": 0,
+   "y": -110,
+   "text": "Login  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "acceso"
+  },
+  "c_EstablecerContrasena": {
+   "x": 0,
+   "y": 1470,
+   "text": "Establecer contraseña  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "acceso"
+  },
+  "c_Dashboard": {
+   "x": 0,
+   "y": 3050,
+   "text": "Dashboard  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "acceso"
+  },
+  "c_Recorrido": {
+   "x": 0,
+   "y": 4630,
+   "text": "Recorrido del pedido  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "acceso"
+  },
+  "c_NoEncontrada": {
+   "x": 0,
+   "y": 6210,
+   "text": "Página no encontrada (404)  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "acceso"
+  },
+  "t_pedidos": {
+   "x": 0,
+   "y": -300,
+   "text": "3 · Pedidos",
+   "kind": "title1",
+   "maxW": 3464,
+   "page": "pedidos"
+  },
+  "c_Pedidos": {
+   "x": 0,
+   "y": -110,
+   "text": "Pedidos  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "pedidos"
+  },
+  "tm_pedidos": {
+   "x": 0,
+   "y": 1580,
+   "text": "Modales del módulo",
+   "kind": "title1",
+   "maxW": 1440,
+   "page": "pedidos"
+  },
+  "t_inventario": {
+   "x": 0,
+   "y": -300,
+   "text": "4 · Inventario",
+   "kind": "title1",
+   "maxW": 3464,
+   "page": "inventario"
+  },
+  "c_Inventario": {
+   "x": 0,
+   "y": -110,
+   "text": "Inventario  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "inventario"
+  },
+  "c_InventarioImportar": {
+   "x": 0,
+   "y": 1470,
+   "text": "Importar inventario  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "inventario"
+  },
+  "tm_inventario": {
+   "x": 0,
+   "y": 3160,
+   "text": "Modales del módulo",
+   "kind": "title1",
+   "maxW": 1440,
+   "page": "inventario"
+  },
+  "t_formulas": {
+   "x": 0,
+   "y": -300,
+   "text": "5 · Fórmulas",
+   "kind": "title1",
+   "maxW": 3464,
+   "page": "formulas"
+  },
+  "c_Formulas": {
+   "x": 0,
+   "y": -110,
+   "text": "Fórmulas  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "formulas"
+  },
+  "c_Formula": {
+   "x": 0,
+   "y": 1470,
+   "text": "Fórmula: crear y editar  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "formulas"
+  },
+  "c_FormulaVersion": {
+   "x": 0,
+   "y": 3050,
+   "text": "Versión de fórmula  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "formulas"
+  },
+  "c_ImportarFormula": {
+   "x": 0,
+   "y": 4630,
+   "text": "Revisar fórmula importada  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "formulas"
+  },
+  "tm_formulas": {
+   "x": 0,
+   "y": 6320,
+   "text": "Modales del módulo",
+   "kind": "title1",
+   "maxW": 1440,
+   "page": "formulas"
+  },
+  "t_operario": {
+   "x": 0,
+   "y": -300,
+   "text": "6 · Operario",
+   "kind": "title1",
+   "maxW": 3464,
+   "page": "operario"
+  },
+  "c_Asignacion": {
+   "x": 0,
+   "y": -110,
+   "text": "Asignación  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "operario"
+  },
+  "c_Ejecucion": {
+   "x": 0,
+   "y": 1470,
+   "text": "Ejecución del operario  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "operario"
+  },
+  "c_Empaque": {
+   "x": 0,
+   "y": 3050,
+   "text": "Empaque  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "operario"
+  },
+  "c_Acondicionamiento": {
+   "x": 0,
+   "y": 4630,
+   "text": "Acondicionamiento  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "operario"
+  },
+  "tm_operario": {
+   "x": 0,
+   "y": 6320,
+   "text": "Modales del módulo",
+   "kind": "title1",
+   "maxW": 1440,
+   "page": "operario"
+  },
+  "t_proveedores": {
+   "x": 0,
+   "y": -300,
+   "text": "7 · Proveedores y clientes",
+   "kind": "title1",
+   "maxW": 3464,
+   "page": "proveedores"
+  },
+  "c_Proveedores": {
+   "x": 0,
+   "y": -110,
+   "text": "Proveedores  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "proveedores"
+  },
+  "c_ProveedorDetalle": {
+   "x": 0,
+   "y": 1470,
+   "text": "Detalle del proveedor  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "proveedores"
+  },
+  "c_ProveedorImportar": {
+   "x": 0,
+   "y": 3050,
+   "text": "Revisar importación de catálogo  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "proveedores"
+  },
+  "c_Clientes": {
+   "x": 0,
+   "y": 4930,
+   "text": "Clientes  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "proveedores"
+  },
+  "tm_proveedores": {
+   "x": 0,
+   "y": 6620,
+   "text": "Modales del módulo",
+   "kind": "title1",
+   "maxW": 1440,
+   "page": "proveedores"
+  },
+  "t_configuracion": {
+   "x": 0,
+   "y": -300,
+   "text": "8 · Configuración e integraciones",
+   "kind": "title1",
+   "maxW": 3464,
+   "page": "configuracion"
+  },
+  "c_Usuarios": {
+   "x": 0,
+   "y": -110,
+   "text": "Usuarios y grupos  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "configuracion"
+  },
+  "c_Presentaciones": {
+   "x": 0,
+   "y": 1470,
+   "text": "Presentaciones  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "configuracion"
+  },
+  "c_Unidades": {
+   "x": 0,
+   "y": 3050,
+   "text": "Unidades  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "configuracion"
+  },
+  "c_Integraciones": {
+   "x": 0,
+   "y": 4630,
+   "text": "Integraciones  ·  escritorio · tablet · teléfono",
+   "size": "l",
+   "bold": true,
+   "w": 1400,
+   "maxH": 70,
+   "fill": "gray",
+   "page": "configuracion"
+  },
+  "tm_configuracion": {
+   "x": 0,
+   "y": 6320,
+   "text": "Modales del módulo",
+   "kind": "title1",
+   "maxW": 1440,
+   "page": "configuracion"
+  }
+ },
+ "designSystems": [],
+ "attachments": {}
+}

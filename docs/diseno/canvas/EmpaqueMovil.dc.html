@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Empaque en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="Empaque" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Empaque · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">packing-order-screen · notice · status-badge · order-distribution-label · confirm-dialog · ui/card · ui/sonner</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (AlertDialog) · <span class="mono">sonner · lucide-react</span></dd>
+      <dt>Escritorio</dt><dd>«Volver a «Por empacar»» como botón con flecha · resumen «Cantidad:» + «Reparto» al lado de «Pasos de envasado» · Comenzar / Terminar en el pie, solo uno activo según el estado (Por empacar → En empaque → Por acondicionar)</dd>
+      <dt>Tablet</dt><dd>Una columna: resumen arriba, pasos debajo · pie fijo</dd>
+      <dt>Teléfono</dt><dd>Botones de 52 px al alcance del pulgar · pie con <span class="mono">safe-area-inset-bottom</span> · «Lo está empacando otra persona.» como Notice info que deja los dos botones deshabilitados (prop «ocupado») · diálogos centrados</dd>
+      <dt>Animación</dt><dd>Entrada escalonada · la flecha de «Volver» retrocede 3 px · diálogo con zoom 300 ms · el estado cambia de color 200 ms · toast al terminar</dd>
+      <dt>Por confirmar</dt><dd>Descripción de «¿Comenzar el empaque?» y «¿Terminar el empaque?» · toast «[Empaque terminado.]» · los pasos de envasado vienen de la receta</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

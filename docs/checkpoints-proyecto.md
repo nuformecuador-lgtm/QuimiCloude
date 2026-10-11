@@ -11,6 +11,10 @@ aquella, punto por punto.
 - [ ] El E2E de un flujo critico es de Playwright.
 - [ ] Si la feature toca UI, cumple `docs/architecture.md > Componentes > Regla:
       multiplataforma — web, iOS y Android`, o el `design.md` declara la excepcion y su porque.
+- [ ] Toda pieza nueva, subida, extendida o borrada en `components/ui`, `components/shared`,
+      `lib/shared/ui` o `hooks` tiene su fila al día en `components/shared/CATALOGO.md`.
+- [ ] Todo componente nuevo o con cambio visual tiene su pase `/design` aprobado, citado en el
+      `design.md` de la feature y en la celda `Diseño` de su fila del catálogo.
 
 ## Flujos criticos
 Los que `CHECKPOINTS.md > Calidad de codigo` obliga a cubrir con E2E: autenticacion, permisos,

@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Avisos y carga</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 1200px; height: 1160px; padding: 40px 48px; display: flex; flex-direction: column; gap: 20px; position: relative; overflow: hidden">
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <h1 class="h1">Avisos, vacíos, errores y carga</h1>
+    <p class="sub" style="max-width: 860px">Cuatro tonos de aviso con el mismo significado que el StatusBadge; un vacío, un sin resultados y un error con la misma caja; la carga dibuja la forma de lo que viene en vez de un spinner a pantalla completa.</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); border-radius: 14px; overflow: hidden; border: 1px solid var(--border)">
+    <div style="padding: 18px 20px; background: var(--card); display: flex; flex-direction: column; gap: 10px">
+      <span class="lab">Notice · claro</span>
+      <div class="nt n-s" role="status"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><div><b>Contraseña establecida</b>Ya puedes entrar con ella.</div></div>
+      <div class="nt n-i" role="status"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg><div><b>Pedido <span class="mono">2026-0000004</span> por empacar</b></div></div>
+      <div class="nt n-w" role="status"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2zM12 10v4M12 17h.01"></path></svg><div>Lo está empacando otra persona.</div></div>
+      <div class="nt n-d" role="alert"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg><div><b>La contraseña todavía no cumple estos requisitos:</b>Al menos un número · Al menos un símbolo que no sea letra ni número</div></div>
+    </div>
+    <div class="dk" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 10px">
+      <span class="lab">Notice · oscuro</span>
+      <div class="nt n-s" role="status"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><div><b>Contraseña establecida</b>Ya puedes entrar con ella.</div></div>
+      <div class="nt n-i" role="status"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg><div><b>Pedido <span class="mono">2026-0000004</span> por empacar</b></div></div>
+      <div class="nt n-w" role="status"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2zM12 10v4M12 17h.01"></path></svg><div>Lo está empacando otra persona.</div></div>
+      <div class="nt n-d" role="alert"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg><div><b>La contraseña todavía no cumple estos requisitos:</b>Al menos un número · Al menos un símbolo que no sea letra ni número</div></div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px">
+    <div style="display: flex; flex-direction: column; gap: 8px"><span class="lab">EmptyState</span>
+      <div class="box" style="flex: 1"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"></path></svg></span><span class="h3">Todavía no hay productos en el catálogo.</span><button class="b b-pri b-sm" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nuevo producto</button></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 8px"><span class="lab">Sin resultados</span>
+      <div class="box" style="flex: 1"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg></span><span class="h3">Ningún proveedor coincide con la búsqueda o el filtro.</span><button class="b b-out b-sm" type="button">Limpiar filtros</button></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 8px"><span class="lab">ErrorState · reintentar</span>
+      <div class="{{ errBoxCls }}" style="flex: 1" aria-busy="{{ retryStr }}">
+        <sc-if value="{{ retrying }}" hint-placeholder-val="{{ false }}">
+          <span class="bi"><svg class="ic ic-lg spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg></span>
+          <span class="sk" style="width: 80%"></span><span class="sk" style="width: 55%"></span>
+        </sc-if>
+        <sc-if value="{{ notRetrying }}" hint-placeholder-val="{{ true }}">
+          <span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2zM12 10v4M12 17h.01"></path></svg></span>
+          <span class="h3" role="alert">No se pudo cargar el catálogo.</span>
+          <button class="b b-out b-sm" type="button" onClick="{{ retry }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"></path></svg>Reintentar</button>
+        </sc-if>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 8px"><span class="lab">No encontrado</span>
+      <div class="box" style="flex: 1"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6v18h12V7zM14 3v4h4"></path></svg></span><span class="h3">No encontramos esta página</span><span class="cap">Revisa la dirección e inténtalo de nuevo, o continúa desde el menú lateral.</span></div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.85fr); gap: 16px">
+    <div style="display: flex; flex-direction: column; gap: 8px"><span class="lab">TableSkeleton · brillo</span>
+      <div class="tw" aria-busy="true" aria-label="Cargando">
+        <table>
+          <thead><tr><th scope="col">Imagen</th><th scope="col">Nombre</th><th scope="col" class="num">Existencia</th><th scope="col" class="num">Disponible</th></tr></thead>
+          <tbody>
+            <tr><td><span class="sk" style="width: 40px; height: 40px; border-radius: 8px"></span></td><td><span class="sk" style="width: 130px"></span></td><td class="num"><span class="sk" style="width: 48px; margin-left: auto"></span></td><td class="num"><span class="sk" style="width: 40px; margin-left: auto"></span></td></tr>
+            <tr><td><span class="sk" style="width: 40px; height: 40px; border-radius: 8px"></span></td><td><span class="sk" style="width: 96px"></span></td><td class="num"><span class="sk" style="width: 52px; margin-left: auto"></span></td><td class="num"><span class="sk" style="width: 36px; margin-left: auto"></span></td></tr>
+            <tr><td><span class="sk" style="width: 40px; height: 40px; border-radius: 8px"></span></td><td><span class="sk" style="width: 150px"></span></td><td class="num"><span class="sk" style="width: 44px; margin-left: auto"></span></td><td class="num"><span class="sk" style="width: 44px; margin-left: auto"></span></td></tr>
+            <tr><td><span class="sk" style="width: 40px; height: 40px; border-radius: 8px"></span></td><td><span class="sk" style="width: 110px"></span></td><td class="num"><span class="sk" style="width: 50px; margin-left: auto"></span></td><td class="num"><span class="sk" style="width: 38px; margin-left: auto"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px"><span class="lab">Recarga al filtrar</span>
+      <div class="toolbar"><button class="{{ chipCls }}" type="button" aria-pressed="{{ filtStr }}" onClick="{{ toggleFilter }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Estado<sc-if value="{{ filtered }}" hint-placeholder-val="{{ false }}"><span class="v">En curso</span></sc-if></button><sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}"><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--muted-fg)"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg></sc-if></div>
+      <div class="{{ reloadCls }}" aria-busy="{{ loadStr }}">
+        <div class="tw">
+          <table>
+            <thead><tr><th scope="col">Nº de pedido</th><th scope="col">Receta</th><th scope="col">Estado</th></tr></thead>
+            <tbody class="{{ bodyCls }}">
+              <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+                <tr><td class="mono">{{ r.no }}</td><td class="strong">{{ r.rec }}</td><td><span class="{{ r.cls }}"><i></i>{{ r.st }}</span></td></tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <span class="cap">La tabla queda a la vista atenuada (55 %) mientras llega la página; luego las filas entran con un fundido.</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px"><span class="lab">Spinner · toast</span>
+      <div class="card" style="padding: 16px; gap: 12px">
+        <div style="display: flex; align-items: center; gap: 16px; color: var(--primary)"><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg><svg class="ic ic-lg spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg><button class="b b-pri b-sm" type="button" disabled aria-busy="true"><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg>Entrando…</button></div>
+        <div style="display: flex; align-items: center; gap: 10px" role="status"><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--muted-fg)"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg><span class="cap" style="font-size: 13px">Cargando los datos de la persona…</span></div>
+        <div class="sep"></div>
+        <span class="cap">Lanza un toast (abajo a la derecha):</span>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <button class="b b-out b-sm" type="button" onClick="{{ toastOk }}">Pedido creado.</button>
+          <button class="b b-out b-sm" type="button" onClick="{{ toastPeople }}">Se añadieron 3 personas…</button>
+          <button class="b b-out b-sm" type="button" onClick="{{ toastErr }}">Usuario o contraseña…</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <dl class="spec" style="margin-top: auto">
+    <dt>Componente</dt><dd><span class="mono">components/shared/error-alert · unexpected-error-notice · empty-state · error-state · table-skeleton · spinner</span> · <span class="mono">components/ui/sonner · skeleton</span> · Notice con los tonos <span class="mono">success · warning · danger · info</span> (avisos de Asignación, establecer contraseña)</dd>
+    <dt>Librerías</dt><dd><span class="mono">sonner</span> (Toaster <span class="mono">richColors</span>) · <span class="mono">lucide-react</span> · <span class="mono">tw-animate-css</span></dd>
+    <dt>Animación</dt><dd>Notice entra subiendo 10 px en 300 ms · brillo del skeleton 1.4 s en bucle · recarga: opacidad a 55 % en 200 ms + filas con fundido 200 ms · spinner 0.9 s lineal · toast sube 16 px y escala .98 → 1 en 300 ms, sale en 150 ms, se va solo a los 3.2 s · movimiento reducido: sin brillo ni giro</dd>
+    <dt>Notas</dt><dd>Vacío ≠ sin resultados: el vacío ofrece crear, el sin resultados ofrece limpiar. El error siempre ofrece «Reintentar». Los toasts van en una región <span class="mono">aria-live="polite"</span>; el de error, en tono danger.</dd>
+  </dl>
+
+  <div class="toastwrap" aria-live="polite"><div class="{{ toastCls }}" role="status"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: {{ toastColor }}"><path d="{{ toastIcon }}"></path></svg><span>{{ toastText }}</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":1160}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t1); clearTimeout(this.t2); clearTimeout(this.t3); }
+renderVals() {
+const s = this.state || {};
+const data = [
+['2026-0000003', 'Desengrasante alcalino', 'En curso', 'progress'],
+['2026-0000004', 'Limpiador multiusos limón', 'Por empacar', 'waiting'],
+['2026-0000005', 'Blanqueador hipoclorito 5 %', 'En empaque', 'progress'],
+['2026-0000011', 'Limpiador cítrico', 'Pendiente', 'neutral']
+];
+const filtered = !!s.filtered;
+const list = filtered ? data.filter((d) => d[3] === 'progress') : data;
+const k = s.k || 0;
+const loading = !!s.loading;
+const retrying = !!s.retrying;
+const OK = 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6';
+const ER = 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01';
+const fire = (text, kind) => () => {
+this.setState({ toast: true, toastText: text, toastKind: kind });
+clearTimeout(this.t3);
+this.t3 = setTimeout(() => this.setState({ toast: false }), 3200);
+};
+return {
+retrying: retrying, notRetrying: !retrying, retryStr: retrying ? 'true' : 'false',
+errBoxCls: retrying ? 'box' : 'box error fade',
+retry: () => { this.setState({ retrying: true }); clearTimeout(this.t1); this.t1 = setTimeout(() => this.setState({ retrying: false }), 1600); },
+filtered: filtered, filtStr: filtered ? 'true' : 'false', chipCls: filtered ? 'chip on' : 'chip',
+loading: loading, loadStr: loading ? 'true' : 'false', reloadCls: loading ? 'reload on' : 'reload',
+toggleFilter: () => { if (loading) return; this.setState({ loading: true }); clearTimeout(this.t2); this.t2 = setTimeout(() => this.setState({ loading: false, filtered: !filtered, k: k + 1 }), 700); },
+bodyCls: k % 2 ? 'fade' : '',
+rows: list.map((d) => ({ no: d[0], rec: d[1], st: d[2], cls: 'sb t-' + d[3] })),
+toastOk: fire('Pedido creado.', 'ok'),
+toastPeople: fire('Se añadieron 3 personas al pedido.', 'ok'),
+toastErr: fire('Usuario o contraseña incorrectos.', 'err'),
+toastCls: s.toast ? 'toast show' : 'toast',
+toastText: s.toastText || 'Pedido creado.',
+toastIcon: s.toastKind === 'err' ? ER : OK,
+toastColor: s.toastKind === 'err' ? 'var(--d-fg)' : 'var(--s-fg)'
+};
+}
+}
+</script>
+</body>
+</html>

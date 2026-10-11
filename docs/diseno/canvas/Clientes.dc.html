@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Clientes</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="clientes" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div class="ph">
+          <div class="ph-t"><h1 class="h1">Clientes</h1></div>
+          <div class="ph-act" style="display: flex; gap: 8px"><button class="b b-pri b-touch-m" type="button" onClick="{{ openNew }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nuevo cliente</button></div>
+        </div>
+
+        <div class="toolbar" role="toolbar" aria-label="Buscar clientes">
+          <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Buscar clientes" aria-label="Buscar clientes"></label>
+        </div>
+
+        <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+          <div class="box"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM7 18c1-2 3-3 5-3s4 1 5 3"></path></svg></span><span class="h3">Todavía no hay clientes registrados.</span><button class="b b-pri" type="button" onClick="{{ openNew }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nuevo cliente</button></div>
+        </sc-if>
+
+        <sc-if value="{{ hasRows }}" hint-placeholder-val="{{ true }}">
+          <div class="tw">
+            <div class="scroll">
+              <table class="collapse">
+                <thead><tr><th scope="col"><button class="sortb asc" type="button">Apellidos<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></th><th scope="col">Nombres</th><th scope="col">Ciudad</th><th scope="col">Teléfono</th><th scope="col">Correo</th><th scope="col">Dirección</th><th scope="col" class="num">Fecha de alta</th><th scope="col" class="num">Última modificación</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead>
+                <tbody>
+                  <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+                    <tr class="{{ r.trCls }}">
+                      <td class="strong">{{ r.ape }}</td>
+                      <td>{{ r.nom }}</td>
+                      <td>{{ r.city }}</td>
+                      <td class="mono">{{ r.tel }}</td>
+                      <td>{{ r.mail }}</td>
+                      <td>{{ r.dir }}</td>
+                      <td class="num mono">{{ r.alta }}</td>
+                      <td class="num mono">{{ r.mod }}</td>
+                      <td class="rowact anchor">
+                        <button class="b b-gho b-ico" type="button" aria-label="{{ r.menuLabel }}" aria-haspopup="menu" aria-expanded="{{ r.open }}" onClick="{{ r.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button>
+                        <div class="{{ r.menuCls }}" role="menu">
+                          <button class="mi" type="button" role="menuitem" onClick="{{ r.edit }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</button>
+                          <div class="sep"></div>
+                          <button class="mi danger" type="button" role="menuitem" onClick="{{ r.del }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Eliminar</button>
+                        </div>
+                      </td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+              <div class="rows-m">
+                <sc-for list="{{ rows }}" as="r" hint-placeholder-count="5">
+                  <div class="rm">
+                    <div class="rm-top"><span class="strong">{{ r.full }}</span><span class="cap">{{ r.city }}</span></div>
+                    <div class="rm-meta"><span class="mono">{{ r.tel }}</span><span>{{ r.mail }}</span></div>
+                    <div class="rm-meta"><span>{{ r.dir }}</span></div>
+                    <div class="rm-top"><span class="cap">Alta <span class="mono">{{ r.alta }}</span></span><button class="b b-out b-sm b-touch-m" type="button" onClick="{{ r.mobileActs }}" aria-label="{{ r.menuLabel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg>Acciones</button></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div class="pg"><span><span class="mono">{{ count }}</span> clientes</span><span class="pgb"><button class="b b-out b-ico b-sm" type="button" aria-label="Página anterior" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><button class="b b-out b-ico b-sm" type="button" aria-label="Página siguiente" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></span></div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="clientes" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <aside class="{{ sheetCls }}" role="dialog" aria-modal="true" aria-labelledby="cl-sh">
+    <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="cl-sh" class="h2">{{ sheetTitle }}</h2><p class="sub">{{ sheetDesc }}</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="sheet-bd">
+      <div class="g2 cq-1">
+        <div class="f"><label for="cl-n">Nombres <span class="req">*</span></label><input id="cl-n" class="in" type="text" value="{{ cf.nom }}"></div>
+        <div class="f"><label for="cl-a">Apellidos <span class="req">*</span></label><input id="cl-a" class="in" type="text" value="{{ cf.ape }}"></div>
+      </div>
+      <div class="f"><label for="cl-c">Ciudad</label><input id="cl-c" class="in" type="text" value="{{ cf.city }}"></div>
+      <div class="f"><label for="cl-t">Teléfono</label><input id="cl-t" class="in mono" type="tel" value="{{ cf.tel }}"></div>
+      <div class="f"><label for="cl-m">Correo</label><input id="cl-m" class="in" type="email" value="{{ cf.mail }}"></div>
+      <div class="f"><label for="cl-d">Dirección</label><input id="cl-d" class="in" type="text" value="{{ cf.dir }}"></div>
+    </div>
+    <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ save }}">Guardar</button></div>
+  </aside>
+
+  <div class="{{ delCls }}" role="alertdialog" aria-modal="true" aria-labelledby="cl-de">
+    <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+    <h2 id="cl-de" class="h2">Eliminar el cliente</h2>
+    <p class="sub">Se va a eliminar el cliente {{ delName }}. Esta acción no se puede deshacer.</p>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des" type="button" onClick="{{ confirmDel }}">Eliminar</button></div>
+  </div>
+
+  <div class="{{ actsCls }}" role="menu" aria-label="Acciones del cliente">
+    <div class="dlg-hd" style="padding: 0 4px 8px"><span class="h3">{{ actsName }}</span><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <button class="mi" type="button" role="menuitem" onClick="{{ actsEdit }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</button>
+    <div class="sep"></div>
+    <button class="mi danger" type="button" role="menuitem" onClick="{{ actsDel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Eliminar</button>
+  </div>
+
+  <div class="toastwrap" aria-live="polite"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastMsg }}</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"vacio":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const data = [
+['c1','Gómez','Laura','Medellín','300 214 5587','laura.gomez@correo.co','Cra. 43A # 18-95','14/01/2026','02/10/2026'],
+['c2','Herrera','Valentina','Bogotá','310 552 0193','vherrera@correo.co','Cl. 93 # 11-27','03/02/2026','28/09/2026'],
+['c3','Ríos','Camila','Envigado','315 870 4410','camila.rios@correo.co','Cra. 27 # 36 Sur-40','22/04/2026','22/04/2026'],
+['c4','Sánchez','Mateo','Cali','318 990 2276','mateo.sanchez@correo.co','Av. 6N # 23-50','11/03/2026','05/10/2026'],
+['c5','Vargas','Santiago','Bucaramanga','301 447 8862','svargas@correo.co','Cl. 36 # 27-18','19/05/2026','19/05/2026'],
+['c6','Ortiz','Julián','Pereira','320 118 6034','julian.ortiz@correo.co','Cra. 8 # 21-45','07/07/2026','01/09/2026']
+];
+const removed = s.removed || {};
+const list = data.filter((d) => !removed[d[0]]);
+const open = s.open;
+const byId = (id) => data.filter((d) => d[0] === id)[0] || data[0];
+const full = (d) => d[2] + ' ' + d[1];
+const isEdit = s.sheet === 'edit';
+const er = byId(s.editId || 'c1');
+const toast = (msg) => { this.setState({ toast: true, toastMsg: msg, sheet: null, dlg: null }); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: false }), 3200); };
+const vacio = !!this.props.vacio;
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+isEmpty: vacio, hasRows: !vacio,
+count: String(list.length),
+rows: list.map((d) => ({ ape: d[1], nom: d[2], full: full(d), city: d[3], tel: d[4], mail: d[5], dir: d[6], alta: d[7], mod: d[8], trCls: s.fresh === d[0] ? 'fade' : '', open: open === d[0] ? 'true' : 'false', menuCls: open === d[0] ? 'pop right at-row open' : 'pop right at-row', menuLabel: 'Acciones de ' + full(d), toggle: () => this.setState({ open: open === d[0] ? null : d[0] }), edit: () => this.setState({ sheet: 'edit', editId: d[0], open: null }), del: () => this.setState({ dlg: 'del', delId: d[0], open: null }), mobileActs: () => this.setState({ acts: d[0] }) })),
+actsCls: s.acts ? 'dlg menu open' : 'dlg menu', actsName: s.acts ? full(byId(s.acts)) : '',
+actsEdit: () => this.setState({ sheet: 'edit', editId: s.acts, acts: null }),
+actsDel: () => this.setState({ dlg: 'del', delId: s.acts, acts: null }),
+openNew: () => this.setState({ sheet: 'new' }),
+sheetCls: s.sheet ? 'sheet open' : 'sheet',
+sheetTitle: isEdit ? 'Editar cliente' : 'Nuevo cliente',
+sheetDesc: isEdit ? 'Cambia los datos del cliente.' : 'Describe el nuevo cliente.',
+cf: isEdit ? { nom: er[2], ape: er[1], city: er[3], tel: er[4], mail: er[5], dir: er[6] } : { nom: '', ape: '', city: '', tel: '', mail: '', dir: '' },
+save: () => { this.setState({ fresh: isEdit ? s.editId : null }); toast(isEdit ? 'Cliente actualizado.' : 'Cliente creado.'); },
+delCls: s.dlg === 'del' ? 'dlg open' : 'dlg',
+delName: s.delId ? full(byId(s.delId)) : '',
+confirmDel: () => { this.setState({ removed: Object.assign({}, removed, { [s.delId]: true }) }); toast('Cliente eliminado.'); },
+ovCls: (s.sheet || s.dlg || s.menu || s.acts) ? 'ov open' : 'ov',
+closeAll: () => this.setState({ sheet: null, dlg: null, menu: false, acts: null, open: null }),
+toastCls: s.toast ? 'toast show' : 'toast',
+toastMsg: s.toastMsg || ''
+};
+}
+}
+</script>
+</body>
+</html>

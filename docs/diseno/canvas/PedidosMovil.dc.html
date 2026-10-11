@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Pedidos en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="Pedidos" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Pedidos · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">shared/data-table · status-badge · priority-mark · responsible-avatars · row-actions-menu · form-sheet · async-autocomplete · presentation-unit-select · confirm-dialog · delete-confirm-dialog · ui/sonner</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">@tanstack/react-table · @base-ui/react</span> (Menu, Dialog, Sheet, Select) · <span class="mono">sonner · lucide-react</span></dd>
+      <dt>Escritorio</dt><dd>Filtros en una barra · acciones de fila en ⋯ (Editar, Responsables, Cliente, Reparto y unidad, Entregar, Cancelar, Eliminar) · cobertura como StatusBadge</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono (78 px) · tabla con scroll horizontal dentro de su caja</dd>
+      <dt>Teléfono</dt><dd>Cabecera con «Alternar barra lateral» + isotipo; el menú sale como Sheet desde la izquierda · la tabla pasa a tarjetas · «Acciones» abre el menú centrado en la pantalla visible, con objetivos de 48 px · Sheets a pantalla completa</dd>
+      <dt>Animación</dt><dd>Entrada escalonada · menú ⋯ 200/150 ms · Sheet 300/150 ms · menú de acciones con zoom 300 ms · toast «Pedido creado.»</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
